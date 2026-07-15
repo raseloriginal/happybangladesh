@@ -1,0 +1,2 @@
+This directory stores uploads and temporary files.
+Add to .gitignore in production.
