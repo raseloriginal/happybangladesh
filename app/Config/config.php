@@ -9,7 +9,17 @@ define('PUB_PATH',  ROOT_PATH . '/public');
 // Adjust BASE_URL to match your XAMPP virtual-host or sub-folder setup
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
 $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
-define('BASE_URL', $protocol . $host . '/happybangladesh');
+
+$isLocalhost = ($host === 'localhost' || $host === '127.0.0.1' || strpos($host, 'localhost:') === 0);
+
+if ($isLocalhost) {
+    define('BASE_URL', $protocol . $host . '/happybangladesh');
+} else {
+    // Determine path dynamically for live server (e.g. root or subfolder)
+    $scriptName = dirname($_SERVER['SCRIPT_NAME']);
+    $basePath = $scriptName === '/' || $scriptName === '\\' ? '' : $scriptName;
+    define('BASE_URL', $protocol . $host . $basePath);
+}
 
 // ─── Application ──────────────────────────────────────────────────────────────
 define('APP_NAME', 'HappyBangladesh DMS');
@@ -18,11 +28,19 @@ define('APP_ENV', 'development');   // development | production
 define('DEBUG_MODE', true);
 
 // ─── Database ─────────────────────────────────────────────────────────────────
-define('DB_HOST', 'localhost');
-define('DB_PORT', '3306');
-define('DB_NAME', 'happybangladesh_dms');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+if ($isLocalhost) {
+    define('DB_HOST', 'localhost');
+    define('DB_PORT', '3306');
+    define('DB_NAME', 'happybangladesh_dms');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+} else {
+    define('DB_HOST', 'localhost');
+    define('DB_PORT', '3306');
+    define('DB_NAME', 'rasedwwq_happybd');
+    define('DB_USER', 'rasedwwq_happybd');
+    define('DB_PASS', '9pH{53ff.uB5Qehh');
+}
 define('DB_CHARSET', 'utf8mb4');
 
 // ─── Session ──────────────────────────────────────────────────────────────────
