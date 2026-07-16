@@ -312,6 +312,7 @@ class SRController extends Controller
     public function storeOrder(): void
     {
         $dealerId = $this->post('dealer_id') ?: null;
+        $retailerId = $this->post('retailer_id') ?: null;
 
         $warehouseId = null;
         if ($dealerId) {
@@ -357,8 +358,8 @@ class SRController extends Controller
             $total += ($quantities[$k] ?? 0) * ($prices[$k] ?? 0);
         }
 
-        $stmt = $this->db->prepare("INSERT INTO orders (sr_id,dealer_id,warehouse_id,total_amount,notes) VALUES (?,?,?,?,?)");
-        $stmt->execute([Auth::id(), $dealerId, $warehouseId, $total, $notes]);
+        $stmt = $this->db->prepare("INSERT INTO orders (sr_id,dealer_id,retailer_id,warehouse_id,total_amount,notes) VALUES (?,?,?,?,?,?)");
+        $stmt->execute([Auth::id(), $dealerId, $retailerId, $warehouseId, $total, $notes]);
         $orderId = $this->db->lastInsertId();
 
         foreach ($productIds as $k => $pid) {

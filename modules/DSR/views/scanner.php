@@ -1,118 +1,85 @@
-<?php $pageTitle = 'QR / Barcode Scanner'; ?>
-<div class="page-header">
-  <div><h1 class="page-title">Product Scanner</h1><div class="breadcrumb">DSR &rsaquo; Scanner</div></div>
-</div>
+<?php $pageTitle = 'QR Scanner'; ?>
 
-<div class="max-w-lg mx-auto">
-  <div class="card">
-    <div class="card-header"><h2 class="card-title"><i class="fa-solid fa-qrcode text-blue-500 mr-2"></i>Scan Product / Lot</h2></div>
-    <div class="card-body space-y-5">
+<div class="h-full flex flex-col bg-black">
+  <!-- Header overlay -->
+  <div class="pt-10 pb-4 px-4 flex items-center justify-between z-10 bg-gradient-to-b from-black/80 to-transparent absolute top-0 left-0 w-full">
+    <a href="javascript:history.back()" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white backdrop-blur-md active:bg-white/20">
+      <i class="fa-solid fa-arrow-left"></i>
+    </a>
+    <div class="text-white font-semibold text-lg">Scan Product</div>
+    <button class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white backdrop-blur-md active:bg-white/20">
+      <i class="fa-solid fa-bolt"></i>
+    </button>
+  </div>
 
-      <!-- Camera scanner -->
-      <div id="scanner-container" class="hidden rounded-xl overflow-hidden bg-black aspect-video relative">
-        <video id="scanner-video" class="w-full h-full object-cover" autoplay muted playsinline></video>
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div class="border-2 border-blue-400 rounded-lg w-48 h-32 opacity-70"></div>
+  <!-- Camera Area (Mockup) -->
+  <div class="flex-1 relative flex flex-col items-center justify-center overflow-hidden">
+    <!-- Background camera feed mockup -->
+    <div class="absolute inset-0 bg-gray-900">
+        <img src="https://images.unsplash.com/photo-1601597111158-2fceff292cdc?auto=format&fit=crop&q=80&w=1080&h=1920" class="w-full h-full object-cover opacity-30 mix-blend-overlay grayscale" alt="camera feed">
+    </div>
+
+    <!-- Scanner Frame -->
+    <div class="relative w-64 h-64 z-10">
+      <!-- 4 corners -->
+      <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-brand rounded-tl-xl"></div>
+      <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-brand rounded-tr-xl"></div>
+      <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-brand rounded-bl-xl"></div>
+      <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-brand rounded-br-xl"></div>
+      
+      <!-- Scanning Laser Animation -->
+      <div class="absolute top-0 left-0 w-full h-0.5 bg-brand shadow-[0_0_8px_2px_rgba(37,99,235,0.7)] animate-[scan_2s_ease-in-out_infinite]"></div>
+    </div>
+    
+    <p class="text-white/80 text-sm mt-8 z-10 font-medium tracking-wide">Align QR code within the frame</p>
+
+    <!-- Switch Camera Btn -->
+    <button class="mt-6 w-12 h-12 bg-white/10 rounded-full text-white flex items-center justify-center backdrop-blur-md z-10 hover:bg-white/20 transition active:scale-90">
+      <i class="fa-solid fa-camera-rotate text-lg"></i>
+    </button>
+  </div>
+
+  <!-- Bottom Sheet: Recent Scans -->
+  <div class="bg-white rounded-t-3xl pt-2 pb-6 px-4 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] z-20 relative">
+    <div class="w-10 h-1.5 bg-gray-300 rounded-full mx-auto mb-4"></div>
+    <div class="flex items-center justify-between mb-4 px-1">
+      <h3 class="font-bold text-gray-800">Recent Scans</h3>
+      <span class="text-xs text-brand font-semibold">View All</span>
+    </div>
+    
+    <div class="space-y-3">
+      <!-- Item 1 -->
+      <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl">
+        <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-500">
+          <i class="fa-solid fa-box-open text-xl"></i>
         </div>
-      </div>
-
-      <!-- Camera controls -->
-      <div class="flex gap-3">
-        <button id="start-scan-btn" class="btn btn-primary flex-1">
-          <i class="fa-solid fa-camera"></i> Start Camera
-        </button>
-        <button id="stop-scan-btn" class="btn btn-danger flex-1 hidden">
-          <i class="fa-solid fa-stop"></i> Stop Camera
-        </button>
-      </div>
-
-      <!-- Scan result display -->
-      <div class="p-3 bg-gray-50 rounded-lg border">
-        <p class="text-xs text-gray-500 mb-1">Scan result:</p>
-        <p id="scan-result" class="text-sm text-gray-600 font-medium">Waiting for scan…</p>
-      </div>
-
-      <!-- Manual input -->
-      <div>
-        <label class="form-label">Manual Code Entry</label>
-        <div class="flex gap-2">
-          <input type="text" id="scan-input" class="form-input flex-1" placeholder="Type or paste barcode / SKU">
-          <button id="lookup-btn" type="button" class="btn btn-primary">
-            <i class="fa-solid fa-magnifying-glass"></i> Lookup
-          </button>
+        <div class="flex-1">
+          <div class="font-semibold text-sm text-gray-800">Happy Mango Juice 250ml</div>
+          <div class="text-[11px] text-gray-500">SKU: HJM-250-102 &bull; 2 mins ago</div>
         </div>
-        <p class="text-xs text-gray-400 mt-1">You can also use a USB barcode scanner — it will auto-detect.</p>
+        <div class="text-xs font-bold text-gray-700">12 PCS</div>
       </div>
-
-      <!-- Product result card -->
-      <div id="product-result" class="hidden p-4 bg-green-50 border border-green-200 rounded-xl">
-        <h3 class="font-semibold text-green-700 mb-2"><i class="fa-solid fa-circle-check mr-1"></i>Found</h3>
-        <div id="product-info" class="text-sm text-gray-700 space-y-1"></div>
+      
+      <!-- Item 2 -->
+      <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl">
+        <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-500">
+          <i class="fa-solid fa-box-open text-xl"></i>
+        </div>
+        <div class="flex-1">
+          <div class="font-semibold text-sm text-gray-800">Happy Orange Drink 500ml</div>
+          <div class="text-[11px] text-gray-500">SKU: HOD-500-405 &bull; 15 mins ago</div>
+        </div>
+        <div class="text-xs font-bold text-gray-700">24 PCS</div>
       </div>
-
-      <div id="not-found-result" class="hidden p-4 bg-red-50 border border-red-200 rounded-xl">
-        <h3 class="font-semibold text-red-700"><i class="fa-solid fa-circle-xmark mr-1"></i>Not Found</h3>
-        <p id="not-found-msg" class="text-sm text-gray-600 mt-1"></p>
-      </div>
-
     </div>
   </div>
 </div>
 
-<?php $extraScripts = <<<'JS'
-<script>
-const lookupBtn     = document.getElementById('lookup-btn');
-const scanInput     = document.getElementById('scan-input');
-const productResult = document.getElementById('product-result');
-const productInfo   = document.getElementById('product-info');
-const notFoundDiv   = document.getElementById('not-found-result');
-const notFoundMsg   = document.getElementById('not-found-msg');
-
-async function lookup(code) {
-  if (!code) return;
-  const res  = await fetch('<?= url('dsr/scanner/scan') ?>', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body:    '_csrf_token=<?= Helpers::csrfToken() ?>&code=' + encodeURIComponent(code)
-  });
-  const json = await res.json();
-
-  productResult.classList.add('hidden');
-  notFoundDiv.classList.add('hidden');
-
-  if (json.success) {
-    productResult.classList.remove('hidden');
-    const d = json.data;
-    if (json.type === 'product') {
-      productInfo.innerHTML = `
-        <div><b>Name:</b> ${d.name}</div>
-        <div><b>SKU:</b> ${d.sku}</div>
-        <div><b>Company:</b> ${d.company_name || '—'}</div>
-        <div><b>Unit:</b> ${d.unit}</div>
-        <div><b>Price:</b> ৳ ${parseFloat(d.price).toFixed(2)}</div>
-      `;
-    } else {
-      productInfo.innerHTML = `
-        <div><b>Lot No:</b> ${d.lot_number}</div>
-        <div><b>Product:</b> ${d.product_name}</div>
-        <div><b>Quantity:</b> ${d.quantity}</div>
-        <div><b>Expiry:</b> ${d.expiry_date || '—'}</div>
-      `;
-    }
-  } else {
-    notFoundDiv.classList.remove('hidden');
-    notFoundMsg.textContent = json.message;
-  }
+<style>
+@keyframes scan {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
 }
-
-lookupBtn.addEventListener('click', () => lookup(scanInput.value.trim()));
-scanInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lookup(scanInput.value.trim()); } });
-
-// Hook into scan result from camera
-const observer = new MutationObserver(() => {
-  const val = scanInput.value.trim();
-  if (val) lookup(val);
-});
-observer.observe(document.getElementById('scan-result'), { childList: true, subtree: true, characterData: true });
-</script>
-JS; ?>
+</style>

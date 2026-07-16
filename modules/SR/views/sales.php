@@ -285,12 +285,7 @@ function placeMyLocationMarker() {
     iconSize: [18, 18], iconAnchor: [9, 9]
   });
   window._myMarker = L.marker([myLat, myLng], { icon }).addTo(mainMap);
-
-  // 1000m radius circle
-  myCircle = L.circle([myLat, myLng], {
-    radius: 1000,
-    className: 'sr-radius-circle'
-  }).addTo(mainMap);
+  // Circle removed per user request
 }
 
 // ══════════════════════════════════════════════════════════════

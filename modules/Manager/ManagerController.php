@@ -500,8 +500,18 @@ class ManagerController extends Controller
             ")->fetchColumn();
             
             $sch['total_dispatch_value'] = (float)$orderVal;
-            $sch['total_return_value'] = 0;
-            $sch['total_damage_value'] = 0;
+            $sch['total_return_value'] = (float)$this->db->query("
+                SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                FROM returns r
+                JOIN return_items ri ON ri.return_id = r.id
+                JOIN products p ON p.id = ri.product_id
+                WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$sch['dispatch_date']}'
+            ")->fetchColumn();
+            $sch['total_damage_value'] = (float)$this->db->query("
+                SELECT COALESCE(total_damage, 0)
+                FROM settlements
+                WHERE dsr_id = {$sch['dsr_id']} AND date = '{$sch['dispatch_date']}'
+            ")->fetchColumn();
         }
 
         echo json_encode($schedules);
@@ -576,14 +586,25 @@ class ManagerController extends Controller
     public function apiDispatchSrDetails(string $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $schedule = $this->db->query("SELECT dispatch_date FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
+        $schedule = $this->db->query("SELECT dispatch_date, dsr_id FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
         if (!$schedule) exit;
 
         $srs = $this->db->query("
             SELECT u.id, u.name,
                    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE sr_id = u.id AND DATE(created_at) = '{$schedule['dispatch_date']}') as orders_value,
-                   0 as dispatch_items_value,
-                   0 as return_items_value,
+                   (SELECT COALESCE(SUM(di.quantity * p.price), 0)
+                    FROM dispatch_items di
+                    JOIN products p ON p.id = di.product_id
+                    JOIN dispatches d ON d.id = di.dispatch_id
+                    JOIN orders o ON o.id = d.order_id
+                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$schedule['dispatch_date']}') as dispatch_items_value,
+                   (SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                    FROM returns r
+                    JOIN return_items ri ON ri.return_id = r.id
+                    JOIN products p ON p.id = ri.product_id
+                    JOIN dispatches d ON d.id = r.dispatch_id
+                    JOIN orders o ON o.id = d.order_id
+                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$schedule['dispatch_date']}') as return_items_value,
                    0 as damage_value
             FROM dispatch_schedule_srs dss
             JOIN users u ON u.id = dss.sr_id
@@ -592,12 +613,31 @@ class ManagerController extends Controller
         
         foreach ($srs as &$sr) {
             $sr['products'] = $this->db->query("
-                SELECT p.name, SUM(oi.quantity) as ordered_qty, 0 as extra_qty, 0 as dispatched_qty, 0 as returned_qty, 0 as damage_value, SUM(oi.total_price) as sale_value
+                SELECT p.name,
+                       SUM(oi.quantity) as ordered_qty,
+                       0 as extra_qty,
+                       (
+                           SELECT COALESCE(SUM(di.quantity), 0)
+                           FROM dispatch_items di
+                           JOIN dispatches d ON d.id = di.dispatch_id
+                           JOIN orders o2 ON o2.id = d.order_id
+                           WHERE o2.sr_id = {$sr['id']} AND DATE(o2.created_at) = '{$schedule['dispatch_date']}' AND di.product_id = p.id
+                       ) as dispatched_qty,
+                       (
+                           SELECT COALESCE(SUM(ri.quantity), 0)
+                           FROM return_items ri
+                           JOIN returns r ON r.id = ri.return_id
+                           JOIN dispatches d ON d.id = r.dispatch_id
+                           JOIN orders o2 ON o2.id = d.order_id
+                           WHERE o2.sr_id = {$sr['id']} AND DATE(o2.created_at) = '{$schedule['dispatch_date']}' AND ri.product_id = p.id
+                       ) as returned_qty,
+                       0 as damage_value,
+                       SUM(oi.total_price) as sale_value
                 FROM orders o
                 JOIN order_items oi ON oi.order_id = o.id
                 JOIN products p ON p.id = oi.product_id
                 WHERE o.sr_id = {$sr['id']} AND DATE(o.created_at) = '{$schedule['dispatch_date']}'
-                GROUP BY p.id
+                GROUP BY p.id, p.name
             ")->fetchAll();
         }
 
@@ -633,13 +673,79 @@ class ManagerController extends Controller
         
         $this->db->beginTransaction();
         try {
+            // Save extras
             $stmt = $this->db->prepare("INSERT INTO dispatch_extras (schedule_id, product_id, qty_boxes, qty_pieces) VALUES (?, ?, ?, ?)");
             foreach ($extras as $ex) {
                 if ($ex['boxes'] > 0 || $ex['pcs'] > 0) {
                     $stmt->execute([$id, $ex['product_id'], $ex['boxes'], $ex['pcs']]);
                 }
             }
+            
+            // Set schedule to organized
             $this->db->prepare("UPDATE dispatch_schedules SET status = 'organized' WHERE id = ?")->execute([$id]);
+
+            // Create Dispatches so DSR can see them for collection
+            $schedule = $this->db->prepare("SELECT * FROM dispatch_schedules WHERE id=?");
+            $schedule->execute([$id]);
+            $sch = $schedule->fetch();
+            
+            if ($sch) {
+                $dsrId = $sch['dsr_id'];
+                $date = $sch['dispatch_date'];
+                
+                // 1. Convert Orders into Dispatches
+                $orders = $this->db->prepare("
+                    SELECT o.id, o.warehouse_id 
+                    FROM orders o 
+                    JOIN dispatch_schedule_srs dss ON dss.sr_id = o.sr_id
+                    WHERE dss.schedule_id = ? AND DATE(o.created_at) = ? AND o.status IN ('pending', 'confirmed')
+                ");
+                $orders->execute([$id, $date]);
+                $ordersList = $orders->fetchAll();
+                
+                foreach ($ordersList as $o) {
+                    $this->db->prepare("INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status) VALUES (?, ?, ?, ?, 'pending')")
+                             ->execute([$o['id'], $dsrId, $o['warehouse_id'], $date]);
+                    $dispatchId = $this->db->lastInsertId();
+                    
+                    $items = $this->db->prepare("SELECT product_id, lot_id, quantity FROM order_items WHERE order_id=?");
+                    $items->execute([$o['id']]);
+                    foreach($items->fetchAll() as $item) {
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity) VALUES (?, ?, ?, ?)")
+                                 ->execute([$dispatchId, $item['product_id'], $item['lot_id'], $item['quantity']]);
+                    }
+                    
+                    // Update order status so they don't get dispatched twice
+                    // Wait, if they are 'dispatched', they still show as 'dispatched' in the manager list.
+                    $this->db->prepare("UPDATE orders SET status='dispatched' WHERE id=?")->execute([$o['id']]);
+                }
+                
+                // 2. Add Extras as a single "null order" dispatch
+                $extrasQuery = $this->db->prepare("
+                    SELECT de.product_id, p.pieces_per_box, de.qty_boxes, de.qty_pieces 
+                    FROM dispatch_extras de
+                    JOIN products p ON p.id = de.product_id
+                    WHERE de.schedule_id = ?
+                ");
+                $extrasQuery->execute([$id]);
+                $extraList = $extrasQuery->fetchAll();
+                
+                if (!empty($extraList)) {
+                    $wId = Auth::warehouseId() ?: $this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn();
+                    $this->db->prepare("INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status) VALUES (NULL, ?, ?, ?, 'pending')")
+                             ->execute([$dsrId, $wId, $date]);
+                    $extraDispatchId = $this->db->lastInsertId();
+                    
+                    foreach ($extraList as $ex) {
+                        $qty = ($ex['qty_boxes'] * max(1, $ex['pieces_per_box'])) + $ex['qty_pieces'];
+                        if ($qty > 0) {
+                            $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity) VALUES (?, ?, NULL, ?)")
+                                     ->execute([$extraDispatchId, $ex['product_id'], $qty]);
+                        }
+                    }
+                }
+            }
+
             $this->db->commit();
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
@@ -654,8 +760,19 @@ class ManagerController extends Controller
         header('Content-Type: application/json; charset=utf-8');
         $input = json_decode(file_get_contents('php://input'), true);
         $status = $input['status'] ?? 'assigned';
-        $this->db->prepare("UPDATE dispatch_schedules SET status = ? WHERE id = ?")->execute([$status, $id]);
-        echo json_encode(['success' => true]);
+        
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("UPDATE dispatch_schedules SET status = ? WHERE id = ?")->execute([$status, $id]);
+            // If the manager manually clicks 'Dispatch', the DSR has already seen the pending items
+            // because they were created in the 'Organize' step. We just update the schedule status here.
+            
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
         exit;
     }
 

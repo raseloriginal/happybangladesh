@@ -74,7 +74,7 @@
       </div>
       <span class="sr-action-label">Profile</span>
     </a>
-    <a href="<?= url('logout') ?>" class="sr-action-btn">
+    <a href="<?= url('sr/logout') ?>" class="sr-action-btn">
       <div class="sr-action-icon" style="background:rgba(239,68,68,.1);color:#ef4444;">
         <i class="fa-solid fa-right-from-bracket"></i>
       </div>

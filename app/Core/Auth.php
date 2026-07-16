@@ -8,7 +8,23 @@ class Auth
     public static function start(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
-            session_name(SESSION_NAME);
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            $basePath = parse_url(BASE_URL, PHP_URL_PATH) ?? '';
+            $path = str_replace($basePath, '', $uri);
+            $path = trim(parse_url($path, PHP_URL_PATH), '/');
+
+            $sessionName = SESSION_NAME;
+            if (str_starts_with($path, 'admin')) {
+                $sessionName .= '_ADMIN';
+            } elseif (str_starts_with($path, 'manager')) {
+                $sessionName .= '_MANAGER';
+            } elseif (str_starts_with($path, 'sr')) {
+                $sessionName .= '_SR';
+            } elseif (str_starts_with($path, 'dsr')) {
+                $sessionName .= '_DSR';
+            }
+
+            session_name($sessionName);
             session_set_cookie_params([
                 'lifetime' => SESSION_LIFETIME,
                 'path'     => '/',

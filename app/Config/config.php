@@ -7,7 +7,9 @@ define('MOD_PATH',  ROOT_PATH . '/modules');
 define('PUB_PATH',  ROOT_PATH . '/public');
 
 // Adjust BASE_URL to match your XAMPP virtual-host or sub-folder setup
-define('BASE_URL', 'http://localhost/happybangladesh');
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
+$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+define('BASE_URL', $protocol . $host . '/happybangladesh');
 
 // ─── Application ──────────────────────────────────────────────────────────────
 define('APP_NAME', 'HappyBangladesh DMS');

@@ -41,8 +41,7 @@
     </div>
   </div>
 
-  <!-- Logout -->
-  <a href="<?= BASE_URL ?>/logout"
+  <a href="<?= url('sr/logout') ?>"
      style="display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;border:1.5px solid #fee2e2;color:#ef4444;border-radius:14px;padding:14px;font-weight:700;font-size:0.9rem;text-decoration:none;">
     <i class="fa-solid fa-right-from-bracket"></i> Logout
   </a>

@@ -101,7 +101,7 @@ $items = $menus[$role] ?? [];
 
   <!-- Logout -->
   <div class="px-3 py-4 border-t border-gray-700/60">
-    <a href="<?= $baseUrl ?>/logout"
+    <a href="<?= url($role . '/logout') ?>"
        class="sidebar-link text-red-400 hover:text-red-300 hover:bg-red-500/10">
       <i class="fa-solid fa-right-from-bracket w-4 text-center"></i>
       <span>Logout</span>

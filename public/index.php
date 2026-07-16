@@ -40,9 +40,20 @@ $url    = $_GET['url'] ?? '/';
 $method = $_SERVER['REQUEST_METHOD'];
 
 // ── Auth routes ───────────────────────────────────────────────
-$router->get( '/login',    ['AuthController', 'showLogin']);
-$router->post('/login',    ['AuthController', 'login']);
-$router->get( '/logout',   ['AuthController', 'logout']);
+$router->get( '/login',         ['AuthController', 'portal']);
+$router->get( '/admin/login',   ['AuthController', 'showLoginAdmin']);
+$router->post('/admin/login',   ['AuthController', 'loginAdmin']);
+$router->get( '/manager/login', ['AuthController', 'showLoginManager']);
+$router->post('/manager/login', ['AuthController', 'loginManager']);
+$router->get( '/sr/login',      ['AuthController', 'showLoginSR']);
+$router->post('/sr/login',      ['AuthController', 'loginSR']);
+$router->get( '/dsr/login',     ['AuthController', 'showLoginDSR']);
+$router->post('/dsr/login',     ['AuthController', 'loginDSR']);
+$router->get( '/admin/logout',   ['AuthController', 'logout']);
+$router->get( '/manager/logout', ['AuthController', 'logout']);
+$router->get( '/sr/logout',      ['AuthController', 'logout']);
+$router->get( '/dsr/logout',     ['AuthController', 'logout']);
+
 $router->get( '/forgot',   ['AuthController', 'showForgot']);
 $router->post('/forgot',   ['AuthController', 'forgot']);
 $router->get( '/',         fn() => header('Location: ' . BASE_URL . '/login') ?: exit());
@@ -164,6 +175,12 @@ $router->get( '/dsr/expenses',                ['DSRController', 'expenses']);
 $router->post('/dsr/expenses/store',          ['DSRController', 'expenseStore']);
 $router->get( '/dsr/delivery',                ['DSRController', 'delivery']);
 $router->post('/dsr/delivery/update/{id}',    ['DSRController', 'deliveryUpdate']);
+$router->get( '/dsr/collection',              ['DSRController', 'collection']);
+$router->post('/dsr/collection/complete',     ['DSRController', 'collectionComplete']);
+$router->get( '/dsr/settlement',              ['DSRController', 'settlement']);
+$router->post('/dsr/settlement/submit',       ['DSRController', 'settlementSubmit']);
+$router->get( '/dsr/profile',                 ['DSRController', 'profile']);
+$router->post('/dsr/api/retailers/store',     ['DSRController', 'apiStoreRetailer']);
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);

@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS `dealers` (
     `business_name`    VARCHAR(150) DEFAULT NULL,
     `phone`            VARCHAR(30)  DEFAULT NULL,
     `address`          TEXT         DEFAULT NULL,
+    `lat`              DECIMAL(10,7) DEFAULT NULL,
+    `lng`              DECIMAL(10,7) DEFAULT NULL,
     `trade_license`    VARCHAR(100) DEFAULT NULL,
     `happy_commission` DECIMAL(5,2) NOT NULL DEFAULT 0.00,
     `status`           TINYINT(1)   NOT NULL DEFAULT 1,
@@ -379,4 +381,24 @@ CREATE TABLE IF NOT EXISTS `dispatch_extras` (
     `qty_pieces`  INT          NOT NULL DEFAULT 0,
     FOREIGN KEY (`schedule_id`) REFERENCES `dispatch_schedules`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`product_id`)  REFERENCES `products`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ── Settlements ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `settlements` (
+    `id`                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `dsr_id`             INT UNSIGNED NOT NULL,
+    `date`               DATE NOT NULL,
+    `total_dispatched`   DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    `total_returned`     DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    `total_damage`       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    `total_expense`      DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    `should_pay`         DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    `counted_cash`       DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    `difference`         DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    `cash_breakdown`     JSON DEFAULT NULL,
+    `status`             ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+    `manager_notes`      TEXT DEFAULT NULL,
+    `created_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`dsr_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;

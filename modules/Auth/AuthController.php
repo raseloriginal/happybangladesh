@@ -11,20 +11,48 @@ class AuthController extends Controller
         $this->viewPath = MOD_PATH . '/Auth/views';
     }
 
-    // ── Show login page ───────────────────────────────────────
-    public function showLogin(): void
+    // ── Portal Selection ──────────────────────────────────────
+    public function portal(): void
+    {
+        if (Auth::check()) {
+            // Legacy session found on the main portal page.
+            // Since we now use role-specific sessions, this is invalid. Destroy it.
+            Auth::logout();
+        }
+        $this->render('portal', ['pageTitle' => 'Select Portal'], 'auth');
+    }
+
+    // ── Admin Login ───────────────────────────────────────────
+    public function showLoginAdmin(): void { $this->showRoleLogin('admin'); }
+    public function loginAdmin(): void { $this->processRoleLogin('admin'); }
+
+    // ── Manager Login ─────────────────────────────────────────
+    public function showLoginManager(): void { $this->showRoleLogin('manager'); }
+    public function loginManager(): void { $this->processRoleLogin('manager'); }
+
+    // ── SR Login ──────────────────────────────────────────────
+    public function showLoginSR(): void { $this->showRoleLogin('sr'); }
+    public function loginSR(): void { $this->processRoleLogin('sr'); }
+
+    // ── DSR Login ─────────────────────────────────────────────
+    public function showLoginDSR(): void { $this->showRoleLogin('dsr'); }
+    public function loginDSR(): void { $this->processRoleLogin('dsr'); }
+
+    // ── Internal Helpers ──────────────────────────────────────
+    private function showRoleLogin(string $role): void
     {
         if (Auth::check()) {
             $this->redirect(ltrim(Auth::defaultRedirect(), '/'));
         }
-        $this->render('login', ['pageTitle' => 'Login'], 'auth');
+        $this->render("login_{$role}", ['pageTitle' => ucfirst($role) . ' Login'], 'auth');
     }
 
-    // ── Process login ─────────────────────────────────────────
-    public function login(): void
+    private function processRoleLogin(string $role): void
     {
+        $loginUrl = $role === 'admin' ? 'admin/login' : "{$role}/login";
+        
         if (!$this->isPost()) {
-            $this->redirect('login');
+            $this->redirect($loginUrl);
         }
 
         $identity = trim($this->post('email', ''));
@@ -32,7 +60,7 @@ class AuthController extends Controller
 
         if (empty($identity) || empty($password)) {
             $this->flash('error', 'Email/Phone and password are required.');
-            $this->redirect('login');
+            $this->redirect($loginUrl);
             return;
         }
 
@@ -48,8 +76,14 @@ class AuthController extends Controller
         $user = $stmt->fetch();
 
         if (!$user || !password_verify($password, $user['password'])) {
-            $this->flash('error', 'Invalid email/phone or password.');
-            $this->redirect('login');
+            $this->flash('error', 'Invalid credentials.');
+            $this->redirect($loginUrl);
+            return;
+        }
+
+        if ($user['role_slug'] !== $role) {
+            $this->flash('error', "This portal is only for {$role}s. Please use the correct portal.");
+            $this->redirect($loginUrl);
             return;
         }
 
@@ -65,8 +99,11 @@ class AuthController extends Controller
     // ── Logout ────────────────────────────────────────────────
     public function logout(): void
     {
+        $role = Auth::role();
         Auth::logout();
-        $this->redirect('login');
+        
+        $loginUrl = $role && $role !== 'admin' ? "{$role}/login" : ($role === 'admin' ? 'admin/login' : 'login');
+        $this->redirect($loginUrl);
     }
 
     // ── Forgot password (UI only) ─────────────────────────────
