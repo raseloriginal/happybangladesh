@@ -106,6 +106,7 @@ class DSRController extends Controller
     public function delivery(): void
     {
         $dsrId = Auth::id();
+        $selectedDate = $_GET['date'] ?? date('Y-m-d');
 
         // Fetch only dispatches that are physically on the van (in_transit, partial) or delivered today
         $q = $this->db->prepare("
@@ -114,7 +115,7 @@ class DSRController extends Controller
                    COALESCE(dl.address, r.address) as address, 
                    COALESCE(dl.lat, r.lat) as lat, 
                    COALESCE(dl.lng, r.lng) as lng,
-                   o.total_amount, d.status,
+                   o.total_amount, d.status, d.paid_amount,
                    c.name as company_name
             FROM dispatches d
             JOIN orders o ON o.id = d.order_id
@@ -123,10 +124,10 @@ class DSRController extends Controller
             LEFT JOIN dealers dl ON dl.id = o.dealer_id
             LEFT JOIN retailers r ON r.id = o.retailer_id
             WHERE d.dsr_id = ?
-              AND (d.status IN ('in_transit', 'partial') OR (d.status = 'delivered' AND d.dispatch_date = CURDATE()))
+              AND (d.status IN ('in_transit', 'partial') OR (d.status IN ('delivered', 'cancelled') AND d.dispatch_date = ?))
             ORDER BY dealer_name ASC
         ");
-        $q->execute([$dsrId]);
+        $q->execute([$dsrId, $selectedDate]);
         $flatRetailers = $q->fetchAll();
 
         // Group by dealer_id
@@ -146,8 +147,8 @@ class DSRController extends Controller
             
             // Fetch products for this dispatch
             $iq = $this->db->prepare("
-                SELECT di.product_id, di.quantity, di.lot_id,
-                       p.name, p.image, p.pieces_per_box
+                SELECT di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
+                       p.name, p.image, p.pieces_per_box, p.price
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
                 WHERE di.dispatch_id = ?
@@ -160,6 +161,7 @@ class DSRController extends Controller
                 'order_id' => $ret['order_id'],
                 'total_amount' => $ret['total_amount'],
                 'status' => $ret['status'],
+                'paid_amount' => $ret['paid_amount'],
                 'company_name' => $ret['company_name'] ?: 'Unknown Company',
                 'products' => $products
             ];
@@ -168,41 +170,75 @@ class DSRController extends Controller
         $orderedRetailers = array_values($grouped);
 
         // Check if collection is complete
-        $check = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=CURDATE() AND status='pending'");
-        $check->execute([$dsrId]);
+        $check = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=? AND status='pending'");
+        $check->execute([$dsrId, $selectedDate]);
         
-        $qItems = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=CURDATE()");
-        $qItems->execute([$dsrId]);
+        $qItems = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=?");
+        $qItems->execute([$dsrId, $selectedDate]);
         
         $isCompleted = ($qItems->fetchColumn() > 0 && $check->fetchColumn() == 0);
 
-        $this->render('delivery', compact('orderedRetailers', 'isCompleted'), 'dsr_app');
+        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'selectedDate'), 'dsr_app');
     }
 
     public function deliveryUpdate(string $id): void
     {
         $status = $this->post('status', 'delivered');
+        $paidAmount = (float) $this->post('paid_amount', 0);
         $dsrId = Auth::id();
         
-        $this->db->prepare("UPDATE dispatches SET status=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
-                 ->execute([$status, $id, $dsrId]);
+        // Check if settlement is already submitted/approved for this dispatch's date
+        $dispatch = $this->db->prepare("SELECT dispatch_date FROM dispatches WHERE id=? AND dsr_id=?");
+        $dispatch->execute([$id, $dsrId]);
+        $dispatchDate = $dispatch->fetchColumn();
+
+        if ($dispatchDate) {
+            $check = $this->db->prepare("SELECT status FROM settlements WHERE dsr_id=? AND date=? AND status IN ('pending', 'approved')");
+            $check->execute([$dsrId, $dispatchDate]);
+            if ($check->fetch()) {
+                $this->json(['success' => false, 'message' => 'Settlement already submitted for this date. Cannot modify delivery.']);
+                return;
+            }
+        }
         
-        if ($status === 'delivered' || $status === 'partial') {
-            // Deduct from van_stock based on dispatch items
-            $items = $this->db->prepare("SELECT product_id, lot_id, quantity FROM dispatch_items WHERE dispatch_id=?");
-            $items->execute([$id]);
-            $items = $items->fetchAll();
+        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
+                 ->execute([$status, $paidAmount, $id, $dsrId]);
+        
+        // Deduct/adjust van_stock based on dispatch items
+        $items = $this->db->prepare("SELECT product_id, lot_id, quantity, delivered_quantity FROM dispatch_items WHERE dispatch_id=?");
+        $items->execute([$id]);
+        $items = $items->fetchAll();
+        
+        $deliveredItemsStr = $this->post('items', '{}');
+        $deliveredItems = json_decode($deliveredItemsStr, true) ?? [];
+        
+        foreach($items as $item) {
+            $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
             
-            foreach($items as $item) {
-                // We're assuming the delivered quantity is equal to dispatch quantity for now,
-                // or we should be receiving the exact delivered qty from the frontend.
-                // The prompt says "Box Input, PCS Input". We need to accept the quantities from frontend!
-                // For simplicity, we deduct the original dispatch quantity if it's 'delivered'.
-                if ($status === 'delivered') {
-                    $this->db->prepare("UPDATE van_stock SET quantity = quantity - ? WHERE dsr_id=? AND product_id=? AND (lot_id=? OR (? IS NULL AND lot_id IS NULL))")
-                             ->execute([$item['quantity'], $dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+            if ($status === 'cancelled') {
+                $newDelivered = 0;
+            } else {
+                // If specific delivery amounts are provided from frontend, use them
+                // Otherwise, default to full quantity (for complete)
+                $newDelivered = $item['quantity'];
+                if (isset($deliveredItems[$item['product_id']])) {
+                    $newDelivered = (int) $deliveredItems[$item['product_id']];
+                    if ($newDelivered > $item['quantity']) {
+                        $newDelivered = $item['quantity'];
+                    }
                 }
             }
+            
+            $diff = $newDelivered - $prevDelivered;
+            
+            if ($diff != 0) {
+                $this->db->prepare("UPDATE van_stock SET quantity = quantity - ? WHERE dsr_id=? AND product_id=? AND (lot_id=? OR (? IS NULL AND lot_id IS NULL))")
+                         ->execute([$diff, $dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+            }
+            
+            // Save the new delivered quantity in DB
+            $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE dispatch_id = ? AND product_id = ?")
+                     ->execute([$newDelivered, $id, $item['product_id']]);
         }
         
         $this->json(['success' => true]);
@@ -278,33 +314,50 @@ class DSRController extends Controller
     public function settlement(): void
     {
         $dsrId = Auth::id();
+        $selectedDate = $_GET['date'] ?? date('Y-m-d');
 
+        // Calculate Dispatched Value and Spot Return Value (from deliveries)
         $q = $this->db->prepare("
-            SELECT COALESCE(SUM(o.total_amount), 0)
-            FROM dispatches d
-            JOIN orders o ON o.id=d.order_id
-            WHERE d.dsr_id=? AND d.dispatch_date=CURDATE()
+            SELECT 
+                COALESCE(SUM(di.quantity * p.price), 0) as dispatched_value,
+                COALESCE(SUM((di.quantity - COALESCE(di.delivered_quantity, di.quantity)) * p.price), 0) as spot_return_value
+            FROM dispatch_items di
+            JOIN dispatches d ON d.id=di.dispatch_id
+            JOIN products p ON p.id=di.product_id
+            WHERE d.dsr_id=? AND d.dispatch_date=?
         ");
-        $q->execute([$dsrId]);
-        $dispatchedValue = $q->fetchColumn();
+        $q->execute([$dsrId, $selectedDate]);
+        $res = $q->fetch();
+        
+        $dispatchedValue = $res['dispatched_value'] ?: 0;
+        $spotReturnValue = $res['spot_return_value'] ?: 0;
 
-        $q = $this->db->prepare("
+        // Formal returns (if any)
+        $q2 = $this->db->prepare("
             SELECT COALESCE(SUM(ri.quantity * p.price), 0)
             FROM returns r
             JOIN return_items ri ON ri.return_id=r.id
             JOIN products p ON p.id=ri.product_id
-            WHERE r.dsr_id=? AND r.return_date=CURDATE()
+            WHERE r.dsr_id=? AND r.return_date=?
         ");
-        $q->execute([$dsrId]);
-        $returnedValue = $q->fetchColumn();
+        $q2->execute([$dsrId, $selectedDate]);
+        $formalReturnValue = $q2->fetchColumn();
 
-        $this->render('settlement', compact('dispatchedValue', 'returnedValue'), 'dsr_app');
+        $returnedValue = $spotReturnValue + $formalReturnValue;
+
+        // Check if settlement already submitted for this date
+        $check = $this->db->prepare("SELECT * FROM settlements WHERE dsr_id=? AND date=?");
+        $check->execute([$dsrId, $selectedDate]);
+        $existingSettlement = $check->fetch() ?: null;
+
+        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'selectedDate', 'existingSettlement'), 'dsr_app');
     }
 
     public function settlementSubmit(): void
     {
         $this->verifyCsrf();
         $dsrId = Auth::id();
+        $date = $this->post('settlement_date', date('Y-m-d'));
         
         $dispatched = (float) $this->post('dispatched_value', 0);
         $returned = (float) $this->post('returned_value', 0);
@@ -313,12 +366,15 @@ class DSRController extends Controller
         $shouldPay = (float) $this->post('should_pay', 0);
         $countedCash = (float) $this->post('counted_cash', 0);
         $difference = (float) $this->post('difference', 0);
-        $cashBreakdown = $this->post('cash_breakdown', '{}');
+        
+        $cashBreakdown = json_decode($this->post('cash_breakdown', '{}'), true) ?? [];
+        $cashBreakdown['note'] = trim($this->post('note', ''));
+        $cashBreakdownStr = json_encode($cashBreakdown);
 
         $this->db->prepare("
             INSERT INTO settlements (dsr_id, date, total_dispatched, total_returned, total_damage, total_expense, should_pay, counted_cash, difference, cash_breakdown)
-            VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
-        ")->execute([$dsrId, $dispatched, $returned, $damage, $expense, $shouldPay, $countedCash, $difference, $cashBreakdown]);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute([$dsrId, $date, $dispatched, $returned, $damage, $expense, $shouldPay, $countedCash, $difference, $cashBreakdownStr]);
 
         $this->flash('success', 'Settlement submitted for Manager approval.');
         $this->redirect('dsr/dashboard');

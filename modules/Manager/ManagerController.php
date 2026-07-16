@@ -777,23 +777,58 @@ class ManagerController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════
-    //  Returns
+    //  Settlements
     // ══════════════════════════════════════════════════════════
-    public function returns(): void
+    public function settlements(): void
     {
         $items = $this->db->query("
-            SELECT r.*, u.name AS dsr_name
-            FROM returns r
-            LEFT JOIN users u ON u.id = r.dsr_id
-            ORDER BY r.created_at DESC
+            SELECT s.*, u.name AS dsr_name
+            FROM settlements s
+            LEFT JOIN users u ON u.id = s.dsr_id
+            ORDER BY s.date DESC, s.created_at DESC
         ")->fetchAll();
-        $this->render('returns', compact('items'));
+        $this->render('settlements', compact('items'));
     }
 
-    public function returnApprove(string $id): void
+    public function apiSettlementUpdate(string $id): void
     {
-        $this->db->prepare("UPDATE returns SET status='approved' WHERE id=?")->execute([$id]);
-        $this->flash('success', 'Return approved.'); $this->redirect('manager/returns');
+        header('Content-Type: application/json; charset=utf-8');
+        
+        // Allow fallback to POST array if fetch didn't send JSON (though frontend should send JSON)
+        $isJson = (strpos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false);
+        $input = $isJson ? json_decode(file_get_contents('php://input'), true) : $_POST;
+        
+        $status = $input['status'] ?? 'pending';
+        $managerNotes = $input['manager_notes'] ?? null;
+        $totalDamage = (float)($input['total_damage'] ?? 0);
+        $totalExpense = (float)($input['total_expense'] ?? 0);
+        $countedCash = (float)($input['counted_cash'] ?? 0);
+        $cashBreakdown = $input['cash_breakdown'] ?? '{}';
+        
+        // Fetch existing settlement to calculate new should_pay and difference
+        $stmt = $this->db->prepare("SELECT total_dispatched, total_returned FROM settlements WHERE id=?");
+        $stmt->execute([$id]);
+        $settlement = $stmt->fetch();
+        if (!$settlement) {
+            echo json_encode(['success' => false, 'message' => 'Settlement not found']);
+            exit;
+        }
+
+        $shouldPay = $settlement['total_dispatched'] - $settlement['total_returned'] - $totalDamage - $totalExpense;
+        $difference = $countedCash - $shouldPay;
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("UPDATE settlements SET status=?, manager_notes=?, total_damage=?, total_expense=?, should_pay=?, counted_cash=?, difference=?, cash_breakdown=?, updated_at=NOW() WHERE id=?")
+                     ->execute([$status, $managerNotes, $totalDamage, $totalExpense, $shouldPay, $countedCash, $difference, $cashBreakdown, $id]);
+            
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
     }
 
     // ══════════════════════════════════════════════════════════

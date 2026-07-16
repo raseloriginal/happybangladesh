@@ -31,7 +31,7 @@ $menus = [
         ['icon' => 'fa-cubes',        'label' => 'Inventory',   'url' => '/manager/inventory'],
         ['section' => 'OPERATIONS'],
         ['icon' => 'fa-truck-fast',   'label' => 'Dispatch',    'url' => '/manager/dispatch'],
-        ['icon' => 'fa-rotate-left',  'label' => 'Returns',     'url' => '/manager/returns'],
+        ['icon' => 'fa-file-invoice-dollar','label' => 'Settlements', 'url' => '/manager/settlements'],
         ['icon' => 'fa-calendar-check','label'=> 'Attendance',  'url' => '/manager/attendance'],
         ['icon' => 'fa-tags',         'label' => 'Ready Sale',  'url' => '/manager/readysale'],
     ],
