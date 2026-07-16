@@ -287,7 +287,7 @@ function locateMe() {
             if (radiusCircle) map.removeLayer(radiusCircle);
             // Circle removed per user request
         }, () => {
-            console.log('Geolocation failed or denied.');
+            // Geolocation failed or denied
         });
     }
 }
