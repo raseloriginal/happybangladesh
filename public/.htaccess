@@ -1,6 +1,5 @@
 Options -MultiViews
 RewriteEngine On
-RewriteBase /happybangladesh/public/
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
