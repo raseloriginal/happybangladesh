@@ -213,7 +213,9 @@ const ALL_PRODUCTS = <?= json_encode($allProducts, JSON_UNESCAPED_UNICODE) ?>;
 
 // ── State ─────────────────────────────────────────────────────
 let mainMap, miniMap, fullMap;
-let myLat = 23.8103, myLng = 90.4125; // Default: Dhaka
+// Load last known location from localStorage if available
+let myLat = parseFloat(localStorage.getItem('sr_last_lat')) || 23.8103;
+let myLng = parseFloat(localStorage.getItem('sr_last_lng')) || 90.4125;
 let pinLat, pinLng;
 let currentRetailer = null;
 let currentProduct  = null;
@@ -253,25 +255,45 @@ window.addEventListener('beforeunload', function (e) {
 });
 
 function initMainMap() {
-  mainMap = L.map('srMap', { zoomControl: false, attributionControl: false }).setView([myLat, myLng], 14);
+  mainMap = L.map('srMap', { zoomControl: false, attributionControl: false }).setView([myLat, myLng], 16);
   L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']}).addTo(mainMap);
   L.control.zoom({ position: 'bottomleft' }).addTo(mainMap);
+  
+  // Show initial cached/default location and load pins immediately
+  placeMyLocationMarker();
+  loadRetailersOnMap();
+  
+  // Refine location in background
   detectLocation(false);
 }
 
 // ── Detect / Go-to My Location ────────────────────────────────
 function detectLocation(animate = true) {
   if (!navigator.geolocation) return;
+  
+  const geoOptions = {
+    enableHighAccuracy: true,
+    timeout: 5000,
+    maximumAge: 30000 // Use cached position if it's less than 30 seconds old
+  };
+
   navigator.geolocation.getCurrentPosition(pos => {
     myLat = pos.coords.latitude;
     myLng = pos.coords.longitude;
+    
+    // Cache the location
+    localStorage.setItem('sr_last_lat', myLat);
+    localStorage.setItem('sr_last_lng', myLng);
+    
     if (animate) mainMap.flyTo([myLat, myLng], 16, { duration: 1.2 });
     else mainMap.setView([myLat, myLng], 16);
+    
     placeMyLocationMarker();
     loadRetailersOnMap();
   }, () => {
-    loadRetailersOnMap(); // still load with default
-  });
+    // If geolocation fails or is denied, still make sure retailers are loaded for the current coordinates
+    loadRetailersOnMap();
+  }, geoOptions);
 }
 
 function placeMyLocationMarker() {
