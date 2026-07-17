@@ -12,6 +12,20 @@ class DSRController extends Controller
         RoleMiddleware::check([ROLE_ADMIN, ROLE_MANAGER, ROLE_DSR]);
         $this->viewPath = MOD_PATH . '/DSR/views';
         $this->db = Database::getInstance();
+        $this->ensurePaidAmountColumn();
+    }
+
+    private function ensurePaidAmountColumn(): void
+    {
+        try {
+            $this->db->query("SELECT paid_amount FROM dispatches LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE dispatches ADD COLUMN paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER status");
+            } catch (PDOException $ex) {
+                // Ignore if add column fails (e.g. column already exists or lock issue)
+            }
+        }
     }
 
     public function dashboard(): void

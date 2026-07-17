@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS `dispatches` (
     `warehouse_id`  INT UNSIGNED NOT NULL,
     `dispatch_date` DATE         NOT NULL,
     `status`        ENUM('pending','in_transit','delivered','partial','returned') NOT NULL DEFAULT 'pending',
+    `paid_amount`   DECIMAL(14,2) NOT NULL DEFAULT 0.00,
     `notes`         TEXT         DEFAULT NULL,
     `created_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
