@@ -522,7 +522,7 @@ class AdminController extends Controller
     // ══════════════════════════════════════════════════════════
     public function databaseSync(): void
     {
-        $schemaPath = BASE_PATH . '/database/migrations/schema.sql';
+        $schemaPath = ROOT_PATH . '/database/migrations/schema.sql';
         $schemaContent = file_exists($schemaPath) ? file_get_contents($schemaPath) : '';
 
         $parsedTables = $this->parseSchemaSql();
@@ -607,7 +607,7 @@ class AdminController extends Controller
 
     private function parseSchemaSql(): array
     {
-        $filePath = BASE_PATH . '/database/migrations/schema.sql';
+        $filePath = ROOT_PATH . '/database/migrations/schema.sql';
         if (!file_exists($filePath)) {
             return [];
         }
