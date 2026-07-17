@@ -652,7 +652,7 @@ class AdminController extends Controller
                 $line = trim($line);
                 if (empty($line)) continue;
 
-                if (preg_match('/^(CONSTRAINT|PRIMARY KEY|UNIQUE KEY|KEY|FOREIGN KEY|UNIQUE)/i', $line)) {
+                if (preg_match('/^(CONSTRAINT|PRIMARY KEY|UNIQUE KEY|KEY|FOREIGN KEY|UNIQUE|INDEX)/i', $line)) {
                     $constraints[] = $line;
                 } else if (preg_match('/^`?([a-zA-Z0-9_-]+)`?\s+(.+)$/', $line, $colMatch)) {
                     $colName = $colMatch[1];
