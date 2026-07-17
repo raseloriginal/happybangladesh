@@ -92,11 +92,18 @@ class ManagerController extends Controller
                 $rowIdx = $rowIndices[$i] ?? null;
                 if ($rowIdx !== null && !empty($_FILES['images']['tmp_name'][$rowIdx])) {
                     $ext = strtolower(pathinfo($_FILES['images']['name'][$rowIdx], PATHINFO_EXTENSION));
-                    $filename = 'prod_' . uniqid() . '.webp';
-                    
                     $tmpName = $_FILES['images']['tmp_name'][$rowIdx];
-                    $imagePath = 'assets/uploads/' . $filename;
-                    $this->convertToWebp($tmpName, $uploadDir . $filename);
+                    
+                    $filename = 'prod_' . uniqid() . '.webp';
+                    if ($this->convertToWebp($tmpName, $uploadDir . $filename)) {
+                        $imagePath = 'assets/uploads/' . $filename;
+                    } else {
+                        // Fallback
+                        $filename = 'prod_' . uniqid() . '.' . ($ext ?: 'jpg');
+                        if (move_uploaded_file($tmpName, $uploadDir . $filename)) {
+                            $imagePath = 'assets/uploads/' . $filename;
+                        }
+                    }
                 }
 
                 $sku = 'PRD-' . strtoupper(substr(md5(uniqid()), 0, 6));
@@ -135,10 +142,19 @@ class ManagerController extends Controller
                 $uploadDir = PUB_PATH . '/assets/uploads/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 
-                $filename = 'prod_' . uniqid() . '.webp';
+                $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
                 $tmpName = $_FILES['image']['tmp_name'];
-                $image = 'assets/uploads/' . $filename;
-                $this->convertToWebp($tmpName, $uploadDir . $filename);
+                
+                $filename = 'prod_' . uniqid() . '.webp';
+                if ($this->convertToWebp($tmpName, $uploadDir . $filename)) {
+                    $image = 'assets/uploads/' . $filename;
+                } else {
+                    // Fallback to direct move if conversion fails
+                    $filename = 'prod_' . uniqid() . '.' . ($ext ?: 'jpg');
+                    if (move_uploaded_file($tmpName, $uploadDir . $filename)) {
+                        $image = 'assets/uploads/' . $filename;
+                    }
+                }
             }
 
             $query = "UPDATE products SET company_id=?, category_id=?, name=?, box_type=?, pieces_per_box=?, dealer_percentage=?";
