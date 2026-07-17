@@ -141,10 +141,6 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Lot Number</label>
-                    <input type="text" id="edit-lot-number" class="form-input text-sm w-full">
-                </div>
-                <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Qty (Pieces) *</label>
                     <input type="number" id="edit-pieces" class="form-input text-sm w-full" required min="0">
                 </div>
@@ -154,17 +150,9 @@
                 </div>
                 <!-- qty_boxes is hidden/ignored as inventory relies on qty_pieces -->
                 <input type="hidden" id="edit-boxes" value="0">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Mfg Date</label>
-                    <input type="date" id="edit-mfg-date" class="form-input text-sm w-full">
-                </div>
-                <div>
+                <div class="col-span-2">
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Expiry Date</label>
                     <input type="date" id="edit-exp-date" class="form-input text-sm w-full">
-                </div>
-                <div class="col-span-2">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Notes</label>
-                    <textarea id="edit-notes" class="form-input text-sm w-full" rows="2"></textarea>
                 </div>
             </div>
             
@@ -483,13 +471,10 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
 function editLot(lot) {
     document.getElementById('edit-id').value = lot.id;
     document.getElementById('edit-product').value = lot.product_id;
-    document.getElementById('edit-lot-number').value = lot.lot_number;
-    document.getElementById('edit-mfg-date').value = lot.manufacturing_date || '';
     document.getElementById('edit-exp-date').value = lot.expiry_date || '';
     document.getElementById('edit-boxes').value = lot.qty_boxes || 0;
     document.getElementById('edit-pieces').value = lot.qty_pieces || 0;
     document.getElementById('edit-buying-price').value = lot.buying_price || 0;
-    document.getElementById('edit-notes').value = lot.notes || '';
     openModal('edit-modal');
 }
 
@@ -501,13 +486,10 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
     const payload = {
         id: document.getElementById('edit-id').value,
         product_id: document.getElementById('edit-product').value,
-        lot_number: document.getElementById('edit-lot-number').value,
-        manufacturing_date: document.getElementById('edit-mfg-date').value,
         expiry_date: document.getElementById('edit-exp-date').value,
         qty_boxes: document.getElementById('edit-boxes').value,
         qty_pieces: document.getElementById('edit-pieces').value,
-        buying_price: document.getElementById('edit-buying-price').value,
-        notes: document.getElementById('edit-notes').value
+        buying_price: document.getElementById('edit-buying-price').value
     };
 
     try {
