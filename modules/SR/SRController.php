@@ -312,6 +312,9 @@ class SRController extends Controller
         $prices     = $this->post('unit_price', []);
 
         if (empty($warehouseId) || empty($productIds)) {
+            if ($this->post('ajax')) {
+                $this->json(['success' => false, 'message' => 'Warehouse and at least one product required.']);
+            }
             $this->flash('error', 'Warehouse and at least one product required.');
             $this->redirect('sr/orders'); return;
         }
@@ -327,6 +330,9 @@ class SRController extends Controller
 
         foreach ($prodData as $pd) {
             if (!in_array($pd['company_id'], $validCompanies)) {
+                if ($this->post('ajax')) {
+                    $this->json(['success' => false, 'message' => 'Unauthorized product selected for this SR.']);
+                }
                 $this->flash('error', 'Unauthorized product selected for this SR.');
                 $this->redirect('sr/orders'); return;
             }
@@ -350,6 +356,9 @@ class SRController extends Controller
         }
 
         $this->flash('success', "Order #$orderId placed successfully!");
+        if ($this->post('ajax')) {
+            $this->json(['success' => true, 'message' => "Order #$orderId placed successfully!", 'order_id' => $orderId]);
+        }
         $this->redirect('sr/orders');
     }
 }

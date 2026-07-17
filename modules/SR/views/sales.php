@@ -615,6 +615,7 @@ function confirmRetailerCart() {
   // You may need to pass retailer ID if the backend supports it, otherwise it relies on session/default
   addInput(form, 'retailer_id', currentRetailer.id);
   addInput(form, 'notes', notes);
+  addInput(form, 'ajax', '1');
   
   cart.forEach((c, i) => {
     addInput(form, `product_id[${i}]`, c.id);
@@ -623,8 +624,48 @@ function confirmRetailerCart() {
   });
 
   isSubmitting = true;
-  document.body.appendChild(form);
-  form.submit();
+  const confirmBtn = document.getElementById('retCartConfirmBtn');
+  const originalBtnHtml = confirmBtn.innerHTML;
+  confirmBtn.disabled = true;
+  confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Placing Order...';
+
+  const formData = new FormData(form);
+
+  fetch(`${BASE_URL}/sr/orders/store`, {
+    method: 'POST',
+    body: formData
+  })
+  .then(r => r.json())
+  .then(d => {
+    isSubmitting = false;
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = originalBtnHtml;
+
+    if (d.success) {
+      // Clear cart for this retailer
+      cartsByRetailer[currentRetailer.id] = [];
+      
+      // Close sheets and popups
+      closeSheet('retCartSheet', 'retCartOverlay');
+      document.getElementById('retailerPopup').classList.remove('open');
+      document.body.style.overflow = '';
+      
+      // Update all pins (so yellow cart indicator is removed)
+      updateAllPins();
+      
+      // Show success toast
+      showMiniToast('✓ ' + d.message);
+    } else {
+      showMiniToast('❌ ' + (d.message || 'Failed to place order'), true);
+    }
+  })
+  .catch(err => {
+    isSubmitting = false;
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = originalBtnHtml;
+    showMiniToast('❌ Network error', true);
+    console.error(err);
+  });
 }
 
 function addInput(form, name, value) {
