@@ -32,6 +32,17 @@ class SRController extends Controller
                 INDEX idx_lat_lng (lat, lng)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+
+        // Also ensure orders table has retailer_id column
+        try {
+            $this->db->query("SELECT retailer_id FROM orders LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE orders ADD COLUMN retailer_id INT DEFAULT NULL AFTER dealer_id");
+            } catch (PDOException $ex) {
+                // Ignore if add column fails (e.g. column already exists or lock issue)
+            }
+        }
     }
 
     // ── Render with SR mobile layout ──────────────────────────

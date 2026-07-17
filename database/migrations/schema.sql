@@ -165,11 +165,27 @@ CREATE TABLE IF NOT EXISTS `inventory` (
     UNIQUE KEY `uq_inventory_lot` (`product_id`, `warehouse_id`, `lot_id`)
 ) ENGINE=InnoDB;
 
+-- ── Retailers ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `retailers` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `sr_id`       INT UNSIGNED NOT NULL,
+    `name`        VARCHAR(255) NOT NULL,
+    `phone`       VARCHAR(30)  DEFAULT NULL,
+    `lat`         DECIMAL(10,7) DEFAULT NULL,
+    `lng`         DECIMAL(10,7) DEFAULT NULL,
+    `address`     TEXT         DEFAULT NULL,
+    `created_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`sr_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
+    INDEX `idx_sr_id` (`sr_id`),
+    INDEX `idx_lat_lng` (`lat`, `lng`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── Orders ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `orders` (
     `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `sr_id`        INT UNSIGNED NOT NULL,
     `dealer_id`    INT UNSIGNED DEFAULT NULL,
+    `retailer_id`  INT UNSIGNED DEFAULT NULL,
     `warehouse_id` INT UNSIGNED NOT NULL,
     `status`       ENUM('pending','confirmed','dispatched','delivered','cancelled') NOT NULL DEFAULT 'pending',
     `total_amount` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
@@ -178,6 +194,7 @@ CREATE TABLE IF NOT EXISTS `orders` (
     `updated_at`   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`sr_id`)        REFERENCES `users`(`id`)       ON DELETE RESTRICT,
     FOREIGN KEY (`dealer_id`)    REFERENCES `dealers`(`id`)     ON DELETE SET NULL,
+    FOREIGN KEY (`retailer_id`)  REFERENCES `retailers`(`id`)   ON DELETE SET NULL,
     FOREIGN KEY (`warehouse_id`) REFERENCES `warehouses`(`id`)  ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
