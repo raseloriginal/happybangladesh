@@ -148,6 +148,10 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Qty (Pieces) *</label>
                     <input type="number" id="edit-pieces" class="form-input text-sm w-full" required min="0">
                 </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Buying Price (৳) *</label>
+                    <input type="number" step="0.01" id="edit-buying-price" class="form-input text-sm w-full" required min="0">
+                </div>
                 <!-- qty_boxes is hidden/ignored as inventory relies on qty_pieces -->
                 <input type="hidden" id="edit-boxes" value="0">
                 <div>
@@ -484,6 +488,7 @@ function editLot(lot) {
     document.getElementById('edit-exp-date').value = lot.expiry_date || '';
     document.getElementById('edit-boxes').value = lot.qty_boxes || 0;
     document.getElementById('edit-pieces').value = lot.qty_pieces || 0;
+    document.getElementById('edit-buying-price').value = lot.buying_price || 0;
     document.getElementById('edit-notes').value = lot.notes || '';
     openModal('edit-modal');
 }
@@ -501,6 +506,7 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
         expiry_date: document.getElementById('edit-exp-date').value,
         qty_boxes: document.getElementById('edit-boxes').value,
         qty_pieces: document.getElementById('edit-pieces').value,
+        buying_price: document.getElementById('edit-buying-price').value,
         notes: document.getElementById('edit-notes').value
     };
 
