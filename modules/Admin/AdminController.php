@@ -516,4 +516,157 @@ class AdminController extends Controller
 
         $this->render('reports', compact('orderStats', 'topProducts', 'from', 'to'), 'main');
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Database Sync
+    // ══════════════════════════════════════════════════════════
+    public function databaseSync(): void
+    {
+        $schemaPath = BASE_PATH . '/database/migrations/schema.sql';
+        $schemaContent = file_exists($schemaPath) ? file_get_contents($schemaPath) : '';
+
+        $parsedTables = $this->parseSchemaSql();
+        
+        $dbTables = $this->db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+        
+        $missingTables = [];
+        $missingColumns = [];
+        $proposedSqls = [];
+
+        foreach ($parsedTables as $tableName => $tableData) {
+            if (!in_array($tableName, $dbTables)) {
+                $missingTables[] = $tableName;
+                $proposedSqls[] = $tableData['full_sql'];
+            } else {
+                try {
+                    $dbCols = $this->db->query("SHOW COLUMNS FROM `{$tableName}`")->fetchAll(PDO::FETCH_ASSOC);
+                    $dbColNames = array_column($dbCols, 'Field');
+                    
+                    foreach ($tableData['columns'] as $colName => $colDefLine) {
+                        if (!in_array($colName, $dbColNames)) {
+                            $missingColumns[$tableName][] = $colName;
+                            // Clean definition line (remove trailing commas if any)
+                            $cleanDef = rtrim(trim($colDefLine), ',');
+                            $proposedSqls[] = "ALTER TABLE `{$tableName}` ADD COLUMN {$cleanDef};";
+                        }
+                    }
+                } catch (PDOException $e) {
+                    // Ignore table errors if table not queryable
+                }
+            }
+        }
+
+        $proposedSql = implode("\n\n", $proposedSqls);
+
+        $pageTitle = 'Database Sync';
+        $this->render('database_sync', compact('schemaContent', 'missingTables', 'missingColumns', 'proposedSql', 'pageTitle'));
+    }
+
+    public function databaseSyncRun(): void
+    {
+        $this->verifyCsrf();
+        $syncType = $this->post('sync_type');
+
+        try {
+            if ($syncType === 'schema') {
+                $sql = $this->post('proposed_sql', '');
+                if (empty(trim($sql))) {
+                    $this->flash('warning', 'No schema updates were needed.');
+                    $this->redirect('admin/database-sync');
+                    return;
+                }
+                
+                // PDO exec doesn't always support multi-queries in a single call depending on driver settings.
+                // We should split queries by semicolon and execute them one by one.
+                $queries = array_filter(array_map('trim', explode(';', $sql)));
+                foreach ($queries as $query) {
+                    if (!empty($query)) {
+                        $this->db->exec($query);
+                    }
+                }
+                
+                $this->flash('success', 'Database schema synced successfully.');
+            } else if ($syncType === 'custom') {
+                $sql = $this->post('custom_sql', '');
+                if (!empty(trim($sql))) {
+                    $queries = array_filter(array_map('trim', explode(';', $sql)));
+                    foreach ($queries as $query) {
+                        if (!empty($query)) {
+                            $this->db->exec($query);
+                        }
+                    }
+                    $this->flash('success', 'Custom SQL executed successfully.');
+                }
+            }
+        } catch (PDOException $e) {
+            $this->flash('error', 'Execution failed: ' . $e->getMessage());
+        }
+
+        $this->redirect('admin/database-sync');
+    }
+
+    private function parseSchemaSql(): array
+    {
+        $filePath = BASE_PATH . '/database/migrations/schema.sql';
+        if (!file_exists($filePath)) {
+            return [];
+        }
+
+        $sql = file_get_contents($filePath);
+        
+        // Remove comments
+        $sql = preg_replace('/--.*$/m', '', $sql);
+        $sql = preg_replace('/\/\*.*?\*\//s', '', $sql);
+
+        // Extract CREATE TABLE blocks
+        preg_match_all('/CREATE TABLE(?: IF NOT EXISTS)?\s+`?([a-zA-Z0-9_-]+)`?\s*\((.*?)\)\s*(?:ENGINE\s*=\s*\w+)?\s*(?:DEFAULT\s+CHARSET\s*=\s*\w+)?\s*;/si', $sql, $matches, PREG_SET_ORDER);
+
+        $tables = [];
+        foreach ($matches as $match) {
+            $tableName = $match[1];
+            $body = $match[2];
+            
+            // Split body by commas, keeping track of parenthesis depth
+            $lines = [];
+            $currentLine = '';
+            $depth = 0;
+            for ($i = 0; $i < strlen($body); $i++) {
+                $char = $body[$i];
+                if ($char === '(') $depth++;
+                if ($char === ')') $depth--;
+                
+                if ($char === ',' && $depth === 0) {
+                    $lines[] = trim($currentLine);
+                    $currentLine = '';
+                } else {
+                    $currentLine .= $char;
+                }
+            }
+            if (trim($currentLine) !== '') {
+                $lines[] = trim($currentLine);
+            }
+
+            $columns = [];
+            $constraints = [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+
+                if (preg_match('/^(CONSTRAINT|PRIMARY KEY|UNIQUE KEY|KEY|FOREIGN KEY|UNIQUE)/i', $line)) {
+                    $constraints[] = $line;
+                } else if (preg_match('/^`?([a-zA-Z0-9_-]+)`?\s+(.+)$/', $line, $colMatch)) {
+                    $colName = $colMatch[1];
+                    $columns[$colName] = $line;
+                }
+            }
+
+            $tables[$tableName] = [
+                'full_sql' => $match[0],
+                'columns' => $columns,
+                'constraints' => $constraints
+            ];
+        }
+
+        return $tables;
+    }
 }

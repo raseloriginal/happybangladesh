@@ -20,6 +20,7 @@ $menus = [
         ['section' => 'SYSTEM'],
         ['icon' => 'fa-circle-check', 'label' => 'Approvals',   'url' => '/admin/approvals'],
         ['icon' => 'fa-chart-bar',    'label' => 'Reports',     'url' => '/admin/reports'],
+        ['icon' => 'fa-database',     'label' => 'Database Sync', 'url' => '/admin/database-sync'],
     ],
     'manager' => [
         ['section' => 'OVERVIEW'],
