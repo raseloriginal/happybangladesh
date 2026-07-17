@@ -119,6 +119,59 @@
     </div>
 </div>
 
+<!-- Edit Lot Modal -->
+<div id="edit-modal" class="modal-overlay hidden">
+    <div class="modal-box p-6" style="max-width: 600px;">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="text-xl font-bold text-gray-900">Edit Lot</h3>
+            <button type="button" onclick="closeModal('edit-modal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="edit-form">
+            <input type="hidden" id="edit-id">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Product *</label>
+                    <select id="edit-product" class="form-input text-sm w-full" required>
+                        <?php foreach ($products as $p): ?>
+                            <option value="<?= $p['id'] ?>"><?= h($p['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Lot Number</label>
+                    <input type="text" id="edit-lot-number" class="form-input text-sm w-full">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Qty (Pieces) *</label>
+                    <input type="number" id="edit-pieces" class="form-input text-sm w-full" required min="0">
+                </div>
+                <!-- qty_boxes is hidden/ignored as inventory relies on qty_pieces -->
+                <input type="hidden" id="edit-boxes" value="0">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Mfg Date</label>
+                    <input type="date" id="edit-mfg-date" class="form-input text-sm w-full">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Expiry Date</label>
+                    <input type="date" id="edit-exp-date" class="form-input text-sm w-full">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Notes</label>
+                    <textarea id="edit-notes" class="form-input text-sm w-full" rows="2"></textarea>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3 pt-4 border-t mt-4">
+                <button type="button" onclick="closeModal('edit-modal')" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Product Selector Modal -->
 <div id="product-selector-modal" class="modal-overlay hidden">
     <div class="modal-box p-6" style="max-width: 800px; width: 90%;">

@@ -120,38 +120,6 @@ class SRController extends Controller
         $q->execute([$srId, $srId]);
         $allProducts = $q->fetchAll(PDO::FETCH_ASSOC);
 
-        // If no assigned products, load all active products as fallback
-        if (empty($allProducts)) {
-            if ($wid) {
-                $q = $this->db->prepare("
-                    SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
-                           COALESCE(SUM(CASE WHEN i.warehouse_id = ? THEN (i.qty_boxes * p.pieces_per_box + i.qty_pieces) ELSE 0 END), 0) AS stock
-                    FROM products p
-                    LEFT JOIN companies c ON c.id=p.company_id
-                    LEFT JOIN inventory i ON i.product_id = p.id
-                    WHERE p.status=1
-                    GROUP BY p.id
-                    ORDER BY p.name
-                    LIMIT 50
-                ");
-                $q->execute([$wid]);
-            } else {
-                $q = $this->db->prepare("
-                    SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
-                           COALESCE(SUM(i.qty_boxes * p.pieces_per_box + i.qty_pieces), 0) AS stock
-                    FROM products p
-                    LEFT JOIN companies c ON c.id=p.company_id
-                    LEFT JOIN inventory i ON i.product_id = p.id
-                    WHERE p.status=1
-                    GROUP BY p.id
-                    ORDER BY p.name
-                    LIMIT 50
-                ");
-                $q->execute();
-            }
-            $allProducts = $q->fetchAll(PDO::FETCH_ASSOC);
-        }
-
         $this->renderApp('sales', compact('allProducts'));
     }
 

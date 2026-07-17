@@ -375,6 +375,9 @@ class AdminController extends Controller
             
             $dealerId = $this->db->lastInsertId();
             
+            $cIds = $_POST['company_id'] ?? [];
+            $sIds = $_POST['sr_id'] ?? [];
+
             $stmt = $this->db->prepare("INSERT INTO dealer_companies (dealer_id, company_id, sr_id) VALUES (?,?,?)");
             foreach ($cIds as $idx => $cid) {
                 if (!empty($cid) && !empty($sIds[$idx])) {

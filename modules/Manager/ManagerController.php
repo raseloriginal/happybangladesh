@@ -92,9 +92,11 @@ class ManagerController extends Controller
                 $rowIdx = $rowIndices[$i] ?? null;
                 if ($rowIdx !== null && !empty($_FILES['images']['tmp_name'][$rowIdx])) {
                     $ext = strtolower(pathinfo($_FILES['images']['name'][$rowIdx], PATHINFO_EXTENSION));
-                    $filename = 'prod_' . uniqid() . '.' . $ext;
-                    move_uploaded_file($_FILES['images']['tmp_name'][$rowIdx], $uploadDir . $filename);
+                    $filename = 'prod_' . uniqid() . '.webp';
+                    
+                    $tmpName = $_FILES['images']['tmp_name'][$rowIdx];
                     $imagePath = 'assets/uploads/' . $filename;
+                    $this->convertToWebp($tmpName, $uploadDir . $filename);
                 }
 
                 $sku = 'PRD-' . strtoupper(substr(md5(uniqid()), 0, 6));
@@ -132,10 +134,11 @@ class ManagerController extends Controller
             if (!empty($_FILES['image']['tmp_name'])) {
                 $uploadDir = PUB_PATH . '/assets/uploads/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-                $ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-                $filename = 'prod_' . uniqid() . '.' . $ext;
-                move_uploaded_file($_FILES['image']['tmp_name'], $uploadDir . $filename);
+                
+                $filename = 'prod_' . uniqid() . '.webp';
+                $tmpName = $_FILES['image']['tmp_name'];
                 $image = 'assets/uploads/' . $filename;
+                $this->convertToWebp($tmpName, $uploadDir . $filename);
             }
 
             $query = "UPDATE products SET company_id=?, category_id=?, name=?, box_type=?, pieces_per_box=?, dealer_percentage=?";
@@ -367,37 +370,40 @@ class ManagerController extends Controller
         $this->db->beginTransaction();
         try {
             // 1. Fetch old lot to revert its inventory contribution
-            $old = $this->db->prepare("SELECT product_id, qty_boxes FROM lots WHERE id=?");
+            $old = $this->db->prepare("SELECT product_id, qty_pieces FROM lots WHERE id=?");
             $old->execute([$input['id']]);
             $oldLot = $old->fetch();
 
             if ($oldLot) {
                 $this->db->prepare(
-                    "UPDATE inventory SET qty_boxes = GREATEST(0, qty_boxes - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
-                )->execute([$oldLot['qty_boxes'], $oldLot['product_id'], $wid, $input['id']]);
+                    "UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
+                )->execute([$oldLot['qty_pieces'], $oldLot['product_id'], $wid, $input['id']]);
             }
 
             // 2. Update the lot row
             $this->db->prepare(
-                "UPDATE lots SET product_id=?, expiry_date=?, qty_boxes=?, buying_price=?, lot_date=? WHERE id=?"
+                "UPDATE lots SET product_id=?, expiry_date=?, qty_pieces=?, buying_price=?, lot_date=?, lot_number=?, manufacturing_date=?, notes=? WHERE id=?"
             )->execute([
                 $input['product_id'],
                 $input['expiry_date'] ?: null,
-                $input['qty_boxes'] ?? 0,
+                $input['qty_pieces'] ?? 0,
                 $input['buying_price'] ?? 0,
                 $input['lot_date'] ?? date('Y-m-d'),
+                $input['lot_number'] ?? null,
+                $input['manufacturing_date'] ?: null,
+                $input['notes'] ?? null,
                 $input['id']
             ]);
 
             // 3. Re-apply inventory
-            $new_qty   = (int)($input['qty_boxes'] ?? 0);
+            $new_qty   = (int)($input['qty_pieces'] ?? 0);
             $new_price = (float)($input['buying_price'] ?? 0);
             $pid       = (int)$input['product_id'];
 
             $this->db->prepare(
                 "INSERT INTO inventory (warehouse_id, product_id, lot_id, qty_boxes, qty_pieces)
-                 VALUES (?,?,?,?,0)
-                 ON DUPLICATE KEY UPDATE qty_boxes = qty_boxes + VALUES(qty_boxes)"
+                 VALUES (?,?,?,0,?)
+                 ON DUPLICATE KEY UPDATE qty_pieces = qty_pieces + VALUES(qty_pieces)"
             )->execute([$wid, $pid, $input['id'], $new_qty]);
 
             // 4. Recalculate selling price
@@ -903,5 +909,46 @@ class ManagerController extends Controller
         $this->db->prepare("INSERT INTO readysales (warehouse_id,product_id,lot_id,quantity,price) VALUES (?,?,?,?,?)")
                  ->execute([$this->post('warehouse_id'), $this->post('product_id'), $this->post('lot_id') ?: null, $this->post('quantity',0), $this->post('price',0)]);
         $this->flash('success', 'Ready sale record added.'); $this->redirect('manager/readysale');
+    }
+
+    private function convertToWebp(string $source, string $destination): bool
+    {
+        $info = getimagesize($source);
+        if ($info === false) return false;
+
+        $mime = $info['mime'];
+        $image = null;
+
+        switch ($mime) {
+            case 'image/jpeg':
+                $image = imagecreatefromjpeg($source);
+                break;
+            case 'image/png':
+                $image = imagecreatefrompng($source);
+                if ($image) {
+                    imagepalettetotruecolor($image);
+                    imagealphablending($image, true);
+                    imagesavealpha($image, true);
+                }
+                break;
+            case 'image/gif':
+                $image = imagecreatefromgif($source);
+                break;
+            case 'image/webp':
+                // It's already WebP, just move it
+                return move_uploaded_file($source, $destination);
+            default:
+                // Unsupported type, fallback to move
+                return move_uploaded_file($source, $destination);
+        }
+
+        if ($image) {
+            // Convert to webp and save
+            $result = imagewebp($image, $destination, 80);
+            imagedestroy($image);
+            return $result;
+        }
+
+        return false;
     }
 }

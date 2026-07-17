@@ -115,6 +115,10 @@ $router->post('/admin/approvals/approve/{id}',['AdminController', 'approvalAppro
 $router->post('/admin/approvals/reject/{id}', ['AdminController', 'approvalReject']);
 $router->get( '/admin/reports',               ['AdminController', 'reports']);
 
+// Database Sync
+$router->get( '/admin/database-sync',         ['AdminController', 'databaseSync']);
+$router->post('/admin/database-sync/run',     ['AdminController', 'databaseSyncRun']);
+
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
 

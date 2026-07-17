@@ -178,7 +178,7 @@
       let hasValidSelection = false;
       Array.from(srSelect.options).forEach(opt => {
         if (opt.value === "") return;
-        if (!companyId || opt.dataset.company === companyId) {
+        if (!companyId || opt.dataset.company === companyId || opt.dataset.company === '') {
           opt.style.display = '';
           if (opt.selected) hasValidSelection = true;
         } else {
