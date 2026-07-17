@@ -236,6 +236,7 @@ CREATE TABLE IF NOT EXISTS `dispatch_items` (
     `product_id`  INT UNSIGNED NOT NULL,
     `lot_id`      INT UNSIGNED DEFAULT NULL,
     `quantity`    INT UNSIGNED NOT NULL,
+    `delivered_quantity` INT UNSIGNED DEFAULT NULL,
     FOREIGN KEY (`dispatch_id`) REFERENCES `dispatches`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`product_id`)  REFERENCES `products`(`id`)   ON DELETE RESTRICT,
     FOREIGN KEY (`lot_id`)      REFERENCES `lots`(`id`)       ON DELETE SET NULL

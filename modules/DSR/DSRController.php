@@ -13,6 +13,7 @@ class DSRController extends Controller
         $this->viewPath = MOD_PATH . '/DSR/views';
         $this->db = Database::getInstance();
         $this->ensurePaidAmountColumn();
+        $this->ensureDeliveredQuantityColumn();
     }
 
     private function ensurePaidAmountColumn(): void
@@ -22,6 +23,19 @@ class DSRController extends Controller
         } catch (PDOException $e) {
             try {
                 $this->db->exec("ALTER TABLE dispatches ADD COLUMN paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER status");
+            } catch (PDOException $ex) {
+                // Ignore if add column fails (e.g. column already exists or lock issue)
+            }
+        }
+    }
+
+    private function ensureDeliveredQuantityColumn(): void
+    {
+        try {
+            $this->db->query("SELECT delivered_quantity FROM dispatch_items LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE dispatch_items ADD COLUMN delivered_quantity INT UNSIGNED DEFAULT NULL AFTER quantity");
             } catch (PDOException $ex) {
                 // Ignore if add column fails (e.g. column already exists or lock issue)
             }
