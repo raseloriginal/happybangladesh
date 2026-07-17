@@ -79,6 +79,22 @@
   </div>
 </div>
 
+<!-- Custom Confirm Modal -->
+<div class="sr-modal-overlay" id="confirmModalOverlay">
+  <div class="sr-confirm-modal">
+    <div class="sr-confirm-title">
+      <i class="fa-solid fa-triangle-exclamation" style="color:var(--sr-primary);margin-right:8px;"></i>Modify Order?
+    </div>
+    <div class="sr-confirm-body" id="confirmModalBody">
+      An order has already been placed for this retailer today. Do you want to modify this order?
+    </div>
+    <div class="sr-confirm-actions">
+      <button class="sr-confirm-btn-no" id="confirmModalNoBtn">No, Cancel</button>
+      <button class="sr-confirm-btn-yes" id="confirmModalYesBtn">Yes, Modify</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════
      RETAILER DETAIL FULLSCREEN POPUP
 ══════════════════════════════════════════════════════════════ -->
@@ -356,7 +372,7 @@ function addRetailerPin(ret) {
   const marker = L.marker([ret.lat, ret.lng], { icon }).addTo(mainMap);
   marker.on('click', () => {
     if (ret.has_order_today) {
-      if (confirm(`An order has already been placed for "${ret.name}" today. Are you sure you want to modify this order?`)) {
+      showConfirmModal(`An order has already been placed for "${ret.name}" today. Are you sure you want to modify this order?`, () => {
         fetch(`${BASE_URL}/sr/api/today-order?retailer_id=${ret.id}`)
           .then(res => res.json())
           .then(data => {
@@ -369,7 +385,7 @@ function addRetailerPin(ret) {
             }
           })
           .catch(() => showMiniToast('❌ Network error', true));
-      }
+      });
       return;
     }
 
@@ -382,6 +398,30 @@ function addRetailerPin(ret) {
     }
   });
   retailerMarkers.push({ marker, ret });
+}
+
+function showConfirmModal(text, onYes) {
+  document.getElementById('confirmModalBody').innerText = text;
+  const overlay = document.getElementById('confirmModalOverlay');
+  overlay.classList.add('open');
+  
+  const yesBtn = document.getElementById('confirmModalYesBtn');
+  const noBtn = document.getElementById('confirmModalNoBtn');
+  
+  const newYesBtn = yesBtn.cloneNode(true);
+  const newNoBtn = noBtn.cloneNode(true);
+  
+  yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+  noBtn.parentNode.replaceChild(newNoBtn, noBtn);
+  
+  newYesBtn.addEventListener('click', () => {
+    overlay.classList.remove('open');
+    onYes();
+  });
+  
+  newNoBtn.addEventListener('click', () => {
+    overlay.classList.remove('open');
+  });
 }
 
 function escHtml(s) {
@@ -892,5 +932,83 @@ function showMiniToast(msg, isError = false) {
 }
 .sr-retailer-marker.already-ordered:hover::after {
   border-top-color: #f97316 !important;
+}
+
+/* Custom Confirm Modal Styling */
+.sr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.sr-modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sr-confirm-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 380px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  transform: translateY(20px);
+  transition: transform 0.25s ease;
+}
+.sr-modal-overlay.open .sr-confirm-modal {
+  transform: translateY(0);
+}
+.sr-confirm-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--sr-text);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+.sr-confirm-body {
+  font-size: 0.9rem;
+  color: var(--sr-text-muted);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+.sr-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sr-confirm-btn-no {
+  background: #f1f5f9;
+  color: #64748b;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+.sr-confirm-btn-no:hover {
+  background: #e2e8f0;
+}
+.sr-confirm-btn-yes {
+  background: var(--sr-primary);
+  color: #ffffff;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+.sr-confirm-btn-yes:hover {
+  background: #4338ca;
 }
 </style>
