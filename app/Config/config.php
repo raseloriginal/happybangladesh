@@ -17,7 +17,8 @@ if ($isLocalhost) {
 } else {
     // Determine path dynamically for live server (e.g. root or subfolder)
     $scriptName = dirname($_SERVER['SCRIPT_NAME']);
-    $basePath = $scriptName === '/' || $scriptName === '\\' ? '' : $scriptName;
+    $basePath = str_replace(['/public', '\\public'], '', $scriptName);
+    $basePath = $basePath === '/' || $basePath === '\\' ? '' : $basePath;
     define('BASE_URL', $protocol . $host . $basePath);
 }
 

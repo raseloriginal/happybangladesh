@@ -68,7 +68,7 @@
                                             <div class="flex items-center gap-3">
                                                 <div class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200 shrink-0">
                                                     <?php if($p['image']): ?>
-                                                        <img src="<?= BASE_URL ?>/public/<?= htmlspecialchars($p['image']) ?>" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                                                        <img src="<?= BASE_URL ?>/<?= htmlspecialchars($p['image']) ?>" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
                                                         <span style="display:none" class="w-full h-full items-center justify-center"><i class="fas fa-box text-gray-400"></i></span>
                                                     <?php else: ?>
                                                         <i class="fas fa-box text-gray-400 text-lg"></i>
@@ -430,7 +430,7 @@ function editProduct(p) {
     const preview = document.getElementById('edit-img-preview');
     const icon = document.getElementById('edit-img-icon');
     if (p.image) {
-        preview.src = '<?= BASE_URL ?>/public/' + p.image;
+        preview.src = '<?= BASE_URL ?>/' + p.image;
         preview.classList.remove('hidden');
         if (icon) icon.classList.add('hidden');
     } else {

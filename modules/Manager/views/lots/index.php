@@ -245,7 +245,7 @@ function renderModalProducts() {
         
         let imgHtml = '';
         if (p.image) {
-            imgHtml = `<img src="<?= BASE_URL ?>/public/${p.image}" class="w-12 h-12 object-cover rounded-md border border-gray-100 shrink-0" onerror="this.outerHTML='<div class=&quot;w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center shrink-0 border border-gray-200&quot;><i class=&quot;fas fa-box text-gray-400&quot;></i></div>'">`;
+            imgHtml = `<img src="<?= BASE_URL ?>/${p.image}" class="w-12 h-12 object-cover rounded-md border border-gray-100 shrink-0" onerror="this.outerHTML='<div class=&quot;w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center shrink-0 border border-gray-200&quot;><i class=&quot;fas fa-box text-gray-400&quot;></i></div>'">`;
         } else {
             imgHtml = `<div class="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center shrink-0 border border-gray-200"><i class="fas fa-box text-gray-400 text-lg"></i></div>`;
         }

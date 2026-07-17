@@ -476,7 +476,7 @@ function renderProductsGrid() {
     const grad  = gradients[i % gradients.length];
     const emoji = emojis[i % emojis.length];
     const imgHtml = p.image
-      ? `<img src="${BASE_URL}/public/${escHtml(p.image)}" class="sr-product-img" alt="${escHtml(p.name)}">`
+      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-img" alt="${escHtml(p.name)}">`
       : `<div class="sr-product-img-placeholder" style="background:${grad};">${emoji}</div>`;
 
     const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || 1);
@@ -519,7 +519,7 @@ function openProductSheet(idx) {
 
   const imgWrap = document.getElementById('productSheetImgWrap');
   if (p.image) {
-    imgWrap.innerHTML = `<img src="${BASE_URL}/public/${escHtml(p.image)}" class="sr-product-sheet-img" alt="${escHtml(p.name)}">`;
+    imgWrap.innerHTML = `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-sheet-img" alt="${escHtml(p.name)}">`;
   } else {
     imgWrap.innerHTML = `<div class="sr-product-sheet-placeholder" style="background:${grad};">${emoji}</div>`;
   }
