@@ -169,6 +169,7 @@ $router->get( '/sr/reports',                  ['SRController', 'reports']);
 $router->get( '/sr/api/retailers',            ['SRController', 'apiRetailers']);
 $router->post('/sr/api/retailers/store',      ['SRController', 'apiStoreRetailer']);
 $router->get( '/sr/api/products',             ['SRController', 'apiProducts']);
+$router->get( '/sr/api/today-order',          ['SRController', 'apiGetTodayOrder']);
 
 // ── DSR routes ────────────────────────────────────────────────
 $router->get( '/dsr/dashboard',               ['DSRController', 'dashboard']);

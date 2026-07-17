@@ -170,21 +170,23 @@ class SRController extends Controller
         $lngDelta = $radius / (111000 * cos(deg2rad($lat)));
 
         $q = $this->db->prepare("
-            SELECT id, name, phone, lat, lng,
+            SELECT r.id, r.name, r.phone, r.lat, r.lng,
+                   (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today,
                    ROUND(
                      6371000 * 2 * ASIN(SQRT(
-                       POWER(SIN(RADIANS(lat - ?) / 2), 2) +
-                       COS(RADIANS(?)) * COS(RADIANS(lat)) *
-                       POWER(SIN(RADIANS(lng - ?) / 2), 2)
+                       POWER(SIN(RADIANS(r.lat - ?) / 2), 2) +
+                       COS(RADIANS(?)) * COS(RADIANS(r.lat)) *
+                       POWER(SIN(RADIANS(r.lng - ?) / 2), 2)
                      ))
                    ) AS dist_m
-            FROM retailers
-            WHERE lat BETWEEN ? AND ?
-              AND lng BETWEEN ? AND ?
+            FROM retailers r
+            WHERE r.lat BETWEEN ? AND ?
+              AND r.lng BETWEEN ? AND ?
             HAVING dist_m <= ?
             ORDER BY dist_m ASC
         ");
         $q->execute([
+            Auth::id(),
             $lat, $lat, $lng,
             $lat - $latDelta, $lat + $latDelta,
             $lng - $lngDelta, $lng + $lngDelta,
@@ -195,10 +197,59 @@ class SRController extends Controller
         // Rename dist_m → dist for JS
         foreach ($retailers as &$r) {
             $r['dist'] = $r['dist_m'];
+            $r['has_order_today'] = intval($r['has_order_today']) > 0;
             unset($r['dist_m']);
         }
 
         $this->json(['success' => true, 'retailers' => $retailers]);
+    }
+
+    // ── API: Get today's order details for a retailer ─────────
+    public function apiGetTodayOrder(): void
+    {
+        $retailerId = intval($_GET['retailer_id'] ?? 0);
+        $srId = Auth::id();
+
+        // Fetch today's order for this retailer by this SR
+        $q = $this->db->prepare("
+            SELECT id, notes, dealer_id
+            FROM orders 
+            WHERE retailer_id = ? AND sr_id = ? AND DATE(created_at) = CURDATE()
+            ORDER BY id DESC LIMIT 1
+        ");
+        $q->execute([$retailerId, $srId]);
+        $order = $q->fetch(PDO::FETCH_ASSOC);
+
+        if (!$order) {
+            $this->json(['success' => false, 'message' => 'No order found today.']);
+            return;
+        }
+
+        // Fetch items
+        $qItems = $this->db->prepare("
+            SELECT oi.product_id, oi.quantity, oi.unit_price, oi.total_price,
+                   p.name, p.pieces_per_box AS pieces_per_carton
+            FROM order_items oi
+            JOIN products p ON p.id = oi.product_id
+            WHERE oi.order_id = ?
+        ");
+        $qItems->execute([$order['id']]);
+        $items = $qItems->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->json([
+            'success' => true,
+            'order' => $order,
+            'items' => array_map(function($item) {
+                return [
+                    'id' => intval($item['product_id']),
+                    'name' => $item['name'],
+                    'qty' => intval($item['quantity']),
+                    'price' => floatval($item['unit_price']),
+                    'total' => floatval($item['total_price']),
+                    'pcsPerCarton' => intval($item['pieces_per_carton'] ?: 12)
+                ];
+            }, $items)
+        ]);
     }
 
     // ── API: Store new retailer ────────────────────────────────
@@ -335,6 +386,17 @@ class SRController extends Controller
                 }
                 $this->flash('error', 'Unauthorized product selected for this SR.');
                 $this->redirect('sr/orders'); return;
+            }
+        }
+
+        // Clean up today's previous order if it exists for this retailer
+        if ($retailerId) {
+            $stmtToday = $this->db->prepare("SELECT id FROM orders WHERE retailer_id=? AND sr_id=? AND DATE(created_at)=CURDATE() LIMIT 1");
+            $stmtToday->execute([$retailerId, Auth::id()]);
+            $oldOrderId = $stmtToday->fetchColumn();
+            if ($oldOrderId) {
+                $this->db->prepare("DELETE FROM order_items WHERE order_id=?")->execute([$oldOrderId]);
+                $this->db->prepare("DELETE FROM orders WHERE id=?")->execute([$oldOrderId]);
             }
         }
 

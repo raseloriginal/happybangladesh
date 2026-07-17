@@ -346,14 +346,33 @@ function updateAllPins() {
 
 function addRetailerPin(ret) {
   const hasCart = cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
+  const markerClass = hasCart ? 'has-cart' : (ret.has_order_today ? 'already-ordered' : '');
   const icon = L.divIcon({
     className: '',
-    html: `<div class="sr-retailer-marker ${hasCart ? 'has-cart' : ''}"><i class="fa-solid fa-store"></i>${escHtml(ret.name)}</div>`,
+    html: `<div class="sr-retailer-marker ${markerClass}"><i class="fa-solid fa-store"></i>${escHtml(ret.name)}</div>`,
     iconSize: [0, 0],
     iconAnchor: [0, 0]
   });
   const marker = L.marker([ret.lat, ret.lng], { icon }).addTo(mainMap);
   marker.on('click', () => {
+    if (ret.has_order_today) {
+      if (confirm(`An order has already been placed for "${ret.name}" today. Are you sure you want to modify this order?`)) {
+        fetch(`${BASE_URL}/sr/api/today-order?retailer_id=${ret.id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              cartsByRetailer[ret.id] = data.items;
+              ret.has_order_today = false; // allow editing
+              openRetailerCartSheet(ret);
+            } else {
+              showMiniToast('❌ ' + (data.message || 'Error fetching order details'), true);
+            }
+          })
+          .catch(() => showMiniToast('❌ Network error', true));
+      }
+      return;
+    }
+
     if (cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0) {
       openRetailerCartSheet(ret);
     } else {
@@ -852,5 +871,26 @@ function showMiniToast(msg, isError = false) {
   0%,100%{transform:translateX(0)}
   25%{transform:translateX(-6px)}
   75%{transform:translateX(6px)}
+}
+.sr-retailer-marker.already-ordered {
+  background: #ffedd5 !important;
+  border-color: #ea580c !important;
+  color: #c2410c !important;
+}
+.sr-retailer-marker.already-ordered::after {
+  border-top-color: #ea580c !important;
+}
+.sr-retailer-marker.already-ordered i {
+  color: #ea580c !important;
+}
+.sr-retailer-marker.already-ordered:hover {
+  background: #f97316 !important;
+  color: #ffffff !important;
+}
+.sr-retailer-marker.already-ordered:hover i {
+  color: #ffffff !important;
+}
+.sr-retailer-marker.already-ordered:hover::after {
+  border-top-color: #f97316 !important;
 }
 </style>
