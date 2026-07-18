@@ -928,14 +928,14 @@ function openProductsForRetailer() {
   const avatarId = (currentRetailer.id % 70) + 1;
   document.getElementById('retPopupAvatar').src = `https://i.pravatar.cc/100?img=${avatarId}`;
 
-  // Dynamically render categories (companies) from ALL_PRODUCTS
-  const companies = [...new Set(ALL_PRODUCTS.map(p => p.company_name).filter(Boolean))];
+  // Dynamically render categories from ALL_PRODUCTS
+  const categories = [...new Set(ALL_PRODUCTS.map(p => p.category_name).filter(Boolean))];
   const catWrap = document.getElementById('popupCategoriesWrap');
   if (catWrap) {
-    if (companies.length > 0) {
-      catWrap.innerHTML = companies.map((cName, idx) => `
+    if (categories.length > 0) {
+      catWrap.innerHTML = categories.map((cName, idx) => `
         <div class="sr-popup-category-card-v2 ${idx === 0 ? 'active' : ''}">
-          <div class="sr-cat-icon-box-v2">🏢</div>
+          <div class="sr-cat-icon-box-v2">🏷️</div>
           <div class="sr-cat-label-v2">${escHtml(cName)}</div>
         </div>
       `).join('');

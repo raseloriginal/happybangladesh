@@ -269,9 +269,10 @@ class SRController extends Controller
     public function apiProducts(): void
     {
         $q = $this->db->prepare("
-            SELECT p.*, c.name AS company_name
+            SELECT p.*, c.name AS company_name, cat.name AS category_name
             FROM products p
             LEFT JOIN companies c ON c.id=p.company_id
+            LEFT JOIN categories cat ON cat.id=p.category_id
             WHERE p.status=1
               AND p.company_id IN (SELECT company_id FROM dealer_companies WHERE sr_id = ?)
             ORDER BY p.name
@@ -305,9 +306,10 @@ class SRController extends Controller
         $dealers = $dealersStmt->fetchAll();
 
         $prodStmt = $this->db->prepare("
-            SELECT p.*, c.name AS company_name
+            SELECT p.*, c.name AS company_name, cat.name AS category_name
             FROM products p
             LEFT JOIN companies c ON c.id=p.company_id
+            LEFT JOIN categories cat ON cat.id=p.category_id
             WHERE p.status=1
               AND p.company_id IN (SELECT company_id FROM dealer_companies WHERE sr_id = ?)
             ORDER BY p.name
