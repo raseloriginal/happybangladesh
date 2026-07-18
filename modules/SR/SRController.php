@@ -160,14 +160,9 @@ class SRController extends Controller
         $radius = floatval($_GET['radius'] ?? 100); // meters
 
         if ($lat === 0.0 || $lng === 0.0) {
-            $this->json(['success' => false, 'retailers' => []]);
-            return;
+            $lat = 23.8103;
+            $lng = 90.4125;
         }
-
-        // Haversine formula approximation using bounding box + filter
-        // 1 degree lat ≈ 111km, 1 degree lng ≈ 111km * cos(lat)
-        $latDelta = $radius / 111000;
-        $lngDelta = $radius / (111000 * cos(deg2rad($lat)));
 
         $q = $this->db->prepare("
             SELECT r.id, r.name, r.phone, r.lat, r.lng,
@@ -180,17 +175,11 @@ class SRController extends Controller
                      ))
                    ) AS dist_m
             FROM retailers r
-            WHERE r.lat BETWEEN ? AND ?
-              AND r.lng BETWEEN ? AND ?
-            HAVING dist_m <= ?
             ORDER BY dist_m ASC
         ");
         $q->execute([
             Auth::id(),
-            $lat, $lat, $lng,
-            $lat - $latDelta, $lat + $latDelta,
-            $lng - $lngDelta, $lng + $lngDelta,
-            $radius
+            $lat, $lat, $lng
         ]);
         $retailers = $q->fetchAll(PDO::FETCH_ASSOC);
 

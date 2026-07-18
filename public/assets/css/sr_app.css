@@ -1019,3 +1019,299 @@
 @media (min-width: 481px) {
   .sr-bottom-nav { border-radius: 0; }
 }
+
+/* ── Search Header & Filter Button ────────────────────────────── */
+.sr-map-header-wrap {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.sr-map-searchbar-new {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 54px;
+}
+.sr-map-searchbar-new input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.95rem;
+  color: var(--sr-text);
+  font-family: 'Inter', sans-serif;
+  background: transparent;
+}
+.sr-map-searchbar-new input::placeholder {
+  color: var(--sr-text-muted);
+}
+.sr-map-search-icon {
+  color: #3b82f6;
+  font-size: 1.1rem;
+}
+.sr-map-filter-btn {
+  background: #2563eb;
+  color: #ffffff;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  box-shadow: 0 8px 30px rgba(37, 99, 235, 0.2);
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: transform 0.2s, background-color 0.2s;
+}
+.sr-map-filter-btn:active {
+  transform: scale(0.95);
+}
+
+/* ── Search Suggestions Dropdown ──────────────────────────────── */
+.sr-search-suggestions {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  right: 66px; /* align exactly below the search input, leaving filter button clear */
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1001;
+  display: none;
+  border: 1.5px solid var(--sr-border);
+}
+.sr-search-suggestions.open {
+  display: block;
+}
+.sr-suggestion-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.2s;
+}
+.sr-suggestion-item:last-child {
+  border-bottom: none;
+}
+.sr-suggestion-item:hover {
+  background-color: #f8fafc;
+}
+.sr-suggestion-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--sr-text);
+}
+.sr-suggestion-desc {
+  font-size: 0.75rem;
+  color: var(--sr-text-muted);
+}
+
+/* ── Retailer Carousel ────────────────────────────────────────── */
+.sr-retailers-carousel-wrap {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none; /* Let clicks pass through empty spaces to Leaflet */
+}
+.sr-retailers-carousel {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 10px 20px 24px 20px; /* bottom padding for shadow room */
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  pointer-events: auto; /* Re-enable clicks inside the carousel */
+}
+.sr-retailers-carousel::-webkit-scrollbar {
+  display: none; /* Safari/Chrome */
+}
+
+/* ── Retailer Card ────────────────────────────────────────────── */
+.sr-retailer-card-new {
+  flex: 0 0 290px;
+  width: 290px;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  scroll-snap-align: center;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.sr-retailer-card-new:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.12);
+}
+.sr-retailer-card-img-wrap {
+  height: 140px;
+  position: relative;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+.sr-retailer-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sr-retailer-card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sr-retailer-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.sr-retailer-card-title-group {
+  flex: 1;
+}
+.sr-retailer-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--sr-text);
+  line-height: 1.3;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sr-retailer-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--sr-text);
+}
+.sr-retailer-card-stars {
+  color: #fbbf24;
+  font-size: 0.75rem;
+  display: flex;
+  gap: 1px;
+}
+.sr-retailer-card-reviews {
+  color: var(--sr-text-muted);
+  font-weight: 400;
+}
+.sr-retailer-card-location {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--sr-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin-top: 4px;
+  min-height: 36px;
+}
+.sr-retailer-card-location i {
+  color: #94a3b8;
+  margin-top: 2px;
+}
+.sr-retailer-card-location span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sr-retailer-card-nav-btn {
+  background: #2563eb;
+  color: #ffffff;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s, background-color 0.2s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sr-retailer-card-nav-btn:active {
+  transform: scale(0.92);
+}
+.sr-retailer-card-nav-btn i {
+  font-size: 1rem;
+  transform: rotate(45deg);
+}
+.sr-retailer-card-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 6px 0;
+}
+.sr-retailer-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--sr-text-muted);
+}
+.sr-retailer-card-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sr-retailer-card-meta-item i {
+  color: #2563eb;
+}
+
+/* Locate Fab positioning above the cards */
+.sr-map-fabs-new {
+  position: absolute;
+  bottom: 270px; /* height of cards + extra space */
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sr-map-fab-new {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #2563eb;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s;
+}
+.sr-map-fab-new:active {
+  transform: scale(0.92);
+}
+.sr-fab-locate-new i {
+  font-size: 1.25rem;
+}
+.sr-fab-add-new {
+  background: linear-gradient(135deg, var(--sr-primary), var(--sr-accent));
+  color: #ffffff;
+}
