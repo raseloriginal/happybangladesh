@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title><?= isset($pageTitle) ? h($pageTitle) . ' — ' : '' ?><?= APP_NAME ?></title>
   <meta name="description" content="<?= APP_NAME ?> — SR Mobile App">
-  <meta name="theme-color" content="#4f46e5">
+  <meta name="theme-color" content="#2563eb">
 
   <!-- Tailwind CSS CDN (for compatibility with existing views) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT:'#4f46e5', light:'#6366f1', dark:'#3730a3' } } } } }</script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT:'#2563eb', light:'#3b82f6', dark:'#1d4ed8' } } } } }</script>
 
   <!-- Leaflet.js for maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">

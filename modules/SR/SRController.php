@@ -91,7 +91,7 @@ class SRController extends Controller
     {
         $srId = Auth::id();
         $q = $this->db->prepare("
-            SELECT o.*, d.name AS dealer_name, w.name AS warehouse_name
+            SELECT o.*, d.name AS dealer_name, d.happy_commission, w.name AS warehouse_name
             FROM orders o
             LEFT JOIN dealers d ON d.id=o.dealer_id
             LEFT JOIN warehouses w ON w.id=o.warehouse_id
@@ -100,6 +100,18 @@ class SRController extends Controller
         ");
         $q->execute([$srId]);
         $items = $q->fetchAll();
+
+        foreach ($items as &$item) {
+            $iq = $this->db->prepare("
+                SELECT oi.*, p.name AS product_name, p.pieces_per_box, p.price AS base_price
+                FROM order_items oi
+                JOIN products p ON p.id = oi.product_id
+                WHERE oi.order_id = ?
+            ");
+            $iq->execute([$item['id']]);
+            $item['products'] = $iq->fetchAll();
+        }
+
         $this->renderApp('orders', compact('items'));
     }
 

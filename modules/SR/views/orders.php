@@ -6,9 +6,14 @@
     <i class="fa-solid fa-house" style="margin-right:4px;"></i>Home › Orders
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between;">
-    <div>
-      <div class="sr-page-title">My Orders</div>
-      <div class="sr-page-sub"><?= count($items) ?> total order<?= count($items)!==1?'s':'' ?></div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <a href="<?= url('sr/dashboard') ?>" style="color:#fff;font-size:1.1rem;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.15);width:38px;height:38px;border-radius:50%;text-decoration:none;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+        <i class="fa-solid fa-arrow-left"></i>
+      </a>
+      <div>
+        <div class="sr-page-title">My Orders</div>
+        <div class="sr-page-sub"><?= count($items) ?> total order<?= count($items)!==1?'s':'' ?></div>
+      </div>
     </div>
     <a href="<?= url('sr/sales') ?>"
        style="background:rgba(255,255,255,0.2);color:#fff;border-radius:12px;padding:10px 16px;text-decoration:none;font-size:0.8rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
@@ -84,7 +89,7 @@
   </div>
 
   <!-- Expandable detail -->
-  <div id="order-detail-<?= $o['id'] ?>" style="display:none;margin:-8px 0 12px;background:#fff;border-radius:0 0 12px 12px;padding:12px 16px;box-shadow:0 4px 12px rgba(0,0,0,.06);">
+  <div id="order-detail-<?= $o['id'] ?>" style="display:none;margin:-8px 0 12px;background:#fff;border-radius:0 0 12px 12px;padding:12px 16px;box-shadow:0 4px 12px rgba(0,0,0,.06);border-top:1px solid #f1f5f9;">
     <div style="font-size:0.8rem;color:var(--sr-text-muted);">
       <span style="font-weight:600;color:var(--sr-text);">Order #<?= $o['id'] ?></span>
       &nbsp;·&nbsp;
@@ -93,6 +98,67 @@
     <?php if (!empty($o['notes'])): ?>
     <div style="font-size:0.8rem;color:var(--sr-text-muted);margin-top:6px;">
       <i class="fa-solid fa-note-sticky" style="color:var(--sr-warning);margin-right:4px;"></i><?= h($o['notes']) ?>
+    </div>
+    <?php endif; ?>
+
+    <div style="margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:12px;">
+      <div style="font-size:0.72rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Products Ordered</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <?php 
+          $total_oc = 0;
+          foreach ($o['products'] as $p): 
+            $ppb = (int)($p['pieces_per_box'] ?: 1);
+            $qty = (int)$p['quantity'];
+            $boxes = floor($qty / $ppb);
+            $pcs = $qty % $ppb;
+            
+            $base_price = (float)$p['base_price'];
+            $unit_price = (float)$p['unit_price'];
+            $item_oc = ($unit_price - $base_price) * $qty;
+            $total_oc += $item_oc;
+        ?>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;border-bottom:1px solid #f8fafc;padding-bottom:6px;">
+            <div style="flex:1;font-weight:600;color:#334155;padding-right:12px;">
+              <?= h($p['product_name']) ?>
+              <?php if ($item_oc != 0): ?>
+                <span style="font-size:0.65rem;font-weight:700;color:<?= $item_oc < 0 ? '#dc2626' : '#16a34a' ?>;background:<?= $item_oc < 0 ? '#fee2e2' : '#d1fae5' ?>;padding:1px 6px;border-radius:4px;margin-left:6px;display:inline-block;vertical-align:middle;">
+                  O/C <?= $item_oc > 0 ? '+' : '' ?><?= round($item_oc) ?>
+                </span>
+              <?php endif; ?>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
+              <div style="font-size:0.75rem;color:#64748b;background:#f1f5f9;padding:2px 8px;border-radius:6px;font-weight:700;">
+                <?= $boxes ?> B / <?= $pcs ?> P
+              </div>
+              <div style="font-size:0.75rem;color:#94a3b8;"><?= Helpers::money($p['unit_price']) ?></div>
+              <div style="font-weight:700;color:#0f172a;min-width:65px;text-align:right;"><?= Helpers::money($p['total_price']) ?></div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+
+    <!-- O/C and Commission Summary -->
+    <?php 
+      $comm_pct = (float)($o['happy_commission'] ?? 0);
+      $commission = (float)$o['total_amount'] * ($comm_pct / 100);
+    ?>
+    <?php if ($total_oc != 0 || $comm_pct > 0): ?>
+    <div style="margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:12px;display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;">
+      <div>
+        <?php if ($total_oc != 0): ?>
+          <span style="color:#64748b;font-weight:600;">Total O/C:</span>
+          <span style="font-weight:700;color:<?= $total_oc < 0 ? '#ef4444' : '#10b981' ?>;">
+            <?= $total_oc > 0 ? '+' : '' ?><?= Helpers::money($total_oc) ?>
+          </span>
+        <?php endif; ?>
+      </div>
+      <div>
+        <?php if ($comm_pct > 0): ?>
+          <span style="color:#64748b;font-weight:600;">Commission (<?= $comm_pct ?>%):</span>
+          <span style="font-weight:700;color:#2563eb;"><?= Helpers::money($commission) ?></span>
+        <?php endif; ?>
+      </div>
     </div>
     <?php endif; ?>
   </div>

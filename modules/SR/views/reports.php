@@ -1,5 +1,5 @@
 <?php $pageTitle = 'Reports'; ?>
-<div style="background:linear-gradient(135deg,#f59e0b,#ef4444);padding:44px 20px 20px;">
+<div style="background:#2563eb;padding:44px 20px 20px;">
   <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);margin-bottom:4px;"><i class="fa-solid fa-house" style="margin-right:4px;"></i>Home › Reports</div>
   <div style="font-size:1.4rem;font-weight:800;color:#fff;">Reports</div>
   <div style="font-size:0.8rem;color:rgba(255,255,255,0.7);margin-top:2px;">Your sales performance & analytics</div>

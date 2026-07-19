@@ -45,7 +45,7 @@
   </div>
   <div class="sr-quick-actions">
     <a href="<?= url('sr/orders') ?>" class="sr-action-btn">
-      <div class="sr-action-icon" style="background:rgba(79,70,229,.1);color:#4f46e5;">
+      <div class="sr-action-icon" style="background:rgba(37,99,235,.1);color:#2563eb;">
         <i class="fa-solid fa-file-invoice"></i>
       </div>
       <span class="sr-action-label">Orders</span>
@@ -90,7 +90,7 @@
       <div class="sr-section-title">Sales Overview</div>
       <div style="font-size:0.72rem;color:var(--sr-text-muted);">Last 7 days performance</div>
     </div>
-    <div style="background:rgba(79,70,229,.1);color:#4f46e5;padding:4px 10px;border-radius:999px;font-size:0.7rem;font-weight:600;">
+    <div style="background:rgba(37,99,235,.1);color:#2563eb;padding:4px 10px;border-radius:999px;font-size:0.7rem;font-weight:600;">
       This Week
     </div>
   </div>
@@ -145,8 +145,8 @@
         data,
         backgroundColor: function(c) {
           const g = c.chart.ctx.createLinearGradient(0,0,0,160);
-          g.addColorStop(0,'rgba(79,70,229,.9)');
-          g.addColorStop(1,'rgba(6,182,212,.5)');
+          g.addColorStop(0,'rgba(37,99,235,.9)');
+          g.addColorStop(1,'rgba(37,99,235,.5)');
           return g;
         },
         borderRadius: 8,

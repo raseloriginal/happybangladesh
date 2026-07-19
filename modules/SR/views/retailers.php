@@ -1,5 +1,5 @@
 <?php $pageTitle = 'Retailers'; ?>
-<div style="background:linear-gradient(135deg,#4f46e5,#06b6d4);padding:44px 20px 20px;">
+<div style="background:#2563eb;padding:44px 20px 20px;">
   <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);margin-bottom:4px;"><i class="fa-solid fa-house" style="margin-right:4px;"></i>Home › Retailers</div>
   <div style="font-size:1.4rem;font-weight:800;color:#fff;">Retailers</div>
 </div>

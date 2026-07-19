@@ -255,12 +255,6 @@
     <!-- Section Title & Filters -->
     <div class="sr-popup-section-header-v2">
       <div class="sr-popup-section-title-v2">প্রোডাক্ট সমূহ</div>
-      <div class="sr-popup-filters-v2">
-        <span class="sr-filter-pill-v2 active">টপ সেলিং</span>
-        <span class="sr-filter-pill-v2">ফ্রেশ</span>
-        <span class="sr-filter-pill-v2">পুষ্টি</span>
-        <span class="sr-filter-pill-v2">প্রাণ</span>
-      </div>
     </div>
 
     <!-- Products Grid -->
@@ -475,7 +469,7 @@ let isSubmitting    = false;
 
 // ── Colour palette for product cards ──────────────────────────
 const gradients = [
-  'linear-gradient(135deg,#4f46e5,#6366f1)',
+  'linear-gradient(135deg,#2563eb,#3b82f6)',
   'linear-gradient(135deg,#06b6d4,#0891b2)',
   'linear-gradient(135deg,#10b981,#059669)',
   'linear-gradient(135deg,#f59e0b,#d97706)',
@@ -570,7 +564,7 @@ function placeMyLocationMarker() {
 
   const icon = L.divIcon({
     className: '',
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:#4f46e5;border:3px solid #fff;box-shadow:0 2px 8px rgba(79,70,229,.5);"></div>`,
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 8px rgba(37,99,235,.5);"></div>`,
     iconSize: [18, 18], iconAnchor: [9, 9]
   });
   window._myMarker = L.marker([myLat, myLng], { icon }).addTo(mainMap);
