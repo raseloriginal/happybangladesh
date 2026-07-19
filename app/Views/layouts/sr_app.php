@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
 
   <!-- SR App CSS -->
-  <link rel="stylesheet" href="<?= asset('css/sr_app.css') ?>">
+  <link rel="stylesheet" href="<?= asset('css/sr_app.css') ?>?v=<?= time() ?>">
 
   <?= $extraHead ?? '' ?>
 </head>
