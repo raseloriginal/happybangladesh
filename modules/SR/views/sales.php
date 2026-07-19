@@ -108,6 +108,9 @@
 
   <!-- Search Bar & Filter Button Overlay -->
   <div class="sr-map-header-wrap">
+    <a href="<?= url('sr/dashboard') ?>" class="w-[54px] h-[54px] bg-white text-slate-700 rounded-[14px] flex items-center justify-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-95 transition-all text-lg flex-shrink-0" title="Back">
+      <i class="fa-solid fa-arrow-left"></i>
+    </a>
     <div class="sr-map-searchbar-new">
       <i class="fa-solid fa-magnifying-glass sr-map-search-icon"></i>
       <input type="text" id="mapSearchInput" placeholder="Search Retailer, Area…" autocomplete="off">

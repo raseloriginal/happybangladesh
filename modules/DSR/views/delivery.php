@@ -317,6 +317,25 @@ $hasDeliveries = !empty($retailers);
       </div>
   </div>
 
+  <!-- Partial Due Options Modal -->
+  <div id="partialDueModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="partialDueContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-exclamation"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-1" id="partialDueTitle">Due Payment</h3>
+              <p class="text-sm text-gray-500 mb-6" id="partialDueMessage">Remaining Due: ৳0.00</p>
+              
+              <div class="flex flex-col gap-3">
+                  <button onclick="handleDuePaymentAction()" class="w-full py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Due Payment</button>
+                  <button onclick="handleDueCancelAction()" class="w-full py-3 bg-red-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-red-500/20 transition">Cancel Order</button>
+                  <button onclick="handleDueDetailsAction()" class="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">View Details</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
 </div><!-- /page root -->
 
 <script>
@@ -326,6 +345,158 @@ const orderedRetailers = <?= json_encode($retailers) ?>;
 let map, userMarker, radiusCircle = null;
 let currentDispatchId = null;
 let markers = [];
+
+let currentPartialDueRetailer = null;
+let currentPartialDueOrders = [];
+
+function handleRetailerClick(ret, shouldWarn) {
+    const partialOrders = ret.orders.filter(o => o.status === 'partial');
+    if (partialOrders.length > 0) {
+        showPartialDuePopup(ret, partialOrders);
+    } else if (shouldWarn) {
+        showConfirmPopup("This delivery was already processed. Do you want to redo/modify it?", () => {
+            openRetailerSheet(ret);
+        });
+    } else {
+        openRetailerSheet(ret);
+    }
+}
+
+function showPartialDuePopup(ret, partialOrders) {
+    currentPartialDueRetailer = ret;
+    currentPartialDueOrders = partialOrders;
+    
+    let totalDue = 0;
+    partialOrders.forEach(o => {
+        totalDue += (parseFloat(o.total_amount) - parseFloat(o.paid_amount));
+    });
+    
+    document.getElementById('partialDueTitle').innerText = ret.name;
+    document.getElementById('partialDueMessage').innerHTML = `This retailer has a pending due of <span class="text-amber-600 font-black">৳${totalDue.toFixed(2)}</span>.`;
+    
+    const modal = document.getElementById('partialDueModal');
+    const content = document.getElementById('partialDueContent');
+    
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+    }, 10);
+}
+
+function closePartialDueModal() {
+    const modal = document.getElementById('partialDueModal');
+    const content = document.getElementById('partialDueContent');
+    
+    content.classList.remove('scale-100', 'opacity-100');
+    content.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 200);
+}
+
+function handleDueDetailsAction() {
+    closePartialDueModal();
+    openRetailerSheet(currentPartialDueRetailer);
+}
+
+function handleDueCancelAction() {
+    closePartialDueModal();
+    currentRetailerObj = currentPartialDueRetailer;
+    if (currentPartialDueOrders.length === 1) {
+        currentDispatchId = currentPartialDueOrders[0].dispatch_id;
+        openSingleCancelModal();
+    } else {
+        showMultiCancelPopup(currentPartialDueOrders);
+    }
+}
+
+async function submitDuePayment(dispatchId, newStatus, newPaidAmount, deliveredItems) {
+    try {
+        const res = await fetch('<?= url("dsr/delivery/update/") ?>' + dispatchId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `csrf_token=<?= Helpers::csrfToken() ?>&status=${newStatus}&paid_amount=${newPaidAmount}&notes=&items=${encodeURIComponent(JSON.stringify(deliveredItems))}`
+        });
+        const data = await res.json();
+        if(!data.success) {
+            throw new Error(data.message || 'Error updating delivery');
+        }
+        return true;
+    } catch (err) {
+        showToast('❌ ' + (err.message || 'An error occurred.'));
+        return false;
+    }
+}
+
+function handleDuePaymentAction() {
+    closePartialDueModal();
+    currentRetailerObj = currentPartialDueRetailer;
+    
+    let totalDue = 0;
+    currentPartialDueOrders.forEach(o => {
+        totalDue += (parseFloat(o.total_amount) - parseFloat(o.paid_amount));
+    });
+    
+    showPromptPopup(`Enter payment amount (Total Due: ৳${totalDue.toFixed(2)}):`, async (val) => {
+        if (val <= 0) {
+            showToast("⚠️ Payment amount must be greater than zero!");
+            return;
+        }
+        
+        let remainingPayment = val;
+        
+        const btns = document.querySelectorAll('button');
+        btns.forEach(b => { b.disabled = true; });
+        
+        try {
+            for (let i = 0; i < currentPartialDueOrders.length; i++) {
+                const order = currentPartialDueOrders[i];
+                const orderDue = parseFloat(order.total_amount) - parseFloat(order.paid_amount);
+                
+                if (remainingPayment <= 0) break;
+                
+                let paymentForThisOrder = Math.min(remainingPayment, orderDue);
+                if (i === currentPartialDueOrders.length - 1) {
+                    paymentForThisOrder = remainingPayment;
+                }
+                remainingPayment -= paymentForThisOrder;
+                
+                const newCumulativePaid = parseFloat(order.paid_amount) + paymentForThisOrder;
+                
+                let status = 'partial';
+                if (newCumulativePaid >= parseFloat(order.total_amount)) {
+                    status = 'delivered';
+                }
+                
+                let deliveredItems = {};
+                if (order.products) {
+                    order.products.forEach(p => {
+                        deliveredItems[p.product_id] = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
+                    });
+                }
+                
+                const success = await submitDuePayment(order.dispatch_id, status, newCumulativePaid, deliveredItems);
+                if (success) {
+                    order.status = status;
+                    order.paid_amount = newCumulativePaid;
+                }
+            }
+            
+            showToast('✅ Due payment recorded!');
+            
+            if (document.getElementById('retailerSheet').classList.contains('active')) {
+                openRetailerSheet(currentRetailerObj);
+                selectCompanyOrder(currentOrderIndex);
+            }
+            if (typeof initMap === 'function') {
+                redrawMapPins();
+            }
+        } finally {
+            btns.forEach(b => { b.disabled = false; });
+        }
+    });
+}
 
 <?php if ($hasDeliveries): ?>
 
@@ -470,13 +641,7 @@ function initMap() {
         });
         const marker = L.marker([parseFloat(ret.lat), parseFloat(ret.lng)], { icon }).addTo(map);
         marker.on('click', () => {
-            if (shouldWarn) {
-                showConfirmPopup("This delivery was already processed. Do you want to redo/modify it?", () => {
-                    openRetailerSheet(ret);
-                });
-            } else {
-                openRetailerSheet(ret);
-            }
+            handleRetailerClick(ret, shouldWarn);
         });
         markers.push(marker);
     });
@@ -1015,13 +1180,7 @@ function redrawMapPins() {
         });
         const marker = L.marker([parseFloat(ret.lat), parseFloat(ret.lng)], { icon }).addTo(map);
         marker.on('click', () => {
-            if (shouldWarn) {
-                showConfirmPopup("This delivery was already processed. Do you want to redo/modify it?", () => {
-                    openRetailerSheet(ret);
-                });
-            } else {
-                openRetailerSheet(ret);
-            }
+            handleRetailerClick(ret, shouldWarn);
         });
         markers.push(marker);
     });
@@ -1059,6 +1218,10 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                         }
                     }
                 });
+            } else if (o.products) {
+                o.products.forEach(p => {
+                    deliveredItems[p.product_id] = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
+                });
             }
 
             const res = await fetch('<?= url("dsr/delivery/update/") ?>' + dispatchId, {
@@ -1076,11 +1239,10 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
         if (status === 'partial') msg = '🔶 Marked as Partial/Due';
         if (status === 'cancelled') msg = '❌ Orders Cancelled';
         showToast(msg);
-        
         if (status === 'cancelled' || status === 'delivered' || status === 'partial') {
             orders.forEach(o => {
                 o.status = status;
-                o.paid_amount = paidAmount;
+                o.paid_amount = paidAmounts[o.dispatch_id] || 0;
                 o.notes = reason;
                 
                 const origIdx = currentRetailerObj.orders.findIndex(orig => orig.dispatch_id === o.dispatch_id);
@@ -1104,8 +1266,10 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                     });
                 }
             });
-            openRetailerSheet(currentRetailerObj);
-            selectCompanyOrder(currentOrderIndex);
+            if (document.getElementById('retailerSheet').classList.contains('active')) {
+                openRetailerSheet(currentRetailerObj);
+                selectCompanyOrder(currentOrderIndex);
+            }
             
             if (typeof initMap === 'function') {
                 redrawMapPins();
