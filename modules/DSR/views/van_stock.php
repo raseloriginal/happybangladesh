@@ -1,4 +1,4 @@
-<?php $pageTitle = 'Van Stock'; ?>
+<?php $pageTitle = 'Inventory'; ?>
 <div class="h-full flex flex-col bg-gray-50 pb-20 overflow-y-auto">
   
   <!-- Header -->
@@ -7,7 +7,7 @@
       <a href="<?= url('dsr/profile') ?>" class="w-8 h-8 flex items-center justify-center text-gray-500 active:text-brand transition">
         <i class="fa-solid fa-arrow-left"></i>
       </a>
-      <h1 class="text-xl font-bold text-gray-800">Van Stock</h1>
+      <h1 class="text-xl font-bold text-gray-800">Inventory</h1>
     </div>
     <div class="text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1.5 rounded-lg">
       <?= count($items) ?> Items
@@ -20,9 +20,8 @@
         <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 mb-4">
           <i class="fa-solid fa-truck-ramp-box text-3xl"></i>
         </div>
-        <h2 class="text-lg font-bold text-gray-800 mb-1">Stock Empty</h2>
-        <p class="text-sm text-gray-500">Your van is currently empty. Collect dispatch items to load your van.</p>
-        <a href="<?= url('dsr/collection') ?>" class="mt-6 bg-brand text-white font-bold py-2 px-6 rounded-xl shadow-md active:scale-95 transition">Go to Collection</a>
+        <h2 class="text-lg font-bold text-gray-800 mb-1">Inventory Empty</h2>
+        <p class="text-sm text-gray-500">Your van is currently empty. Please wait for your manager to complete the dispatch.</p>
       </div>
     <?php else: ?>
       <div class="space-y-3">

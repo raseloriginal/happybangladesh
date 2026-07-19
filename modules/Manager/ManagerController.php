@@ -605,6 +605,53 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiDispatchUpdateDsr(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input = json_decode(file_get_contents('php://input'), true);
+        $scheduleId = (int)($input['schedule_id'] ?? 0);
+        $newDsrId = (int)($input['dsr_id'] ?? 0);
+
+        if (!$scheduleId || !$newDsrId) {
+            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+            exit;
+        }
+
+        $sch = $this->db->prepare("SELECT dsr_id, dispatch_date FROM dispatch_schedules WHERE id = ?");
+        $sch->execute([$scheduleId]);
+        $schData = $sch->fetch();
+
+        if (!$schData) {
+            echo json_encode(['success' => false, 'message' => 'Dispatch schedule not found']);
+            exit;
+        }
+
+        $oldDsrId = $schData['dsr_id'];
+        $date = $schData['dispatch_date'];
+
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare("UPDATE dispatch_schedules SET dsr_id = ? WHERE id = ?");
+            $stmt->execute([$newDsrId, $scheduleId]);
+
+            $stmtDisp = $this->db->prepare("UPDATE dispatches SET dsr_id = ? WHERE dsr_id = ? AND dispatch_date = ?");
+            $stmtDisp->execute([$newDsrId, $oldDsrId, $date]);
+
+            $stmtRet = $this->db->prepare("UPDATE returns SET dsr_id = ? WHERE dsr_id = ? AND return_date = ?");
+            $stmtRet->execute([$newDsrId, $oldDsrId, $date]);
+
+            $stmtSett = $this->db->prepare("UPDATE settlements SET dsr_id = ? WHERE dsr_id = ? AND date = ?");
+            $stmtSett->execute([$newDsrId, $oldDsrId, $date]);
+
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function apiDispatchSrDetails(string $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -783,11 +830,51 @@ class ManagerController extends Controller
         $input = json_decode(file_get_contents('php://input'), true);
         $status = $input['status'] ?? 'assigned';
         
+        $sch = $this->db->query("SELECT dsr_id, dispatch_date FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found']);
+            exit;
+        }
+        $dsrId = $sch['dsr_id'];
+        $date = $sch['dispatch_date'];
+
         $this->db->beginTransaction();
         try {
+            if ($status === 'dispatched') {
+                // 1. Get all items that are pending dispatch for this DSR today
+                $q = $this->db->prepare("
+                    SELECT di.product_id, di.lot_id, SUM(di.quantity) as total_qty
+                    FROM dispatch_items di
+                    JOIN dispatches d ON d.id = di.dispatch_id
+                    WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status='pending'
+                    GROUP BY di.product_id, di.lot_id
+                ");
+                $q->execute([$dsrId, $date]);
+                $itemsToLoad = $q->fetchAll();
+
+                foreach ($itemsToLoad as $item) {
+                    $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
+                    $params = [$dsrId, $item['product_id']];
+                    if ($item['lot_id'] !== null) $params[] = $item['lot_id'];
+                    
+                    $check = $this->db->prepare("SELECT id FROM van_stock WHERE dsr_id=? AND product_id=? AND lot_id $lotCondition LIMIT 1");
+                    $check->execute($params);
+                    
+                    if ($row = $check->fetch()) {
+                        $this->db->prepare("UPDATE van_stock SET quantity = quantity + ?, loaded_at = ? WHERE id=?")
+                                 ->execute([$item['total_qty'], $date, $row['id']]);
+                    } else {
+                        $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, loaded_at) VALUES (?, ?, ?, ?, ?)")
+                                 ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $date]);
+                    }
+                }
+
+                // 2. Mark dispatches as in_transit
+                $this->db->prepare("UPDATE dispatches SET status='in_transit', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status='pending'")
+                         ->execute([$dsrId, $date]);
+            }
+
             $this->db->prepare("UPDATE dispatch_schedules SET status = ? WHERE id = ?")->execute([$status, $id]);
-            // If the manager manually clicks 'Dispatch', the DSR has already seen the pending items
-            // because they were created in the 'Organize' step. We just update the schedule status here.
             
             $this->db->commit();
             echo json_encode(['success' => true]);

@@ -26,16 +26,16 @@ $hasDeliveries = !empty($retailers);
     <h2 class="text-xl font-black text-gray-800 mb-2">Van is Empty</h2>
     <?php if (isset($isCompleted) && $isCompleted): ?>
       <p class="text-sm text-gray-500 leading-relaxed mb-6">
-        You have successfully collected your products, but there are no retailer deliveries assigned to your route today.<br>
+        No retailer deliveries are assigned to your route today.<br>
         You can proceed with Ready Sales if you have van stock.
       </p>
     <?php else: ?>
       <p class="text-sm text-gray-500 leading-relaxed mb-6">
         No deliveries are loaded on your van today.<br>
-        Please complete the <strong>Collection</strong> step first to load products onto your van.
+        Please wait for your manager to complete the dispatch.
       </p>
-      <a href="<?= url('dsr/collection') ?>" class="inline-flex items-center gap-2 px-6 py-3 bg-brand text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 active:scale-95 transition">
-        <i class="fa-solid fa-boxes-stacked"></i> Go to Collection
+      <a href="<?= url('dsr/van-stock') ?>" class="inline-flex items-center gap-2 px-6 py-3 bg-brand text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 active:scale-95 transition">
+        <i class="fa-solid fa-boxes-stacked"></i> Go to Inventory
       </a>
     <?php endif; ?>
     <a href="<?= url('dsr/dashboard') ?>" class="mt-3 text-sm text-gray-400 font-medium">← Back to Dashboard</a>
@@ -149,7 +149,7 @@ $hasDeliveries = !empty($retailers);
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex gap-4 mt-4 pt-3 border-t border-gray-100">
+      <div class="flex gap-4 mt-4 pt-3 border-t border-gray-100" id="bsActionButtons">
         <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
         <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
       </div>
@@ -174,6 +174,60 @@ $hasDeliveries = !empty($retailers);
               <div class="flex gap-3">
                   <button id="confirmCancelBtn" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
                   <button id="confirmOkBtn" class="flex-1 py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/30 transition">Yes, Proceed</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Single Cancel Reason Modal -->
+  <div id="singleCancelModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="singleCancelContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-xmark"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-2">Cancel Order</h3>
+              <p class="text-sm text-gray-500 mb-4">Please select a reason for cancellation:</p>
+              
+              <select id="cancelReasonSelect" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 mb-6 transition font-semibold text-gray-700">
+                  <option value="Retailer Refused">Retailer Refused</option>
+                  <option value="Shop Closed">Shop Closed</option>
+                  <option value="Out of Stock / Mismatch">Out of Stock / Mismatch</option>
+                  <option value="Payment Issue">Payment Issue</option>
+                  <option value="Price Mismatch">Price Mismatch</option>
+                  <option value="Other">Other</option>
+              </select>
+              
+              <div class="flex gap-3">
+                  <button onclick="closeSingleCancelModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button onclick="submitSingleCancel()" class="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-red-500/30 transition">Submit</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Paid Payment Modal -->
+  <div id="paidPaymentModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="paidPaymentContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-hand-holding-dollar"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-1">Receipt Amount</h3>
+              
+              <!-- Info block showing due status -->
+              <div id="paymentDueInfo" class="text-sm font-semibold text-gray-500 mb-4 h-5">
+                  Paid in Full
+              </div>
+              
+              <div class="mb-6">
+                  <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider text-left mb-1.5">Amount Paid (৳)</label>
+                  <input type="number" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-2xl font-black text-gray-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition">
+              </div>
+              
+              <div class="flex gap-3">
+                  <button onclick="closePaidPaymentModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button onclick="submitPaidPayment()" class="flex-1 py-3 bg-[#007aff] text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Submit</button>
               </div>
           </div>
       </div>
@@ -326,12 +380,12 @@ function initMap() {
                 color: #fff;
             }
             .pin-delivered .map-pin-tail { border-top: 9px solid #15803d; }
-            /* Orange — partial */
+            /* Yellow — partial */
             .pin-partial .map-pin-card {
-                background: linear-gradient(135deg, #b45309 0%, #d97706 60%, #f59e0b 100%);
+                background: linear-gradient(135deg, #a16207 0%, #d97706 60%, #eab308 100%);
                 color: #fff;
             }
-            .pin-partial .map-pin-tail { border-top: 9px solid #b45309; }
+            .pin-partial .map-pin-tail { border-top: 9px solid #a16207; }
             /* Red — cancelled */
             .pin-cancelled .map-pin-card {
                 background: linear-gradient(135deg, #dc2626 0%, #ef4444 60%, #f87171 100%);
@@ -463,9 +517,11 @@ function locateMe() {
 
 // ── Open bottom sheet for a specific retailer ──
 let currentRetailerObj = null;
+let currentOrderIndex = 0;
 
 function openRetailerSheet(retailer) {
     currentRetailerObj = retailer;
+    currentOrderIndex = 0;
     
     // Set Name & Subtitle & Avatar
     document.getElementById('bsRetailerName').innerText = retailer.retailer_name || retailer.dealer_name || retailer.name;
@@ -483,9 +539,17 @@ function openRetailerSheet(retailer) {
         retailer.orders.forEach((order, idx) => {
             const isSelected = idx === 0;
             const count = order.products ? order.products.length : 0;
+            const isCancelled = order.status === 'cancelled';
+            let borderClass = 'border-gray-200 bg-white text-gray-500';
+            if (isCancelled) {
+                borderClass = isSelected ? 'border-red-600 bg-white text-red-600 font-bold' : 'border-red-200 bg-red-50/30 text-red-500';
+            } else if (isSelected) {
+                borderClass = 'border-blue-600 bg-white text-blue-600 font-bold';
+            }
+            
             tabsContainer.insertAdjacentHTML('beforeend', `
                 <button onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
-                        class="whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border transition ${isSelected ? 'border-blue-600 bg-white text-blue-600 font-bold' : 'border-gray-200 bg-white text-gray-500 active:bg-gray-50'}">
+                        class="whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border transition ${borderClass}">
                     ${order.company_name} <span class="text-blue-500 ml-1 font-bold">${count}</span>
                 </button>
             `);
@@ -505,10 +569,7 @@ function openRetailerSheet(retailer) {
                     const ppb = parseInt(p.pieces_per_box) || 1;
                     const qty = parseInt(p.quantity); // pieces dispatched on van
 
-                    let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : 0;
-                    if (p.delivered_quantity === null && order.status === 'delivered') {
-                        initialDeliveredQty = qty;
-                    }
+                    let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
 
                     const initialBoxes = Math.floor(initialDeliveredQty / ppb);
                     const initialPcs = initialDeliveredQty % ppb;
@@ -572,16 +633,26 @@ function selectCompanyOrder(orderIndex) {
     if (!order) return;
     
     currentDispatchId = order.dispatch_id;
+    currentOrderIndex = orderIndex;
 
     // Update tabs visual state
     if (currentRetailerObj.orders.length > 1) {
         document.querySelectorAll('[id^="tab-order-"]').forEach((btn, idx) => {
             const ord = currentRetailerObj.orders[idx];
             const count = ord.products ? ord.products.length : 0;
+            const isCancelled = ord.status === 'cancelled';
             if (idx === orderIndex) {
-                btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-blue-600 bg-white text-blue-600 font-bold';
+                if (isCancelled) {
+                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-red-600 bg-white text-red-600 font-bold';
+                } else {
+                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-blue-600 bg-white text-blue-600 font-bold';
+                }
             } else {
-                btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white text-gray-500 active:bg-gray-50';
+                if (isCancelled) {
+                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-red-200 bg-red-50/30 text-red-500';
+                } else {
+                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white text-gray-500 active:bg-gray-50';
+                }
             }
         });
     }
@@ -617,10 +688,30 @@ function selectCompanyOrder(orderIndex) {
     // Toggle visibility
     document.querySelectorAll('.order-group-container').forEach(div => div.classList.add('hidden'));
     const activeDiv = document.getElementById(`order-group-${orderIndex}`);
-    if (activeDiv) activeDiv.classList.remove('hidden');
+    if (activeDiv) {
+        activeDiv.classList.remove('hidden');
+        // Disable or enable inputs based on cancellation
+        const inputs = activeDiv.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.disabled = (order.status === 'cancelled');
+        });
+    }
+
+    // Dynamic Action Buttons
+    const actionContainer = document.getElementById('bsActionButtons');
+    if (actionContainer) {
+        if (order.status === 'cancelled') {
+            actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-3 rounded-full font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-rotate-left"></i> Redo</button>`;
+        } else {
+            actionContainer.innerHTML = `
+                <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
+                <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
+            `;
+        }
+    }
 
     // Trigger initial calculation for this group
-    const firstInput = activeDiv.querySelector('.delivery-input-box');
+    const firstInput = activeDiv ? activeDiv.querySelector('.delivery-input-box') : null;
     if (firstInput) {
         calcProgress(firstInput, `${orderIndex}-0`);
     } else {
@@ -717,27 +808,32 @@ function calcProgress(el, idx) {
     }
 }
 
+function getSelectedOrderGettingTotal() {
+    const activeDiv = document.getElementById(`order-group-${currentOrderIndex}`);
+    if (!activeDiv) return 0;
+    let total = 0;
+    activeDiv.querySelectorAll('.product-item').forEach(pItem => {
+        const bInp = pItem.querySelector('.delivery-input-box');
+        const pInp = pItem.querySelector('.delivery-input-pcs');
+        if (bInp && pInp) {
+            const b = parseInt(bInp.value) || 0;
+            const p = parseInt(pInp.value) || 0;
+            const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
+            const tQty = (b * p_ppb) + p;
+            const price = parseFloat(bInp.getAttribute('data-price')) || 0;
+            total += (tQty * price);
+        }
+    });
+    return total;
+}
+
 function markDelivery(status) {
     if (!currentRetailerObj || !currentRetailerObj.orders) return;
 
     if (status === 'delivered') {
-        if (currentRetailerObj.orders.length > 1) {
-            showMultiCompletePopup(currentRetailerObj.orders);
-        } else {
-            showConfirmPopup("Are you sure you want to mark this delivery as Complete?", () => {
-                const targetDispatchIds = [currentRetailerObj.orders[0].dispatch_id];
-                submitSelectedDeliveries(status, targetDispatchIds);
-            });
-        }
+        openPaidPaymentModal();
     } else if (status === 'cancelled') {
-        if (currentRetailerObj.orders.length > 1) {
-            showMultiCancelPopup(currentRetailerObj.orders);
-        } else {
-            showConfirmPopup("Are you sure you want to cancel this order?", () => {
-                const targetDispatchIds = [currentRetailerObj.orders[0].dispatch_id];
-                submitSelectedDeliveries(status, targetDispatchIds);
-            });
-        }
+        openSingleCancelModal();
     } else if (status === 'partial') {
         if (currentRetailerObj.orders.length > 1) {
             showMultiPartialPopup(currentRetailerObj.orders);
@@ -752,7 +848,186 @@ function markDelivery(status) {
     }
 }
 
-async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts = {}) {
+function openPaidPaymentModal() {
+    const totalPayable = getSelectedOrderGettingTotal();
+    document.getElementById('paidPaymentInput').value = totalPayable.toFixed(2);
+    document.getElementById('paymentDueInfo').innerText = 'Paid in Full';
+    document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-green-500 mb-4 h-5';
+    
+    document.getElementById('paidPaymentModal').classList.remove('hidden');
+    setTimeout(() => {
+        document.getElementById('paidPaymentContent').classList.remove('scale-95', 'opacity-0');
+    }, 50);
+}
+
+function closePaidPaymentModal() {
+    document.getElementById('paidPaymentContent').classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        document.getElementById('paidPaymentModal').classList.add('hidden');
+    }, 200);
+}
+
+function onPaidPaymentInput(el) {
+    const entered = parseFloat(el.value) || 0;
+    const total = getSelectedOrderGettingTotal();
+    const due = total - entered;
+    
+    const info = document.getElementById('paymentDueInfo');
+    if (due > 0) {
+        info.innerText = `Due: ৳${due.toFixed(2)} (Will set as Partial)`;
+        info.className = 'text-sm font-bold text-red-500 mb-4 h-5';
+    } else {
+        info.innerText = 'Paid in Full';
+        info.className = 'text-sm font-semibold text-green-500 mb-4 h-5';
+    }
+}
+
+function submitPaidPayment() {
+    const entered = parseFloat(document.getElementById('paidPaymentInput').value) || 0;
+    const total = getSelectedOrderGettingTotal();
+    
+    let status = 'delivered';
+    if (entered < total) {
+        status = 'partial';
+    }
+    
+    closePaidPaymentModal();
+    
+    let paidAmounts = {};
+    paidAmounts[currentDispatchId] = entered;
+    
+    submitSelectedDeliveries(status, [currentDispatchId], paidAmounts);
+}
+
+function openSingleCancelModal() {
+    document.getElementById('singleCancelModal').classList.remove('hidden');
+    setTimeout(() => {
+        document.getElementById('singleCancelContent').classList.remove('scale-95', 'opacity-0');
+    }, 50);
+}
+
+function closeSingleCancelModal() {
+    document.getElementById('singleCancelContent').classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        document.getElementById('singleCancelModal').classList.add('hidden');
+    }, 200);
+}
+
+function submitSingleCancel() {
+    const reason = document.getElementById('cancelReasonSelect').value;
+    closeSingleCancelModal();
+    submitSelectedDeliveries('cancelled', [currentDispatchId], {}, reason);
+}
+
+async function redoCancelledOrder(orderIndex) {
+    const order = currentRetailerObj.orders[orderIndex];
+    if (!order) return;
+    
+    const dispatchId = order.dispatch_id;
+    const btns = document.querySelectorAll('#retailerSheet button');
+    btns.forEach(b => { b.disabled = true; });
+
+    try {
+        const res = await fetch('<?= url("dsr/delivery/update/") ?>' + dispatchId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `csrf_token=<?= Helpers::csrfToken() ?>&status=in_transit&paid_amount=0&notes=&items=${encodeURIComponent(JSON.stringify({}))}`
+        });
+        const data = await res.json();
+        if(!data.success) {
+            throw new Error(data.message || 'Error updating delivery');
+        }
+
+        // Update local object
+        order.status = 'in_transit';
+        order.notes = '';
+        
+        showToast('🔄 Order restored to pending!');
+        
+        // Re-render and refresh sheet
+        openRetailerSheet(currentRetailerObj);
+        selectCompanyOrder(orderIndex);
+
+        // Redraw map pins
+        if (typeof initMap === 'function' && map) {
+            redrawMapPins();
+        }
+
+    } catch (err) {
+        showToast('❌ ' + (err.message || 'An error occurred.'));
+    } finally {
+        btns.forEach(b => { b.disabled = false; });
+    }
+}
+
+function redrawMapPins() {
+    if (!map) return;
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    
+    orderedRetailers.forEach((ret, i) => {
+        let hasDelivered = false;
+        let hasPending = false;
+        let hasPartial = false;
+        let hasCancelled = false;
+        ret.orders.forEach(o => {
+            if (o.status === 'in_transit') hasPending = true;
+            if (o.status === 'partial') hasPartial = true;
+            if (o.status === 'delivered') hasDelivered = true;
+            if (o.status === 'cancelled') hasCancelled = true;
+        });
+        let pinClass = 'pin-pending';
+        let pinIcon = 'fa-clock';
+        if (hasPending) { pinClass = 'pin-pending'; pinIcon = 'fa-clock'; }
+        else if (hasPartial) { pinClass = 'pin-partial'; pinIcon = 'fa-circle-half-stroke'; }
+        else if (hasDelivered && hasCancelled) { pinClass = 'pin-mixed'; pinIcon = 'fa-shuffle'; }
+        else if (hasCancelled) { pinClass = 'pin-cancelled'; pinIcon = 'fa-circle-xmark'; }
+        else if (hasDelivered) { pinClass = 'pin-delivered'; pinIcon = 'fa-check'; }
+
+        let shouldWarn = true;
+        ret.orders.forEach(o => {
+            if (o.status !== 'delivered' && o.status !== 'cancelled') {
+                shouldWarn = false;
+            }
+        });
+
+        let orderSummary = '';
+        if (ret.orders.length > 1) {
+            orderSummary = `<div class="text-[9px] font-normal opacity-80 mt-[-2px]">${ret.orders.length} Orders</div>`;
+        }
+
+        const icon = L.divIcon({
+            className: pinClass,
+            html: `
+                <div class="map-pin-wrap">
+                    <div class="map-pin-card">
+                        <div class="pin-icon"><i class="fa-solid ${pinIcon}"></i></div>
+                        <div>
+                            <div>${ret.name}</div>
+                            ${orderSummary}
+                        </div>
+                    </div>
+                    <div class="map-pin-tail"></div>
+                </div>
+            `,
+            iconSize: [120, 45],
+            iconAnchor: [60, 45]
+        });
+        const marker = L.marker([parseFloat(ret.lat), parseFloat(ret.lng)], { icon }).addTo(map);
+        marker.on('click', () => {
+            if (shouldWarn) {
+                showConfirmPopup("This delivery was already processed. Do you want to redo/modify it?", () => {
+                    openRetailerSheet(ret);
+                });
+            } else {
+                openRetailerSheet(ret);
+            }
+        });
+        markers.push(marker);
+    });
+}
+
+async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts = {}, reason = '') {
     const orders = currentRetailerObj.orders.filter(o => targetDispatchIds.map(String).includes(String(o.dispatch_id)));
     if (orders.length === 0) return;
 
@@ -789,7 +1064,7 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
             const res = await fetch('<?= url("dsr/delivery/update/") ?>' + dispatchId, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `csrf_token=<?= Helpers::csrfToken() ?>&status=${status}&paid_amount=${paidAmount}&items=${encodeURIComponent(JSON.stringify(deliveredItems))}`
+                body: `csrf_token=<?= Helpers::csrfToken() ?>&status=${status}&paid_amount=${paidAmount}&notes=${encodeURIComponent(reason)}&items=${encodeURIComponent(JSON.stringify(deliveredItems))}`
             });
             const data = await res.json();
             if(!data.success) {
@@ -801,10 +1076,47 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
         if (status === 'partial') msg = '🔶 Marked as Partial/Due';
         if (status === 'cancelled') msg = '❌ Orders Cancelled';
         showToast(msg);
-        setTimeout(() => location.reload(), 900);
+        
+        if (status === 'cancelled' || status === 'delivered' || status === 'partial') {
+            orders.forEach(o => {
+                o.status = status;
+                o.paid_amount = paidAmount;
+                o.notes = reason;
+                
+                const origIdx = currentRetailerObj.orders.findIndex(orig => orig.dispatch_id === o.dispatch_id);
+                const orderGroup = document.getElementById(`order-group-${origIdx}`);
+                if (orderGroup) {
+                    orderGroup.querySelectorAll('.product-item').forEach(pItem => {
+                        const bInp = pItem.querySelector('.delivery-input-box');
+                        const pInp = pItem.querySelector('.delivery-input-pcs');
+                        if (bInp && pInp) {
+                            const b = parseInt(bInp.value) || 0;
+                            const p = parseInt(pInp.value) || 0;
+                            const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
+                            const tQty = (b * p_ppb) + p;
+                            const pid = bInp.getAttribute('data-pid');
+                            
+                            const prod = o.products.find(pr => String(pr.product_id) === String(pid));
+                            if (prod) {
+                                prod.delivered_quantity = tQty;
+                            }
+                        }
+                    });
+                }
+            });
+            openRetailerSheet(currentRetailerObj);
+            selectCompanyOrder(currentOrderIndex);
+            
+            if (typeof initMap === 'function') {
+                redrawMapPins();
+            }
+        } else {
+            setTimeout(() => location.reload(), 900);
+        }
 
     } catch (err) {
         showToast('❌ ' + (err.message || 'An error occurred.'));
+    } finally {
         btns.forEach(b => { b.disabled = false; });
     }
 }

@@ -57,9 +57,9 @@
           <i class="fa-solid fa-house text-xl mb-1"></i>
           <span class="text-[10px] font-semibold">Home</span>
         </a>
-        <a href="<?= url('dsr/collection') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 <?= strpos($_SERVER['REQUEST_URI'], '/dsr/collection') !== false ? 'text-brand' : 'text-gray-400 hover:text-gray-600' ?> transition-colors">
+        <a href="<?= url('dsr/van-stock') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 <?= strpos($_SERVER['REQUEST_URI'], '/dsr/van-stock') !== false ? 'text-brand' : 'text-gray-400 hover:text-gray-600' ?> transition-colors">
           <i class="fa-solid fa-boxes-stacked text-xl mb-1"></i>
-          <span class="text-[10px] font-semibold">Collect</span>
+          <span class="text-[10px] font-semibold">Inventory</span>
         </a>
         <a href="<?= url('dsr/delivery') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 relative">
           <div class="nav-fab bg-brand text-white w-14 h-14 rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(37,99,235,0.4)] absolute -top-8 left-1/2 transform -translate-x-1/2 ring-4 ring-white transition-transform active:scale-95">

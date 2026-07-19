@@ -154,10 +154,10 @@ class DSRController extends Controller
             LEFT JOIN dealers dl ON dl.id = o.dealer_id
             LEFT JOIN retailers r ON r.id = o.retailer_id
             WHERE d.dsr_id = ?
-              AND (d.status IN ('in_transit', 'partial') OR (d.status IN ('delivered', 'cancelled') AND d.dispatch_date = ?))
+              AND (d.status IN ('in_transit', 'partial') OR (d.status IN ('delivered', 'cancelled') AND (d.dispatch_date = ? OR DATE(d.updated_at) = ?)))
             ORDER BY dealer_name ASC
         ");
-        $q->execute([$dsrId, $selectedDate]);
+        $q->execute([$dsrId, $selectedDate, $selectedDate]);
         $flatRetailers = $q->fetchAll();
 
         // Group by dealer_id
@@ -233,8 +233,10 @@ class DSRController extends Controller
             }
         }
         
-        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
-                 ->execute([$status, $paidAmount, $id, $dsrId]);
+        $notes = $this->post('notes', null);
+        
+        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
+                 ->execute([$status, $paidAmount, $notes, $id, $dsrId]);
         
         // Deduct/adjust van_stock based on dispatch items
         $items = $this->db->prepare("SELECT product_id, lot_id, quantity, delivered_quantity FROM dispatch_items WHERE dispatch_id=?");

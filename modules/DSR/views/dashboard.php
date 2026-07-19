@@ -84,11 +84,11 @@
       <span class="text-[10px] font-semibold text-gray-600">Map View</span>
     </a>
     
-    <a href="<?= url('dsr/collection') ?>" class="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl shadow-sm hover:shadow-md transition active:scale-95">
+    <a href="<?= url('dsr/van-stock') ?>" class="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl shadow-sm hover:shadow-md transition active:scale-95">
       <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center">
-        <i class="fa-solid fa-box-open text-lg"></i>
+        <i class="fa-solid fa-boxes-stacked text-lg"></i>
       </div>
-      <span class="text-[10px] font-semibold text-gray-600">Collection</span>
+      <span class="text-[10px] font-semibold text-gray-600">Inventory</span>
     </a>
     
     <a href="<?= url('dsr/settlement') ?>" class="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl shadow-sm hover:shadow-md transition active:scale-95 relative">

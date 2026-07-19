@@ -159,13 +159,43 @@
   </div>
 </div>
 
+<!-- ========================================== -->
+<!-- 3. EDIT DSR MODAL                          -->
+<!-- ========================================== -->
+<div id="edit-dsr-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-user-pen text-blue-500 mr-2"></i> Change Dispatch DSR</h3>
+    <input type="hidden" id="edit-dsr-schedule-id">
+    <div class="mb-5">
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select New DSR</label>
+      <select id="edit-dsr-select" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-gray-700">
+        <!-- populated via JS -->
+      </select>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="closeEditDsrModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+      <button onclick="saveDsrChange()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Save Change</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================================
 // MAIN TABLE LOGIC
 // ============================================================================
 let schedules = [];
+let allDsrs = [];
+
+async function fetchDsrs() {
+  const res = await fetch('<?= url("manager/api/dispatch/new-popup-data") ?>');
+  const data = await res.json();
+  allDsrs = data.dsrs || [];
+}
 
 async function loadSchedules() {
+  if (allDsrs.length === 0) {
+    await fetchDsrs();
+  }
   const res = await fetch('<?= url("manager/api/dispatch/data") ?>');
   schedules = await res.json();
   renderSchedules();
@@ -196,9 +226,14 @@ function renderSchedules() {
     tr.innerHTML = `
       <td class="p-4 text-sm">${sch.dispatch_date}</td>
       <td class="p-4 font-medium text-gray-800">
-        <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">${sch.dsr_name.charAt(0)}</div>
-          ${sch.dsr_name}
+        <div class="flex items-center justify-between gap-2 w-full">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">${sch.dsr_name.charAt(0)}</div>
+            <span>${sch.dsr_name}</span>
+          </div>
+          <button onclick="openEditDsrModal(${sch.id}, ${sch.dsr_id})" class="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-gray-150 transition-colors opacity-0 group-hover:opacity-100" title="Change DSR">
+            <i class="fa-solid fa-pen text-xs"></i>
+          </button>
         </div>
       </td>
       <td class="p-4 text-sm font-medium">৳ ${parseFloat(sch.total_dispatch_value).toLocaleString()}</td>
@@ -327,6 +362,56 @@ async function updateStatus(id, status) {
     loadSchedules();
   } else {
     alert("Error updating status");
+  }
+}
+
+function openEditDsrModal(scheduleId, currentDsrId) {
+  document.getElementById('edit-dsr-schedule-id').value = scheduleId;
+  const select = document.getElementById('edit-dsr-select');
+  select.innerHTML = '';
+  
+  allDsrs.forEach(dsr => {
+    const opt = document.createElement('option');
+    opt.value = dsr.id;
+    opt.textContent = dsr.name;
+    if (parseInt(dsr.id) === parseInt(currentDsrId)) {
+      opt.selected = true;
+    }
+    select.appendChild(opt);
+  });
+  
+  document.getElementById('edit-dsr-modal').classList.remove('hidden');
+}
+
+function closeEditDsrModal() {
+  document.getElementById('edit-dsr-modal').classList.add('hidden');
+}
+
+async function saveDsrChange() {
+  const scheduleId = document.getElementById('edit-dsr-schedule-id').value;
+  const dsrId = document.getElementById('edit-dsr-select').value;
+  
+  if (!scheduleId || !dsrId) return;
+  
+  try {
+    const res = await fetch('<?= url("manager/api/dispatch/update-dsr") ?>', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ schedule_id: scheduleId, dsr_id: dsrId })
+    });
+    
+    const result = await res.json();
+    if (result.success) {
+      closeEditDsrModal();
+      loadSchedules();
+    } else {
+      alert(result.message || 'Failed to update DSR');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('An error occurred while updating DSR');
   }
 }
 

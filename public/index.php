@@ -150,6 +150,7 @@ $router->get( '/manager/api/dispatch/sr-details/{id}',       ['ManagerController
 $router->get( '/manager/api/dispatch/organize-data/{id}',    ['ManagerController', 'apiDispatchOrganizeData']);
 $router->post('/manager/api/dispatch/organize-save/{id}',    ['ManagerController', 'apiDispatchOrganizeSave']);
 $router->post('/manager/api/dispatch/status-update/{id}',    ['ManagerController', 'apiDispatchStatusUpdate']);
+$router->post('/manager/api/dispatch/update-dsr',            ['ManagerController', 'apiDispatchUpdateDsr']);
 $router->get( '/manager/settlements',               ['ManagerController', 'settlements']);
 $router->post('/manager/api/settlements/update/{id}',['ManagerController', 'apiSettlementUpdate']);
 $router->get( '/manager/attendance',          ['ManagerController', 'attendance']);
