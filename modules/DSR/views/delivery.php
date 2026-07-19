@@ -82,16 +82,57 @@ $hasDeliveries = !empty($retailers);
   ═══════════════════════════════════════════════════════ -->
   <div id="retailerSheet" class="bottom-sheet pb-[env(safe-area-inset-bottom)]">
     <div class="bottom-sheet-handle"></div>
-    <div class="bottom-sheet-content">
+    <div class="bottom-sheet-content no-scrollbar">
+
+      <!-- Sheet Header -->
+      <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+        <button onclick="closeBottomSheet()" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800">
+          <i class="fa-solid fa-chevron-left text-lg"></i>
+        </button>
+        <span class="text-base font-black text-gray-800">Order Details</span>
+        <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800">
+          <i class="fa-solid fa-list-ul text-lg"></i>
+        </button>
+      </div>
 
       <!-- Retailer Info -->
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl flex-shrink-0">
-          <i class="fa-solid fa-store"></i>
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <img id="bsRetailerAvatar" src="" class="w-12 h-12 rounded-full object-cover border border-gray-100 shadow-sm" onerror="this.src='https://i.pravatar.cc/100?img=12'">
+          <div>
+            <h2 class="text-base font-black text-gray-800 leading-tight" id="bsRetailerName">Retailer Name</h2>
+            <p class="text-xs text-gray-400 font-bold mt-0.5" id="bsRetailerSub">Address details</p>
+          </div>
         </div>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-lg font-bold text-gray-800 truncate" id="bsRetailerName">Retailer Name</h2>
-          <p class="text-xs text-gray-500 truncate" id="bsRetailerAddress">Address details</p>
+        <!-- Action Buttons on Right -->
+        <div class="flex gap-2">
+          <a href="#" class="w-8 h-8 bg-green-50 text-green-500 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition">
+            <i class="fa-solid fa-circle-plus text-lg"></i>
+          </a>
+          <button class="w-8 h-8 bg-red-50 text-red-400 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition">
+            <i class="fa-solid fa-ban text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats / Summary -->
+      <div class="flex justify-between items-center mb-4">
+        <div class="text-sm font-bold text-gray-800 flex items-center gap-1">
+          অর্ডার সমূহ <span class="text-emerald-500 font-black text-base ml-1" id="bsTotalQty">50</span>
+        </div>
+        <div class="border border-blue-400 text-blue-500 bg-blue-50/10 font-bold px-4 py-1 rounded-full text-xs" id="bsOrderTotal">
+          Tk 50.00
+        </div>
+      </div>
+
+      <!-- Hidden elements to preserve JS bindings -->
+      <div class="hidden">
+        <div id="bsRetailerAddress"></div>
+        <span id="bsGettingTotal">৳0</span>
+        <span id="bsStatus">Pending</span>
+        <div id="bsPartialInfo">
+          <span id="bsPaidAmount">৳0.00</span>
+          <span id="bsDueAmount">৳0.00</span>
         </div>
       </div>
 
@@ -100,43 +141,17 @@ $hasDeliveries = !empty($retailers);
           <!-- JS will populate company tabs here -->
       </div>
 
-      <!-- Order Summary -->
-      <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-4 flex justify-between items-center">
-        <div>
-          <div class="text-[10px] text-gray-500 font-bold uppercase">Order Value</div>
-          <div class="text-lg font-black text-green-600" id="bsOrderTotal">৳0</div>
-          <div class="text-[10px] text-gray-500 font-bold uppercase mt-1">Getting Value</div>
-          <div class="text-lg font-black text-brand" id="bsGettingTotal">৳0</div>
-        </div>
-        <div class="text-right">
-          <div class="text-[10px] text-gray-500 font-bold uppercase">Status</div>
-          <div class="text-sm font-bold text-blue-500" id="bsStatus">Pending</div>
-          <div id="bsPartialInfo" class="mt-1 text-right text-[11px] hidden leading-tight">
-            <div class="text-gray-500">Paid: <span class="font-bold text-green-600" id="bsPaidAmount">৳0.00</span></div>
-            <div class="text-gray-500">Due: <span class="font-bold text-red-600" id="bsDueAmount">৳0.00</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Products List (from dispatch_items — what's on the van) -->
+      <!-- Products List -->
       <div class="mb-4">
-        <h3 class="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-          <i class="fa-solid fa-boxes-stacked text-brand text-xs"></i>
-          Products on Van
-        </h3>
-        <div id="bsProductsList" class="space-y-3 max-h-[35vh] overflow-y-auto pr-1">
+        <div id="bsProductsList" class="space-y-3 max-h-[45vh] overflow-y-auto pr-1 no-scrollbar">
           <!-- JS will populate this -->
         </div>
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex flex-col gap-2">
-        <div class="flex gap-3">
-          <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-xl font-bold bg-red-100 text-red-600 active:bg-red-200 transition text-sm">Cancel</button>
-          <button onclick="markDelivery('partial')" class="flex-1 py-3 rounded-xl font-bold bg-orange-100 text-orange-600 active:bg-orange-200 transition text-sm">Partial/Due</button>
-          <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-xl font-bold bg-brand text-white active:scale-[0.98] transition shadow-lg shadow-blue-500/30 text-sm">Complete</button>
-        </div>
-        <button onclick="saveQuantitiesOnly()" class="w-full py-3 rounded-xl font-bold bg-emerald-600 text-white active:scale-[0.98] transition shadow-lg shadow-emerald-500/30 text-sm flex items-center justify-center gap-2"><i class="fa-solid fa-floppy-disk"></i> Save Quantities</button>
+      <div class="flex gap-4 mt-4 pt-3 border-t border-gray-100">
+        <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
+        <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
       </div>
 
     </div>
@@ -451,9 +466,12 @@ let currentRetailerObj = null;
 
 function openRetailerSheet(retailer) {
     currentRetailerObj = retailer;
-    document.getElementById('bsRetailerName').innerText = retailer.dealer_name || retailer.name;
-    document.getElementById('bsRetailerAddress').innerText = retailer.address || 'No address provided';
-
+    
+    // Set Name & Subtitle & Avatar
+    document.getElementById('bsRetailerName').innerText = retailer.retailer_name || retailer.dealer_name || retailer.name;
+    document.getElementById('bsRetailerSub').innerText = retailer.retailer_name ? retailer.dealer_name : 'Retailer';
+    document.getElementById('bsRetailerAvatar').src = 'https://i.pravatar.cc/100?img=' + ((parseInt(retailer.dealer_id) % 70) + 1);
+    
     const tabsContainer = document.getElementById('bsCompanyTabs');
     tabsContainer.innerHTML = '';
     
@@ -464,10 +482,11 @@ function openRetailerSheet(retailer) {
         tabsContainer.classList.remove('hidden');
         retailer.orders.forEach((order, idx) => {
             const isSelected = idx === 0;
+            const count = order.products ? order.products.length : 0;
             tabsContainer.insertAdjacentHTML('beforeend', `
                 <button onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
-                        class="whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition border ${isSelected ? 'bg-brand text-white border-brand' : 'bg-white text-gray-600 border-gray-200 active:bg-gray-50'}">
-                    ${order.company_name}
+                        class="whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border transition ${isSelected ? 'border-blue-600 bg-white text-blue-600 font-bold' : 'border-gray-200 bg-white text-gray-500 active:bg-gray-50'}">
+                    ${order.company_name} <span class="text-blue-500 ml-1 font-bold">${count}</span>
                 </button>
             `);
         });
@@ -493,51 +512,40 @@ function openRetailerSheet(retailer) {
 
                     const initialBoxes = Math.floor(initialDeliveredQty / ppb);
                     const initialPcs = initialDeliveredQty % ppb;
-                    const percent = Math.round((initialDeliveredQty / qty) * 100);
-                    let barColorClass = 'bg-brand';
-                    if (percent >= 100) barColorClass = 'bg-green-500';
-                    else if (percent > 0) barColorClass = 'bg-orange-400';
 
                     orderHtml += `
-                    <div class="bg-white rounded-xl border border-gray-100 p-3 shadow-sm product-item" data-price="${p.price || 0}">
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" data-price="${p.price || 0}">
+                        <div class="flex items-center gap-4 mb-3">
+                            <div class="w-16 h-16 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 p-1">
                                 ${p.image
-                                    ? `<img src="<?= asset('uploads/products/') ?>${p.image}" class="w-full h-full object-cover">`
-                                    : `<i class="fa-solid fa-box text-gray-300"></i>`
+                                    ? `<img src="<?= asset('uploads/products/') ?>${p.image}" class="w-full h-full object-contain rounded-xl">`
+                                    : `<i class="fa-solid fa-box text-gray-300 text-2xl"></i>`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
-                                <div class="text-sm font-bold text-gray-800 line-clamp-1">${p.name}</div>
-                                <div class="text-[10px] text-gray-500">On Van: <span class="font-bold text-brand">${qty}</span> PCS &nbsp;·&nbsp; 1 Box = ${ppb} PCS &nbsp;·&nbsp; ৳${p.price}</div>
+                                <div class="text-sm font-black text-gray-800 line-clamp-2 leading-snug">${p.name}</div>
+                                <div class="text-xs font-black text-pink-500 mt-1">Tk ${parseFloat(p.price || 0).toFixed(0)}</div>
                             </div>
                         </div>
 
-                        <!-- Delivery Input -->
-                        <div class="flex gap-2 mb-2">
-                            <div class="flex-1 bg-gray-50 rounded-lg p-2 border border-gray-200">
-                                <div class="text-[9px] text-gray-400 font-bold uppercase mb-1">Boxes Delivered</div>
+                        <!-- Delivery Input Box & Pcs -->
+                        <div class="flex gap-3 mt-3">
+                            <!-- Box Input -->
+                            <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
                                 <input type="number" min="0" value="${initialBoxes}"
-                                    class="w-full bg-transparent outline-none font-bold text-gray-700 delivery-input-box"
+                                    class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-box text-sm"
                                     data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                     oninput="calcProgress(this, '${orderIdx}-${idx}')">
+                                <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">Box</div>
                             </div>
-                            <div class="flex-1 bg-gray-50 rounded-lg p-2 border border-gray-200">
-                                <div class="text-[9px] text-gray-400 font-bold uppercase mb-1">Extra PCS</div>
+                            <!-- Pcs Input -->
+                            <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
                                 <input type="number" min="0" value="${initialPcs}"
-                                    class="w-full bg-transparent outline-none font-bold text-gray-700 delivery-input-pcs"
+                                    class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-pcs text-sm"
                                     data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                     oninput="calcProgress(this, '${orderIdx}-${idx}')">
+                                <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">Pcs</div>
                             </div>
-                        </div>
-
-                        <!-- Progress Bar -->
-                        <div class="flex items-center justify-between text-[10px] font-bold mb-1">
-                            <span class="text-gray-500">Delivered: <span id="delQty-${orderIdx}-${idx}">${initialDeliveredQty}</span> / ${qty} PCS</span>
-                            <span id="delPercent-${orderIdx}-${idx}" class="text-brand">${percent}%</span>
-                        </div>
-                        <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                            <div id="delBar-${orderIdx}-${idx}" class="h-full transition-all duration-300 ${barColorClass}" style="width: ${percent}%"></div>
                         </div>
                     </div>`;
                 });
@@ -567,31 +575,43 @@ function selectCompanyOrder(orderIndex) {
 
     // Update tabs visual state
     if (currentRetailerObj.orders.length > 1) {
-        document.querySelectorAll('[id^="tab-order-"]').forEach(btn => {
-            btn.className = 'whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition border bg-white text-gray-600 border-gray-200 active:bg-gray-50';
+        document.querySelectorAll('[id^="tab-order-"]').forEach((btn, idx) => {
+            const ord = currentRetailerObj.orders[idx];
+            const count = ord.products ? ord.products.length : 0;
+            if (idx === orderIndex) {
+                btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-blue-600 bg-white text-blue-600 font-bold';
+            } else {
+                btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white text-gray-500 active:bg-gray-50';
+            }
         });
-        const activeBtn = document.getElementById(`tab-order-${orderIndex}`);
-        if (activeBtn) activeBtn.className = 'whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition border bg-brand text-white border-brand';
     }
 
-    document.getElementById('bsOrderTotal').innerText = '৳' + parseFloat(order.total_amount || 0).toFixed(2);
+    document.getElementById('bsOrderTotal').innerText = 'Tk ' + parseFloat(order.total_amount || 0).toFixed(2);
+    
+    // Update order quantity stats
+    const totalQty = order.products ? order.products.reduce((acc, p) => acc + parseInt(p.quantity), 0) : 0;
+    document.getElementById('bsTotalQty').innerText = totalQty;
 
     const statusLabel = { 'in_transit': 'Pending Delivery', 'delivered': 'Delivered', 'partial': 'Partial/Due', 'cancelled': 'Cancelled' };
     const statusColor = { 'in_transit': '#3b82f6', 'delivered': '#16a34a', 'partial': '#f97316', 'cancelled': '#dc2626' };
     const bsStatus = document.getElementById('bsStatus');
-    bsStatus.innerText = statusLabel[order.status] || 'Pending';
-    bsStatus.style.color = statusColor[order.status] || '#3b82f6';
+    if (bsStatus) {
+        bsStatus.innerText = statusLabel[order.status] || 'Pending';
+        bsStatus.style.color = statusColor[order.status] || '#3b82f6';
+    }
 
     const bsPartialInfo = document.getElementById('bsPartialInfo');
-    if (order.status === 'partial') {
-        bsPartialInfo.classList.remove('hidden');
-        const paid = parseFloat(order.paid_amount || 0);
-        const total = parseFloat(order.total_amount || 0);
-        const due = total - paid;
-        document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(2);
-        document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
-    } else {
-        bsPartialInfo.classList.add('hidden');
+    if (bsPartialInfo) {
+        if (order.status === 'partial') {
+            bsPartialInfo.classList.remove('hidden');
+            const paid = parseFloat(order.paid_amount || 0);
+            const total = parseFloat(order.total_amount || 0);
+            const due = total - paid;
+            document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(2);
+            document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
+        } else {
+            bsPartialInfo.classList.add('hidden');
+        }
     }
 
     // Toggle visibility
@@ -635,21 +655,25 @@ function calcProgress(el, idx) {
         totalDelivered = maxQty;
     }
 
-    document.getElementById(`delQty-${idx}`).innerText = totalDelivered;
+    const delQtyEl = document.getElementById(`delQty-${idx}`);
+    if (delQtyEl) delQtyEl.innerText = totalDelivered;
 
     let percent = (totalDelivered / maxQty) * 100;
     if (percent > 100) percent = 100;
 
-    document.getElementById(`delPercent-${idx}`).innerText = Math.round(percent) + '%';
+    const delPercentEl = document.getElementById(`delPercent-${idx}`);
+    if (delPercentEl) delPercentEl.innerText = Math.round(percent) + '%';
 
     const bar = document.getElementById(`delBar-${idx}`);
-    bar.style.width = percent + '%';
-    if (percent >= 100) {
-        bar.className = 'h-full transition-all duration-300 bg-green-500';
-    } else if (percent > 0) {
-        bar.className = 'h-full transition-all duration-300 bg-orange-400';
-    } else {
-        bar.className = 'h-full transition-all duration-300 bg-brand';
+    if (bar) {
+        bar.style.width = percent + '%';
+        if (percent >= 100) {
+            bar.className = 'h-full transition-all duration-300 bg-green-500';
+        } else if (percent > 0) {
+            bar.className = 'h-full transition-all duration-300 bg-orange-400';
+        } else {
+            bar.className = 'h-full transition-all duration-300 bg-brand';
+        }
     }
     
     // Recalculate getting total for the CURRENT active order group
@@ -672,11 +696,12 @@ function calcProgress(el, idx) {
         }
     });
     
-    document.getElementById('bsGettingTotal').innerText = '৳' + gettingTotal.toFixed(2);
+    const bsGettingTotal = document.getElementById('bsGettingTotal');
+    if (bsGettingTotal) bsGettingTotal.innerText = '৳' + gettingTotal.toFixed(2);
 
     // Update due if partial info is visible
     const bsPartialInfo = document.getElementById('bsPartialInfo');
-    if (!bsPartialInfo.classList.contains('hidden') && currentRetailerObj && currentRetailerObj.orders) {
+    if (bsPartialInfo && !bsPartialInfo.classList.contains('hidden') && currentRetailerObj && currentRetailerObj.orders) {
         const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
         if (order) {
             const paid = parseFloat(order.paid_amount || 0);
@@ -686,7 +711,8 @@ function calcProgress(el, idx) {
             } else {
                 due = parseFloat(order.total_amount || 0) - paid;
             }
-            document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
+            const bsDueAmount = document.getElementById('bsDueAmount');
+            if (bsDueAmount) bsDueAmount.innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
         }
     }
 }

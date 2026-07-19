@@ -53,7 +53,7 @@
     <div class="bottom-sheet-content">
       <h3 class="font-bold text-lg text-gray-800 mb-4">Record New Expense</h3>
       
-      <form action="<?= url('dsr/expenses') ?>" method="POST">
+      <form action="<?= url('dsr/expenses/store') ?>" method="POST">
         <?= Helpers::csrfField() ?>
         
         <div class="space-y-4">

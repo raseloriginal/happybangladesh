@@ -103,9 +103,10 @@ class DSRController extends Controller
     {
         $dsrId = Auth::id();
         $items = $this->db->prepare("
-            SELECT vs.*, p.name, p.image, p.pieces_per_box
+            SELECT vs.*, p.name as product_name, p.sku, p.image, p.pieces_per_box, l.lot_number
             FROM van_stock vs
             JOIN products p ON p.id = vs.product_id
+            LEFT JOIN lots l ON l.id = vs.lot_id
             WHERE vs.dsr_id = ? AND vs.quantity > 0
             ORDER BY p.name ASC
         ");
@@ -140,6 +141,7 @@ class DSRController extends Controller
         $q = $this->db->prepare("
             SELECT d.id as dispatch_id, o.id as order_id, COALESCE(dl.id, r.id) as dealer_id,
                    COALESCE(dl.name, r.name) as dealer_name, 
+                   r.name as retailer_name, dl.name as dealer_business_name,
                    COALESCE(dl.address, r.address) as address, 
                    COALESCE(dl.lat, r.lat) as lat, 
                    COALESCE(dl.lng, r.lng) as lng,
@@ -166,6 +168,8 @@ class DSRController extends Controller
                 $grouped[$did] = [
                     'dealer_id' => $ret['dealer_id'],
                     'dealer_name' => $ret['dealer_name'],
+                    'retailer_name' => $ret['retailer_name'],
+                    'dealer_business_name' => $ret['dealer_business_name'],
                     'address' => $ret['address'],
                     'lat' => $ret['lat'],
                     'lng' => $ret['lng'],
