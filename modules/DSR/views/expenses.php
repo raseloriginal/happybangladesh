@@ -15,13 +15,35 @@
   </div>
 
   <div class="px-4 -mt-4 relative z-20">
+    
+    <!-- Modern Date Selector -->
+    <div class="mb-5">
+      <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+        <?php 
+          // Show last 7 days
+          for($i = 6; $i >= 0; $i--):
+              $d = date('Y-m-d', strtotime("-$i days"));
+              $dayName = date('D', strtotime($d));
+              $dayNum = date('d', strtotime($d));
+              $isSelected = ($d === $selectedDate);
+              $bgClass = $isSelected ? 'bg-brand text-white shadow-lg ring-2 ring-brand ring-offset-2 ring-offset-gray-50' : 'bg-white border border-gray-100 shadow-sm';
+              $textClass = $isSelected ? 'text-white' : 'text-gray-800';
+        ?>
+        <a href="?date=<?= $d ?>" class="snap-start flex-shrink-0 w-[4.5rem] h-20 flex flex-col items-center justify-center rounded-3xl transition-all duration-200 active:scale-95 <?= $bgClass ?>">
+          <span class="text-[11px] font-bold uppercase mb-1 tracking-wider <?= $isSelected ? 'text-white/80' : 'text-gray-400' ?>"><?= $dayName ?></span>
+          <span class="text-2xl font-black <?= $textClass ?>"><?= $dayNum ?></span>
+        </a>
+        <?php endfor; ?>
+      </div>
+    </div>
+
     <?php if(empty($items)): ?>
       <div class="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
         <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 mb-4">
           <i class="fa-solid fa-receipt text-3xl"></i>
         </div>
-        <h2 class="text-lg font-bold text-gray-800 mb-1">No Expenses Yet</h2>
-        <p class="text-sm text-gray-500">You haven't recorded any expenses. Tap the + button to add one.</p>
+        <h2 class="text-lg font-bold text-gray-800 mb-1">No Expenses</h2>
+        <p class="text-sm text-gray-500">You haven't recorded any expenses for this date. Tap the + button to add one.</p>
       </div>
     <?php else: ?>
       <div class="space-y-3">
@@ -75,7 +97,7 @@
 
           <div>
             <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1 ml-1">Date</label>
-            <input type="date" name="date" required value="<?= date('Y-m-d') ?>" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition">
+            <input type="date" name="date" required value="<?= htmlspecialchars($selectedDate) ?>" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-semibold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition">
           </div>
 
           <div>

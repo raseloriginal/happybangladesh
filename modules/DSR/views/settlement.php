@@ -1,8 +1,8 @@
 <?php 
 $pageTitle = 'Settlement'; 
 $isSubmitted = !empty($existingSettlement);
-$savedDamage = $isSubmitted ? $existingSettlement['total_damage'] : 0;
-$savedExpense = $isSubmitted ? $existingSettlement['total_expense'] : 0;
+$savedDamage = $isSubmitted ? $existingSettlement['total_damage'] : $totalDamage;
+$savedExpense = $isSubmitted ? $existingSettlement['total_expense'] : $totalExpense;
 $cashBreakdown = $isSubmitted && !empty($existingSettlement['cash_breakdown']) ? json_decode($existingSettlement['cash_breakdown'], true) : [];
 $savedNote = $cashBreakdown['note'] ?? '';
 
@@ -105,14 +105,14 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
             <label class="text-sm font-semibold text-gray-600">Damage Amount (-)</label>
             <div class="relative w-32">
               <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-bold">৳</span>
-              <input type="number" name="damage_amount" id="inputDamage" value="<?= $savedDamage ?>" min="0" step="0.01" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-7 pr-3 text-right font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand <?= $isLocked ? 'opacity-70' : '' ?>" oninput="calculate()" <?= $readonlyAttr ?>>
+              <input type="number" name="damage_amount" id="inputDamage" value="<?= $savedDamage ?>" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-7 pr-3 text-right font-bold text-gray-800 outline-none opacity-80" readonly>
             </div>
           </div>
           <div class="flex items-center justify-between">
             <label class="text-sm font-semibold text-gray-600">Total Expenses (-)</label>
             <div class="relative w-32">
               <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-bold">৳</span>
-              <input type="number" name="total_expense" id="inputExpense" value="<?= $savedExpense ?>" min="0" step="0.01" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-7 pr-3 text-right font-bold text-gray-800 outline-none focus:ring-2 focus:ring-brand <?= $isLocked ? 'opacity-70' : '' ?>" oninput="calculate()" <?= $readonlyAttr ?>>
+              <input type="number" name="total_expense" id="inputExpense" value="<?= $savedExpense ?>" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-7 pr-3 text-right font-bold text-gray-800 outline-none opacity-80" readonly>
             </div>
           </div>
         </div>

@@ -336,18 +336,21 @@ class DSRController extends Controller
 
     public function expenses(): void
     {
-        $items = $this->db->prepare("SELECT * FROM expenses WHERE dsr_id=? ORDER BY date DESC, created_at DESC");
-        $items->execute([Auth::id()]);
+        $selectedDate = $_GET['date'] ?? date('Y-m-d');
+        $items = $this->db->prepare("SELECT * FROM expenses WHERE dsr_id=? AND date=? ORDER BY created_at DESC");
+        $items->execute([Auth::id(), $selectedDate]);
         $items = $items->fetchAll();
-        $this->render('expenses', compact('items'), 'dsr_app');
+        $this->render('expenses', compact('items', 'selectedDate'), 'dsr_app');
     }
 
     public function expenseStore(): void
     {
         $this->verifyCsrf();
+        $date = $this->post('date', date('Y-m-d'));
         $this->db->prepare("INSERT INTO expenses (dsr_id,date,category,amount,description) VALUES (?,?,?,?,?)")
-                 ->execute([Auth::id(), $this->post('date', date('Y-m-d')), $this->post('category','other'), $this->post('amount',0), trim($this->post('description',''))]);
-        $this->flash('success', 'Expense recorded.'); $this->redirect('dsr/expenses');
+                 ->execute([Auth::id(), $date, $this->post('category','other'), $this->post('amount',0), trim($this->post('description',''))]);
+        $this->flash('success', 'Expense recorded.'); 
+        $this->redirect('dsr/expenses?date=' . $date);
     }
 
     public function delivery(): void
@@ -590,19 +593,39 @@ class DSRController extends Controller
             FROM returns r
             JOIN return_items ri ON ri.return_id=r.id
             JOIN products p ON p.id=ri.product_id
-            WHERE r.dsr_id=? AND r.return_date=?
+            WHERE r.dsr_id=? AND r.return_date=? AND (r.reason != 'Damage' OR r.reason IS NULL)
         ");
         $q2->execute([$dsrId, $selectedDate]);
         $formalReturnValue = $q2->fetchColumn();
 
         $returnedValue = $spotReturnValue + $formalReturnValue;
+        
+        // Damage amount
+        $q3 = $this->db->prepare("
+            SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+            FROM returns r
+            JOIN return_items ri ON ri.return_id=r.id
+            JOIN products p ON p.id=ri.product_id
+            WHERE r.dsr_id=? AND r.return_date=? AND r.reason='Damage'
+        ");
+        $q3->execute([$dsrId, $selectedDate]);
+        $totalDamage = (float) $q3->fetchColumn();
+
+        // Total Expenses
+        $q4 = $this->db->prepare("
+            SELECT COALESCE(SUM(amount), 0)
+            FROM expenses
+            WHERE dsr_id=? AND date=?
+        ");
+        $q4->execute([$dsrId, $selectedDate]);
+        $totalExpense = (float) $q4->fetchColumn();
 
         // Check if settlement already submitted for this date
         $check = $this->db->prepare("SELECT * FROM settlements WHERE dsr_id=? AND date=?");
         $check->execute([$dsrId, $selectedDate]);
         $existingSettlement = $check->fetch() ?: null;
 
-        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'selectedDate', 'existingSettlement'), 'dsr_app');
+        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'selectedDate', 'existingSettlement'), 'dsr_app');
     }
 
     public function settlementSubmit(): void
