@@ -605,6 +605,49 @@ class AdminController extends Controller
         $this->redirect('admin/database-sync');
     }
 
+    public function databaseClear(): void
+    {
+        $this->verifyCsrf();
+        $currentUserId = Auth::id();
+
+        try {
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 0;");
+
+            $tablesToTruncate = [
+                'activity_logs', 'approvals', 'attendance', 'categories', 
+                'companies', 'dealer_companies', 'dealers', 'dispatch_extras', 
+                'dispatch_items', 'dispatch_schedule_srs', 'dispatch_schedules', 
+                'dispatches', 'expenses', 'inventory', 'lots', 
+                'order_items', 'orders', 'products', 'readysales', 'retailers', 
+                'return_items', 'returns', 'sales_reports', 'settlements', 
+                'van_stock'
+            ];
+
+            foreach ($tablesToTruncate as $table) {
+                $this->db->exec("TRUNCATE TABLE `{$table}`");
+            }
+
+            // Truncate warehouses and insert a default one to avoid foreign key or Auth errors
+            $this->db->exec("TRUNCATE TABLE `warehouses`");
+            $this->db->exec("INSERT INTO `warehouses` (`id`, `name`, `location`, `status`) VALUES (1, 'Default Warehouse', 'Tejgaon, Dhaka', 1)");
+
+            // Delete all users except the current admin
+            $this->db->prepare("DELETE FROM users WHERE id != ?")->execute([$currentUserId]);
+            
+            // Link current admin to the default warehouse
+            $this->db->prepare("UPDATE users SET warehouse_id = 1 WHERE id = ?")->execute([$currentUserId]);
+
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
+
+            $this->flash('success', 'Database successfully cleared! Only your Admin user remains.');
+        } catch (PDOException $e) {
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
+            $this->flash('error', 'Failed to clear database: ' . $e->getMessage());
+        }
+
+        $this->redirect('admin/database-sync');
+    }
+
     private function parseSchemaSql(): array
     {
         $filePath = ROOT_PATH . '/database/migrations/schema.sql';

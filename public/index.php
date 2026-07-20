@@ -118,6 +118,7 @@ $router->get( '/admin/reports',               ['AdminController', 'reports']);
 // Database Sync
 $router->get( '/admin/database-sync',         ['AdminController', 'databaseSync']);
 $router->post('/admin/database-sync/run',     ['AdminController', 'databaseSyncRun']);
+$router->post('/admin/database-sync/clear',   ['AdminController', 'databaseClear']);
 
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);

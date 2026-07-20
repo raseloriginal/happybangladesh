@@ -75,35 +75,37 @@
   </div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
   
   <!-- Run Schema Sync -->
   <div class="card">
     <div class="card-header bg-blue-50 border-b border-blue-100">
       <h2 class="card-title text-blue-800"><i class="fas fa-database mr-2"></i> Run Schema Sync</h2>
     </div>
-    <div class="card-body">
-      <p class="text-sm text-gray-600 mb-4">
-        This runs only the missing updates compared against <code>schema.sql</code>.
-      </p>
-      
-      <form method="POST" action="<?= url('admin/database-sync/run') ?>">
-        <?= Helpers::csrfField() ?>
-        <input type="hidden" name="sync_type" value="schema">
-        <input type="hidden" name="proposed_sql" value="<?= htmlspecialchars($proposedSql) ?>">
+    <div class="card-body flex flex-col justify-between h-full">
+      <div>
+        <p class="text-sm text-gray-600 mb-4">
+          This runs only the missing updates compared against <code>schema.sql</code>.
+        </p>
         
-        <div class="bg-gray-800 rounded-md p-3 mb-4 overflow-y-auto" style="max-height: 200px;">
-          <?php if (!empty($proposedSql)): ?>
-            <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap"><?= htmlspecialchars($proposedSql) ?></pre>
-          <?php else: ?>
-            <p class="text-xs text-gray-400 italic">No updates pending. Database is fully synced.</p>
-          <?php endif; ?>
-        </div>
-        
-        <button type="submit" class="btn btn-primary bg-blue-600 hover:bg-blue-700 w-full" <?= empty($proposedSql) ? 'disabled' : '' ?> onclick="return confirm('Are you sure you want to run the schema sync?')">
-          <i class="fas fa-play mr-2"></i> Execute Sync SQL
-        </button>
-      </form>
+        <form method="POST" action="<?= url('admin/database-sync/run') ?>">
+          <?= Helpers::csrfField() ?>
+          <input type="hidden" name="sync_type" value="schema">
+          <input type="hidden" name="proposed_sql" value="<?= htmlspecialchars($proposedSql) ?>">
+          
+          <div class="bg-gray-800 rounded-md p-3 mb-4 overflow-y-auto" style="max-height: 200px;">
+            <?php if (!empty($proposedSql)): ?>
+              <pre class="text-xs text-green-400 font-mono whitespace-pre-wrap"><?= htmlspecialchars($proposedSql) ?></pre>
+            <?php else: ?>
+              <p class="text-xs text-gray-400 italic">No updates pending. Database is fully synced.</p>
+            <?php endif; ?>
+          </div>
+          
+          <button type="submit" class="btn btn-primary bg-blue-600 hover:bg-blue-700 w-full" <?= empty($proposedSql) ? 'disabled' : '' ?> onclick="return confirm('Are you sure you want to run the schema sync?')">
+            <i class="fas fa-play mr-2"></i> Execute Sync SQL
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -112,23 +114,58 @@
     <div class="card-header bg-purple-50 border-b border-purple-100">
       <h2 class="card-title text-purple-800"><i class="fas fa-terminal mr-2"></i> Run Custom Migration (SQL)</h2>
     </div>
-    <div class="card-body">
-      <p class="text-sm text-gray-600 mb-4">
-        Paste your <code>ALTER TABLE</code> or any other SQL migration commands here to apply custom changes to the database.
-      </p>
-      
-      <form method="POST" action="<?= url('admin/database-sync/run') ?>">
-        <?= Helpers::csrfField() ?>
-        <input type="hidden" name="sync_type" value="custom">
+    <div class="card-body flex flex-col justify-between h-full">
+      <div>
+        <p class="text-sm text-gray-600 mb-4">
+          Paste your <code>ALTER TABLE</code> or any other SQL migration commands here to apply custom changes.
+        </p>
         
-        <div class="form-group mb-4">
-          <textarea name="custom_sql" class="form-input font-mono text-sm w-full p-2 border rounded" rows="8" placeholder="ALTER TABLE products ADD COLUMN ... ;" required></textarea>
+        <form method="POST" action="<?= url('admin/database-sync/run') ?>">
+          <?= Helpers::csrfField() ?>
+          <input type="hidden" name="sync_type" value="custom">
+          
+          <div class="form-group mb-4">
+            <textarea name="custom_sql" class="form-input font-mono text-sm w-full p-2 border rounded" rows="6" placeholder="ALTER TABLE products ADD COLUMN ... ;" required></textarea>
+          </div>
+          
+          <button type="submit" class="btn btn-primary bg-purple-600 hover:bg-purple-700 w-full" onclick="return confirm('Are you sure you want to execute these custom SQL commands?')">
+            <i class="fas fa-bolt mr-2"></i> Execute Custom SQL
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear Database -->
+  <div class="card">
+    <div class="card-header bg-red-50 border-b border-red-100">
+      <h2 class="card-title text-red-800"><i class="fas fa-trash-alt mr-2"></i> Reset Database (Start Fresh)</h2>
+    </div>
+    <div class="card-body flex flex-col justify-between h-full">
+      <div>
+        <p class="text-sm text-gray-600 mb-4">
+          Wipes all transactional data, customers, products, stock, and users.
+        </p>
+        <div class="bg-red-50 border-l-4 border-red-400 p-3 mb-4 rounded">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <i class="fas fa-exclamation-triangle text-red-400"></i>
+            </div>
+            <div class="ml-3">
+              <p class="text-xs text-red-700 font-bold">
+                WARNING: This action is irreversible. Only your current Administrator account and system roles will remain.
+              </p>
+            </div>
+          </div>
         </div>
         
-        <button type="submit" class="btn btn-primary bg-purple-600 hover:bg-purple-700 w-full" onclick="return confirm('Are you sure you want to execute these custom SQL commands?')">
-          <i class="fas fa-bolt mr-2"></i> Execute Custom SQL
-        </button>
-      </form>
+        <form method="POST" action="<?= url('admin/database-sync/clear') ?>" onsubmit="return confirm('CRITICAL WARNING: Are you absolutely sure you want to clear all data? This will delete all users, orders, dispatches, products, dealers, and reset the database. This action CANNOT be undone!')">
+          <?= Helpers::csrfField() ?>
+          <button type="submit" class="btn btn-danger bg-red-600 hover:bg-red-700 text-white w-full py-2.5 font-bold rounded-lg shadow-md transition active:scale-[0.98]">
+            <i class="fas fa-trash-arrow-up mr-2"></i> Clear All Data
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 
