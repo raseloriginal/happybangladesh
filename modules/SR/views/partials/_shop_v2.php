@@ -569,6 +569,11 @@ function renderProductsGrid() {
     const btnHtml = isInCart 
       ? `<button class="sr-prod-card-btn-v2 added" onclick="event.stopPropagation(); openProductSheet(${i})">যোগ হয়েছে</button>`
       : `<button class="sr-prod-card-btn-v2" onclick="event.stopPropagation(); openProductSheet(${i})">যোগ করুন <i class="fa-solid fa-plus" style="font-size: 0.65rem; margin-left: 2px;"></i></button>`;
+      
+    const stockQty = parseInt(p.stock || 0);
+    const stockHtml = stockQty > 0 
+      ? `<span style="font-size: 0.65rem; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">Stock: ${stockQty}</span>`
+      : `<span style="font-size: 0.65rem; font-weight: 700; color: #ef4444; background: #fee2e2; padding: 2px 6px; border-radius: 4px;">Out of Stock</span>`;
 
     return `
     <div class="sr-product-card-v2" onclick="openProductSheet(${i})">
@@ -577,7 +582,10 @@ function renderProductsGrid() {
       </div>
       <div class="sr-product-card-info-v2">
         <div class="sr-product-card-name-v2">${escHtml(p.name)}</div>
-        <div class="sr-product-card-price-v2">Tk ${parseFloat(p.selling_price || p.price || 0)}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+            <div class="sr-product-card-price-v2" style="margin-bottom:0;">Tk ${parseFloat(p.selling_price || p.price || 0)}</div>
+            ${stockHtml}
+        </div>
         <div class="sr-product-card-action-v2">
           ${btnHtml}
         </div>

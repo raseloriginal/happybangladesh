@@ -22,6 +22,59 @@
   </div>
 </div>
 
+<!-- ── Orders Summary (New) ────────────────────────────────── -->
+<div style="padding: 0 16px 16px 16px;">
+  <div style="background: white; border-radius: 16px; padding: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--sr-text);">
+        <i class="fa-solid fa-chart-pie" style="color: var(--sr-primary); margin-right: 6px;"></i> Order Summary (Today)
+      </h3>
+      <div style="background: #eff6ff; color: #2563eb; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+        <i class="fa-solid fa-store" style="margin-right: 4px;"></i> <?= $retailerCount ?? 0 ?> Retailers
+      </div>
+    </div>
+    
+    <?php if (empty($productSummary)): ?>
+      <div style="text-align: center; color: #94a3b8; font-size: 0.8rem; padding: 10px 0;">No products ordered yet.</div>
+    <?php else: ?>
+      <div style="max-height: 150px; overflow-y: auto; border: 1px solid #f1f5f9; border-radius: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+          <thead style="background: #f8fafc; position: sticky; top: 0;">
+            <tr>
+              <th style="padding: 8px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">Product</th>
+              <th style="padding: 8px; text-align: right; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">Qty</th>
+              <th style="padding: 8px; text-align: right; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0;">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php 
+              $grandTotalQty = 0;
+              $grandTotalVal = 0;
+              foreach ($productSummary as $ps): 
+                $grandTotalQty += $ps['qty'];
+                $grandTotalVal += $ps['total_val'];
+                $boxes = floor($ps['qty'] / $ps['ppb']);
+                $pcs = $ps['qty'] % $ps['ppb'];
+                $qtyStr = ($boxes > 0 ? $boxes . 'B ' : '') . ($pcs > 0 || $boxes == 0 ? $pcs . 'P' : '');
+            ?>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px; font-weight: 600; color: #334155;"><?= h($ps['name']) ?></td>
+              <td style="padding: 8px; text-align: right; color: #475569;"><span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700;"><?= $qtyStr ?></span></td>
+              <td style="padding: 8px; text-align: right; font-weight: 700; color: #0f172a;">৳<?= number_format($ps['total_val'], 0) ?></td>
+            </tr>
+            <?php endforeach; ?>
+            <tr style="background: #f8fafc;">
+              <td style="padding: 8px; font-weight: 700; color: #0f172a;">Total</td>
+              <td style="padding: 8px; text-align: right; font-weight: 700; color: #2563eb;"><?= $grandTotalQty ?> Units</td>
+              <td style="padding: 8px; text-align: right; font-weight: 700; color: #ef4444;">৳<?= number_format($grandTotalVal, 0) ?></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
+  </div>
+</div>
+
 <!-- ── Filter Tabs ─────────────────────────────────────────── -->
 <div style="display:flex;gap:8px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;">
   <?php

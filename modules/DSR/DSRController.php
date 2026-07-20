@@ -374,11 +374,10 @@ class DSRController extends Controller
             LEFT JOIN companies c ON c.id = u.company_id
             LEFT JOIN dealers dl ON dl.id = o.dealer_id
             LEFT JOIN retailers r ON r.id = o.retailer_id
-            WHERE d.dsr_id = ?
-              AND (d.status IN ('in_transit', 'partial') OR (d.status IN ('delivered', 'cancelled') AND (d.dispatch_date = ? OR DATE(d.updated_at) = ?)))
+            WHERE d.dsr_id = ? AND d.dispatch_date = ?
             ORDER BY dealer_name ASC
         ");
-        $q->execute([$dsrId, $selectedDate, $selectedDate]);
+        $q->execute([$dsrId, $selectedDate]);
         $flatRetailers = $q->fetchAll();
 
         // Group by dealer_id
@@ -431,7 +430,26 @@ class DSRController extends Controller
         
         $isCompleted = ($qItems->fetchColumn() > 0 && $check->fetchColumn() == 0);
 
-        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'selectedDate'), 'dsr_app');
+        // Van stock: total dispatched qty minus delivered qty for today
+        $vanQ = $this->db->prepare("
+            SELECT di.product_id, 
+                   SUM(di.quantity) as dispatched,
+                   SUM(COALESCE(di.delivered_quantity, 0)) as delivered
+            FROM dispatch_items di
+            JOIN dispatches d ON d.id = di.dispatch_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            GROUP BY di.product_id
+        ");
+        $vanQ->execute([$dsrId, $selectedDate]);
+        $vanStockMap = [];
+        foreach ($vanQ->fetchAll() as $row) {
+            $remaining = (int)$row['dispatched'] - (int)$row['delivered'];
+            if ($remaining > 0) {
+                $vanStockMap[(int)$row['product_id']] = $remaining;
+            }
+        }
+
+        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'selectedDate', 'vanStockMap'), 'dsr_app');
     }
 
     public function deliveryUpdate(string $id): void

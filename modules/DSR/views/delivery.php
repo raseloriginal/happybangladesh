@@ -515,6 +515,7 @@ $hasDeliveries = !empty($retailers);
 <script>
 // ── Data from PHP ────────────────────────────────────────────
 const orderedRetailers = <?= json_encode($retailers) ?>;
+const vanStockMap = <?= json_encode($vanStockMap ?? new stdClass()) ?>;
 
 let map, userMarker, radiusCircle = null;
 let currentDispatchId = null;
@@ -1180,7 +1181,10 @@ function openRetailerSheet(retailer) {
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="text-sm font-black text-gray-800 line-clamp-2 leading-snug">${p.name}</div>
-                                <div class="text-xs font-black text-pink-500 mt-1">Tk ${parseFloat(p.price || 0).toFixed(0)}</div>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <div class="text-xs font-black text-pink-500" id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</div>
+                                    ${vanStockMap[p.product_id] ? `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Van: ${vanStockMap[p.product_id]}pcs</span>` : `<span class="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-md">Van: 0</span>`}
+                                </div>
                             </div>
                         </div>
 
@@ -1344,6 +1348,13 @@ function calcProgress(el, idx) {
     const delQtyEl = document.getElementById(`delQty-${idx}`);
     if (delQtyEl) delQtyEl.innerText = totalDelivered;
 
+    // Update item price display (total cost = qty * unit price)
+    const itemPriceEl = document.getElementById(`itemPrice-${idx}`);
+    if (itemPriceEl) {
+        const unitPrice = parseFloat(el.closest('.product-item').getAttribute('data-price')) || 0;
+        itemPriceEl.innerText = 'Tk ' + (totalDelivered * unitPrice).toFixed(0);
+    }
+
     let percent = (totalDelivered / maxQty) * 100;
     if (percent > 100) percent = 100;
 
@@ -1445,9 +1456,24 @@ function markDelivery(status) {
 
 function openPaidPaymentModal() {
     const totalPayable = getSelectedOrderGettingTotal();
-    document.getElementById('paidPaymentInput').value = totalPayable.toFixed(2);
-    document.getElementById('paymentDueInfo').innerText = 'Paid in Full';
-    document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-green-500 mb-4 h-5';
+    
+    // Check if this order already has some paid amount
+    let existingPaid = 0;
+    if (currentRetailerObj && currentRetailerObj.orders) {
+        const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
+        if (order) existingPaid = parseFloat(order.paid_amount || 0);
+    }
+    const remainingDue = totalPayable - existingPaid;
+    
+    document.getElementById('paidPaymentInput').value = (remainingDue > 0 ? remainingDue : totalPayable).toFixed(2);
+    
+    if (existingPaid > 0) {
+        document.getElementById('paymentDueInfo').innerHTML = `Already Paid: ৳${existingPaid.toFixed(2)} | Remaining: ৳${remainingDue.toFixed(2)}`;
+        document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-amber-600 mb-4 h-5';
+    } else {
+        document.getElementById('paymentDueInfo').innerText = 'Paid in Full';
+        document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-green-500 mb-4 h-5';
+    }
     
     document.getElementById('paidPaymentModal').classList.remove('hidden');
     setTimeout(() => {
@@ -1481,15 +1507,23 @@ function submitPaidPayment() {
     const entered = parseFloat(document.getElementById('paidPaymentInput').value) || 0;
     const total = getSelectedOrderGettingTotal();
     
+    // Get existing paid amount for this order (for cumulative calculation)
+    let existingPaid = 0;
+    if (currentRetailerObj && currentRetailerObj.orders) {
+        const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
+        if (order) existingPaid = parseFloat(order.paid_amount || 0);
+    }
+    const cumulativePaid = existingPaid + entered;
+    
     let status = 'delivered';
-    if (entered < total) {
+    if (cumulativePaid < total) {
         status = 'partial';
     }
     
     closePaidPaymentModal();
     
     let paidAmounts = {};
-    paidAmounts[currentDispatchId] = entered;
+    paidAmounts[currentDispatchId] = cumulativePaid;
     
     submitSelectedDeliveries(status, [currentDispatchId], paidAmounts);
 }

@@ -128,7 +128,16 @@ class SRController extends Controller
         $q->execute([$srId]);
         $items = $q->fetchAll();
 
+        $retailersSet = [];
+        $productSummary = [];
+
         foreach ($items as &$item) {
+            if ($item['retailer_id']) {
+                $retailersSet['retailer_'.$item['retailer_id']] = true;
+            } elseif ($item['dealer_id']) {
+                $retailersSet['dealer_'.$item['dealer_id']] = true;
+            }
+
             $iq = $this->db->prepare("
                 SELECT oi.*, p.name AS product_name, p.pieces_per_box, p.price AS base_price
                 FROM order_items oi
@@ -137,9 +146,26 @@ class SRController extends Controller
             ");
             $iq->execute([$item['id']]);
             $item['products'] = $iq->fetchAll();
+
+            foreach ($item['products'] as $p) {
+                $pid = $p['product_id'];
+                if (!isset($productSummary[$pid])) {
+                    $productSummary[$pid] = [
+                        'name' => $p['product_name'],
+                        'qty' => 0,
+                        'total_val' => 0,
+                        'ppb' => (int)$p['pieces_per_box'] ?: 1
+                    ];
+                }
+                $productSummary[$pid]['qty'] += (int)$p['quantity'];
+                $productSummary[$pid]['total_val'] += (float)$p['total_price'];
+            }
         }
 
-        $this->renderApp('orders', compact('items'));
+        $retailerCount = count($retailersSet);
+        $productSummary = array_values($productSummary); // Reset keys for easier loop in view
+
+        $this->renderApp('orders', compact('items', 'retailerCount', 'productSummary'));
     }
 
     // ── Sales / Map Page ──────────────────────────────────────
