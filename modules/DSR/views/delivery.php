@@ -122,21 +122,26 @@ $hasDeliveries = !empty($retailers);
       <div class="flex justify-between items-center mb-4">
         <div class="text-sm font-bold text-gray-800 flex items-center gap-1">
           অর্ডার সমূহ <span class="text-emerald-500 font-black text-base ml-1" id="bsTotalQty">50</span>
+          <span id="bsStatus" class="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold border border-current">Pending</span>
         </div>
         <div class="border border-blue-400 text-blue-500 bg-blue-50/10 font-bold px-4 py-1 rounded-full text-xs" id="bsOrderTotal">
           Tk 50.00
         </div>
       </div>
 
+      <!-- Partial Info -->
+      <div id="bsPartialInfo" class="hidden mb-4 bg-orange-50 border border-orange-100 rounded-lg p-3 flex justify-between items-center text-xs shadow-sm">
+          <div class="text-orange-700 font-bold">Partial Status</div>
+          <div class="flex gap-4">
+              <div>Paid: <span id="bsPaidAmount" class="font-black text-green-600">৳0.00</span></div>
+              <div>Due: <span id="bsDueAmount" class="font-black text-red-500">৳0.00</span></div>
+          </div>
+      </div>
+
       <!-- Hidden elements to preserve JS bindings -->
       <div class="hidden">
         <div id="bsRetailerAddress"></div>
         <span id="bsGettingTotal">৳0</span>
-        <span id="bsStatus">Pending</span>
-        <div id="bsPartialInfo">
-          <span id="bsPaidAmount">৳0.00</span>
-          <span id="bsDueAmount">৳0.00</span>
-        </div>
       </div>
 
       <!-- Company Tabs Container -->
@@ -1171,7 +1176,7 @@ function openRetailerSheet(retailer) {
                     const initialPcs = initialDeliveredQty % ppb;
 
                     orderHtml += `
-                    <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" data-price="${p.price || 0}">
+                    <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
                         <div class="flex items-center gap-4 mb-3">
                             <div class="w-16 h-16 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 p-1">
                                 ${p.image
@@ -1181,8 +1186,9 @@ function openRetailerSheet(retailer) {
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="text-sm font-black text-gray-800 line-clamp-2 leading-snug">${p.name}</div>
-                                <div class="flex items-center gap-2 mt-1">
+                                <div class="flex items-center gap-2 mt-1 flex-wrap">
                                     <div class="text-xs font-black text-pink-500" id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</div>
+                                    <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
                                     ${vanStockMap[p.product_id] ? `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Van: ${vanStockMap[p.product_id]}pcs</span>` : `<span class="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-md">Van: 0</span>`}
                                 </div>
                             </div>
@@ -1362,9 +1368,22 @@ function calcProgress(el, idx) {
 
     // Update item price display (total cost = qty * unit price)
     const itemPriceEl = document.getElementById(`itemPrice-${idx}`);
+    const itemOcEl = document.getElementById(`itemOc-${idx}`);
     if (itemPriceEl) {
-        const unitPrice = parseFloat(el.closest('.product-item').getAttribute('data-price')) || 0;
+        const unitPrice = parseFloat(parent.getAttribute('data-price')) || 0;
+        const basePrice = parseFloat(parent.getAttribute('data-baseprice')) || 0;
         itemPriceEl.innerText = 'Tk ' + (totalDelivered * unitPrice).toFixed(0);
+        
+        if (itemOcEl) {
+            const oc = (unitPrice - basePrice) * totalDelivered;
+            if (Math.round(oc) !== 0 && totalDelivered > 0) {
+                itemOcEl.className = `text-[10px] font-bold px-1.5 py-0.5 rounded-md ${oc > 0 ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`;
+                itemOcEl.innerText = `${oc > 0 ? '+' : ''}${Math.round(oc)} O/C`;
+                itemOcEl.classList.remove('hidden');
+            } else {
+                itemOcEl.classList.add('hidden');
+            }
+        }
     }
 
     let percent = (totalDelivered / maxQty) * 100;

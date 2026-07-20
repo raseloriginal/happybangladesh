@@ -401,6 +401,7 @@ class DSRController extends Controller
             $iq = $this->db->prepare("
                 SELECT di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
                        p.name, p.image, p.pieces_per_box, 
+                       p.price as base_price,
                        COALESCE(oi.unit_price, p.price) as price
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
