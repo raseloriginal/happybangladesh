@@ -400,12 +400,14 @@ class DSRController extends Controller
             // Fetch products for this dispatch
             $iq = $this->db->prepare("
                 SELECT di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
-                       p.name, p.image, p.pieces_per_box, p.price
+                       p.name, p.image, p.pieces_per_box, 
+                       COALESCE(oi.unit_price, p.price) as price
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
+                LEFT JOIN order_items oi ON oi.order_id = ? AND oi.product_id = di.product_id
                 WHERE di.dispatch_id = ?
             ");
-            $iq->execute([$ret['dispatch_id']]);
+            $iq->execute([$ret['order_id'], $ret['dispatch_id']]);
             $products = $iq->fetchAll();
             
             $grouped[$did]['orders'][] = [

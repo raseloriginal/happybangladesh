@@ -1275,8 +1275,20 @@ function selectCompanyOrder(orderIndex) {
         if (order.status === 'partial') {
             bsPartialInfo.classList.remove('hidden');
             const paid = parseFloat(order.paid_amount || 0);
-            const total = parseFloat(order.total_amount || 0);
-            const due = total - paid;
+            
+            // Calculate the actual total based on products' delivered quantity
+            let actualTotal = 0;
+            if (order.products) {
+                order.products.forEach(p => {
+                    const qty = parseInt(p.quantity);
+                    let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+                    actualTotal += (deliveredQty * parseFloat(p.price || 0));
+                });
+            } else {
+                actualTotal = parseFloat(order.total_amount || 0);
+            }
+            
+            const due = actualTotal - paid;
             document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(2);
             document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
         } else {
@@ -1402,12 +1414,7 @@ function calcProgress(el, idx) {
         const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
         if (order) {
             const paid = parseFloat(order.paid_amount || 0);
-            let due = 0;
-            if (anyInputFilled) {
-                due = gettingTotal - paid;
-            } else {
-                due = parseFloat(order.total_amount || 0) - paid;
-            }
+            let due = gettingTotal - paid;
             const bsDueAmount = document.getElementById('bsDueAmount');
             if (bsDueAmount) bsDueAmount.innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
         }
