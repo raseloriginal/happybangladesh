@@ -555,7 +555,7 @@ function showPartialDuePopup(ret, partialOrders) {
     });
     
     document.getElementById('partialDueTitle').innerText = ret.name;
-    document.getElementById('partialDueMessage').innerHTML = `This retailer has a pending due of <span class="text-amber-600 font-black">৳${totalDue.toFixed(2)}</span>.`;
+    document.getElementById('partialDueMessage').innerHTML = `This retailer has a pending due of <span class="text-amber-600 font-black">৳${totalDue.toFixed(0)}</span>.`;
     
     const modal = document.getElementById('partialDueModal');
     const content = document.getElementById('partialDueContent');
@@ -617,16 +617,16 @@ function calcDamageSummary() {
     });
 
     const dmgTotalAmountInput = document.getElementById('dmgTotalAmount');
-    dmgTotalAmountInput.value = totalDamage > 0 ? totalDamage.toFixed(2) : '';
+    dmgTotalAmountInput.value = totalDamage > 0 ? totalDamage.toFixed(0) : '';
 
     const deliveredValue = typeof getSelectedOrderGettingTotal === 'function' ? getSelectedOrderGettingTotal() : 0;
-    document.getElementById('dmgDeliveredValue').innerText = '৳' + deliveredValue.toFixed(2);
+    document.getElementById('dmgDeliveredValue').innerText = '৳' + deliveredValue.toFixed(0);
 
     let netPayable = deliveredValue - totalDamage;
     if (netPayable < 0) netPayable = 0;
 
-    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(2);
-    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(2) : '';
+    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(0);
+    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(0) : '';
 }
 
 function onManualDamageAmountChange() {
@@ -636,8 +636,8 @@ function onManualDamageAmountChange() {
     let netPayable = deliveredValue - totalDamage;
     if (netPayable < 0) netPayable = 0;
 
-    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(2);
-    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(2) : '';
+    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(0);
+    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(0) : '';
 }
 
 function renderSelectedDamageProducts() {
@@ -877,7 +877,7 @@ function handleDuePaymentAction() {
         totalDue += (parseFloat(o.total_amount) - parseFloat(o.paid_amount));
     });
     
-    showPromptPopup(`Enter payment amount (Total Due: ৳${totalDue.toFixed(2)}):`, async (val) => {
+    showPromptPopup(`Enter payment amount (Total Due: ৳${totalDue.toFixed(0)}):`, async (val) => {
         if (val <= 0) {
             showToast("⚠️ Payment amount must be greater than zero!");
             return;
@@ -1265,7 +1265,7 @@ function selectCompanyOrder(orderIndex) {
         });
     }
 
-    document.getElementById('bsOrderTotal').innerText = 'Tk ' + parseFloat(order.total_amount || 0).toFixed(2);
+    document.getElementById('bsOrderTotal').innerText = 'Tk ' + parseFloat(order.total_amount || 0).toFixed(0);
     
     // Update order quantity stats
     const totalQty = order.products ? order.products.reduce((acc, p) => acc + parseInt(p.quantity), 0) : 0;
@@ -1298,8 +1298,8 @@ function selectCompanyOrder(orderIndex) {
             }
             
             const due = actualTotal - paid;
-            document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(2);
-            document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
+            document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(0);
+            document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(0);
         } else {
             bsPartialInfo.classList.add('hidden');
         }
@@ -1428,7 +1428,7 @@ function calcProgress(el, idx) {
     });
     
     const bsGettingTotal = document.getElementById('bsGettingTotal');
-    if (bsGettingTotal) bsGettingTotal.innerText = '৳' + gettingTotal.toFixed(2);
+    if (bsGettingTotal) bsGettingTotal.innerText = '৳' + gettingTotal.toFixed(0);
 
     // Update due if partial info is visible
     const bsPartialInfo = document.getElementById('bsPartialInfo');
@@ -1438,7 +1438,7 @@ function calcProgress(el, idx) {
             const paid = parseFloat(order.paid_amount || 0);
             let due = gettingTotal - paid;
             const bsDueAmount = document.getElementById('bsDueAmount');
-            if (bsDueAmount) bsDueAmount.innerText = '৳' + (due > 0 ? due : 0).toFixed(2);
+            if (bsDueAmount) bsDueAmount.innerText = '৳' + (due > 0 ? due : 0).toFixed(0);
         }
     }
 }
@@ -1494,10 +1494,10 @@ function openPaidPaymentModal() {
     }
     const remainingDue = totalPayable - existingPaid;
     
-    document.getElementById('paidPaymentInput').value = (remainingDue > 0 ? remainingDue : totalPayable).toFixed(2);
+    document.getElementById('paidPaymentInput').value = (remainingDue > 0 ? remainingDue : totalPayable).toFixed(0);
     
     if (existingPaid > 0) {
-        document.getElementById('paymentDueInfo').innerHTML = `Already Paid: ৳${existingPaid.toFixed(2)} | Remaining: ৳${remainingDue.toFixed(2)}`;
+        document.getElementById('paymentDueInfo').innerHTML = `Already Paid: ৳${existingPaid.toFixed(0)} | Remaining: ৳${remainingDue.toFixed(0)}`;
         document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-amber-600 mb-4 h-5';
     } else {
         document.getElementById('paymentDueInfo').innerText = 'Paid in Full';
@@ -1524,7 +1524,7 @@ function onPaidPaymentInput(el) {
     
     const info = document.getElementById('paymentDueInfo');
     if (due > 0) {
-        info.innerText = `Due: ৳${due.toFixed(2)} (Will set as Partial)`;
+        info.innerText = `Due: ৳${due.toFixed(0)} (Will set as Partial)`;
         info.className = 'text-sm font-bold text-red-500 mb-4 h-5';
     } else {
         info.innerText = 'Paid in Full';
@@ -1790,7 +1790,7 @@ function showMultiCancelPopup(orders) {
                 <input type="checkbox" name="cancel_dispatch" value="${o.dispatch_id}" checked class="w-5 h-5 text-red-600 rounded focus:ring-red-500">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-gray-800">${o.company_name}</div>
-                    <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(2)}</div>
+                    <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(0)}</div>
                 </div>
             </label>
         `);
@@ -1842,7 +1842,7 @@ function showMultiCompletePopup(orders) {
                 <input type="checkbox" name="complete_dispatch" value="${o.dispatch_id}" checked class="w-5 h-5 text-green-600 rounded focus:ring-green-500">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-gray-800">${o.company_name}</div>
-                    <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(2)}</div>
+                    <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(0)}</div>
                 </div>
             </label>
         `);
@@ -1895,7 +1895,7 @@ function showMultiPartialPopup(orders) {
                     <input type="checkbox" name="partial_dispatch" value="${o.dispatch_id}" checked class="w-5 h-5 text-orange-500 rounded focus:ring-orange-500" onchange="togglePartialInput(this)">
                     <div class="flex-1">
                         <div class="text-sm font-bold text-gray-800">${o.company_name}</div>
-                        <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(2)}</div>
+                        <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(0)}</div>
                     </div>
                 </label>
                 <div class="flex items-center gap-2 pl-8" id="partial-input-wrapper-${o.dispatch_id}">

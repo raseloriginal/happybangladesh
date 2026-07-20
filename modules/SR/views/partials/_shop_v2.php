@@ -619,7 +619,7 @@ function openProductSheet(idx) {
   document.getElementById('productSheetBasePrice').textContent = `Tk 0`;
   
   // Set the big input default to the carton base price
-  document.getElementById('totalDisplayInput').value = cartonBasePrice.toFixed(2);
+  document.getElementById('totalDisplayInput').value = cartonBasePrice.toFixed(0);
 
   const imgWrap = document.getElementById('productSheetImgWrap');
   if (p.image) {
@@ -636,7 +636,7 @@ function openProductSheet(idx) {
     cartons = Math.floor(existing.qty / ppb);
     pieces = existing.qty % ppb;
     currentPiecePrice = existing.price;
-    document.getElementById('totalDisplayInput').value = (currentPiecePrice * ppb).toFixed(2);
+    document.getElementById('totalDisplayInput').value = (currentPiecePrice * ppb).toFixed(0);
   }
 
   document.getElementById('qtyCartons').value = cartons;
@@ -657,7 +657,7 @@ function changeQty(type, delta) {
 function changeTotalAmount(amount) {
   const input = document.getElementById('totalDisplayInput');
   let currentBoxPrice = parseFloat(input.value) || 0;
-  input.value = Math.max(0, currentBoxPrice + amount).toFixed(2);
+  input.value = Math.max(0, currentBoxPrice + amount).toFixed(0);
   calcTotal();
 }
 
