@@ -124,8 +124,12 @@ $hasDeliveries = !empty($retailers);
           অর্ডার সমূহ <span class="text-emerald-500 font-black text-base ml-1" id="bsTotalQty">50</span>
           <span id="bsStatus" class="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold border border-current">Pending</span>
         </div>
-        <div class="border border-blue-400 text-blue-500 bg-blue-50/10 font-bold px-4 py-1 rounded-full text-xs" id="bsOrderTotal">
-          Tk 50.00
+        <div class="flex flex-col items-end gap-1">
+            <div class="text-[10px] text-gray-400 font-bold uppercase">Ordered: <span id="bsOrderTotal" class="text-gray-500 line-through">Tk 0.00</span></div>
+            <div class="border border-blue-400 text-blue-600 bg-blue-50/30 font-black px-3 py-1 rounded-full text-xs shadow-sm flex items-center gap-1">
+              <span>Payable:</span>
+              <span id="bsGettingTotal">৳0.00</span>
+            </div>
         </div>
       </div>
 
@@ -141,7 +145,6 @@ $hasDeliveries = !empty($retailers);
       <!-- Hidden elements to preserve JS bindings -->
       <div class="hidden">
         <div id="bsRetailerAddress"></div>
-        <span id="bsGettingTotal">৳0</span>
       </div>
 
       <!-- Company Tabs Container -->
