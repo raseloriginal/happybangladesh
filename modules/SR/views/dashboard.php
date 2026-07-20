@@ -134,14 +134,14 @@
 (function() {
   const ctx = document.getElementById('srSalesChart');
   if (!ctx) return;
-  const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const data   = [12,19,8,25,14,30,22]; // demo data — replace with real
+  const labels = <?= json_encode($chartLabels) ?>;
+  const data   =  <?= json_encode($chartValues) ?>;
   new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
       datasets: [{
-        label: 'Orders',
+        label: 'Sales Value (৳)',
         data,
         backgroundColor: function(c) {
           const g = c.chart.ctx.createLinearGradient(0,0,0,160);

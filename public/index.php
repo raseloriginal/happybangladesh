@@ -187,6 +187,8 @@ $router->get( '/dsr/settlement',              ['DSRController', 'settlement']);
 $router->post('/dsr/settlement/submit',       ['DSRController', 'settlementSubmit']);
 $router->get( '/dsr/profile',                 ['DSRController', 'profile']);
 $router->post('/dsr/api/retailers/store',     ['DSRController', 'apiStoreRetailer']);
+$router->post('/dsr/damage/store',            ['DSRController', 'damageStore']);
+$router->get('/dsr/api/companies-products',    ['DSRController', 'apiCompanyProducts']);
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);

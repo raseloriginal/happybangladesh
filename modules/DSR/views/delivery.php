@@ -62,6 +62,9 @@ $hasDeliveries = !empty($retailers);
         </div>
         <div class="text-white text-lg font-black leading-tight"><?= count($retailers) ?> Retailer<?= count($retailers) !== 1 ? 's' : '' ?> on Van</div>
       </div>
+      <button onclick="openRetailerListModal()" class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md active:scale-95 transition" style="margin-right: -4px;">
+        <i class="fa-solid fa-list-ul"></i>
+      </button>
       <button onclick="locateMe()" class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-md active:scale-95 transition">
         <i class="fa-solid fa-location-crosshairs"></i>
       </button>
@@ -109,7 +112,7 @@ $hasDeliveries = !empty($retailers);
           <a href="#" class="w-8 h-8 bg-green-50 text-green-500 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition">
             <i class="fa-solid fa-circle-plus text-lg"></i>
           </a>
-          <button class="w-8 h-8 bg-red-50 text-red-400 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition">
+          <button onclick="openDamageModal()" id="damageBtn" class="w-8 h-8 bg-red-50 text-red-400 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition" title="Report Damage">
             <i class="fa-solid fa-ban text-sm"></i>
           </button>
         </div>
@@ -162,6 +165,68 @@ $hasDeliveries = !empty($retailers);
   <!-- ══════════════════════════════════════════════════════
        CUSTOM MODALS
   ═══════════════════════════════════════════════════════ -->
+
+  <!-- Retailer List Modal -->
+  <div id="retailerListModal" class="fixed inset-0 z-[500] hidden flex flex-col bg-gray-100 transition-opacity">
+      <!-- Header -->
+      <div class="bg-white px-5 pt-10 pb-4 shadow-sm flex items-center gap-4 sticky top-0 z-10">
+          <button onclick="closeRetailerListModal()" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 active:scale-95 transition">
+              <i class="fa-solid fa-arrow-left"></i>
+          </button>
+          <div class="flex-1">
+              <h2 class="text-lg font-black text-gray-800">Retailers on Van</h2>
+              <div class="text-xs text-gray-500 font-semibold"><?= count($retailers) ?> Retailers</div>
+          </div>
+      </div>
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto px-4 py-4 grid grid-cols-2 gap-3 pb-20 content-start">
+          <?php foreach ($retailers as $idx => $r): 
+              $hasDelivered = false;
+              $hasPending = false;
+              $hasPartial = false;
+              $hasCancelled = false;
+              foreach ($r['orders'] as $o) {
+                  if ($o['status'] === 'in_transit') $hasPending = true;
+                  if ($o['status'] === 'partial') $hasPartial = true;
+                  if ($o['status'] === 'delivered') $hasDelivered = true;
+                  if ($o['status'] === 'cancelled') $hasCancelled = true;
+              }
+              
+              $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700">Pending</span>';
+              if ($hasPending) {
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700"><i class="fa-regular fa-clock mr-1"></i>Pending</span>';
+              } elseif ($hasPartial) {
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-yellow-100 text-yellow-700"><i class="fa-solid fa-circle-half-stroke mr-1"></i>Partial</span>';
+              } elseif ($hasDelivered && $hasCancelled) {
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700"><i class="fa-solid fa-shuffle mr-1"></i>Mixed</span>';
+              } elseif ($hasCancelled) {
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700"><i class="fa-solid fa-xmark mr-1"></i>Cancelled</span>';
+              } elseif ($hasDelivered) {
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-100 text-green-700"><i class="fa-solid fa-check mr-1"></i>Delivered</span>';
+              }
+          ?>
+            <div class="bg-white rounded-2xl p-3 shadow-sm active:scale-[0.98] transition cursor-pointer border border-gray-100 flex flex-col h-full" onclick="handleRetailerListClick(<?= $idx ?>)">
+                <div class="mb-2">
+                    <?= $statusBadge ?>
+                </div>
+                <div class="text-sm font-black text-gray-800 leading-tight mb-1 line-clamp-2"><?= h($r['retailer_name'] ?? $r['dealer_name'] ?? 'Unknown Retailer') ?></div>
+                <div class="text-[10px] text-gray-400 line-clamp-2 mb-auto leading-tight"><i class="fa-solid fa-location-dot mr-1 text-gray-300"></i><?= h($r['address'] ?? 'No Address') ?></div>
+                
+                <div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-50">
+                    <?php if (count($r['orders']) > 1): ?>
+                        <div class="text-[9px] font-bold text-brand bg-blue-50 px-1.5 py-0.5 rounded"><?= count($r['orders']) ?> Orders</div>
+                    <?php else: ?>
+                        <div></div>
+                    <?php endif; ?>
+                    <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
+                    </div>
+                </div>
+            </div>
+          <?php endforeach; ?>
+      </div>
+  </div>
+
   <!-- Confirm Modal -->
   <div id="customConfirmModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
       <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="customConfirmContent">
@@ -336,6 +401,115 @@ $hasDeliveries = !empty($retailers);
       </div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════
+       DAMAGE MODAL
+  ═══════════════════════════════════════════════════════ -->
+  <div id="damageModal" class="fixed inset-0 z-[300] hidden flex items-end justify-center bg-black/50 transition-opacity">
+    <div class="bg-white rounded-t-3xl w-full max-w-[480px] shadow-2xl transform transition-transform translate-y-full duration-300" id="damageModalContent">
+      <!-- Handle -->
+      <div class="flex justify-center pt-3 pb-1">
+        <div class="w-10 h-1 bg-gray-200 rounded-full"></div>
+      </div>
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 pt-2 pb-4 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-red-100 rounded-full flex items-center justify-center">
+            <i class="fa-solid fa-ban text-red-500"></i>
+          </div>
+          <div>
+            <div class="text-base font-black text-gray-800">Report Damage</div>
+            <div class="text-xs text-gray-400 font-medium" id="dmgRetailerLabel">Select retailer damage</div>
+          </div>
+        </div>
+        <button onclick="closeDamageModal()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <!-- Body -->
+      <div class="px-5 pt-4 pb-2 max-h-[55vh] overflow-y-auto">
+        <!-- Product selection trigger -->
+        <button type="button" onclick="openDamageProductSelection()" class="w-full mb-4 py-2.5 px-4 rounded-xl border border-dashed border-red-300 hover:border-red-500 text-red-600 font-bold text-xs flex items-center justify-center gap-2 bg-red-50/20 transition active:scale-[0.98]">
+          <i class="fa-solid fa-circle-plus"></i> Select Products
+        </button>
+
+        <!-- Selected products for inputting quantity -->
+        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Damaged Products List</div>
+        <div id="dmgProductList" class="space-y-2 mb-4">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Total Delivery Value (Current Tab) -->
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Delivered Value</div>
+            <div id="dmgDeliveredValue" class="text-sm font-black text-blue-600">৳0.00</div>
+        </div>
+
+        <!-- Total Damage Amount -->
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Damage Amount</div>
+        </div>
+        <input type="number" id="dmgTotalAmount" min="0" step="0.01" placeholder="0.00" oninput="onManualDamageAmountChange()"
+          class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-xl font-black text-red-500 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20 transition mb-4">
+
+        <!-- Net Payable -->
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Net Payable</div>
+            <div id="dmgNetPayable" class="text-lg font-black text-gray-800">৳0.00</div>
+        </div>
+
+        <!-- Receipt Amount -->
+        <div class="flex justify-between items-center mb-2 mt-4 border-t border-gray-100 pt-4">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Receipt Amount (৳)</div>
+        </div>
+        <input type="number" id="dmgReceiptAmount" placeholder="Enter amount..."
+          class="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-center text-xl font-black text-gray-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition mb-4">
+      </div>
+      <!-- Footer -->
+      <div class="px-5 pb-6 pt-3 border-t border-gray-100 flex gap-3">
+        <button onclick="closeDamageModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-2xl active:bg-gray-200 transition">Cancel</button>
+        <button onclick="submitDamage()" class="flex-1 py-3 bg-red-500 text-white font-bold rounded-2xl shadow-lg shadow-red-500/30 active:scale-[0.98] transition">Submit Damage</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       DAMAGE PRODUCT SELECTION MODAL
+  ═══════════════════════════════════════════════════════ -->
+  <div id="damageProductSelectModal" class="fixed inset-0 z-[400] hidden flex items-end justify-center bg-black/60 transition-opacity">
+    <div class="bg-white rounded-t-3xl w-full max-w-[480px] shadow-2xl transform transition-transform translate-y-full duration-300" id="damageProductSelectContent">
+      <!-- Handle -->
+      <div class="flex justify-center pt-3 pb-1">
+        <div class="w-10 h-1 bg-gray-200 rounded-full"></div>
+      </div>
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 pt-2 pb-4 border-b border-gray-100">
+        <div>
+          <div class="text-base font-black text-gray-800">Select Products</div>
+          <div class="text-xs text-gray-400 font-medium">Choose from retailer's company products</div>
+        </div>
+        <button onclick="closeDamageProductSelection()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <!-- Search Box -->
+      <div class="px-5 pt-3 pb-2">
+        <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl">
+          <i class="fa-solid fa-magnifying-glass text-gray-400 text-sm"></i>
+          <input type="text" id="dmgProductSearch" placeholder="Search products..." oninput="filterDmgProductSelection()" class="bg-transparent border-none text-sm outline-none w-full text-gray-700">
+        </div>
+      </div>
+      <!-- Body -->
+      <div class="px-5 pt-2 pb-2 max-h-[45vh] overflow-y-auto" id="dmgProductSelectItems">
+        <!-- Products list with check buttons -->
+      </div>
+      <!-- Footer -->
+      <div class="px-5 pb-6 pt-3 border-t border-gray-100 flex gap-3">
+        <button onclick="closeDamageProductSelection()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-2xl active:bg-gray-200 transition">Cancel</button>
+        <button onclick="confirmDamageProductSelection()" class="flex-1 py-3 bg-red-500 text-white font-bold rounded-2xl shadow-lg shadow-red-500/30 active:scale-[0.98] transition">Add Selected</button>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /page root -->
 
 <script>
@@ -393,6 +567,262 @@ function closePartialDueModal() {
     setTimeout(() => {
         modal.classList.add('hidden');
     }, 200);
+}
+
+// ── Damage Modal ──────────────────────────────────────────────
+let selectedDamageProducts = [];
+let allCompanyProducts = [];
+
+function openDamageModal() {
+    if (!currentRetailerObj) return;
+
+    // Reset selected products
+    selectedDamageProducts = [];
+    allCompanyProducts = [];
+
+    // Set retailer label
+    const name = currentRetailerObj.retailer_name || currentRetailerObj.dealer_name || currentRetailerObj.name || 'Retailer';
+    document.getElementById('dmgRetailerLabel').innerText = name;
+
+    // Render empty / initial state
+    renderSelectedDamageProducts();
+
+    document.getElementById('dmgTotalAmount').value = '';
+    
+    const modal = document.getElementById('damageModal');
+    const content = document.getElementById('damageModalContent');
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        content.classList.remove('translate-y-full');
+        content.classList.add('translate-y-0');
+    });
+    
+    // Initial calculation
+    calcDamageSummary();
+}
+
+function calcDamageSummary() {
+    let totalDamage = 0;
+    selectedDamageProducts.forEach(p => {
+        totalDamage += (p.qty || 1) * (parseFloat(p.price) || 0);
+    });
+
+    const dmgTotalAmountInput = document.getElementById('dmgTotalAmount');
+    dmgTotalAmountInput.value = totalDamage > 0 ? totalDamage.toFixed(2) : '';
+
+    const deliveredValue = typeof getSelectedOrderGettingTotal === 'function' ? getSelectedOrderGettingTotal() : 0;
+    document.getElementById('dmgDeliveredValue').innerText = '৳' + deliveredValue.toFixed(2);
+
+    let netPayable = deliveredValue - totalDamage;
+    if (netPayable < 0) netPayable = 0;
+
+    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(2);
+    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(2) : '';
+}
+
+function onManualDamageAmountChange() {
+    const totalDamage = parseFloat(document.getElementById('dmgTotalAmount').value) || 0;
+    const deliveredValue = typeof getSelectedOrderGettingTotal === 'function' ? getSelectedOrderGettingTotal() : 0;
+    
+    let netPayable = deliveredValue - totalDamage;
+    if (netPayable < 0) netPayable = 0;
+
+    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(2);
+    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(2) : '';
+}
+
+function renderSelectedDamageProducts() {
+    const list = document.getElementById('dmgProductList');
+    if (selectedDamageProducts.length === 0) {
+        list.innerHTML = `<div class="text-sm text-gray-400 text-center py-4">No products selected. Click "Select Products" to add.</div>`;
+    } else {
+        list.innerHTML = selectedDamageProducts.map(p => `
+            <div class="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border border-red-100">
+                <button type="button" onclick="removeDamageProduct(${p.id})" class="text-red-500 hover:text-red-700">
+                    <i class="fa-solid fa-circle-minus text-lg"></i>
+                </button>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-gray-800 truncate">${p.name}</div>
+                    <div class="text-xs text-pink-500 font-bold">Tk ${parseFloat(p.price || 0).toFixed(0)}</div>
+                </div>
+                <input type="number" min="1" value="${p.qty || 1}" placeholder="Qty"
+                       class="dmg-qty-input w-16 text-center text-sm font-bold bg-white border border-gray-200 rounded-xl py-1.5 outline-none focus:border-red-400 transition"
+                       data-pid="${p.id}" oninput="updateDamageProductQty(${p.id}, this.value)">
+            </div>
+        `).join('');
+    }
+}
+
+function removeDamageProduct(id) {
+    selectedDamageProducts = selectedDamageProducts.filter(p => p.id !== id);
+    renderSelectedDamageProducts();
+    calcDamageSummary();
+}
+
+function updateDamageProductQty(id, qty) {
+    const p = selectedDamageProducts.find(prod => prod.id === id);
+    if (p) {
+        p.qty = parseInt(qty) || 1;
+        calcDamageSummary();
+    }
+}
+
+// ── Damage Product Selection Modal ────────────────────────────
+async function openDamageProductSelection() {
+    if (!currentRetailerObj) return;
+
+    let dispatchIds = [];
+    if (currentRetailerObj.orders) {
+        dispatchIds = currentRetailerObj.orders.map(o => o.dispatch_id).filter(id => id);
+    }
+    
+    // Fallback if missing
+    if (dispatchIds.length === 0 && currentDispatchId) {
+        dispatchIds = [currentDispatchId];
+    }
+
+    // Show loading
+    const listContainer = document.getElementById('dmgProductSelectItems');
+    listContainer.innerHTML = `<div class="text-center py-8 text-gray-500 font-bold"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading products...</div>`;
+
+    document.getElementById('dmgProductSearch').value = '';
+
+    // Show selection modal
+    const modal = document.getElementById('damageProductSelectModal');
+    const content = document.getElementById('damageProductSelectContent');
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        content.classList.remove('translate-y-full');
+        content.classList.add('translate-y-0');
+    });
+
+    try {
+        const res = await fetch(`<?= url("dsr/api/companies-products") ?>?dispatch_ids=${dispatchIds.join(',')}`);
+        const data = await res.json();
+        if (data.success && data.products) {
+            allCompanyProducts = data.products;
+            renderDmgProductSelectionList();
+        } else {
+            listContainer.innerHTML = `<div class="text-sm text-red-500 text-center py-4">${data.message || 'Failed to load products.'}</div>`;
+        }
+    } catch(err) {
+        listContainer.innerHTML = `<div class="text-sm text-red-500 text-center py-4">Error loading products.</div>`;
+    }
+}
+
+function renderDmgProductSelectionList() {
+    const container = document.getElementById('dmgProductSelectItems');
+    const query = document.getElementById('dmgProductSearch').value.toLowerCase().trim();
+    
+    const filtered = allCompanyProducts.filter(p => p.name.toLowerCase().includes(query));
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-sm text-gray-400 text-center py-8 font-semibold">No products match search.</div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(p => {
+        const isChecked = selectedDamageProducts.some(prod => prod.id == p.id);
+        return `
+            <label class="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 cursor-pointer select-none border border-transparent has-[:checked]:border-red-300 has-[:checked]:bg-red-50/40 transition mb-2">
+                <input type="checkbox" class="dmg-select-cb w-4 h-4 accent-red-500 rounded" 
+                       data-pid="${p.id}" data-name="${p.name}" data-price="${p.price}"
+                       ${isChecked ? 'checked' : ''}>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold text-gray-800 truncate">${p.name}</div>
+                    <div class="text-xs text-gray-400 font-bold">${p.company_name} | Tk ${parseFloat(p.price || 0).toFixed(0)}</div>
+                </div>
+            </label>
+        `;
+    }).join('');
+}
+
+function filterDmgProductSelection() {
+    renderDmgProductSelectionList();
+}
+
+function closeDamageProductSelection() {
+    const modal = document.getElementById('damageProductSelectModal');
+    const content = document.getElementById('damageProductSelectContent');
+    content.classList.remove('translate-y-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => { modal.classList.add('hidden'); }, 300);
+}
+
+function confirmDamageProductSelection() {
+    const newSelection = [];
+    document.querySelectorAll('.dmg-select-cb:checked').forEach(cb => {
+        const id = parseInt(cb.dataset.pid);
+        const name = cb.dataset.name;
+        const price = parseFloat(cb.dataset.price);
+
+        // Keep existing quantity if already selected before
+        const existing = selectedDamageProducts.find(p => p.id === id);
+        newSelection.push({
+            id: id,
+            name: name,
+            price: price,
+            qty: existing ? existing.qty : 1
+        });
+    });
+
+    selectedDamageProducts = newSelection;
+    renderSelectedDamageProducts();
+    calcDamageSummary();
+    closeDamageProductSelection();
+}
+
+function closeDamageModal() {
+    const modal = document.getElementById('damageModal');
+    const content = document.getElementById('damageModalContent');
+    content.classList.remove('translate-y-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => { modal.classList.add('hidden'); }, 300);
+}
+
+async function submitDamage() {
+    const totalAmount = parseFloat(document.getElementById('dmgTotalAmount').value || 0);
+    if (totalAmount <= 0) {
+        showToast('⚠️ Please enter the total damage amount.');
+        return;
+    }
+
+    if (selectedDamageProducts.length === 0) {
+        showToast('⚠️ Please select at least one product.');
+        return;
+    }
+
+    const payloadProducts = selectedDamageProducts.map(p => ({
+        product_id: p.id,
+        qty: p.qty || 1
+    }));
+
+    const retailerId = currentRetailerObj.retailer_id || currentRetailerObj.dealer_id || 0;
+    const date = document.querySelector('input[type="date"]')?.value || new Date().toISOString().split('T')[0];
+
+    const submitBtn = document.querySelector('#damageModal button[onclick="submitDamage()"]');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Saving...';
+
+    try {
+        const res = await fetch('<?= url("dsr/damage/store") ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `csrf_token=<?= Helpers::csrfToken() ?>&retailer_id=${retailerId}&date=${date}&total_amount=${totalAmount}&products=${encodeURIComponent(JSON.stringify(payloadProducts))}`
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeDamageModal();
+            showToast('✅ Damage report saved successfully!');
+        } else {
+            showToast('❌ ' + (data.message || 'Failed to save damage report.'));
+        }
+    } catch(err) {
+        showToast('❌ Network error. Please try again.');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Submit Damage';
+    }
 }
 
 function handleDueDetailsAction() {
@@ -1598,6 +2028,30 @@ function showToast(msg) {
     t.innerText = msg;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 1800);
+}
+function openRetailerListModal() {
+    const modal = document.getElementById('retailerListModal');
+    modal.classList.remove('hidden');
+    // Animate opacity if needed, but since it's full screen, just show it
+}
+
+function closeRetailerListModal() {
+    document.getElementById('retailerListModal').classList.add('hidden');
+}
+
+function handleRetailerListClick(idx) {
+    closeRetailerListModal();
+    const ret = orderedRetailers[idx];
+    if (!ret) return;
+    
+    let shouldWarn = true;
+    ret.orders.forEach(o => {
+        if (o.status !== 'delivered' && o.status !== 'cancelled') {
+            shouldWarn = false;
+        }
+    });
+    
+    handleRetailerClick(ret, shouldWarn);
 }
 
 <?php endif; // $hasDeliveries ?>

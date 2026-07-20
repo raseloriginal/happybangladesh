@@ -14,6 +14,7 @@ class DSRController extends Controller
         $this->db = Database::getInstance();
         $this->ensurePaidAmountColumn();
         $this->ensureDeliveredQuantityColumn();
+        $this->ensureReturnRetailerColumn();
     }
 
     private function ensurePaidAmountColumn(): void
@@ -39,6 +40,70 @@ class DSRController extends Controller
             } catch (PDOException $ex) {
                 // Ignore if add column fails (e.g. column already exists or lock issue)
             }
+        }
+    }
+
+    private function ensureReturnRetailerColumn(): void
+    {
+        try {
+            $this->db->query("SELECT retailer_id FROM returns LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE returns ADD COLUMN retailer_id INT(11) DEFAULT NULL AFTER dsr_id");
+            } catch (PDOException $ex) {
+                // Ignore
+            }
+        }
+    }
+
+    /**
+     * POST /dsr/damage/store
+     * Saves damage report for a retailer visit.
+     * Payload: csrf_token, retailer_id, total_amount, date, products (JSON array of {product_id, qty})
+     */
+    public function damageStore(): void
+    {
+        $this->verifyCsrf();
+        $dsrId      = Auth::id();
+        $retailerId = (int)($_POST['retailer_id'] ?? 0);
+        $date       = $_POST['date'] ?? date('Y-m-d');
+        $totalAmt   = (float)($_POST['total_amount'] ?? 0);
+        $products   = json_decode($_POST['products'] ?? '[]', true);
+
+        if (empty($products) || $totalAmt <= 0) {
+            echo json_encode(['success' => false, 'message' => 'No products or amount provided.']);
+            return;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            // Insert return header (damage type)
+            $stmt = $this->db->prepare("
+                INSERT INTO returns (dsr_id, retailer_id, return_date, status, reason)
+                VALUES (?, ?, ?, 'approved', 'Damage')
+            ");
+            $stmt->execute([$dsrId, $retailerId ?: null, $date]);
+            $returnId = $this->db->lastInsertId();
+
+            // Insert return_items
+            $itemStmt = $this->db->prepare("
+                INSERT INTO return_items (return_id, product_id, quantity, reason)
+                VALUES (?, ?, ?, 'Damage')
+            ");
+            foreach ($products as $p) {
+                $pid = (int)($p['product_id'] ?? 0);
+                $qty = (int)($p['qty'] ?? 0);
+                if ($pid > 0 && $qty > 0) {
+                    $itemStmt->execute([$returnId, $pid, $qty]);
+                }
+            }
+
+            $this->db->commit();
+            echo json_encode(['success' => true, 'return_id' => $returnId]);
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 
@@ -102,18 +167,171 @@ class DSRController extends Controller
     public function vanStock(): void
     {
         $dsrId = Auth::id();
-        $items = $this->db->prepare("
-            SELECT vs.*, p.name as product_name, p.sku, p.image, p.pieces_per_box, l.lot_number
-            FROM van_stock vs
-            JOIN products p ON p.id = vs.product_id
-            LEFT JOIN lots l ON l.id = vs.lot_id
-            WHERE vs.dsr_id = ? AND vs.quantity > 0
-            ORDER BY p.name ASC
-        ");
-        $items->execute([$dsrId]);
-        $items = $items->fetchAll();
+        $date = $_GET['date'] ?? date('Y-m-d');
 
-        $this->render('van_stock', compact('items'), 'dsr_app');
+        // We need to fetch products that have activity (outside, sale, inside, damage) for this DSR on this date.
+        // We will build an aggregated structure in PHP.
+
+        $productsData = [
+            'outside' => [],
+            'sale' => [],
+            'inside' => [],
+            'damage' => []
+        ];
+        
+        $totals = ['outside' => 0, 'sale' => 0, 'inside' => 0, 'damage' => 0];
+
+        // Helper to fetch basic product info + trade_price
+        // First get all relevant products to prevent many queries
+        $allProductsStmt = $this->db->query("SELECT id, name, sku, pieces_per_box, price FROM products");
+        $productMap = [];
+        while($row = $allProductsStmt->fetch()) {
+            $productMap[$row['id']] = $row;
+        }
+
+        // 1. OUTSIDE (Dispatches loaded onto van)
+        $outsideQ = $this->db->prepare("
+            SELECT di.product_id, SUM(di.quantity) as qty
+            FROM dispatches d
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            GROUP BY di.product_id
+        ");
+        $outsideQ->execute([$dsrId, $date]);
+        foreach ($outsideQ->fetchAll() as $row) {
+            $pid = $row['product_id'];
+            if(isset($productMap[$pid])) {
+                $p = $productMap[$pid];
+                $val = $row['qty'] * $p['price'];
+                $totals['outside'] += $val;
+                $productsData['outside'][] = [
+                    'name' => $p['name'],
+                    'qty' => (int)$row['qty'],
+                    'pcs_per_box' => (int)$p['pieces_per_box'],
+                    'trade_price' => $p['price'],
+                    'value' => $val,
+                    'oc_value' => 0
+                ];
+            }
+        }
+
+        // 2. SALE (Delivered orders)
+        // Orders created on that date by ANY SR, but dispatched by this DSR on that date.
+        // Or simply `delivered_quantity` in dispatch_items? Actually order_items is better.
+        // Let's use dispatch_items.delivered_quantity which is updated when DSR confirms delivery.
+        $saleQ = $this->db->prepare("
+            SELECT di.product_id, SUM(di.delivered_quantity) as qty
+            FROM dispatches d
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            WHERE d.dsr_id = ? AND DATE(d.updated_at) = ? AND d.status IN ('delivered', 'partial')
+            GROUP BY di.product_id
+        ");
+        $saleQ->execute([$dsrId, $date]);
+        foreach ($saleQ->fetchAll() as $row) {
+            $pid = $row['product_id'];
+            if(isset($productMap[$pid]) && $row['qty'] > 0) {
+                $p = $productMap[$pid];
+                $val = $row['qty'] * $p['price'];
+                $totals['sale'] += $val;
+                $productsData['sale'][] = [
+                    'name' => $p['name'],
+                    'qty' => (int)$row['qty'],
+                    'pcs_per_box' => (int)$p['pieces_per_box'],
+                    'trade_price' => $p['price'],
+                    'value' => $val,
+                    'oc_value' => 0 // In real app, calculate actual OC if stored
+                ];
+            }
+        }
+
+        // 3. INSIDE = Outside - Sale (per product)
+        // Build a map of outside quantities keyed by product_id for easy subtraction
+        $outsideQtyMap = [];
+        foreach ($productsData['outside'] as $item) {
+            // find product_id from productMap by name match is fragile; re-query instead
+        }
+        // Re-fetch outside as map keyed by product_id
+        $outsideMapQ = $this->db->prepare("
+            SELECT di.product_id, SUM(di.quantity) as qty
+            FROM dispatches d
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            GROUP BY di.product_id
+        ");
+        $outsideMapQ->execute([$dsrId, $date]);
+        foreach ($outsideMapQ->fetchAll() as $row) {
+            $outsideQtyMap[(int)$row['product_id']] = (int)$row['qty'];
+        }
+
+        // Re-fetch sale as map keyed by product_id
+        $saleQtyMap = [];
+        $saleMapQ = $this->db->prepare("
+            SELECT di.product_id, SUM(di.delivered_quantity) as qty
+            FROM dispatches d
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            WHERE d.dsr_id = ? AND DATE(d.updated_at) = ? AND d.status IN ('delivered', 'partial')
+            GROUP BY di.product_id
+        ");
+        $saleMapQ->execute([$dsrId, $date]);
+        foreach ($saleMapQ->fetchAll() as $row) {
+            $saleQtyMap[(int)$row['product_id']] = (int)$row['qty'];
+        }
+
+        // Inside = Outside qty - Sale qty for each product that was dispatched
+        $allPids = array_unique(array_merge(array_keys($outsideQtyMap), array_keys($saleQtyMap)));
+        foreach ($allPids as $pid) {
+            if (!isset($productMap[$pid])) continue;
+            $p        = $productMap[$pid];
+            $oQty     = $outsideQtyMap[$pid] ?? 0;
+            $sQty     = $saleQtyMap[$pid]    ?? 0;
+            $insideQty = $oQty - $sQty;
+            if ($insideQty <= 0) continue;
+            $val = $insideQty * $p['price'];
+            $totals['inside'] += $val;
+            $productsData['inside'][] = [
+                'name'        => $p['name'],
+                'qty'         => $insideQty,
+                'pcs_per_box' => (int)$p['pieces_per_box'],
+                'trade_price' => $p['price'],
+                'value'       => $val,
+                'oc_value'    => 0
+            ];
+        }
+
+        // 4. DAMAGE (Returns marked as Damage)
+        $damageQ = $this->db->prepare("
+            SELECT ri.product_id, SUM(ri.quantity) as qty
+            FROM returns r
+            JOIN return_items ri ON r.id = ri.return_id
+            WHERE r.dsr_id = ? AND r.return_date = ? AND ri.reason = 'Damage'
+            GROUP BY ri.product_id
+        ");
+        $damageQ->execute([$dsrId, $date]);
+        foreach ($damageQ->fetchAll() as $row) {
+            $pid = $row['product_id'];
+            if(isset($productMap[$pid])) {
+                $p = $productMap[$pid];
+                $val = $row['qty'] * $p['price'];
+                $totals['damage'] += $val;
+                $productsData['damage'][] = [
+                    'name' => $p['name'],
+                    'qty' => (int)$row['qty'],
+                    'pcs_per_box' => (int)$p['pieces_per_box'],
+                    'trade_price' => $p['price'],
+                    'value' => $val,
+                    'oc_value' => 0
+                ];
+            }
+        }
+
+        // Final: Inside total = Outside total - Sale total
+        $totals['inside'] = max(0, $totals['outside'] - $totals['sale']);
+
+        $this->render('van_stock', [
+            'products' => $productsData,
+            'totals' => $totals,
+            'selectedDate' => $date
+        ], 'dsr_app');
     }
 
     public function expenses(): void
@@ -444,5 +662,42 @@ class DSRController extends Controller
         $id = $this->db->lastInsertId();
 
         $this->json(['success' => true, 'id' => $id]);
+    }
+
+    public function apiCompanyProducts(): void
+    {
+        $dsrId = Auth::id();
+        $dispatchIds = $_GET['dispatch_ids'] ?? '';
+        $dispatchIdsArray = array_filter(array_map('intval', explode(',', $dispatchIds)));
+
+        if (empty($dispatchIdsArray)) {
+            $this->json(['success' => true, 'products' => []]);
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($dispatchIdsArray), '?'));
+        
+        // Fetch products of the companies that are present in the specified dispatches
+        $q = $this->db->prepare("
+            SELECT p.*, c.name AS company_name, cat.name AS category_name
+            FROM products p
+            LEFT JOIN companies c ON c.id = p.company_id
+            LEFT JOIN categories cat ON cat.id = p.category_id
+            WHERE p.status = 1 AND p.company_id IN (
+                SELECT DISTINCT p2.company_id
+                FROM dispatches d
+                JOIN orders o ON o.id = d.order_id
+                JOIN order_items oi ON oi.order_id = o.id
+                JOIN products p2 ON p2.id = oi.product_id
+                WHERE d.dsr_id = ? AND d.id IN ($placeholders)
+            )
+            ORDER BY p.name
+        ");
+        
+        $params = array_merge([$dsrId], $dispatchIdsArray);
+        $q->execute($params);
+        $products = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->json(['success' => true, 'products' => $products]);
     }
 }

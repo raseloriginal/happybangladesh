@@ -83,7 +83,34 @@ class SRController extends Controller
         $q->execute([$srId]);
         $recentOrders = $q->fetchAll();
 
-        $this->renderApp('dashboard', compact('stats', 'recentOrders'));
+        // Fetch order values for the last 7 days dynamically
+        $q = $this->db->prepare("
+            SELECT DATE(created_at) as order_date, COALESCE(SUM(total_amount), 0) as total_val
+            FROM orders
+            WHERE sr_id=? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY DATE(created_at) ASC
+        ");
+        $q->execute([$srId]);
+        $rawChartData = $q->fetchAll();
+
+        $chartLabels = [];
+        $chartValues = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = date('Y-m-d', strtotime("-$i days"));
+            $chartLabels[] = date('D', strtotime("-$i days"));
+            
+            $val = 0;
+            foreach ($rawChartData as $row) {
+                if ($row['order_date'] === $date) {
+                    $val = (float)$row['total_val'];
+                    break;
+                }
+            }
+            $chartValues[] = $val;
+        }
+
+        $this->renderApp('dashboard', compact('stats', 'recentOrders', 'chartLabels', 'chartValues'));
     }
 
     // ── Orders ────────────────────────────────────────────────
@@ -146,10 +173,68 @@ class SRController extends Controller
         $this->renderApp('sales', compact('allProducts'));
     }
 
-    // ── Retailers (Coming Soon) ───────────────────────────────
+    // ── Retailers List & Filtering ────────────────────────────
     public function retailers(): void
     {
-        $this->renderApp('retailers');
+        $search = trim($_GET['search'] ?? '');
+        $page = max(1, intval($_GET['page'] ?? 1));
+        $limit = 15;
+        $offset = ($page - 1) * $limit;
+
+        $params = [];
+        $where = " WHERE 1=1 ";
+        if ($search !== '') {
+            $where .= " AND (r.name LIKE ? OR r.phone LIKE ? OR r.address LIKE ?) ";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        // Get total count
+        $countQuery = $this->db->prepare("SELECT COUNT(*) FROM retailers r $where");
+        $countQuery->execute($params);
+        $totalRetailers = (int)$countQuery->fetchColumn();
+
+        // Get paginated items with order count today
+        $srId = Auth::id();
+        $q = $this->db->prepare("
+            SELECT r.*,
+                   (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today
+            FROM retailers r
+            $where
+            ORDER BY r.name ASC
+            LIMIT $limit OFFSET $offset
+        ");
+        
+        $selectParams = array_merge([$srId], $params);
+        $q->execute($selectParams);
+        $retailers = $q->fetchAll();
+
+        $totalPages = ceil($totalRetailers / $limit);
+
+        // Load all products this SR can sell, summing stock from the warehouses of their assigned dealers
+        $pq = $this->db->prepare("
+            SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
+                   COALESCE(SUM(i.qty_boxes * p.pieces_per_box + i.qty_pieces), 0) AS stock
+            FROM products p
+            LEFT JOIN companies c ON c.id=p.company_id
+            LEFT JOIN inventory i ON i.product_id = p.id
+              AND EXISTS (
+                  SELECT 1 FROM dealers d 
+                  JOIN dealer_companies dc ON dc.dealer_id = d.id 
+                  WHERE dc.sr_id = ? AND d.warehouse_id = i.warehouse_id
+              )
+            WHERE p.status=1
+              AND p.company_id IN (
+                  SELECT DISTINCT company_id FROM dealer_companies WHERE sr_id = ?
+              )
+            GROUP BY p.id
+            ORDER BY p.name
+        ");
+        $pq->execute([$srId, $srId]);
+        $allProducts = $pq->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->renderApp('retailers', compact('retailers', 'search', 'page', 'totalPages', 'totalRetailers', 'allProducts'));
     }
 
     // ── Profile ───────────────────────────────────────────────
@@ -158,11 +243,6 @@ class SRController extends Controller
         $this->renderApp('profile');
     }
 
-    // ── Reports ───────────────────────────────────────────────
-    public function reports(): void
-    {
-        $this->renderApp('reports');
-    }
 
     // ── API: Get retailers near location ──────────────────────
     public function apiRetailers(): void
@@ -425,5 +505,136 @@ class SRController extends Controller
             $this->json(['success' => true, 'message' => "Order #$orderId placed successfully!", 'order_id' => $orderId]);
         }
         $this->redirect('sr/orders');
+    }
+
+    public function reports(): void
+    {
+        $srId = Auth::id();
+
+        // ── Date filter ───────────────────────────────────────────────
+        $period     = $_GET['period'] ?? 'month';   // today | week | month | custom
+        $customFrom = $_GET['from']   ?? date('Y-m-01');
+        $customTo   = $_GET['to']     ?? date('Y-m-d');
+
+        switch ($period) {
+            case 'today':
+                $dateFrom = date('Y-m-d');
+                $dateTo   = date('Y-m-d');
+                break;
+            case 'week':
+                $dateFrom = date('Y-m-d', strtotime('monday this week'));
+                $dateTo   = date('Y-m-d');
+                break;
+            case 'custom':
+                $dateFrom = $customFrom;
+                $dateTo   = $customTo;
+                break;
+            default: // month
+                $dateFrom = date('Y-m-01');
+                $dateTo   = date('Y-m-d');
+        }
+
+        // ── Summary stats ─────────────────────────────────────────────
+        $statsQ = $this->db->prepare("
+            SELECT
+                COUNT(*) as total_orders,
+                COALESCE(SUM(total_amount), 0) as total_value,
+                COALESCE(SUM(CASE WHEN status='pending'   THEN 1 ELSE 0 END), 0) as pending,
+                COALESCE(SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END), 0) as confirmed,
+                COALESCE(SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END), 0) as delivered,
+                COALESCE(SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END), 0) as cancelled,
+                COUNT(DISTINCT COALESCE(retailer_id, dealer_id)) as unique_customers
+            FROM orders
+            WHERE sr_id = ? AND DATE(created_at) BETWEEN ? AND ?
+        ");
+        $statsQ->execute([$srId, $dateFrom, $dateTo]);
+        $stats = $statsQ->fetch();
+
+        // ── Daily chart data (last 30 days always, for the trend chart) ─
+        $chartQ = $this->db->prepare("
+            SELECT DATE(created_at) as d, COUNT(*) as orders, COALESCE(SUM(total_amount),0) as value
+            FROM orders
+            WHERE sr_id=? AND DATE(created_at) BETWEEN ? AND ?
+            GROUP BY DATE(created_at)
+            ORDER BY DATE(created_at) ASC
+        ");
+        $chartQ->execute([$srId, $dateFrom, $dateTo]);
+        $rawChart = $chartQ->fetchAll();
+
+        $chartLabels = [];
+        $chartOrders = [];
+        $chartValues = [];
+        $start = strtotime($dateFrom);
+        $end   = strtotime($dateTo);
+        $chartMap = [];
+        foreach ($rawChart as $row) { $chartMap[$row['d']] = $row; }
+        for ($d = $start; $d <= $end; $d += 86400) {
+            $key = date('Y-m-d', $d);
+            $chartLabels[] = date('d M', $d);
+            $chartOrders[] = (int)($chartMap[$key]['orders'] ?? 0);
+            $chartValues[] = (float)($chartMap[$key]['value']  ?? 0);
+        }
+
+        // ── Top retailers by order value ───────────────────────────────
+        $topRetailersQ = $this->db->prepare("
+            SELECT
+                COALESCE(r.name, dl.name, 'Unknown') as customer_name,
+                COUNT(o.id) as order_count,
+                COALESCE(SUM(o.total_amount), 0) as total_value
+            FROM orders o
+            LEFT JOIN retailers r  ON r.id  = o.retailer_id
+            LEFT JOIN dealers   dl ON dl.id = o.dealer_id
+            WHERE o.sr_id = ? AND DATE(o.created_at) BETWEEN ? AND ?
+            GROUP BY o.retailer_id, o.dealer_id
+            ORDER BY total_value DESC
+            LIMIT 8
+        ");
+        $topRetailersQ->execute([$srId, $dateFrom, $dateTo]);
+        $topRetailers = $topRetailersQ->fetchAll();
+
+        // ── Top products by quantity ───────────────────────────────────
+        $topProductsQ = $this->db->prepare("
+            SELECT
+                p.name, p.image,
+                SUM(oi.quantity) as total_qty,
+                SUM(oi.total_price) as total_value
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            JOIN products p ON p.id = oi.product_id
+            WHERE o.sr_id = ? AND DATE(o.created_at) BETWEEN ? AND ?
+            GROUP BY oi.product_id
+            ORDER BY total_qty DESC
+            LIMIT 8
+        ");
+        $topProductsQ->execute([$srId, $dateFrom, $dateTo]);
+        $topProducts = $topProductsQ->fetchAll();
+
+        // ── Recent orders ─────────────────────────────────────────────
+        $recentQ = $this->db->prepare("
+            SELECT o.id, o.total_amount, o.status, o.created_at,
+                   COALESCE(r.name, dl.name, 'Unknown') as customer_name
+            FROM orders o
+            LEFT JOIN retailers r  ON r.id  = o.retailer_id
+            LEFT JOIN dealers   dl ON dl.id = o.dealer_id
+            WHERE o.sr_id = ? AND DATE(o.created_at) BETWEEN ? AND ?
+            ORDER BY o.created_at DESC
+            LIMIT 15
+        ");
+        $recentQ->execute([$srId, $dateFrom, $dateTo]);
+        $recentOrders = $recentQ->fetchAll();
+
+        // ── Status breakdown for donut ────────────────────────────────
+        $donutData = [
+            'pending'   => (int)$stats['pending'],
+            'confirmed' => (int)$stats['confirmed'],
+            'delivered' => (int)$stats['delivered'],
+            'cancelled' => (int)$stats['cancelled'],
+        ];
+
+        $this->renderApp('reports', compact(
+            'stats', 'chartLabels', 'chartOrders', 'chartValues',
+            'topRetailers', 'topProducts', 'recentOrders',
+            'donutData', 'period', 'dateFrom', 'dateTo', 'customFrom', 'customTo'
+        ));
     }
 }
