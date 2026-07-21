@@ -22,7 +22,7 @@
       <select id="filter-category" class="form-input text-sm w-auto">
           <option value="">All Categories</option>
           <?php foreach ($categories as $cat): ?>
-              <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+              <option value="<?= $cat['id'] ?>"><?= htmlspecialchars(($cat['main_category_name'] ? $cat['main_category_name'] . ' > ' : '') . $cat['name']) ?></option>
           <?php endforeach; ?>
       </select>
 
@@ -206,7 +206,7 @@
                     <select id="edit-category" class="form-input text-sm w-full">
                         <option value="">Uncategorized</option>
                         <?php foreach ($categories as $cat): ?>
-                            <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                            <option value="<?= $cat['id'] ?>"><?= htmlspecialchars(($cat['main_category_name'] ? $cat['main_category_name'] . ' > ' : '') . $cat['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -222,11 +222,14 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Box Type</label>
                 <select id="edit-box-type" class="form-input text-sm w-full">
                     <option value="বক্স">বক্স</option>
-                    <option value="কার্টন">কার্টন</option>
+                    <option value="পলি">পলি</option>
+                    <option value="কার্টুন">কার্টুন</option>
                     <option value="পিস">পিস</option>
+                    <option value="বস্তা">বস্তা</option>
+                    <option value="জার">জার</option>
+                    <option value="কেজি">কেজি</option>
                     <option value="ডজন">ডজন</option>
-                    <option value="প্যাকেট">প্যাকেট</option>
-                    <option value="বান্ডেল">বান্ডেল</option>
+                    <option value="কম্বো">কম্বো</option>
                 </select>
             </div>
                 <div>
@@ -266,7 +269,7 @@
 <script>
 // UI State
 const categories = <?= json_encode($categories) ?>;
-const categoriesOptions = '<option value="">Sel Cat</option>' + categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+const categoriesOptions = '<option value="">Sel Cat</option>' + categories.map(c => `<option value="${c.id}">${c.main_category_name ? c.main_category_name + ' > ' : ''}${c.name}</option>`).join('');
 
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
@@ -308,11 +311,14 @@ function addBulkRow() {
     const idx = bulkRowIndex++;
     const boxTypes = `
         <option value="বক্স">বক্স</option>
-        <option value="কার্টন">কার্টন</option>
+        <option value="পলি">পলি</option>
+        <option value="কার্টুন">কার্টুন</option>
         <option value="পিস">পিস</option>
+        <option value="বস্তা">বস্তা</option>
+        <option value="জার">জার</option>
+        <option value="কেজি">কেজি</option>
         <option value="ডজন">ডজন</option>
-        <option value="প্যাকেট">প্যাকেট</option>
-        <option value="বান্ডেল">বান্ডেল</option>
+        <option value="কম্বো">কম্বো</option>
     `;
     tr.innerHTML = `
         <td class="p-2"><select class="form-input text-sm p-1.5 bulk-cat">${categoriesOptions}</select></td>
@@ -483,7 +489,37 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
     } catch(err) { alert('Network error: ' + err.message); btn.disabled = false; btn.innerHTML = 'Save Changes'; }
 });
 
+// Paste clipboard image to hovered bulk row
+let hoveredBulkRow = null;
+document.getElementById('bulk-rows').addEventListener('mouseover', (e) => {
+    hoveredBulkRow = e.target.closest('.bulk-row');
+});
+document.getElementById('bulk-rows').addEventListener('mouseout', (e) => {
+    hoveredBulkRow = null;
+});
 
+window.addEventListener('paste', (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    let imageFile = null;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') === 0) {
+            imageFile = items[i].getAsFile();
+            break;
+        }
+    }
+    if (!imageFile) return;
+
+    if (hoveredBulkRow) {
+        const fileInput = hoveredBulkRow.querySelector('.bulk-img-input');
+        if (fileInput) {
+            const dataTransfer = new DataTransfer();
+            const file = new File([imageFile], `paste_${Date.now()}.png`, { type: imageFile.type });
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+            previewBulkImage(fileInput);
+        }
+    }
+});
 
 </script>
 

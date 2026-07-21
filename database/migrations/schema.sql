@@ -168,15 +168,12 @@ CREATE TABLE IF NOT EXISTS `inventory` (
 -- ── Retailers ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `retailers` (
     `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `sr_id`       INT UNSIGNED NOT NULL,
     `name`        VARCHAR(255) NOT NULL,
     `phone`       VARCHAR(30)  DEFAULT NULL,
     `lat`         DECIMAL(10,7) DEFAULT NULL,
     `lng`         DECIMAL(10,7) DEFAULT NULL,
     `address`     TEXT         DEFAULT NULL,
     `created_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`sr_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT,
-    INDEX `idx_sr_id` (`sr_id`),
     INDEX `idx_lat_lng` (`lat`, `lng`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

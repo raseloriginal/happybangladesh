@@ -68,7 +68,7 @@
     <table class="w-full text-left border-collapse" id="main-table">
       <thead>
         <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="p-4 font-medium text-gray-500">Date</th>
+          <th class="p-4 font-medium text-gray-500">Dates (Order & Delivery)</th>
           <th class="p-4 font-medium text-gray-500">DSR</th>
           <th class="p-4 font-medium text-gray-500">Dispatch Value</th>
           <th class="p-4 font-medium text-gray-500">Return Value</th>
@@ -140,8 +140,9 @@
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
               <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
-              <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Total Ordered</th>
-              <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Add Extra (Box | Pcs)</th>
+              <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Ordered Qty</th>
+              <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Dispatch Qty (Box | Pcs)</th>
+              <th class="p-3 text-xs font-semibold text-gray-500 uppercase text-center">Change (কম / বেশি)</th>
               <th class="p-3 text-xs font-semibold text-gray-500 uppercase text-center">Organized?</th>
             </tr>
           </thead>
@@ -224,7 +225,10 @@ function renderSchedules() {
     const tr = document.createElement('tr');
     tr.className = 'border-b border-gray-50 hover:bg-gray-50/50 transition-colors group';
     tr.innerHTML = `
-      <td class="p-4 text-sm">${sch.dispatch_date}</td>
+      <td class="p-4">
+        <div class="text-sm font-medium text-gray-800">Order: ${sch.dispatch_date}</div>
+        <div class="text-xs text-gray-500 mt-1">Deliv: ${sch.delivery_date || sch.dispatch_date}</div>
+      </td>
       <td class="p-4 font-medium text-gray-800">
         <div class="flex items-center justify-between gap-2 w-full">
           <div class="flex items-center gap-2">
@@ -429,42 +433,99 @@ async function openOrganizeModal(schId) {
   tbody.innerHTML = '';
   
   if (products.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center p-5 text-gray-400">No products found for these orders.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center p-5 text-gray-400">No products found for these orders.</td></tr>';
   } else {
     products.forEach(p => {
       const img = p.image ? `<img src="<?= BASE_URL ?>/${p.image}" class="w-10 h-10 rounded object-cover border border-gray-200">` : `<div class="w-10 h-10 rounded bg-gray-100 flex items-center justify-center"><i class="fa-solid fa-box text-gray-300"></i></div>`;
       
-      const boxes = Math.floor(p.total_ordered_qty / Math.max(1, p.pieces_per_box));
-      const pcs = p.total_ordered_qty % Math.max(1, p.pieces_per_box);
-      const qtyStr = `${boxes} box | ${pcs} pcs`;
+      const ppb = Math.max(1, parseInt(p.pieces_per_box) || 1);
+      const origPcs = parseInt(p.total_ordered_qty) || 0;
+      const origBoxes = Math.floor(origPcs / ppb);
+      const origRemPcs = origPcs % ppb;
+      const origStr = `${origBoxes} box | ${origRemPcs} pcs`;
+
+      // Pre-fill editable inputs with existing dispatch quantity if extra/diff exists
+      const extraPcs = (parseInt(p.extra_boxes || 0) * ppb) + parseInt(p.extra_pieces || 0);
+      const initDispatchPcs = Math.max(0, origPcs + extraPcs);
+      const initDispatchBoxes = Math.floor(initDispatchPcs / ppb);
+      const initDispatchRemPcs = initDispatchPcs % ppb;
 
       tbody.innerHTML += `
-        <tr class="hover:bg-gray-50/50" data-pid="${p.product_id}">
+        <tr class="hover:bg-gray-50/50" data-pid="${p.product_id}" data-orig-pcs="${origPcs}" data-ppb="${ppb}">
           <td class="p-3">
             <div class="flex items-center gap-3">
               ${img}
-              <div class="font-medium text-gray-800">${p.name}</div>
+              <div>
+                <div class="font-medium text-gray-800">${p.name}</div>
+                <div class="text-xs text-gray-400">${ppb} Pcs / Box</div>
+              </div>
             </div>
           </td>
-          <td class="p-3">
-            <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm font-medium border border-gray-200">${qtyStr}</span>
-            <div class="text-xs text-gray-400 mt-1">Total: ${p.total_ordered_qty} pcs</div>
+          <td class="p-3 whitespace-nowrap">
+            <span class="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200">${origStr}</span>
+            <div class="text-[11px] text-gray-400 mt-1">Total: ${origPcs} pcs</div>
           </td>
           <td class="p-3">
             <div class="flex items-center gap-2">
-              <input type="number" min="0" class="org-extra-box w-16 text-sm border-gray-300 rounded" placeholder="Box">
-              <input type="number" min="0" class="org-extra-pcs w-16 text-sm border-gray-300 rounded" placeholder="Pcs">
+              <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm">
+                <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-16 text-sm py-1.5 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
+                <span class="bg-gray-100 text-gray-500 text-xs px-2 py-2 border-l border-r border-gray-200 font-medium">Box</span>
+                <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-16 text-sm py-1.5 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
+                <span class="bg-gray-100 text-gray-500 text-xs px-2 py-2 border-l border-gray-200 font-medium">Pcs</span>
+              </div>
             </div>
           </td>
+          <td class="p-3 text-center whitespace-nowrap">
+            <div class="org-diff-badge flex items-center justify-center"></div>
+          </td>
           <td class="p-3 text-center">
-            <input type="checkbox" class="org-check w-5 h-5 text-amber-500 rounded border-gray-300 focus:ring-amber-500">
+            <input type="checkbox" class="org-check w-5 h-5 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer">
           </td>
         </tr>
       `;
     });
+
+    // Trigger difference updates for initial state
+    document.querySelectorAll('#organize-tbody tr').forEach(tr => {
+      const input = tr.querySelector('.org-dispatch-box');
+      if (input) updateOrgDiff(input);
+    });
   }
   
   document.getElementById('organize-modal').classList.remove('hidden');
+}
+
+function updateOrgDiff(elem) {
+  const tr = elem.closest('tr');
+  const origPcs = parseInt(tr.getAttribute('data-orig-pcs')) || 0;
+  const ppb = parseInt(tr.getAttribute('data-ppb')) || 1;
+  
+  const boxVal = parseInt(tr.querySelector('.org-dispatch-box').value) || 0;
+  const pcsVal = parseInt(tr.querySelector('.org-dispatch-pcs').value) || 0;
+  
+  const newTotalPcs = (boxVal * ppb) + pcsVal;
+  const diffPcs = newTotalPcs - origPcs;
+  const badgeContainer = tr.querySelector('.org-diff-badge');
+  
+  if (diffPcs === 0) {
+    badgeContainer.innerHTML = '<span class="text-xs text-gray-500 font-medium px-2 py-0.5 rounded bg-gray-100 border border-gray-200">ঠিক আছে</span>';
+    return;
+  }
+  
+  const absDiff = Math.abs(diffPcs);
+  const diffBox = Math.floor(absDiff / ppb);
+  const diffRemPcs = absDiff % ppb;
+  
+  let parts = [];
+  if (diffBox > 0) parts.push(`${diffBox} box`);
+  if (diffRemPcs > 0 || parts.length === 0) parts.push(`${diffRemPcs} pcs`);
+  const textStr = parts.join(' ');
+  
+  if (diffPcs > 0) {
+    badgeContainer.innerHTML = `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-semibold border border-emerald-200"><i class="fa-solid fa-arrow-up text-[10px]"></i> +${textStr} বেশি</span>`;
+  } else {
+    badgeContainer.innerHTML = `<span class="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-2.5 py-1 rounded-full text-xs font-semibold border border-rose-200"><i class="fa-solid fa-arrow-down text-[10px]"></i> -${textStr} কম</span>`;
+  }
 }
 
 function closeOrganizeModal() {
@@ -486,10 +547,19 @@ async function saveOrganize(event) {
   const extras = [];
   document.querySelectorAll('#organize-tbody tr').forEach(tr => {
     const pid = tr.getAttribute('data-pid');
-    const box = parseInt(tr.querySelector('.org-extra-box').value) || 0;
-    const pcs = parseInt(tr.querySelector('.org-extra-pcs').value) || 0;
-    if (box > 0 || pcs > 0) {
-      extras.push({ product_id: pid, boxes: box, pcs: pcs });
+    const origPcs = parseInt(tr.getAttribute('data-orig-pcs')) || 0;
+    const ppb = parseInt(tr.getAttribute('data-ppb')) || 1;
+    
+    const boxVal = parseInt(tr.querySelector('.org-dispatch-box').value) || 0;
+    const pcsVal = parseInt(tr.querySelector('.org-dispatch-pcs').value) || 0;
+    
+    const newTotalPcs = (boxVal * ppb) + pcsVal;
+    const diffPcs = newTotalPcs - origPcs;
+    
+    if (diffPcs !== 0) {
+      let diffBoxes = Math.trunc(diffPcs / ppb);
+      let diffRemPcs = diffPcs - (diffBoxes * ppb);
+      extras.push({ product_id: pid, boxes: diffBoxes, pcs: diffRemPcs });
     }
   });
 
@@ -592,18 +662,24 @@ function renderDsrList(dsrs) {
       <!-- Connection dot -->
       <div class="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-300 border-4 border-white dot" id="dsr-dot-${dsr.id}"></div>
       
-      <div class="flex items-center gap-3 pointer-events-none">
-        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">${dsr.name.charAt(0)}</div>
-        <div>
-          <div class="font-bold text-gray-800">${dsr.name}</div>
+      <div class="flex items-center gap-3 pointer-events-none w-1/2">
+        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold min-w-[40px]">${dsr.name.charAt(0)}</div>
+        <div class="truncate">
+          <div class="font-bold text-gray-800 truncate" title="${dsr.name}">${dsr.name}</div>
           <div class="text-xs text-gray-500">DSR</div>
         </div>
       </div>
-      <div class="ml-auto pointer-events-none">
+      <div class="ml-auto pointer-events-auto flex flex-col items-end gap-1">
+         <div class="flex items-center gap-1">
+             <label class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Delivery:</label>
+             <input type="date" id="dsr-date-${dsr.id}" class="form-input text-xs px-1 py-0.5 border-gray-300 rounded shadow-sm w-[110px]" value="${document.getElementById('wire-date').value}">
+         </div>
          <span id="dsr-count-${dsr.id}" class="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">0 SRs</span>
       </div>
     `;
-    div.onclick = () => handleDsrClick(dsr.id);
+    div.onclick = (e) => { 
+        if(e.target.tagName !== 'INPUT') handleDsrClick(dsr.id); 
+    };
     container.appendChild(div);
     dsrElements[dsr.id] = document.getElementById(`dsr-dot-${dsr.id}`);
   });
@@ -747,12 +823,15 @@ document.getElementById('dsr-list').addEventListener('scroll', updateVisuals);
 async function saveWireAssignments() {
   const date = document.getElementById('wire-date').value;
   
-  // Pivot connections into: { dsr_id: [sr_id, ...] }
+  // Pivot connections into: { dsr_id: { sr_ids: [sr_id, ...], delivery_date: '...' } }
   const assignments = {};
   Object.keys(connections).forEach(sId => {
     const dId = connections[sId];
-    if (!assignments[dId]) assignments[dId] = [];
-    assignments[dId].push(sId);
+    if (!assignments[dId]) {
+      const dDate = document.getElementById(`dsr-date-${dId}`).value || date;
+      assignments[dId] = { sr_ids: [], delivery_date: dDate };
+    }
+    assignments[dId].sr_ids.push(sId);
   });
   
   if (Object.keys(assignments).length === 0) {

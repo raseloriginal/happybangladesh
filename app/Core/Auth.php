@@ -13,6 +13,22 @@ class Auth
             $path = str_replace($basePath, '', $uri);
             $path = trim(parse_url($path, PHP_URL_PATH), '/');
 
+            // Strip "public" if it's at the start of the path
+            if (str_starts_with($path, 'public/')) {
+                $path = substr($path, 7);
+            } elseif ($path === 'public') {
+                $path = '';
+            }
+
+            // Strip "index.php" if it's at the start of the path
+            if (str_starts_with($path, 'index.php/')) {
+                $path = substr($path, 10);
+            } elseif ($path === 'index.php') {
+                $path = '';
+            }
+
+            $path = trim($path, '/');
+
             $sessionName = SESSION_NAME;
             if (str_starts_with($path, 'admin')) {
                 $sessionName .= '_ADMIN';

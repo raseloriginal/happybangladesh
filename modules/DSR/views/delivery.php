@@ -193,24 +193,35 @@ $hasDeliveries = !empty($retailers);
               $hasPending = false;
               $hasPartial = false;
               $hasCancelled = false;
+              $actionedCount = 0;
               foreach ($r['orders'] as $o) {
-                  if ($o['status'] === 'in_transit') $hasPending = true;
+                  if ($o['status'] === 'in_transit') {
+                      $hasPending = true;
+                  } else {
+                      $actionedCount++;
+                  }
                   if ($o['status'] === 'partial') $hasPartial = true;
                   if ($o['status'] === 'delivered') $hasDelivered = true;
                   if ($o['status'] === 'cancelled') $hasCancelled = true;
               }
+              $totalOrders = count($r['orders']);
               
-              $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700">Pending</span>';
-              if ($hasPending) {
+              // Determine status badge
+              if ($hasPending && $actionedCount > 0) {
+                  // Some actioned, some still pending => Incomplete (Black)
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-800 text-white"><i class="fa-solid fa-circle-exclamation mr-1"></i>Incomplete</span>';
+              } elseif ($hasPending) {
+                  // All pending
                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700"><i class="fa-regular fa-clock mr-1"></i>Pending</span>';
-              } elseif ($hasPartial) {
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-yellow-100 text-yellow-700"><i class="fa-solid fa-circle-half-stroke mr-1"></i>Partial</span>';
-              } elseif ($hasDelivered && $hasCancelled) {
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700"><i class="fa-solid fa-shuffle mr-1"></i>Mixed</span>';
-              } elseif ($hasCancelled) {
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700"><i class="fa-solid fa-xmark mr-1"></i>Cancelled</span>';
-              } elseif ($hasDelivered) {
+              } elseif ($hasDelivered && !$hasPartial && !$hasCancelled) {
                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-100 text-green-700"><i class="fa-solid fa-check mr-1"></i>Delivered</span>';
+              } elseif ($hasCancelled && !$hasDelivered && !$hasPartial) {
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700"><i class="fa-solid fa-xmark mr-1"></i>Cancelled</span>';
+              } elseif ($hasPartial && !$hasDelivered && !$hasCancelled) {
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-yellow-100 text-yellow-700"><i class="fa-solid fa-circle-half-stroke mr-1"></i>Partial</span>';
+              } else {
+                  // Mixed completed statuses
+                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700"><i class="fa-solid fa-shuffle mr-1"></i>Mixed</span>';
               }
           ?>
             <div class="bg-white rounded-2xl p-3 shadow-sm active:scale-[0.98] transition cursor-pointer border border-gray-100 flex flex-col h-full" onclick="handleRetailerListClick(<?= $idx ?>)">
@@ -401,7 +412,7 @@ $hasDeliveries = !empty($retailers);
               <p class="text-sm text-gray-500 mb-6" id="partialDueMessage">Remaining Due: ৳0.00</p>
               
               <div class="flex flex-col gap-3">
-                  <button onclick="handleDuePaymentAction()" class="w-full py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Due Payment</button>
+                  <button onclick="handleDuePaymentAction()" class="w-full py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Due Complete</button>
                   <button onclick="handleDueCancelAction()" class="w-full py-3 bg-red-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-red-500/20 transition">Cancel Order</button>
                   <button onclick="handleDueDetailsAction()" class="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">View Details</button>
               </div>
@@ -877,36 +888,16 @@ function handleDuePaymentAction() {
         totalDue += (parseFloat(o.total_amount) - parseFloat(o.paid_amount));
     });
     
-    showPromptPopup(`Enter payment amount (Total Due: ৳${totalDue.toFixed(0)}):`, async (val) => {
-        if (val <= 0) {
-            showToast("⚠️ Payment amount must be greater than zero!");
-            return;
-        }
-        
-        let remainingPayment = val;
-        
+    showConfirmPopup(`Mark all due orders as fully paid? (Total Due: ৳${totalDue.toFixed(0)})`, async () => {
         const btns = document.querySelectorAll('button');
         btns.forEach(b => { b.disabled = true; });
         
         try {
             for (let i = 0; i < currentPartialDueOrders.length; i++) {
                 const order = currentPartialDueOrders[i];
-                const orderDue = parseFloat(order.total_amount) - parseFloat(order.paid_amount);
                 
-                if (remainingPayment <= 0) break;
-                
-                let paymentForThisOrder = Math.min(remainingPayment, orderDue);
-                if (i === currentPartialDueOrders.length - 1) {
-                    paymentForThisOrder = remainingPayment;
-                }
-                remainingPayment -= paymentForThisOrder;
-                
-                const newCumulativePaid = parseFloat(order.paid_amount) + paymentForThisOrder;
-                
-                let status = 'partial';
-                if (newCumulativePaid >= parseFloat(order.total_amount)) {
-                    status = 'delivered';
-                }
+                // Set paid_amount = total_amount (fully paid)
+                const fullPaid = parseFloat(order.total_amount);
                 
                 let deliveredItems = {};
                 if (order.products) {
@@ -915,14 +906,14 @@ function handleDuePaymentAction() {
                     });
                 }
                 
-                const success = await submitDuePayment(order.dispatch_id, status, newCumulativePaid, deliveredItems);
+                const success = await submitDuePayment(order.dispatch_id, 'delivered', fullPaid, deliveredItems);
                 if (success) {
-                    order.status = status;
-                    order.paid_amount = newCumulativePaid;
+                    order.status = 'delivered';
+                    order.paid_amount = fullPaid;
                 }
             }
             
-            showToast('✅ Due payment recorded!');
+            showToast('✅ All dues marked as complete!');
             
             if (document.getElementById('retailerSheet').classList.contains('active')) {
                 openRetailerSheet(currentRetailerObj);
@@ -978,39 +969,128 @@ function initMap() {
                 border-right: 7px solid transparent;
                 margin-top: -1px;
             }
-            /* Blue — in_transit (pending delivery) */
+            /* Blue — in_transit (all pending delivery) */
             .pin-pending .map-pin-card {
                 background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 60%, #3b82f6 100%);
                 color: #fff;
             }
             .pin-pending .map-pin-tail { border-top: 9px solid #1d4ed8; }
-            /* Green — delivered */
+            /* Green — all delivered / complete */
             .pin-delivered .map-pin-card {
-                background: linear-gradient(135deg, #15803d 0%, #16a34a 60%, #22c55e 100%);
+                background: linear-gradient(135deg, #15803d 0%, #16a34a 60%, #22c55e 100%) !important;
                 color: #fff;
             }
-            .pin-delivered .map-pin-tail { border-top: 9px solid #15803d; }
-            /* Yellow — partial */
+            .pin-delivered .map-pin-tail { border-top: 9px solid #15803d !important; }
+            /* Yellow — all partial / due */
             .pin-partial .map-pin-card {
-                background: linear-gradient(135deg, #a16207 0%, #d97706 60%, #eab308 100%);
+                background: linear-gradient(135deg, #b45309 0%, #d97706 60%, #eab308 100%) !important;
                 color: #fff;
             }
-            .pin-partial .map-pin-tail { border-top: 9px solid #a16207; }
-            /* Red — cancelled */
+            .pin-partial .map-pin-tail { border-top: 9px solid #b45309 !important; }
+            /* Red — all cancelled */
             .pin-cancelled .map-pin-card {
-                background: linear-gradient(135deg, #dc2626 0%, #ef4444 60%, #f87171 100%);
+                background: linear-gradient(135deg, #dc2626 0%, #ef4444 60%, #f87171 100%) !important;
                 color: #fff;
             }
-            .pin-cancelled .map-pin-tail { border-top: 9px solid #dc2626; }
-            /* Green and Red Gradient — Mixed (Delivered + Cancelled) */
-            .pin-mixed .map-pin-card {
-                background: linear-gradient(135deg, #15803d 0%, #16a34a 50%, #ef4444 50%, #dc2626 100%) !important;
+            .pin-cancelled .map-pin-tail { border-top: 9px solid #dc2626 !important; }
+            /* Black — incomplete (some actioned, some still pending) */
+            .pin-incomplete .map-pin-card {
+                background: linear-gradient(135deg, #1a1a1a 0%, #374151 60%, #4b5563 100%) !important;
                 color: #fff;
             }
-            .pin-mixed .map-pin-tail { border-top: 9px solid #16a34a; }
+            .pin-incomplete .map-pin-tail { border-top: 9px solid #1a1a1a !important; }
+            /* Green + Red split — Delivered + Cancelled */
+            .pin-delivered-cancelled .map-pin-card {
+                background: linear-gradient(135deg, #15803d 0%, #16a34a 48%, #ef4444 52%, #dc2626 100%) !important;
+                color: #fff;
+            }
+            .pin-delivered-cancelled .map-pin-tail { border-top: 9px solid #16a34a; }
+            /* Green + Yellow split — Delivered + Partial */
+            .pin-delivered-partial .map-pin-card {
+                background: linear-gradient(135deg, #15803d 0%, #16a34a 48%, #d97706 52%, #eab308 100%) !important;
+                color: #fff;
+            }
+            .pin-delivered-partial .map-pin-tail { border-top: 9px solid #16a34a; }
+            /* Yellow + Red split — Partial + Cancelled */
+            .pin-partial-cancelled .map-pin-card {
+                background: linear-gradient(135deg, #b45309 0%, #eab308 48%, #ef4444 52%, #dc2626 100%) !important;
+                color: #fff;
+            }
+            .pin-partial-cancelled .map-pin-tail { border-top: 9px solid #b45309; }
+            /* Green + Yellow + Red — All three mixed */
+            .pin-mixed-all .map-pin-card {
+                background: linear-gradient(135deg, #15803d 0%, #16a34a 30%, #eab308 50%, #ef4444 70%, #dc2626 100%) !important;
+                color: #fff;
+            }
+            .pin-mixed-all .map-pin-tail { border-top: 9px solid #15803d; }
         `;
         document.head.appendChild(s);
     }
+
+function getRetailerPinInfo(ret) {
+    let deliveredCount = 0;
+    let partialCount = 0;
+    let cancelledCount = 0;
+    let pendingCount = 0;
+    const totalOrders = ret.orders ? ret.orders.length : 0;
+
+    ret.orders.forEach(o => {
+        if (o.status === 'delivered') {
+            deliveredCount++;
+        } else if (o.status === 'partial') {
+            partialCount++;
+        } else if (o.status === 'cancelled') {
+            cancelledCount++;
+        } else {
+            // in_transit or any other = pending
+            pendingCount++;
+        }
+    });
+
+    const actionedCount = deliveredCount + partialCount + cancelledCount;
+
+    // 1. Some actioned + some still pending => BLACK (incomplete)
+    if (pendingCount > 0 && actionedCount > 0) {
+        return { pinClass: 'pin-incomplete', pinIcon: 'fa-circle-exclamation' };
+    }
+
+    // 2. All still pending => BLUE
+    if (pendingCount === totalOrders) {
+        return { pinClass: 'pin-pending', pinIcon: 'fa-clock' };
+    }
+
+    // 3. All same status (no pending left)
+    if (deliveredCount === totalOrders) {
+        return { pinClass: 'pin-delivered', pinIcon: 'fa-check' };
+    }
+    if (cancelledCount === totalOrders) {
+        return { pinClass: 'pin-cancelled', pinIcon: 'fa-circle-xmark' };
+    }
+    if (partialCount === totalOrders) {
+        return { pinClass: 'pin-partial', pinIcon: 'fa-circle-half-stroke' };
+    }
+
+    // 4. Mixed completed statuses — split color pins
+    const hasDelivered = deliveredCount > 0;
+    const hasPartial = partialCount > 0;
+    const hasCancelled = cancelledCount > 0;
+
+    if (hasDelivered && hasPartial && hasCancelled) {
+        return { pinClass: 'pin-mixed-all', pinIcon: 'fa-shuffle' };
+    }
+    if (hasDelivered && hasCancelled) {
+        return { pinClass: 'pin-delivered-cancelled', pinIcon: 'fa-shuffle' };
+    }
+    if (hasDelivered && hasPartial) {
+        return { pinClass: 'pin-delivered-partial', pinIcon: 'fa-shuffle' };
+    }
+    if (hasPartial && hasCancelled) {
+        return { pinClass: 'pin-partial-cancelled', pinIcon: 'fa-shuffle' };
+    }
+
+    // Fallback => BLUE
+    return { pinClass: 'pin-pending', pinIcon: 'fa-clock' };
+}
 
     const fallbackLat = 23.8103, fallbackLng = 90.4125;
     let firstValidLat = null, firstValidLng = null;
@@ -1028,25 +1108,9 @@ function initMap() {
         if (!firstValidLat) { firstValidLat = parseFloat(ret.lat); firstValidLng = parseFloat(ret.lng); }
 
         // Determine aggregate status for pin color
-        let hasDelivered = false;
-        let hasPending = false;
-        let hasPartial = false;
-        let hasCancelled = false;
-        
-        ret.orders.forEach(o => {
-            if (o.status === 'in_transit') hasPending = true;
-            if (o.status === 'partial') hasPartial = true;
-            if (o.status === 'delivered') hasDelivered = true;
-            if (o.status === 'cancelled') hasCancelled = true;
-        });
-
-        let pinClass = 'pin-pending';
-        let pinIcon = 'fa-clock';
-        if (hasPending) { pinClass = 'pin-pending'; pinIcon = 'fa-clock'; }
-        else if (hasPartial) { pinClass = 'pin-partial'; pinIcon = 'fa-circle-half-stroke'; }
-        else if (hasDelivered && hasCancelled) { pinClass = 'pin-mixed'; pinIcon = 'fa-shuffle'; }
-        else if (hasCancelled) { pinClass = 'pin-cancelled'; pinIcon = 'fa-circle-xmark'; }
-        else if (hasDelivered) { pinClass = 'pin-delivered'; pinIcon = 'fa-check'; }
+        const pinInfo = getRetailerPinInfo(ret);
+        const pinClass = pinInfo.pinClass;
+        const pinIcon = pinInfo.pinIcon;
 
         let shouldWarn = true;
         ret.orders.forEach(o => {
@@ -1330,10 +1394,15 @@ function selectCompanyOrder(orderIndex) {
         }
     }
 
-    // Trigger initial calculation for this group
-    const firstInput = activeDiv ? activeDiv.querySelector('.delivery-input-box') : null;
-    if (firstInput) {
-        calcProgress(firstInput, `${orderIndex}-0`);
+    // Trigger initial calculation for ALL items in this group
+    if (activeDiv) {
+        const productItems = activeDiv.querySelectorAll('.product-item');
+        productItems.forEach((pItem, pIdx) => {
+            const bInput = pItem.querySelector('.delivery-input-box');
+            if (bInput) {
+                calcProgress(bInput, `${orderIndex}-${pIdx}`);
+            }
+        });
     } else {
         document.getElementById('bsGettingTotal').innerText = '৳0.00';
     }
@@ -1624,23 +1693,9 @@ function redrawMapPins() {
     markers = [];
     
     orderedRetailers.forEach((ret, i) => {
-        let hasDelivered = false;
-        let hasPending = false;
-        let hasPartial = false;
-        let hasCancelled = false;
-        ret.orders.forEach(o => {
-            if (o.status === 'in_transit') hasPending = true;
-            if (o.status === 'partial') hasPartial = true;
-            if (o.status === 'delivered') hasDelivered = true;
-            if (o.status === 'cancelled') hasCancelled = true;
-        });
-        let pinClass = 'pin-pending';
-        let pinIcon = 'fa-clock';
-        if (hasPending) { pinClass = 'pin-pending'; pinIcon = 'fa-clock'; }
-        else if (hasPartial) { pinClass = 'pin-partial'; pinIcon = 'fa-circle-half-stroke'; }
-        else if (hasDelivered && hasCancelled) { pinClass = 'pin-mixed'; pinIcon = 'fa-shuffle'; }
-        else if (hasCancelled) { pinClass = 'pin-cancelled'; pinIcon = 'fa-circle-xmark'; }
-        else if (hasDelivered) { pinClass = 'pin-delivered'; pinIcon = 'fa-check'; }
+        const pinInfo = getRetailerPinInfo(ret);
+        const pinClass = pinInfo.pinClass;
+        const pinIcon = pinInfo.pinIcon;
 
         let shouldWarn = true;
         ret.orders.forEach(o => {

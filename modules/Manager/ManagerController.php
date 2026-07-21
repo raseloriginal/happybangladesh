@@ -54,7 +54,13 @@ class ManagerController extends Controller
             ORDER BY p.created_at DESC
         ")->fetchAll();
         $companies = $this->db->query("SELECT * FROM companies WHERE status=1 ORDER BY name")->fetchAll();
-        $categories = $this->db->query("SELECT * FROM categories WHERE status=1 ORDER BY name")->fetchAll();
+        $categories = $this->db->query("
+            SELECT c.*, mc.name as main_category_name 
+            FROM categories c 
+            LEFT JOIN main_categories mc ON mc.id = c.main_category_id 
+            WHERE c.status=1 
+            ORDER BY COALESCE(mc.name, 'zzz'), c.name
+        ")->fetchAll();
         $this->render('products/index', compact('items', 'companies', 'categories'));
     }
 
@@ -237,14 +243,16 @@ class ManagerController extends Controller
     public function categories(): void
     {
         $items = $this->db->query("
-            SELECT c.*, co.name as company_name 
+            SELECT c.*, co.name as company_name, mc.name as main_category_name 
             FROM categories c 
             LEFT JOIN companies co ON co.id=c.company_id 
+            LEFT JOIN main_categories mc ON mc.id=c.main_category_id
             WHERE c.status=1 
             ORDER BY c.id DESC
         ")->fetchAll();
         $companies = $this->db->query('SELECT id, name FROM companies WHERE status=1 ORDER BY name')->fetchAll();
-        $this->render('categories/index', compact('items', 'companies'));
+        $main_categories = $this->db->query('SELECT id, name FROM main_categories ORDER BY name')->fetchAll();
+        $this->render('categories/index', compact('items', 'companies', 'main_categories'));
     }
 
     public function apiCategoryStore(): void
@@ -254,10 +262,23 @@ class ManagerController extends Controller
         if (!$input || empty($input['names'])) exit;
         
         $cid = $input['company_id'] ?: null;
-        $stmt = $this->db->prepare("INSERT INTO categories (company_id, name) VALUES (?, ?)");
+        $mcid = $input['main_category_id'] ?: null;
+        
+        if ($mcid === 'new' && !empty($input['new_main_category_name'])) {
+            $stmt = $this->db->prepare("SELECT id FROM main_categories WHERE name = ?");
+            $stmt->execute([trim($input['new_main_category_name'])]);
+            $mcid = $stmt->fetchColumn();
+            if (!$mcid) {
+                $stmt = $this->db->prepare("INSERT INTO main_categories (name) VALUES (?)");
+                $stmt->execute([trim($input['new_main_category_name'])]);
+                $mcid = $this->db->lastInsertId();
+            }
+        }
+        
+        $stmt = $this->db->prepare("INSERT INTO categories (company_id, main_category_id, name) VALUES (?, ?, ?)");
         
         foreach ($input['names'] as $name) {
-            $stmt->execute([$cid, $name]);
+            $stmt->execute([$cid, $mcid ?: null, $name]);
         }
         echo json_encode(['success' => true]);
         exit;
@@ -268,8 +289,19 @@ class ManagerController extends Controller
         $this->verifyCsrf();
         $input = json_decode(file_get_contents('php://input'), true);
         if ($input && !empty($input['id'])) {
-            $this->db->prepare("UPDATE categories SET company_id=?, name=? WHERE id=?")
-                     ->execute([$input['company_id'] ?: null, trim($input['name']), $input['id']]);
+            $mcid = $input['main_category_id'] ?: null;
+            if ($mcid === 'new' && !empty($input['new_main_category_name'])) {
+                $stmt = $this->db->prepare("SELECT id FROM main_categories WHERE name = ?");
+                $stmt->execute([trim($input['new_main_category_name'])]);
+                $mcid = $stmt->fetchColumn();
+                if (!$mcid) {
+                    $stmt = $this->db->prepare("INSERT INTO main_categories (name) VALUES (?)");
+                    $stmt->execute([trim($input['new_main_category_name'])]);
+                    $mcid = $this->db->lastInsertId();
+                }
+            }
+            $this->db->prepare("UPDATE categories SET company_id=?, main_category_id=?, name=? WHERE id=?")
+                     ->execute([$input['company_id'] ?: null, $mcid ?: null, trim($input['name']), $input['id']]);
             echo json_encode(['success' => true]);
         }
         exit;
@@ -514,6 +546,8 @@ class ManagerController extends Controller
 
         foreach ($schedules as &$sch) {
             $sid = $sch['id'];
+            $delivery_date = $sch['delivery_date'] ?: $sch['dispatch_date'];
+            
             $orderVal = $this->db->query("
                 SELECT COALESCE(SUM(o.total_amount), 0)
                 FROM dispatch_schedule_srs dss
@@ -527,12 +561,12 @@ class ManagerController extends Controller
                 FROM returns r
                 JOIN return_items ri ON ri.return_id = r.id
                 JOIN products p ON p.id = ri.product_id
-                WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$sch['dispatch_date']}'
+                WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}'
             ")->fetchColumn();
             $sch['total_damage_value'] = (float)$this->db->query("
                 SELECT COALESCE(total_damage, 0)
                 FROM settlements
-                WHERE dsr_id = {$sch['dsr_id']} AND date = '{$sch['dispatch_date']}'
+                WHERE dsr_id = {$sch['dsr_id']} AND date = '{$delivery_date}'
             ")->fetchColumn();
         }
 
@@ -585,10 +619,13 @@ class ManagerController extends Controller
 
         $this->db->beginTransaction();
         try {
-            foreach ($assignments as $dsr_id => $sr_ids) {
+            foreach ($assignments as $dsr_id => $data) {
+                $sr_ids = $data['sr_ids'] ?? [];
+                $delivery_date = $data['delivery_date'] ?? $date;
+                
                 if (empty($sr_ids)) continue;
-                $stmt = $this->db->prepare("INSERT INTO dispatch_schedules (dsr_id, dispatch_date, status) VALUES (?, ?, 'assigned')");
-                $stmt->execute([$dsr_id, $date]);
+                $stmt = $this->db->prepare("INSERT INTO dispatch_schedules (dsr_id, dispatch_date, delivery_date, status) VALUES (?, ?, ?, 'assigned')");
+                $stmt->execute([$dsr_id, $date, $delivery_date]);
                 $schedule_id = $this->db->lastInsertId();
                 
                 $srStmt = $this->db->prepare("INSERT INTO dispatch_schedule_srs (schedule_id, sr_id) VALUES (?, ?)");
@@ -617,7 +654,7 @@ class ManagerController extends Controller
             exit;
         }
 
-        $sch = $this->db->prepare("SELECT dsr_id, dispatch_date FROM dispatch_schedules WHERE id = ?");
+        $sch = $this->db->prepare("SELECT dsr_id, dispatch_date, delivery_date FROM dispatch_schedules WHERE id = ?");
         $sch->execute([$scheduleId]);
         $schData = $sch->fetch();
 
@@ -628,6 +665,7 @@ class ManagerController extends Controller
 
         $oldDsrId = $schData['dsr_id'];
         $date = $schData['dispatch_date'];
+        $deliv_date = $schData['delivery_date'] ?: $date;
 
         $this->db->beginTransaction();
         try {
@@ -635,13 +673,13 @@ class ManagerController extends Controller
             $stmt->execute([$newDsrId, $scheduleId]);
 
             $stmtDisp = $this->db->prepare("UPDATE dispatches SET dsr_id = ? WHERE dsr_id = ? AND dispatch_date = ?");
-            $stmtDisp->execute([$newDsrId, $oldDsrId, $date]);
+            $stmtDisp->execute([$newDsrId, $oldDsrId, $deliv_date]);
 
             $stmtRet = $this->db->prepare("UPDATE returns SET dsr_id = ? WHERE dsr_id = ? AND return_date = ?");
-            $stmtRet->execute([$newDsrId, $oldDsrId, $date]);
+            $stmtRet->execute([$newDsrId, $oldDsrId, $deliv_date]);
 
             $stmtSett = $this->db->prepare("UPDATE settlements SET dsr_id = ? WHERE dsr_id = ? AND date = ?");
-            $stmtSett->execute([$newDsrId, $oldDsrId, $date]);
+            $stmtSett->execute([$newDsrId, $oldDsrId, $deliv_date]);
 
             $this->db->commit();
             echo json_encode(['success' => true]);
@@ -655,8 +693,10 @@ class ManagerController extends Controller
     public function apiDispatchSrDetails(string $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $schedule = $this->db->query("SELECT dispatch_date, dsr_id FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
+        $schedule = $this->db->query("SELECT dispatch_date, delivery_date, dsr_id FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
         if (!$schedule) exit;
+        
+        $delivery_date = $schedule['delivery_date'] ?: $schedule['dispatch_date'];
 
         $srs = $this->db->query("
             SELECT u.id, u.name,
@@ -666,14 +706,14 @@ class ManagerController extends Controller
                     JOIN products p ON p.id = di.product_id
                     JOIN dispatches d ON d.id = di.dispatch_id
                     JOIN orders o ON o.id = d.order_id
-                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$schedule['dispatch_date']}') as dispatch_items_value,
+                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$delivery_date}') as dispatch_items_value,
                    (SELECT COALESCE(SUM(ri.quantity * p.price), 0)
                     FROM returns r
                     JOIN return_items ri ON ri.return_id = r.id
                     JOIN products p ON p.id = ri.product_id
                     JOIN dispatches d ON d.id = r.dispatch_id
                     JOIN orders o ON o.id = d.order_id
-                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$schedule['dispatch_date']}') as return_items_value,
+                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$delivery_date}') as return_items_value,
                    0 as damage_value
             FROM dispatch_schedule_srs dss
             JOIN users u ON u.id = dss.sr_id
@@ -721,11 +761,14 @@ class ManagerController extends Controller
         
         $products = $this->db->query("
             SELECT p.id as product_id, p.name, p.image, p.pieces_per_box, 
-                   SUM(oi.quantity) as total_ordered_qty
+                   SUM(oi.quantity) as total_ordered_qty,
+                   IFNULL(de.qty_boxes, 0) as extra_boxes,
+                   IFNULL(de.qty_pieces, 0) as extra_pieces
             FROM dispatch_schedule_srs dss
             JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$schedule['dispatch_date']}'
             JOIN order_items oi ON oi.order_id = o.id
             JOIN products p ON p.id = oi.product_id
+            LEFT JOIN dispatch_extras de ON de.schedule_id = dss.schedule_id AND de.product_id = p.id
             WHERE dss.schedule_id = " . (int)$id . "
             GROUP BY p.id
         ")->fetchAll();
@@ -742,10 +785,13 @@ class ManagerController extends Controller
         
         $this->db->beginTransaction();
         try {
+            // Delete existing extras for this schedule before saving new ones
+            $this->db->prepare("DELETE FROM dispatch_extras WHERE schedule_id = ?")->execute([$id]);
+
             // Save extras
             $stmt = $this->db->prepare("INSERT INTO dispatch_extras (schedule_id, product_id, qty_boxes, qty_pieces) VALUES (?, ?, ?, ?)");
             foreach ($extras as $ex) {
-                if ($ex['boxes'] > 0 || $ex['pcs'] > 0) {
+                if ($ex['boxes'] != 0 || $ex['pcs'] != 0) {
                     $stmt->execute([$id, $ex['product_id'], $ex['boxes'], $ex['pcs']]);
                 }
             }
@@ -760,7 +806,8 @@ class ManagerController extends Controller
             
             if ($sch) {
                 $dsrId = $sch['dsr_id'];
-                $date = $sch['dispatch_date'];
+                $date = $sch['dispatch_date']; // Order date
+                $deliv_date = $sch['delivery_date'] ?: $date;
                 
                 // 1. Convert Orders into Dispatches
                 $orders = $this->db->prepare("
@@ -774,7 +821,7 @@ class ManagerController extends Controller
                 
                 foreach ($ordersList as $o) {
                     $this->db->prepare("INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status) VALUES (?, ?, ?, ?, 'pending')")
-                             ->execute([$o['id'], $dsrId, $o['warehouse_id'], $date]);
+                             ->execute([$o['id'], $dsrId, $o['warehouse_id'], $deliv_date]);
                     $dispatchId = $this->db->lastInsertId();
                     
                     $items = $this->db->prepare("SELECT product_id, lot_id, quantity FROM order_items WHERE order_id=?");
@@ -785,7 +832,6 @@ class ManagerController extends Controller
                     }
                     
                     // Update order status so they don't get dispatched twice
-                    // Wait, if they are 'dispatched', they still show as 'dispatched' in the manager list.
                     $this->db->prepare("UPDATE orders SET status='dispatched' WHERE id=?")->execute([$o['id']]);
                 }
                 
@@ -807,7 +853,7 @@ class ManagerController extends Controller
                     
                     foreach ($extraList as $ex) {
                         $qty = ($ex['qty_boxes'] * max(1, $ex['pieces_per_box'])) + $ex['qty_pieces'];
-                        if ($qty > 0) {
+                        if ($qty != 0) {
                             $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity) VALUES (?, ?, NULL, ?)")
                                      ->execute([$extraDispatchId, $ex['product_id'], $qty]);
                         }
@@ -830,13 +876,14 @@ class ManagerController extends Controller
         $input = json_decode(file_get_contents('php://input'), true);
         $status = $input['status'] ?? 'assigned';
         
-        $sch = $this->db->query("SELECT dsr_id, dispatch_date FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
+        $sch = $this->db->query("SELECT dsr_id, dispatch_date, delivery_date FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
         if (!$sch) {
             echo json_encode(['success' => false, 'message' => 'Schedule not found']);
             exit;
         }
         $dsrId = $sch['dsr_id'];
         $date = $sch['dispatch_date'];
+        $deliv_date = $sch['delivery_date'] ?: $date;
 
         $this->db->beginTransaction();
         try {
@@ -849,7 +896,7 @@ class ManagerController extends Controller
                     WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status='pending'
                     GROUP BY di.product_id, di.lot_id
                 ");
-                $q->execute([$dsrId, $date]);
+                $q->execute([$dsrId, $deliv_date]);
                 $itemsToLoad = $q->fetchAll();
 
                 foreach ($itemsToLoad as $item) {
@@ -862,16 +909,16 @@ class ManagerController extends Controller
                     
                     if ($row = $check->fetch()) {
                         $this->db->prepare("UPDATE van_stock SET quantity = quantity + ?, loaded_at = ? WHERE id=?")
-                                 ->execute([$item['total_qty'], $date, $row['id']]);
+                                 ->execute([$item['total_qty'], $deliv_date, $row['id']]);
                     } else {
                         $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, loaded_at) VALUES (?, ?, ?, ?, ?)")
-                                 ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $date]);
+                                 ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $deliv_date]);
                     }
                 }
 
                 // 2. Mark dispatches as in_transit
                 $this->db->prepare("UPDATE dispatches SET status='in_transit', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status='pending'")
-                         ->execute([$dsrId, $date]);
+                         ->execute([$dsrId, $deliv_date]);
             }
 
             $this->db->prepare("UPDATE dispatch_schedules SET status = ? WHERE id = ?")->execute([$status, $id]);

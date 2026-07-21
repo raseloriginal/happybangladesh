@@ -123,10 +123,15 @@ class AdminController extends Controller
     private function usersByRole(string $role): array
     {
         $stmt = $this->db->prepare("
-            SELECT u.*, r.name AS role_name, w.name AS warehouse_name
+            SELECT u.*, r.name AS role_name, w.name AS warehouse_name, c.name AS company_name,
+                   (SELECT GROUP_CONCAT(DISTINCT d.name ORDER BY d.name SEPARATOR ', ') 
+                    FROM dealer_companies dc 
+                    JOIN dealers d ON d.id = dc.dealer_id 
+                    WHERE dc.sr_id = u.id) AS dealer_names
             FROM users u
             JOIN roles r ON r.id = u.role_id
             LEFT JOIN warehouses w ON w.id = u.warehouse_id
+            LEFT JOIN companies c ON c.id = u.company_id
             WHERE r.slug = ?
             ORDER BY u.created_at DESC
         ");
@@ -379,9 +384,16 @@ class AdminController extends Controller
             $sIds = $_POST['sr_id'] ?? [];
 
             $stmt = $this->db->prepare("INSERT INTO dealer_companies (dealer_id, company_id, sr_id) VALUES (?,?,?)");
+            $seen = [];
             foreach ($cIds as $idx => $cid) {
-                if (!empty($cid) && !empty($sIds[$idx])) {
-                    $stmt->execute([$dealerId, $cid, $sIds[$idx]]);
+                $sid = $sIds[$idx] ?? '';
+                if (!empty($cid) && !empty($sid)) {
+                    $key = $cid . '-' . $sid;
+                    if (isset($seen[$key])) {
+                        continue;
+                    }
+                    $seen[$key] = true;
+                    $stmt->execute([$dealerId, $cid, $sid]);
                 }
             }
             
@@ -442,9 +454,16 @@ class AdminController extends Controller
             $sIds = $_POST['sr_id'] ?? [];
             
             $stmt = $this->db->prepare("INSERT INTO dealer_companies (dealer_id, company_id, sr_id) VALUES (?,?,?)");
+            $seen = [];
             foreach ($cIds as $idx => $cid) {
-                if (!empty($cid) && !empty($sIds[$idx])) {
-                    $stmt->execute([$id, $cid, $sIds[$idx]]);
+                $sid = $sIds[$idx] ?? '';
+                if (!empty($cid) && !empty($sid)) {
+                    $key = $cid . '-' . $sid;
+                    if (isset($seen[$key])) {
+                        continue;
+                    }
+                    $seen[$key] = true;
+                    $stmt->execute([$id, $cid, $sid]);
                 }
             }
             
@@ -712,4 +731,123 @@ class AdminController extends Controller
 
         return $tables;
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Import Retailers
+    // ══════════════════════════════════════════════════════════
+    public function retailersImport(): void
+    {
+        $pageTitle = 'Import Retailers';
+        $this->render('retailers_import', compact('pageTitle'));
+    }
+
+    public function retailersImportPost(): void
+    {
+        $this->verifyCsrf();
+
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            $this->flash('error', 'Please select a valid CSV file.');
+            $this->redirect('admin/retailers/import');
+            return;
+        }
+
+        $fileTmp = $_FILES['csv_file']['tmp_name'];
+        $handle = fopen($fileTmp, 'r');
+        if (!$handle) {
+            $this->flash('error', 'Failed to open the uploaded file.');
+            $this->redirect('admin/retailers/import');
+            return;
+        }
+
+        // Read header row
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            $this->flash('error', 'The CSV file is empty.');
+            $this->redirect('admin/retailers/import');
+            return;
+        }
+
+        // Remove BOM if present
+        if (substr($header[0], 0, 3) === "\xEF\xBB\xBF") {
+            $header[0] = substr($header[0], 3);
+        }
+
+        // Normalize headers
+        $header = array_map(function($h) {
+            return strtolower(trim($h));
+        }, $header);
+
+        $nameIdx = -1;
+        $phoneIdx = -1;
+        $latIdx = -1;
+        $lngIdx = -1;
+
+        foreach ($header as $idx => $col) {
+            if (in_array($col, ['name', 'store name', 'store', 'retailer'])) {
+                $nameIdx = $idx;
+            } elseif (in_array($col, ['phone', 'number', 'phone number', 'mobile'])) {
+                $phoneIdx = $idx;
+            } elseif (in_array($col, ['lat', 'latitude'])) {
+                $latIdx = $idx;
+            } elseif (in_array($col, ['lng', 'longitude'])) {
+                $lngIdx = $idx;
+            }
+        }
+
+        if ($nameIdx === -1) {
+            fclose($handle);
+            $this->flash('error', 'Could not find a column named "Name" or "Store Name" in the CSV.');
+            $this->redirect('admin/retailers/import');
+            return;
+        }
+
+        $inserted = 0;
+        $this->db->beginTransaction();
+
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO retailers (name, phone, lat, lng, address) 
+                VALUES (?, ?, ?, ?, ?)
+            ");
+
+            while (($row = fgetcsv($handle)) !== false) {
+                if (empty($row) || (count($row) === 1 && $row[0] === null)) {
+                    continue;
+                }
+
+                $name = isset($row[$nameIdx]) ? trim($row[$nameIdx]) : '';
+                if ($name === '') {
+                    continue; // Skip if name is empty
+                }
+
+                $phone = ($phoneIdx !== -1 && isset($row[$phoneIdx])) ? trim($row[$phoneIdx]) : null;
+                $lat = ($latIdx !== -1 && isset($row[$latIdx]) && $row[$latIdx] !== '') ? floatval(trim($row[$latIdx])) : null;
+                $lng = ($lngIdx !== -1 && isset($row[$lngIdx]) && $row[$lngIdx] !== '') ? floatval(trim($row[$lngIdx])) : null;
+                $address = "Imported dummy retailer";
+
+                $stmt->execute([
+                    $name,
+                    $phone,
+                    $lat,
+                    $lng,
+                    $address
+                ]);
+                $inserted++;
+            }
+
+            $this->db->commit();
+            fclose($handle);
+
+            $this->flash('success', "Successfully imported {$inserted} retailers.");
+            $this->redirect('admin/retailers/import');
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            fclose($handle);
+            $this->flash('error', 'Error importing data: ' . $e->getMessage());
+            $this->redirect('admin/retailers/import');
+        }
+    }
 }
+

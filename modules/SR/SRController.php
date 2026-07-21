@@ -21,14 +21,12 @@ class SRController extends Controller
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS retailers (
                 id          INT AUTO_INCREMENT PRIMARY KEY,
-                sr_id       INT NOT NULL,
                 name        VARCHAR(255) NOT NULL,
                 phone       VARCHAR(30),
                 lat         DECIMAL(10,7),
                 lng         DECIMAL(10,7),
                 address     TEXT,
                 created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_sr_id (sr_id),
                 INDEX idx_lat_lng (lat, lng)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
@@ -374,10 +372,10 @@ class SRController extends Controller
         }
 
         $q = $this->db->prepare("
-            INSERT INTO retailers (sr_id, name, phone, lat, lng)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO retailers (name, phone, lat, lng)
+            VALUES (?, ?, ?, ?)
         ");
-        $q->execute([Auth::id(), $name, $phone, $lat ?: null, $lng ?: null]);
+        $q->execute([$name, $phone, $lat ?: null, $lng ?: null]);
         $id = $this->db->lastInsertId();
 
         $this->json(['success' => true, 'id' => $id]);

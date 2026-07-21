@@ -120,6 +120,10 @@ $router->get( '/admin/database-sync',         ['AdminController', 'databaseSync'
 $router->post('/admin/database-sync/run',     ['AdminController', 'databaseSyncRun']);
 $router->post('/admin/database-sync/clear',   ['AdminController', 'databaseClear']);
 
+// Import Retailers
+$router->get( '/admin/retailers/import',      ['AdminController', 'retailersImport']);
+$router->post('/admin/retailers/import',      ['AdminController', 'retailersImportPost']);
+
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
 

@@ -26,7 +26,7 @@ $createUrl  = url("admin/{$role}s/create");
     <table class="data-table" id="users-table">
       <thead>
         <tr>
-          <th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Warehouse</th><th>Status</th><th>Actions</th>
+          <th>#</th><th>Name</th><th>Email</th><th>Phone</th><th><?= $role === 'sr' ? 'Company' : 'Warehouse' ?></th><?php if ($role === 'sr'): ?><th>Dealer</th><?php endif; ?><th>Status</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -43,7 +43,10 @@ $createUrl  = url("admin/{$role}s/create");
           </td>
           <td class="text-gray-500"><?= h($u['email']) ?></td>
           <td><?= h($u['phone'] ?? '—') ?></td>
-          <td><?= h($u['warehouse_name'] ?? '—') ?></td>
+          <td><?= $role === 'sr' ? h($u['company_name'] ?? '—') : h($u['warehouse_name'] ?? '—') ?></td>
+          <?php if ($role === 'sr'): ?>
+          <td><?= h($u['dealer_names'] ?? '—') ?></td>
+          <?php endif; ?>
           <td><?= Helpers::statusBadge($u['status'] ? 'active' : 'inactive') ?></td>
           <td>
             <div class="flex items-center gap-1">
@@ -59,7 +62,7 @@ $createUrl  = url("admin/{$role}s/create");
         </tr>
         <?php endforeach; ?>
         <?php if (empty($items)): ?>
-          <tr><td colspan="7" class="text-center py-8 text-gray-400">No <?= strtolower($pageTitle) ?> found.</td></tr>
+          <tr><td colspan="<?= $role === 'sr' ? '8' : '7' ?>" class="text-center py-8 text-gray-400">No <?= strtolower($pageTitle) ?> found.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>

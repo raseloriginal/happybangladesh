@@ -113,11 +113,11 @@ class DSRController extends Controller
         $stats = [];
 
         // Today's Delivery Count
-        $q = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=CURDATE()"); $q->execute([$dsrId]);
+        $q = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=CURDATE() AND status != 'pending'"); $q->execute([$dsrId]);
         $stats['todays_deliveries'] = $q->fetchColumn();
 
         // Ordered Retailers
-        $q = $this->db->prepare("SELECT COUNT(DISTINCT COALESCE(o.dealer_id, o.id)) FROM dispatches d JOIN orders o ON o.id=d.order_id WHERE d.dsr_id=? AND d.dispatch_date=CURDATE()"); $q->execute([$dsrId]);
+        $q = $this->db->prepare("SELECT COUNT(DISTINCT COALESCE(o.dealer_id, o.id)) FROM dispatches d JOIN orders o ON o.id=d.order_id WHERE d.dsr_id=? AND d.dispatch_date=CURDATE() AND d.status != 'pending'"); $q->execute([$dsrId]);
         $stats['ordered_retailers'] = $q->fetchColumn();
 
         // Completed Deliveries
@@ -125,7 +125,7 @@ class DSRController extends Controller
         $stats['completed_deliveries'] = $q->fetchColumn();
 
         // Due Deliveries
-        $q = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND status IN ('pending', 'in_transit') AND dispatch_date=CURDATE()"); $q->execute([$dsrId]);
+        $q = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND status='in_transit' AND dispatch_date=CURDATE()"); $q->execute([$dsrId]);
         $stats['due_deliveries'] = $q->fetchColumn();
 
         // Ready Sales
@@ -194,7 +194,7 @@ class DSRController extends Controller
             SELECT di.product_id, SUM(di.quantity) as qty
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
             GROUP BY di.product_id
         ");
         $outsideQ->execute([$dsrId, $date]);
@@ -255,7 +255,7 @@ class DSRController extends Controller
             SELECT di.product_id, SUM(di.quantity) as qty
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
             GROUP BY di.product_id
         ");
         $outsideMapQ->execute([$dsrId, $date]);
@@ -374,7 +374,7 @@ class DSRController extends Controller
             LEFT JOIN companies c ON c.id = u.company_id
             LEFT JOIN dealers dl ON dl.id = o.dealer_id
             LEFT JOIN retailers r ON r.id = o.retailer_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
             ORDER BY dealer_name ASC
         ");
         $q->execute([$dsrId, $selectedDate]);
@@ -425,10 +425,10 @@ class DSRController extends Controller
         $orderedRetailers = array_values($grouped);
 
         // Check if collection is complete
-        $check = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=? AND status='pending'");
+        $check = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=? AND status='in_transit'");
         $check->execute([$dsrId, $selectedDate]);
         
-        $qItems = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=?");
+        $qItems = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=? AND status != 'pending'");
         $qItems->execute([$dsrId, $selectedDate]);
         
         $isCompleted = ($qItems->fetchColumn() > 0 && $check->fetchColumn() == 0);
@@ -440,7 +440,7 @@ class DSRController extends Controller
                    SUM(COALESCE(di.delivered_quantity, 0)) as delivered
             FROM dispatch_items di
             JOIN dispatches d ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
             GROUP BY di.product_id
         ");
         $vanQ->execute([$dsrId, $selectedDate]);
@@ -530,13 +530,13 @@ class DSRController extends Controller
             FROM dispatch_items di
             JOIN dispatches d ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
-            WHERE d.dsr_id=? AND d.dispatch_date=?
+            WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status != 'pending'
             GROUP BY di.product_id, p.name, p.image
         ");
         $q->execute([$dsrId, $date]);
         $items = $q->fetchAll();
 
-        $check = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=? AND status='pending'");
+        $check = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id=? AND dispatch_date=? AND status='in_transit'");
         $check->execute([$dsrId, $date]);
         $isCompleted = (!empty($items) && $check->fetchColumn() == 0);
 
@@ -581,8 +581,8 @@ class DSRController extends Controller
                  ->execute([$dsrId, $date]);
 
         // 4. Update the manager's dispatch schedule status to 'dispatched'
-        $this->db->prepare("UPDATE dispatch_schedules SET status='dispatched' WHERE dsr_id=? AND dispatch_date=? AND status='organized'")
-                 ->execute([$dsrId, $date]);
+        $this->db->prepare("UPDATE dispatch_schedules SET status='dispatched' WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) AND status='organized'")
+                 ->execute([$dsrId, $date, $date]);
         
         $this->json(['success' => true]);
     }
@@ -697,12 +697,11 @@ class DSRController extends Controller
             return;
         }
 
-        // We use the dsr_id as sr_id for compatibility with the retailers table
         $q = $this->db->prepare("
-            INSERT INTO retailers (sr_id, name, phone, lat, lng)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO retailers (name, phone, lat, lng)
+            VALUES (?, ?, ?, ?)
         ");
-        $q->execute([Auth::id(), $name, $phone, $lat ?: null, $lng ?: null]);
+        $q->execute([$name, $phone, $lat ?: null, $lng ?: null]);
         $id = $this->db->lastInsertId();
 
         $this->json(['success' => true, 'id' => $id]);
