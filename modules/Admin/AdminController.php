@@ -849,5 +849,217 @@ class AdminController extends Controller
             $this->redirect('admin/retailers/import');
         }
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Orders & Retailer Map View
+    // ══════════════════════════════════════════════════════════
+    public function orders(): void
+    {
+        $srs = $this->db->query("
+            SELECT u.id, u.name 
+            FROM users u 
+            JOIN roles r ON r.id = u.role_id 
+            WHERE r.slug='sr' AND u.status=1 
+            ORDER BY u.name
+        ")->fetchAll();
+
+        $dsrs = $this->db->query("
+            SELECT u.id, u.name 
+            FROM users u 
+            JOIN roles r ON r.id = u.role_id 
+            WHERE r.slug='dsr' AND u.status=1 
+            ORDER BY u.name
+        ")->fetchAll();
+
+        $warehouses = $this->db->query("
+            SELECT id, name 
+            FROM warehouses 
+            WHERE status=1 
+            ORDER BY name
+        ")->fetchAll();
+
+        $selectedDate = $_GET['date'] ?? date('Y-m-d');
+        $pageTitle = 'Orders & Retailer Map';
+
+        $this->render('orders', compact('srs', 'dsrs', 'warehouses', 'selectedDate', 'pageTitle'));
+    }
+
+    public function apiOrders(): void
+    {
+        $date        = trim($_GET['date'] ?? date('Y-m-d'));
+        $srId        = !empty($_GET['sr_id']) ? (int)$_GET['sr_id'] : null;
+        $dsrId       = !empty($_GET['dsr_id']) ? (int)$_GET['dsr_id'] : null;
+        $warehouseId = !empty($_GET['warehouse_id']) ? (int)$_GET['warehouse_id'] : null;
+        $status      = !empty($_GET['status']) ? trim($_GET['status']) : null;
+        $ocStatus    = !empty($_GET['oc_status']) ? trim($_GET['oc_status']) : null;
+        $search      = !empty($_GET['search']) ? trim($_GET['search']) : null;
+
+        $where = ["DATE(o.created_at) = ?"];
+        $params = [$date];
+
+        if ($srId) {
+            $where[] = "o.sr_id = ?";
+            $params[] = $srId;
+        }
+        if ($dsrId) {
+            $where[] = "disp.dsr_id = ?";
+            $params[] = $dsrId;
+        }
+        if ($warehouseId) {
+            $where[] = "o.warehouse_id = ?";
+            $params[] = $warehouseId;
+        }
+        if ($status) {
+            $where[] = "o.status = ?";
+            $params[] = $status;
+        }
+        if ($search) {
+            $where[] = "(r.name LIKE ? OR r.phone LIKE ? OR d.name LIKE ? OR d.phone LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        $whereSql = implode(" AND ", $where);
+
+        $sql = "
+            SELECT 
+                o.id AS order_id,
+                o.sr_id,
+                o.warehouse_id,
+                o.status AS order_status,
+                o.total_amount,
+                o.notes,
+                o.created_at AS order_date,
+                sr.name AS sr_name,
+                w.name AS warehouse_name,
+                disp.dsr_id,
+                dsr.name AS dsr_name,
+                disp.status AS dispatch_status,
+                COALESCE(r.id, d.id) AS retailer_id,
+                COALESCE(r.name, d.name, 'Unknown Retailer') AS retailer_name,
+                COALESCE(r.phone, d.phone, 'N/A') AS phone,
+                COALESCE(r.address, d.address, 'N/A') AS address,
+                COALESCE(r.lat, d.lat) AS lat,
+                COALESCE(r.lng, d.lng) AS lng,
+                CASE WHEN r.id IS NOT NULL THEN 'retailer' ELSE 'dealer' END AS entity_type
+            FROM orders o
+            LEFT JOIN retailers r ON r.id = o.retailer_id
+            LEFT JOIN dealers d ON d.id = o.dealer_id
+            LEFT JOIN users sr ON sr.id = o.sr_id
+            LEFT JOIN warehouses w ON w.id = o.warehouse_id
+            LEFT JOIN dispatches disp ON disp.order_id = o.id
+            LEFT JOIN users dsr ON dsr.id = disp.dsr_id
+            WHERE {$whereSql}
+            ORDER BY o.created_at DESC
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $results = [];
+        $summary = [
+            'total_orders'    => count($orders),
+            'total_amount'    => 0,
+            'total_retailers' => 0,
+            'checked_out_cnt' => 0,
+            'ordered_cnt'     => 0
+        ];
+
+        $retailerIdsSeen = [];
+
+        foreach ($orders as $ord) {
+            $ordId = (int)$ord['order_id'];
+            
+            $isDelivered = ($ord['order_status'] === 'delivered' || $ord['dispatch_status'] === 'delivered');
+            $calculatedOc = $isDelivered ? 'checked_out' : 'ordered';
+
+            if ($ocStatus && $ocStatus !== $calculatedOc) {
+                continue;
+            }
+
+            if ($isDelivered) {
+                $summary['checked_out_cnt']++;
+            } else {
+                $summary['ordered_cnt']++;
+            }
+
+            $summary['total_amount'] += (float)$ord['total_amount'];
+
+            $retKey = $ord['entity_type'] . '_' . $ord['retailer_id'];
+            if (!isset($retailerIdsSeen[$retKey])) {
+                $retailerIdsSeen[$retKey] = true;
+                $summary['total_retailers']++;
+            }
+
+            $itemStmt = $this->db->prepare("
+                SELECT oi.id, oi.product_id, oi.quantity, oi.unit_price, oi.total_price,
+                       p.name AS product_name, p.sku, p.pieces_per_box
+                FROM order_items oi
+                JOIN products p ON p.id = oi.product_id
+                WHERE oi.order_id = ?
+            ");
+            $itemStmt->execute([$ordId]);
+            $rawItems = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $items = [];
+            $totalBoxes = 0;
+            $totalPieces = 0;
+
+            foreach ($rawItems as $ri) {
+                $ppb = (int)($ri['pieces_per_box'] ?: 1);
+                $qty = (int)$ri['quantity'];
+                $b = (int)floor($qty / $ppb);
+                $p = $qty % $ppb;
+                $totalBoxes += $b;
+                $totalPieces += $p;
+
+                $items[] = [
+                    'id'             => (int)$ri['id'],
+                    'product_id'     => (int)$ri['product_id'],
+                    'product_name'   => $ri['product_name'],
+                    'sku'            => $ri['sku'],
+                    'pieces_per_box' => $ppb,
+                    'quantity'       => $qty,
+                    'boxes'          => $b,
+                    'pieces'         => $p,
+                    'unit_price'     => (float)$ri['unit_price'],
+                    'total_price'    => (float)$ri['total_price']
+                ];
+            }
+
+            $results[] = [
+                'order_id'       => $ordId,
+                'order_no'       => 'ORD-' . str_pad((string)$ordId, 5, '0', STR_PAD_LEFT),
+                'retailer_id'    => (int)$ord['retailer_id'],
+                'retailer_name'  => $ord['retailer_name'],
+                'phone'          => $ord['phone'],
+                'address'        => $ord['address'] ?: 'N/A',
+                'lat'            => $ord['lat'] !== null ? (float)$ord['lat'] : null,
+                'lng'            => $ord['lng'] !== null ? (float)$ord['lng'] : null,
+                'sr_name'        => $ord['sr_name'] ?: 'N/A',
+                'dsr_name'       => $ord['dsr_name'] ?: 'Not Assigned',
+                'warehouse_name' => $ord['warehouse_name'] ?: 'N/A',
+                'order_status'   => $ord['order_status'],
+                'oc_status'      => $calculatedOc,
+                'total_amount'   => (float)$ord['total_amount'],
+                'notes'          => $ord['notes'],
+                'order_date'     => date('h:i A, d M Y', strtotime($ord['order_date'])),
+                'items_count'    => count($items),
+                'total_boxes'    => $totalBoxes,
+                'total_pieces'   => $totalPieces,
+                'items'          => $items
+            ];
+        }
+
+        $this->json([
+            'success' => true,
+            'summary' => $summary,
+            'orders'  => $results
+        ]);
+    }
 }
+
 

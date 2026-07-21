@@ -124,6 +124,11 @@ $router->post('/admin/database-sync/clear',   ['AdminController', 'databaseClear
 $router->get( '/admin/retailers/import',      ['AdminController', 'retailersImport']);
 $router->post('/admin/retailers/import',      ['AdminController', 'retailersImportPost']);
 
+// Orders
+$router->get( '/admin/orders',                ['AdminController', 'orders']);
+$router->get( '/admin/api/orders',            ['AdminController', 'apiOrders']);
+
+
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
 
