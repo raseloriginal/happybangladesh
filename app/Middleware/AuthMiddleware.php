@@ -1,6 +1,8 @@
 <?php
 /**
- * AuthMiddleware — ensure user is logged in
+ * AuthMiddleware — ensure user is logged in.
+ * Also validates session against DB (for force-logout support)
+ * and updates last_active_at timestamp.
  */
 class AuthMiddleware
 {
@@ -27,5 +29,19 @@ class AuthMiddleware
             header('Location: ' . BASE_URL . $loginUrl);
             exit;
         }
+
+        // ── Check if session was force-logged-out by admin ────
+        if (!Auth::isSessionValid()) {
+            $role = Auth::role();
+            Auth::logout();
+            $loginUrl = $role && $role !== 'admin' ? "/{$role}/login" : '/admin/login';
+            Auth::start(); // Restart session so flash message works
+            Auth::setFlash('error', 'Your session was ended by an administrator.');
+            header('Location: ' . BASE_URL . $loginUrl);
+            exit;
+        }
+
+        // ── Update last activity timestamp (throttled) ────────
+        Auth::updateActivity();
     }
 }

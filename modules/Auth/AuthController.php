@@ -87,7 +87,7 @@ class AuthController extends Controller
             return;
         }
 
-        Auth::login($user);
+        Auth::login($user, !empty($this->post('remember')));
 
         // Log activity
         $db->prepare("INSERT INTO activity_logs (user_id, action, module, description, ip_address) VALUES (?, 'login', 'auth', 'User logged in', ?)")

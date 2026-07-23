@@ -178,8 +178,25 @@ window.addEventListener('beforeunload', function (e) {
 });
 
 function initMainMap() {
-  mainMap = L.map('srMap', { zoomControl: false, attributionControl: false }).setView([myLat, myLng], 18);
-  L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']}).addTo(mainMap);
+  // Mobile Internet Optimization: Use HTML5 Canvas renderer for 60fps performance on mobile devices
+  mainMap = L.map('srMap', { 
+    zoomControl: false, 
+    attributionControl: false,
+    preferCanvas: true, // Render Leaflet markers on Canvas for mobile RAM optimization
+    fadeAnimation: true,
+    markerZoomAnimation: true
+  }).setView([myLat, myLng], 18);
+
+  // Fast HTTPS Google Tile Layer with buffer caching and idle updates to save mobile data
+  L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    maxNativeZoom: 19,
+    subdomains: ['mt0','mt1','mt2','mt3'],
+    keepBuffer: 6,           // Buffer surrounding tiles to eliminate white squares on panning
+    updateWhenIdle: true,    // Saves mobile data by postponing tile requests until pan stops
+    updateWhenZooming: false
+  }).addTo(mainMap);
+
   L.control.zoom({ position: 'bottomleft' }).addTo(mainMap);
   
   // Show initial cached/default location and load pins immediately
@@ -196,8 +213,8 @@ function detectLocation(animate = true) {
   
   const geoOptions = {
     enableHighAccuracy: true,
-    timeout: 5000,
-    maximumAge: 30000 // Use cached position if it's less than 30 seconds old
+    timeout: 4000,           // Fast 4s timeout for mobile internet
+    maximumAge: 60000        // Use cached position if less than 60s old
   };
 
   navigator.geolocation.getCurrentPosition(pos => {
@@ -208,19 +225,18 @@ function detectLocation(animate = true) {
     localStorage.setItem('sr_last_lat', myLat);
     localStorage.setItem('sr_last_lng', myLng);
     
-    if (animate) mainMap.flyTo([myLat, myLng], 18, { duration: 1.2 });
+    if (animate) mainMap.flyTo([myLat, myLng], 18, { duration: 1.0 });
     else mainMap.setView([myLat, myLng], 18);
     
     placeMyLocationMarker();
     loadRetailersOnMap();
   }, () => {
-    // If geolocation fails or is denied, still make sure retailers are loaded for the current coordinates
+    // If geolocation fails or is denied, load retailers using cached location
     loadRetailersOnMap();
   }, geoOptions);
 }
 
 function placeMyLocationMarker() {
-  // Remove old
   if (window._myMarker) mainMap.removeLayer(window._myMarker);
   if (myCircle) mainMap.removeLayer(myCircle);
 
@@ -231,7 +247,6 @@ function placeMyLocationMarker() {
   });
   window._myMarker = L.marker([myLat, myLng], { icon }).addTo(mainMap);
   
-  // Add 100 meter radius circle around location
   myCircle = L.circle([myLat, myLng], {
     radius: 100,
     className: 'sr-radius-circle'
@@ -243,46 +258,62 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// RETAILERS ON MAP & DYNAMIC CAROUSEL
+// RETAILERS ON MAP WITH MOBILE INTERNET CACHING
 // ══════════════════════════════════════════════════════════════
 function loadRetailersOnMap() {
+  const cacheKey = `sr_ret_cache_${myLat.toFixed(3)}_${myLng.toFixed(3)}`;
+  const cachedData = sessionStorage.getItem(cacheKey);
+
+  // Instant render from local cache if available (0ms load time for mobile)
+  if (cachedData) {
+    try {
+      const parsed = JSON.parse(cachedData);
+      processRetailerData(parsed);
+    } catch (e) {}
+  }
+
+  // Network Fetch
   fetch(`${BASE_URL}/sr/api/retailers?lat=${myLat}&lng=${myLng}&radius=1000`)
     .then(r => r.json())
     .then(data => {
-      retailerMarkers.forEach(m => mainMap.removeLayer(m.marker));
-      retailerMarkers = [];
-      const retailers = data.retailers || [];
-      allRetailersData = retailers;
-      
-      const nearbyRetailers = retailers.filter(ret => {
-        const dist = ret.dist !== undefined ? ret.dist : calculateDistance(myLat, myLng, ret.lat, ret.lng);
-        return dist <= 100;
-      });
-      
-      nearbyRetailers.forEach(ret => addRetailerPin(ret));
-      renderRetailerCards(nearbyRetailers);
-
-      // Auto open retailer from query parameter
-      const urlParams = new URLSearchParams(window.location.search);
-      const targetRetailerId = parseInt(urlParams.get('retailer_id'));
-      if (targetRetailerId) {
-        const targetRet = retailers.find(ret => ret.id === targetRetailerId);
-        if (targetRet) {
-          const isNearby = nearbyRetailers.some(ret => ret.id === targetRetailerId);
-          if (!isNearby) {
-            addRetailerPin(targetRet);
-          }
-          mainMap.setView([targetRet.lat, targetRet.lng], 17);
-          setTimeout(() => {
-            openRetailerCartSheet(targetRet);
-          }, 350);
-        }
-      }
+      sessionStorage.setItem(cacheKey, JSON.stringify(data));
+      processRetailerData(data);
     })
     .catch(() => {
-      // Silently fail — show demo pins
-      showDemoPins();
+      if (!cachedData) showDemoPins();
     });
+}
+
+function processRetailerData(data) {
+  retailerMarkers.forEach(m => mainMap.removeLayer(m.marker));
+  retailerMarkers = [];
+  const retailers = data.retailers || [];
+  allRetailersData = retailers;
+  
+  const nearbyRetailers = retailers.filter(ret => {
+    const dist = ret.dist !== undefined ? ret.dist : calculateDistance(myLat, myLng, ret.lat, ret.lng);
+    return dist <= 100;
+  });
+  
+  nearbyRetailers.forEach(ret => addRetailerPin(ret));
+  renderRetailerCards(nearbyRetailers);
+
+  // Auto open retailer from query parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetRetailerId = parseInt(urlParams.get('retailer_id'));
+  if (targetRetailerId) {
+    const targetRet = retailers.find(ret => ret.id === targetRetailerId);
+    if (targetRet) {
+      const isNearby = nearbyRetailers.some(ret => ret.id === targetRetailerId);
+      if (!isNearby) {
+        addRetailerPin(targetRet);
+      }
+      mainMap.setView([targetRet.lat, targetRet.lng], 17);
+      setTimeout(() => {
+        openRetailerCartSheet(targetRet);
+      }, 350);
+    }
+  }
 }
 
 function showDemoPins() {
@@ -463,9 +494,11 @@ function openAddRetailerSheet() {
   openSheet('addRetSheet','addRetOverlay');
   setTimeout(() => {
     if (!miniMapInitialized) {
-      miniMap = L.map('srMiniMap', { zoomControl: false, attributionControl: false })
+      miniMap = L.map('srMiniMap', { zoomControl: false, attributionControl: false, preferCanvas: true })
         .setView([myLat, myLng], 15);
-      L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']}).addTo(miniMap);
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20, maxNativeZoom: 19, subdomains: ['mt0','mt1','mt2','mt3'], keepBuffer: 4, updateWhenIdle: true
+      }).addTo(miniMap);
       miniMapInitialized = true;
     } else {
       miniMap.setView([myLat, myLng], 15);
@@ -489,9 +522,11 @@ function openFullMap() {
   document.getElementById('fullMapOverlay').classList.remove('hidden');
   setTimeout(() => {
     if (!fullMapInitialized) {
-      fullMap = L.map('srFullMap', { zoomControl: true, attributionControl: false })
+      fullMap = L.map('srFullMap', { zoomControl: true, attributionControl: false, preferCanvas: true })
         .setView([pinLat, pinLng], 16);
-      L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']}).addTo(fullMap);
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20, maxNativeZoom: 19, subdomains: ['mt0','mt1','mt2','mt3'], keepBuffer: 4, updateWhenIdle: true
+      }).addTo(fullMap);
       fullMapInitialized = true;
     } else {
       fullMap.setView([pinLat, pinLng], 16);

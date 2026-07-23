@@ -933,12 +933,21 @@ function handleDuePaymentAction() {
 document.addEventListener('DOMContentLoaded', initMap);
 
 function initMap() {
-    map = L.map('dsrMap', { zoomControl: false }).setView([23.8103, 90.4125], 13);
+    map = L.map('dsrMap', { 
+        zoomControl: false,
+        attributionControl: false,
+        preferCanvas: true, // HTML5 Canvas rendering for 60fps mobile map performance
+        fadeAnimation: true
+    }).setView([23.8103, 90.4125], 13);
 
-    // Google Maps tiles
-    L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    // Fast HTTPS Google Maps tiles with tile buffering and data saver
+    L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
         maxZoom: 20,
-        subdomains: ['mt0','mt1','mt2','mt3']
+        maxNativeZoom: 19,
+        subdomains: ['mt0','mt1','mt2','mt3'],
+        keepBuffer: 6,
+        updateWhenIdle: true,
+        updateWhenZooming: false
     }).addTo(map);
 
     // ── Pin styles ──

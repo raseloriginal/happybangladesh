@@ -48,6 +48,10 @@ define('DB_CHARSET', 'utf8mb4');
 define('SESSION_NAME', 'hb_dms_sess');
 define('SESSION_LIFETIME', 7200);   // 2 hours
 
+// ─── Remember Me ──────────────────────────────────────────────────────────────
+define('REMEMBER_LIFETIME', 2592000);           // 30 days in seconds
+define('REMEMBER_COOKIE_NAME', 'hb_dms_remember'); // cookie prefix (role suffix appended)
+
 // ─── Pagination ───────────────────────────────────────────────────────────────
 define('PER_PAGE', 15);
 

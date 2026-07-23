@@ -128,6 +128,10 @@ $router->post('/admin/retailers/import',      ['AdminController', 'retailersImpo
 $router->get( '/admin/orders',                ['AdminController', 'orders']);
 $router->get( '/admin/api/orders',            ['AdminController', 'apiOrders']);
 
+// Sessions
+$router->get( '/admin/sessions',              ['AdminController', 'sessions']);
+$router->post('/admin/sessions/logout/{id}',  ['AdminController', 'sessionForceLogout']);
+
 
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);

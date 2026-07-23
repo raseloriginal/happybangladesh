@@ -23,6 +23,7 @@ $menus = [
         ['icon' => 'fa-chart-bar',    'label' => 'Reports',     'url' => '/admin/reports'],
         ['icon' => 'fa-file-import',  'label' => 'Import Retailers', 'url' => '/admin/retailers/import'],
         ['icon' => 'fa-database',     'label' => 'Database Sync', 'url' => '/admin/database-sync'],
+        ['icon' => 'fa-shield-halved','label' => 'Sessions',      'url' => '/admin/sessions'],
     ],
     'manager' => [
         ['section' => 'OVERVIEW'],

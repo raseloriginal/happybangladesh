@@ -7,14 +7,19 @@ class DSRController extends Controller
     protected string $viewPath;
     private PDO $db;
 
+    private static bool $schemaChecked = false;
+
     public function __construct()
     {
         RoleMiddleware::check([ROLE_ADMIN, ROLE_MANAGER, ROLE_DSR]);
         $this->viewPath = MOD_PATH . '/DSR/views';
         $this->db = Database::getInstance();
-        $this->ensurePaidAmountColumn();
-        $this->ensureDeliveredQuantityColumn();
-        $this->ensureReturnRetailerColumn();
+        if (!self::$schemaChecked) {
+            $this->ensurePaidAmountColumn();
+            $this->ensureDeliveredQuantityColumn();
+            $this->ensureReturnRetailerColumn();
+            self::$schemaChecked = true;
+        }
     }
 
     private function ensurePaidAmountColumn(): void
@@ -135,6 +140,19 @@ class DSRController extends Controller
         // Pending Settlement
         $q = $this->db->prepare("SELECT COUNT(*) FROM settlements WHERE dsr_id=? AND status='pending'"); $q->execute([$dsrId]);
         $stats['pending_settlement'] = $q->fetchColumn();
+
+        // Today Delivery Rate %
+        $totToday = (int)$stats['todays_deliveries'];
+        $compToday = (int)$stats['completed_deliveries'];
+        $stats['today_rate'] = $totToday > 0 ? round(($compToday / $totToday) * 100, 1) : 0;
+
+        // Overall Average Delivery Rate %
+        $q = $this->db->prepare("SELECT COUNT(*) as tot_all, SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END) as tot_del FROM dispatches WHERE dsr_id=? AND status != 'pending'");
+        $q->execute([$dsrId]);
+        $rowAvg = $q->fetch();
+        $totAll = (int)($rowAvg['tot_all'] ?? 0);
+        $totDel = (int)($rowAvg['tot_del'] ?? 0);
+        $stats['avg_rate'] = $totAll > 0 ? round(($totDel / $totAll) * 100, 1) : 0;
 
         $this->render('dashboard', compact('stats'), 'dsr_app');
     }

@@ -50,34 +50,50 @@
       
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="dsr-bottom-nav absolute bottom-0 left-0 w-full bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.08)] z-40 rounded-t-3xl pb-[env(safe-area-inset-bottom)]">
-      <div class="flex justify-around items-end h-16 px-2 pb-2">
-        <a href="<?= url('dsr/dashboard') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 <?= strpos($_SERVER['REQUEST_URI'], '/dsr/dashboard') !== false ? 'text-brand' : 'text-gray-400 hover:text-gray-600' ?> transition-colors">
-          <i class="fa-solid fa-house text-xl mb-1"></i>
-          <span class="text-[10px] font-semibold">Home</span>
-        </a>
-        <a href="<?= url('dsr/van-stock') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 <?= strpos($_SERVER['REQUEST_URI'], '/dsr/van-stock') !== false ? 'text-brand' : 'text-gray-400 hover:text-gray-600' ?> transition-colors">
-          <i class="fa-solid fa-boxes-stacked text-xl mb-1"></i>
-          <span class="text-[10px] font-semibold">Inventory</span>
-        </a>
-        <a href="<?= url('dsr/delivery') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 relative">
-          <div class="nav-fab bg-brand text-white w-14 h-14 rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(37,99,235,0.4)] absolute -top-8 left-1/2 transform -translate-x-1/2 ring-4 ring-white transition-transform active:scale-95">
-            <i class="fa-solid fa-motorcycle text-2xl"></i>
-          </div>
-          <span class="text-[10px] font-semibold text-gray-700 mt-7 <?= strpos($_SERVER['REQUEST_URI'], '/dsr/delivery') !== false ? 'text-brand' : '' ?>">Delivery</span>
-        </a>
-        <a href="<?= url('dsr/settlement') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 <?= strpos($_SERVER['REQUEST_URI'], '/dsr/settlement') !== false ? 'text-brand' : 'text-gray-400 hover:text-gray-600' ?> transition-colors">
-          <i class="fa-solid fa-file-invoice-dollar text-xl mb-1"></i>
-          <span class="text-[10px] font-semibold">Settle</span>
-        </a>
-        <a href="<?= url('dsr/profile') ?>" class="nav-item flex flex-col items-center justify-center w-1/5 <?= strpos($_SERVER['REQUEST_URI'], '/dsr/profile') !== false ? 'text-brand' : 'text-gray-400 hover:text-gray-600' ?> transition-colors">
-          <i class="fa-solid fa-user text-xl mb-1"></i>
-          <span class="text-[10px] font-semibold">Profile</span>
-        </a>
-      </div>
-    </nav>
+    <!-- Floating Bottom Navigation Bar (SR Panel Floating Pill Style) -->
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 max-w-sm sm:max-w-md w-[92%] bg-white/95 backdrop-blur-md rounded-full shadow-2xl border border-slate-200/80 px-5 py-2 flex items-center justify-between z-50">
+      
+      <!-- Home Tab -->
+      <a href="<?= url('dsr/dashboard') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/dashboard') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
+        <i class="fa-solid fa-house text-base mb-0.5"></i>
+        <span>হোম</span>
+      </a>
+
+      <!-- Inventory Tab -->
+      <a href="<?= url('dsr/van-stock') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/van-stock') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
+        <i class="fa-solid fa-boxes-stacked text-base mb-0.5"></i>
+        <span>মাল (স্টক)</span>
+      </a>
+
+      <!-- Delivery Center Floating FAB -->
+      <a href="<?= url('dsr/delivery') ?>" title="ডেলিভারি রুট" class="dsr-float-loc-btn w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 -mt-6 hover:scale-105 transition">
+        <i class="fa-solid fa-truck-fast text-lg"></i>
+      </a>
+
+      <!-- Settlement Tab -->
+      <a href="<?= url('dsr/settlement') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/settlement') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
+        <i class="fa-solid fa-file-invoice-dollar text-base mb-0.5"></i>
+        <span>হিসাব মিলাও</span>
+      </a>
+
+      <!-- Profile Tab -->
+      <a href="<?= url('dsr/profile') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/profile') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
+        <i class="fa-solid fa-user text-base mb-0.5"></i>
+        <span>প্রোফাইল</span>
+      </a>
+
+    </div>
   </div>
+
+  <style>
+  @keyframes dsrSubtleFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  .dsr-float-loc-btn {
+    animation: dsrSubtleFloat 2.5s infinite ease-in-out;
+  }
+  </style>
 
   <?= $extraScripts ?? '' ?>
 </body>

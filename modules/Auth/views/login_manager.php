@@ -38,21 +38,18 @@
                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition">
       </div>
 
+      <div class="flex items-center gap-2 mt-1">
+        <input type="checkbox" name="remember" value="1" id="remember_manager"
+               class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
+        <label for="remember_manager" class="text-xs text-slate-600 font-medium cursor-pointer select-none">Remember me for 30 days</label>
+      </div>
+
       <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-600/20 transition mt-2">
         Sign In to Manager
       </button>
     </form>
 
-    <!-- Excel Role Tabs at Bottom -->
-    <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between text-xs">
-      <span class="text-slate-400 font-medium">Select Portal:</span>
-      <div class="flex items-center gap-1 font-bold">
-        <a href="<?= url('admin/login') ?>" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded">Admin</a>
-        <a href="<?= url('manager/login') ?>" class="px-2.5 py-1 bg-blue-600 text-white rounded">Manager</a>
-        <a href="<?= url('sr/login') ?>" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded">SR</a>
-        <a href="<?= url('dsr/login') ?>" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded">DSR</a>
-      </div>
-    </div>
+
 
   </div>
 </div>

@@ -55,7 +55,8 @@
       <?= $content ?>
     </main>
 
-
+    <!-- Bottom Navigation Bar -->
+    <?php include MOD_PATH . '/SR/views/partials/_bottom_nav.php'; ?>
 
   </div><!-- /.sr-app-shell -->
 

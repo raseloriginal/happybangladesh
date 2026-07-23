@@ -15,9 +15,16 @@ class SRController extends Controller
         $this->ensureRetailersTable();
     }
 
+    private static bool $schemaChecked = false;
+
     // ── Ensure retailers table exists ─────────────────────────
     private function ensureRetailersTable(): void
     {
+        if (self::$schemaChecked) {
+            return;
+        }
+        self::$schemaChecked = true;
+
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS retailers (
                 id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -38,7 +45,7 @@ class SRController extends Controller
             try {
                 $this->db->exec("ALTER TABLE orders ADD COLUMN retailer_id INT DEFAULT NULL AFTER dealer_id");
             } catch (PDOException $ex) {
-                // Ignore if add column fails (e.g. column already exists or lock issue)
+                // Ignore if add column fails
             }
         }
     }
@@ -54,40 +61,38 @@ class SRController extends Controller
     {
         $srId = Auth::id();
 
-        $q = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id=?"); $q->execute([$srId]);
-        $totalOrders = $q->fetchColumn();
+        // Optimized Single Aggregated Database Query
+        $q = $this->db->prepare("
+            SELECT 
+                COUNT(*) AS total_orders,
+                SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending_orders,
+                SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END) AS confirmed,
+                COALESCE(SUM(total_amount), 0) AS total_value,
+                COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() THEN total_amount ELSE 0 END), 0) AS today_sales,
+                COUNT(DISTINCT CASE WHEN DATE(created_at) = CURDATE() THEN NULLIF(retailer_id, 0) ELSE NULL END) AS visited_today
+            FROM orders 
+            WHERE sr_id = ?
+        ");
+        $q->execute([$srId]);
+        $rowStats = $q->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        $q = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id=? AND status='pending'"); $q->execute([$srId]);
-        $pendingOrders = $q->fetchColumn();
-
-        $q = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id=? AND status='confirmed'"); $q->execute([$srId]);
-        $confirmed = $q->fetchColumn();
-
-        $q = $this->db->prepare("SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE sr_id=?"); $q->execute([$srId]);
-        $totalValue = $q->fetchColumn();
-
-        // Today's sales
-        $q = $this->db->prepare("SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE sr_id=? AND DATE(created_at) = CURDATE()"); $q->execute([$srId]);
-        $todaySales = $q->fetchColumn();
-
-        // Total retailers
+        // Total retailers count
         $q = $this->db->query("SELECT COUNT(*) FROM retailers");
-        $totalRetailers = $q->fetchColumn();
+        $totalRetailers = (int)$q->fetchColumn();
 
-        // Visited today (unique retailers ordered from today or orders today)
-        $q = $this->db->prepare("SELECT COUNT(DISTINCT NULLIF(retailer_id, 0)) FROM orders WHERE sr_id=? AND DATE(created_at) = CURDATE()"); $q->execute([$srId]);
-        $visitedToday = $q->fetchColumn();
-        if ($visitedToday == 0) {
-            $q = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id=? AND DATE(created_at) = CURDATE()"); $q->execute([$srId]);
-            $visitedToday = $q->fetchColumn();
+        $visitedToday = (int)($rowStats['visited_today'] ?? 0);
+        if ($visitedToday === 0) {
+            $q = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id=? AND DATE(created_at) = CURDATE()");
+            $q->execute([$srId]);
+            $visitedToday = (int)$q->fetchColumn();
         }
 
         $stats = [
-            'total_orders'    => $totalOrders,
-            'pending_orders'  => $pendingOrders,
-            'confirmed'       => $confirmed,
-            'total_value'     => $totalValue,
-            'today_sales'     => $todaySales,
+            'total_orders'    => (int)($rowStats['total_orders'] ?? 0),
+            'pending_orders'  => (int)($rowStats['pending_orders'] ?? 0),
+            'confirmed'       => (int)($rowStats['confirmed'] ?? 0),
+            'total_value'     => (float)($rowStats['total_value'] ?? 0),
+            'today_sales'     => (float)($rowStats['today_sales'] ?? 0),
             'total_retailers' => $totalRetailers,
             'visited_today'   => $visitedToday,
         ];
@@ -133,63 +138,127 @@ class SRController extends Controller
     // ── Orders ────────────────────────────────────────────────
     public function orders(): void
     {
-        $srId = Auth::id();
+        $srId   = Auth::id();
+        $period = trim($_GET['period'] ?? 'all');
+        $from   = trim($_GET['from'] ?? '');
+        $to     = trim($_GET['to'] ?? '');
+
+        $whereSql = " WHERE o.sr_id = ? ";
+        $params   = [$srId];
+
+        if ($period === 'today') {
+            $whereSql .= " AND DATE(o.created_at) = CURDATE() ";
+        } elseif ($period === 'yesterday') {
+            $whereSql .= " AND DATE(o.created_at) = SUBDATE(CURDATE(), 1) ";
+        } elseif ($period === 'week') {
+            $whereSql .= " AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) ";
+        } elseif ($period === 'month') {
+            $whereSql .= " AND MONTH(o.created_at) = MONTH(CURDATE()) AND YEAR(o.created_at) = YEAR(CURDATE()) ";
+        } elseif ($period === 'custom' && !empty($from) && !empty($to)) {
+            $whereSql .= " AND DATE(o.created_at) BETWEEN ? AND ? ";
+            $params[] = $from;
+            $params[] = $to;
+        }
+
         $q = $this->db->prepare("
-            SELECT o.*, d.name AS dealer_name, d.happy_commission, w.name AS warehouse_name
+            SELECT o.*, d.name AS dealer_name, d.happy_commission, w.name AS warehouse_name,
+                   r.name AS retailer_name, r.phone AS retailer_phone, r.address AS retailer_address
             FROM orders o
             LEFT JOIN dealers d ON d.id=o.dealer_id
             LEFT JOIN warehouses w ON w.id=o.warehouse_id
-            WHERE o.sr_id=?
+            LEFT JOIN retailers r ON r.id=o.retailer_id
+            {$whereSql}
             ORDER BY o.created_at DESC
         ");
-        $q->execute([$srId]);
+        $q->execute($params);
         $items = $q->fetchAll();
 
         $retailersSet = [];
         $productSummary = [];
 
         foreach ($items as &$item) {
-            if ($item['retailer_id']) {
+            if (!empty($item['retailer_id'])) {
                 $retailersSet['retailer_'.$item['retailer_id']] = true;
-            } elseif ($item['dealer_id']) {
+            } elseif (!empty($item['dealer_id'])) {
                 $retailersSet['dealer_'.$item['dealer_id']] = true;
             }
 
             $iq = $this->db->prepare("
-                SELECT oi.*, p.name AS product_name, p.pieces_per_box, p.price AS base_price
+                SELECT oi.*, p.name AS product_name, p.pieces_per_box, p.price AS base_price, c.name AS company_name
                 FROM order_items oi
                 JOIN products p ON p.id = oi.product_id
+                LEFT JOIN companies c ON c.id = p.company_id
                 WHERE oi.order_id = ?
             ");
             $iq->execute([$item['id']]);
             $item['products'] = $iq->fetchAll();
 
+            $comm_pct = (float)($item['happy_commission'] ?? 0);
+
             foreach ($item['products'] as $p) {
                 $pid = $p['product_id'];
                 if (!isset($productSummary[$pid])) {
                     $productSummary[$pid] = [
+                        'id' => $pid,
                         'name' => $p['product_name'],
+                        'company' => $p['company_name'] ?? 'General',
                         'qty' => 0,
+                        'delivered_qty' => 0,
+                        'pending_qty' => 0,
                         'total_val' => 0,
+                        'delivered_val' => 0,
                         'total_oc' => 0,
-                        'ppb' => (int)$p['pieces_per_box'] ?: 1
+                        'delivered_oc' => 0,
+                        'total_happy_comm' => 0,
+                        'ppb' => (int)($p['pieces_per_box'] ?? 1) ?: 1,
+                        'base_price' => (float)($p['base_price'] ?? 0),
+                        'unit_price' => (float)($p['unit_price'] ?? 0),
+                        'orders_count' => 0,
+                        'delivered_orders_count' => 0,
+                        'order_lines' => [],
                     ];
                 }
                 $qty = (int)$p['quantity'];
                 $base_price = (float)($p['base_price'] ?? 0);
                 $unit_price = (float)($p['unit_price'] ?? 0);
                 $item_oc = ($unit_price - $base_price) * $qty;
+                $item_val = (float)$p['total_price'];
+                $item_happy_comm = $item_val * ($comm_pct / 100);
 
                 $productSummary[$pid]['qty'] += $qty;
-                $productSummary[$pid]['total_val'] += (float)$p['total_price'];
+                $productSummary[$pid]['total_val'] += $item_val;
                 $productSummary[$pid]['total_oc'] += $item_oc;
+                $productSummary[$pid]['total_happy_comm'] += $item_happy_comm;
+                $productSummary[$pid]['orders_count']++;
+
+                if ($item['status'] === 'delivered') {
+                    $productSummary[$pid]['delivered_qty'] += $qty;
+                    $productSummary[$pid]['delivered_val'] += $item_val;
+                    $productSummary[$pid]['delivered_oc'] += $item_oc;
+                    $productSummary[$pid]['delivered_orders_count']++;
+                } else {
+                    $productSummary[$pid]['pending_qty'] += $qty;
+                }
+
+                $productSummary[$pid]['order_lines'][] = [
+                    'order_id' => $item['id'],
+                    'dealer_name' => $item['dealer_name'] ?? 'Direct',
+                    'status' => $item['status'],
+                    'created_at' => $item['created_at'],
+                    'qty' => $qty,
+                    'unit_price' => $unit_price,
+                    'base_price' => $base_price,
+                    'item_val' => $item_val,
+                    'item_oc' => $item_oc,
+                    'happy_comm' => $item_happy_comm,
+                ];
             }
         }
 
         $retailerCount = count($retailersSet);
-        $productSummary = array_values($productSummary); // Reset keys for easier loop in view
+        $productSummary = array_values($productSummary); // Reset keys for view
 
-        $this->renderApp('orders', compact('items', 'retailerCount', 'productSummary'));
+        $this->renderApp('orders', compact('items', 'retailerCount', 'productSummary', 'period', 'from', 'to'));
     }
 
     // ── Sales / Map Page ──────────────────────────────────────

@@ -1060,6 +1060,57 @@ class AdminController extends Controller
             'orders'  => $results
         ]);
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Session Management
+    // ══════════════════════════════════════════════════════════
+    public function sessions(): void
+    {
+        $filterRole = $this->get('role', '');
+        $sessions = Auth::getActiveSessions($filterRole ?: null);
+        $counts   = Auth::getSessionCounts();
+        $currentToken = Auth::sessionToken();
+
+        $pageTitle = 'Active Sessions';
+        $this->render('sessions', compact('sessions', 'counts', 'filterRole', 'currentToken', 'pageTitle'));
+    }
+
+    public function sessionForceLogout(string $id): void
+    {
+        $this->verifyCsrf();
+
+        $sessionId = (int) $id;
+        if ($sessionId <= 0) {
+            $this->flash('error', 'Invalid session ID.');
+            $this->redirect('admin/sessions');
+            return;
+        }
+
+        // Prevent admin from force-logging out their own current session
+        $db = Database::getInstance();
+        $stmt = $db->prepare("SELECT token, user_id FROM user_sessions WHERE id = ? LIMIT 1");
+        $stmt->execute([$sessionId]);
+        $session = $stmt->fetch();
+
+        if ($session && $session['token'] === Auth::sessionToken()) {
+            $this->flash('error', 'You cannot force-logout your own current session. Use the regular logout instead.');
+            $this->redirect('admin/sessions');
+            return;
+        }
+
+        if (Auth::forceLogout($sessionId)) {
+            // Log the action
+            $targetUserId = $session['user_id'] ?? 0;
+            $db->prepare("INSERT INTO activity_logs (user_id, action, module, record_id, description, ip_address) VALUES (?, 'force_logout', 'sessions', ?, 'Admin force-logged out a session', ?)")
+               ->execute([Auth::id(), $targetUserId, $_SERVER['REMOTE_ADDR'] ?? '']);
+
+            $this->flash('success', 'Session terminated successfully.');
+        } else {
+            $this->flash('error', 'Session not found or already inactive.');
+        }
+
+        $this->redirect('admin/sessions');
+    }
 }
 
 
