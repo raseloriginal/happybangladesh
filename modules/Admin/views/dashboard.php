@@ -52,34 +52,41 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
   <!-- Recent Orders -->
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title"><i class="fa-solid fa-file-invoice text-blue-500 mr-2"></i>Recent Orders</h2>
-      <a href="<?= url('admin/reports') ?>" class="text-xs text-blue-600 hover:underline">View all</a>
+  <div class="excel-container">
+    <div class="excel-ribbon">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-file-excel text-blue-200"></i>
+        <span class="font-bold text-sm">Recent Orders Sheet</span>
+      </div>
+      <a href="<?= url('admin/orders') ?>" class="excel-action-btn">
+        View All Orders <i class="fa-solid fa-arrow-right text-xs"></i>
+      </a>
     </div>
     <div class="overflow-x-auto">
-      <table class="data-table">
+      <table class="excel-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>SR</th>
+            <th class="excel-row-num">#</th>
+            <th>Order ID</th>
+            <th>SR Name</th>
             <th>Dealer</th>
-            <th>Amount</th>
-            <th>Status</th>
+            <th class="text-right">Amount</th>
+            <th class="text-center">Status</th>
           </tr>
         </thead>
         <tbody>
-          <?php foreach ($recentOrders as $o): ?>
+          <?php foreach ($recentOrders as $i => $o): ?>
           <tr>
-            <td class="font-mono text-xs text-gray-500">#<?= $o['id'] ?></td>
-            <td><?= h($o['sr_name'] ?? '—') ?></td>
-            <td><?= h($o['dealer_name'] ?? '—') ?></td>
-            <td class="font-semibold"><?= Helpers::money($o['total_amount']) ?></td>
-            <td><?= Helpers::statusBadge($o['status']) ?></td>
+            <td class="excel-row-num"><?= $i+1 ?></td>
+            <td class="excel-mono text-blue-700 font-bold">#<?= $o['id'] ?></td>
+            <td class="font-bold text-gray-900"><?= h($o['sr_name'] ?? '—') ?></td>
+            <td class="text-gray-700"><?= h($o['dealer_name'] ?? '—') ?></td>
+            <td class="excel-money"><?= Helpers::money($o['total_amount']) ?></td>
+            <td class="text-center"><?= Helpers::statusBadge($o['status']) ?></td>
           </tr>
           <?php endforeach; ?>
           <?php if (empty($recentOrders)): ?>
-            <tr><td colspan="5" class="text-center text-gray-400 py-4">No orders yet</td></tr>
+            <tr><td colspan="6" class="text-center text-gray-400 py-4">No orders yet</td></tr>
           <?php endif; ?>
         </tbody>
       </table>

@@ -61,34 +61,34 @@ $items = $menus[$role] ?? [];
 ?>
 
 <!-- ── Sidebar ─────────────────────────────────────────────── -->
-<aside id="sidebar" class="sidebar bg-gray-900 flex flex-col">
+<aside id="sidebar" class="sidebar bg-white border-r border-slate-200 flex flex-col shadow-sm">
 
   <!-- Brand -->
-  <div class="flex items-center gap-3 px-5 py-5 border-b border-gray-700/60">
-    <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
+  <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-100">
+    <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
       <i class="fa-solid fa-truck-fast text-white text-sm"></i>
     </div>
     <div>
-      <div class="text-white font-bold text-sm leading-none">HappyBD</div>
-      <div class="text-gray-400 text-xs mt-0.5">DMS v<?= APP_VERSION ?></div>
+      <div class="text-slate-900 font-black text-base leading-none">HappyBD</div>
+      <div class="text-blue-600 font-bold text-[11px] mt-0.5 tracking-wider uppercase">DMS v<?= APP_VERSION ?></div>
     </div>
   </div>
 
   <!-- User card -->
-  <div class="px-4 py-4 border-b border-gray-700/60">
+  <div class="px-4 py-3.5 border-b border-slate-100 bg-slate-50/60">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+      <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xs font-black shadow-sm flex-shrink-0">
         <?= Helpers::initials(Auth::name()) ?>
       </div>
       <div class="min-w-0">
-        <div class="text-white text-sm font-medium truncate"><?= h(Auth::name()) ?></div>
-        <div class="text-gray-400 text-xs truncate"><?= h(Auth::roleName()) ?></div>
+        <div class="text-slate-900 text-xs font-bold truncate"><?= h(Auth::name()) ?></div>
+        <div class="inline-block text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full mt-0.5"><?= h(Auth::roleName()) ?></div>
       </div>
     </div>
   </div>
 
   <!-- Nav -->
-  <nav class="flex-1 overflow-y-auto py-3 px-3">
+  <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
     <?php foreach ($items as $item): ?>
       <?php if (isset($item['section'])): ?>
         <div class="sidebar-section"><?= $item['section'] ?></div>
@@ -103,9 +103,9 @@ $items = $menus[$role] ?? [];
   </nav>
 
   <!-- Logout -->
-  <div class="px-3 py-4 border-t border-gray-700/60">
+  <div class="px-3 py-4 border-t border-slate-100 bg-slate-50/40">
     <a href="<?= url($role . '/logout') ?>"
-       class="sidebar-link text-red-400 hover:text-red-300 hover:bg-red-500/10">
+       class="sidebar-link text-rose-600 hover:text-rose-700 hover:bg-rose-50">
       <i class="fa-solid fa-right-from-bracket w-4 text-center"></i>
       <span>Logout</span>
     </a>

@@ -10,7 +10,7 @@ define('PUB_PATH',  ROOT_PATH . '/public');
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
 $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
 
-$isLocalhost = ($host === 'localhost' || $host === '192.168.1.100' || $host === '127.0.0.1' || strpos($host, 'localhost:') === 0);
+$isLocalhost = ($host === 'localhost' || $host === '192.168.0.111' || $host === '192.168.1.100' || $host === '127.0.0.1' || strpos($host, 'localhost:') === 0);
 
 if ($isLocalhost) {
     define('BASE_URL', $protocol . $host . '/happybangladesh');

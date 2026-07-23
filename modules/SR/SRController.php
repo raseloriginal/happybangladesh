@@ -66,11 +66,30 @@ class SRController extends Controller
         $q = $this->db->prepare("SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE sr_id=?"); $q->execute([$srId]);
         $totalValue = $q->fetchColumn();
 
+        // Today's sales
+        $q = $this->db->prepare("SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE sr_id=? AND DATE(created_at) = CURDATE()"); $q->execute([$srId]);
+        $todaySales = $q->fetchColumn();
+
+        // Total retailers
+        $q = $this->db->query("SELECT COUNT(*) FROM retailers");
+        $totalRetailers = $q->fetchColumn();
+
+        // Visited today (unique retailers ordered from today or orders today)
+        $q = $this->db->prepare("SELECT COUNT(DISTINCT NULLIF(retailer_id, 0)) FROM orders WHERE sr_id=? AND DATE(created_at) = CURDATE()"); $q->execute([$srId]);
+        $visitedToday = $q->fetchColumn();
+        if ($visitedToday == 0) {
+            $q = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id=? AND DATE(created_at) = CURDATE()"); $q->execute([$srId]);
+            $visitedToday = $q->fetchColumn();
+        }
+
         $stats = [
-            'total_orders'   => $totalOrders,
-            'pending_orders' => $pendingOrders,
-            'confirmed'      => $confirmed,
-            'total_value'    => $totalValue,
+            'total_orders'    => $totalOrders,
+            'pending_orders'  => $pendingOrders,
+            'confirmed'       => $confirmed,
+            'total_value'     => $totalValue,
+            'today_sales'     => $todaySales,
+            'total_retailers' => $totalRetailers,
+            'visited_today'   => $visitedToday,
         ];
 
         $q = $this->db->prepare("
@@ -152,11 +171,18 @@ class SRController extends Controller
                         'name' => $p['product_name'],
                         'qty' => 0,
                         'total_val' => 0,
+                        'total_oc' => 0,
                         'ppb' => (int)$p['pieces_per_box'] ?: 1
                     ];
                 }
-                $productSummary[$pid]['qty'] += (int)$p['quantity'];
+                $qty = (int)$p['quantity'];
+                $base_price = (float)($p['base_price'] ?? 0);
+                $unit_price = (float)($p['unit_price'] ?? 0);
+                $item_oc = ($unit_price - $base_price) * $qty;
+
+                $productSummary[$pid]['qty'] += $qty;
                 $productSummary[$pid]['total_val'] += (float)$p['total_price'];
+                $productSummary[$pid]['total_oc'] += $item_oc;
             }
         }
 

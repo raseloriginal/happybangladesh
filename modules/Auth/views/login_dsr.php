@@ -1,65 +1,60 @@
 <?php $pageTitle = 'DSR Login'; ?>
 
-<div class="h-screen w-full bg-blue-600 flex flex-col relative overflow-hidden" style="max-width: 480px; margin: 0 auto;">
+<div class="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden p-8">
     
-    <!-- Top Branding Area -->
-    <div class="flex-1 flex flex-col items-center justify-center p-8 text-white relative z-10">
-        <div class="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center mb-6 shadow-xl border border-white/30">
-            <i class="fa-solid fa-truck-fast text-4xl text-white"></i>
-        </div>
-        <h1 class="text-3xl font-extrabold tracking-tight mb-2">Delivery App</h1>
-        <p class="text-blue-100 text-center text-sm font-medium">Log in to manage your deliveries, collections, and van stock.</p>
+    <!-- Clean Header -->
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 bg-blue-900 rounded-2xl flex items-center justify-center text-white text-xl font-bold mx-auto mb-3 shadow-md shadow-blue-800/20">
+        <i class="fa-solid fa-truck-fast"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-slate-900">Happy Bangladesh</h1>
+      <p class="text-xs text-slate-500 mt-1 font-medium">Delivery Rep Portal Sign In</p>
     </div>
 
-    <!-- Bottom Sheet Form Area -->
-    <div class="bg-white rounded-t-[32px] px-6 pt-10 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] relative z-20 flex flex-col w-full h-[60%] justify-between">
-        <div class="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full"></div>
-        
-        <div class="flex-1 overflow-y-auto no-scrollbar">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">Welcome Back!</h2>
-            
-            <?php $flash = Auth::getFlash(); if ($flash): ?>
-                <div class="rounded-2xl bg-red-50 p-4 mb-6 flex items-start border border-red-100">
-                    <i class="fa-solid fa-circle-exclamation text-red-500 mt-0.5 mr-3"></i>
-                    <p class="text-sm text-red-700 font-medium leading-tight"><?= h($flash['message']) ?></p>
-                </div>
-            <?php endif; ?>
+    <?php $flash = Auth::getFlash(); if ($flash): ?>
+      <div class="rounded-xl bg-rose-50 border border-rose-200 p-3.5 mb-6 flex items-center gap-2.5 text-xs text-rose-700 font-bold">
+        <i class="fa-solid fa-circle-exclamation text-rose-500 text-sm"></i>
+        <span><?= h($flash['message']) ?></span>
+      </div>
+    <?php endif; ?>
 
-            <form action="<?= url('dsr/login') ?>" method="POST" class="space-y-5">
-                <?= Helpers::csrfField() ?>
-                
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Phone or Email</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fa-solid fa-mobile-screen-button text-gray-400"></i>
-                        </div>
-                        <input type="text" name="email" required class="block w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-base" placeholder="Enter your ID">
-                    </div>
-                </div>
+    <!-- Login Form -->
+    <form action="<?= url('dsr/login') ?>" method="POST" class="space-y-4">
+      <?= Helpers::csrfField() ?>
+      
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1.5">Phone or Email ID</label>
+        <input type="text" name="email" required placeholder="01700000000 / dsr@happybd.com" 
+               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition">
+      </div>
 
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Password</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fa-solid fa-lock text-gray-400"></i>
-                        </div>
-                        <input type="password" name="password" required class="block w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-base" placeholder="Enter password">
-                    </div>
-                </div>
-
-                <div class="pt-4 pb-2">
-                    <button type="submit" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-transform">
-                        Login Now
-                    </button>
-                </div>
-            </form>
-            
-            <div class="mt-6 text-center">
-                <a href="<?= url('login') ?>" class="text-sm font-bold text-gray-400 hover:text-gray-600">
-                    Wrong app? Go to Portals
-                </a>
-            </div>
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="block text-xs font-bold text-slate-700">Password</label>
+          <a href="<?= url('forgot') ?>" class="text-xs text-blue-600 font-bold hover:underline">Forgot?</a>
         </div>
+        <input type="password" name="password" required placeholder="••••••••" 
+               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition">
+      </div>
+
+      <button type="submit" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-600/20 transition mt-2">
+        Sign In to Delivery App
+      </button>
+    </form>
+
+    <!-- Excel Role Tabs at Bottom -->
+    <div class="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between text-xs">
+      <span class="text-slate-400 font-medium">Select Portal:</span>
+      <div class="flex items-center gap-1 font-bold">
+        <a href="<?= url('admin/login') ?>" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded">Admin</a>
+        <a href="<?= url('manager/login') ?>" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded">Manager</a>
+        <a href="<?= url('sr/login') ?>" class="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded">SR</a>
+        <a href="<?= url('dsr/login') ?>" class="px-2.5 py-1 bg-blue-600 text-white rounded">DSR</a>
+      </div>
     </div>
+
+  </div>
 </div>
+
+

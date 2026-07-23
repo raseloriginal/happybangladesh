@@ -135,13 +135,17 @@
       
       <!-- Tab Controls -->
       <div class="inline-flex bg-gray-100 p-1 rounded-xl">
+        <button id="btnTabExcel" onclick="switchTab('excel')" 
+                class="px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-emerald-600 text-white shadow-sm">
+          <i class="fa-solid fa-file-excel text-base"></i> Modern Excel View
+        </button>
         <button id="btnTabMap" onclick="switchTab('map')" 
-                class="px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-white text-blue-600 shadow-sm">
+                class="px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 text-gray-600 hover:text-gray-900">
           <i class="fa-solid fa-map text-base"></i> Map View
         </button>
         <button id="btnTabList" onclick="switchTab('list')" 
                 class="px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 text-gray-600 hover:text-gray-900">
-          <i class="fa-solid fa-list-ul text-base"></i> Card List View
+          <i class="fa-solid fa-table-list text-base"></i> Card List View
         </button>
       </div>
 
@@ -226,9 +230,93 @@
   </div>
 
   <!-- ═════════════════════════════════════════════════════════════
+       MODERN EXCEL SPREADSHEET VIEW TAB
+  ══════════════════════════════════════════════════════════════ -->
+  <div id="viewExcelContainer" class="space-y-4">
+    <div class="excel-container">
+      
+      <!-- Excel Ribbon Toolbar -->
+      <div class="excel-ribbon">
+        <div class="flex items-center gap-3">
+          <div class="excel-ribbon-badge">
+            <i class="fa-solid fa-file-excel text-blue-200 text-lg"></i>
+            <span>Orders Excel Spreadsheet</span>
+          </div>
+          <span class="text-xs text-blue-100 hidden sm:inline-block">• Live Retailer Orders Data Grid</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="exportTableToCSV('excelOrdersTable', 'Retailer_Orders_Sheet.csv')" class="excel-action-btn">
+            <i class="fa-solid fa-file-csv"></i> Export CSV / Excel
+          </button>
+          <button onclick="printTable('excelOrdersTable', 'Retailer Orders Excel Sheet')" class="excel-action-btn excel-action-btn-secondary">
+            <i class="fa-solid fa-print"></i> Print Sheet
+          </button>
+        </div>
+      </div>
+
+      <!-- Excel Formula & Summary Bar -->
+      <div class="excel-formula-bar">
+        <span class="fx-symbol">fx</span>
+        <div class="excel-pill">
+          <i class="fa-solid fa-calculator text-blue-600"></i>
+          <span>COUNT: <strong id="fxCount" class="text-blue-700 font-mono">0 rows</strong></span>
+        </div>
+        <div class="excel-pill">
+          <i class="fa-solid fa-bangladeshi-taka-sign text-blue-600"></i>
+          <span>SUM TOTAL: <strong id="fxSumTotal" class="text-blue-700 font-mono">৳0</strong></span>
+        </div>
+        <div class="excel-pill">
+          <i class="fa-solid fa-circle-check text-emerald-600"></i>
+          <span>DELIVERED: <strong id="fxSumDelivered" class="text-emerald-700 font-mono">৳0</strong></span>
+        </div>
+        <div class="excel-pill">
+          <i class="fa-solid fa-clock-rotate-left text-amber-600"></i>
+          <span>PENDING: <strong id="fxSumPending" class="text-amber-700 font-mono">৳0</strong></span>
+        </div>
+      </div>
+
+      <!-- Excel Grid Table -->
+      <div class="overflow-x-auto max-h-[620px]">
+        <table class="excel-table" id="excelOrdersTable">
+          <thead>
+            <tr>
+              <th class="excel-row-num">#</th>
+              <th>Order No</th>
+              <th>Retailer Name</th>
+              <th>Phone</th>
+              <th>SR Name</th>
+              <th>DSR Name</th>
+              <th>Warehouse</th>
+              <th class="text-center">Items (Box/Pcs)</th>
+              <th class="text-right">Total Amount</th>
+              <th class="text-center">Order Status</th>
+              <th class="text-center">O/C Status</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="excelOrdersTableBody">
+            <!-- Dynamic Excel Rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty Excel State -->
+      <div id="emptyExcelState" class="hidden py-12 text-center bg-white">
+        <div class="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+          <i class="fa-solid fa-file-excel"></i>
+        </div>
+        <h3 class="text-base font-bold text-gray-800">No Orders in Sheet</h3>
+        <p class="text-xs text-gray-500 mt-1">Change date or filter parameters to display orders data.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════
        MAP VIEW TAB
   ══════════════════════════════════════════════════════════════ -->
-  <div id="viewMapContainer" class="relative bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-2">
+  <div id="viewMapContainer" class="hidden relative bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-2">
     <!-- Map Legend Bar -->
     <div class="p-3 bg-gray-50 rounded-xl mb-2 flex flex-wrap items-center justify-between gap-3 text-xs">
       <div class="flex items-center gap-4 font-semibold text-gray-700">
@@ -273,7 +361,7 @@
   <div class="modal-content-box bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
     
     <!-- Modal Header -->
-    <div class="px-6 py-5 bg-gradient-to-r from-gray-900 to-gray-800 text-white flex items-center justify-between">
+    <div class="px-6 py-5 bg-blue-600 text-white flex items-center justify-between">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-lg font-bold border border-blue-400/30">
           <i class="fa-solid fa-store"></i>
@@ -387,7 +475,7 @@
      JAVASCRIPT LOGIC
 ══════════════════════════════════════════════════════════════ -->
 <script>
-  let currentTab = 'map';
+  let currentTab = 'excel';
   let leafletMap = null;
   let mapMarkers = [];
   let fetchedOrders = [];
@@ -420,24 +508,28 @@
   // ── Switch Tabs ──────────────────────────────────────────────
   function switchTab(tab) {
     currentTab = tab;
+    const btnExcel = document.getElementById('btnTabExcel');
     const btnMap = document.getElementById('btnTabMap');
     const btnList = document.getElementById('btnTabList');
+    const viewExcel = document.getElementById('viewExcelContainer');
     const viewMap = document.getElementById('viewMapContainer');
     const viewList = document.getElementById('viewListContainer');
 
+    const activeCls = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-emerald-600 text-white shadow-sm";
+    const inactiveCls = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 text-gray-600 hover:text-gray-900";
+
+    btnExcel.className = (tab === 'excel') ? activeCls : inactiveCls;
+    btnMap.className = (tab === 'map') ? activeCls : inactiveCls;
+    btnList.className = (tab === 'list') ? activeCls : inactiveCls;
+
+    viewExcel.classList.toggle('hidden', tab !== 'excel');
+    viewMap.classList.toggle('hidden', tab !== 'map');
+    viewList.classList.toggle('hidden', tab !== 'list');
+
     if (tab === 'map') {
-      btnMap.className = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-white text-blue-600 shadow-sm";
-      btnList.className = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 text-gray-600 hover:text-gray-900";
-      viewMap.classList.remove('hidden');
-      viewList.classList.add('hidden');
       setTimeout(() => {
         if (leafletMap) leafletMap.invalidateSize();
       }, 200);
-    } else {
-      btnList.className = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 bg-white text-blue-600 shadow-sm";
-      btnMap.className = "px-5 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 text-gray-600 hover:text-gray-900";
-      viewList.classList.remove('hidden');
-      viewMap.classList.add('hidden');
     }
   }
 
@@ -486,6 +578,7 @@
         if (data.success) {
           fetchedOrders = data.orders || [];
           updateSummaryCounters(data.summary || {});
+          renderExcelGrid(fetchedOrders);
           renderMapMarkers(fetchedOrders);
           renderCardList(fetchedOrders);
         }
@@ -499,6 +592,69 @@
     document.getElementById('cntTotalAmount').textContent = '৳' + (summary.total_amount || 0).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
     document.getElementById('cntOrdered').textContent = summary.ordered_cnt || 0;
     document.getElementById('cntCheckedOut').textContent = summary.checked_out_cnt || 0;
+  }
+
+  // ── Render Modern Excel Spreadsheet Grid ──────────────────────
+  function renderExcelGrid(orders) {
+    const tbody = document.getElementById('excelOrdersTableBody');
+    const emptyState = document.getElementById('emptyExcelState');
+    tbody.innerHTML = '';
+
+    if (orders.length === 0) {
+      emptyState.classList.remove('hidden');
+      document.getElementById('fxCount').textContent = '0 rows';
+      document.getElementById('fxSumTotal').textContent = '৳0';
+      document.getElementById('fxSumDelivered').textContent = '৳0';
+      document.getElementById('fxSumPending').textContent = '৳0';
+      return;
+    }
+    emptyState.classList.add('hidden');
+
+    let sumTotal = 0;
+    let sumDelivered = 0;
+    let sumPending = 0;
+
+    orders.forEach((ord, i) => {
+      sumTotal += (parseFloat(ord.total_amount) || 0);
+      if (ord.oc_status === 'checked_out' || ord.order_status === 'delivered') {
+        sumDelivered += (parseFloat(ord.total_amount) || 0);
+      } else {
+        sumPending += (parseFloat(ord.total_amount) || 0);
+      }
+
+      const tr = document.createElement('tr');
+      
+      const ocBadgeClass = ord.oc_status === 'checked_out' ? 'badge-checked_out' : 'badge-ordered';
+      const ocText = ord.oc_status === 'checked_out' ? 'Checked Out' : 'Ordered';
+      const orderBadgeClass = 'badge-' + ord.order_status;
+
+      tr.innerHTML = `
+        <td class="excel-row-num">${i + 1}</td>
+        <td class="excel-mono text-blue-600 font-bold">${escapeHtml(ord.order_no)}</td>
+        <td class="font-bold text-gray-900">${escapeHtml(ord.retailer_name)}</td>
+        <td class="text-gray-500 font-mono">${escapeHtml(ord.phone)}</td>
+        <td class="font-medium text-gray-700">${escapeHtml(ord.sr_name)}</td>
+        <td class="font-medium text-gray-700">${escapeHtml(ord.dsr_name)}</td>
+        <td class="text-xs text-gray-500">${escapeHtml(ord.warehouse_name)}</td>
+        <td class="excel-qty">${ord.items_count} <span class="text-xs text-gray-400">(${ord.total_boxes}B / ${ord.total_pieces}P)</span></td>
+        <td class="excel-money">৳${(parseFloat(ord.total_amount) || 0).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
+        <td class="text-center"><span class="badge-status ${orderBadgeClass}">${ord.order_status}</span></td>
+        <td class="text-center"><span class="badge-status ${ocBadgeClass}">${ocText}</span></td>
+        <td class="text-center">
+          <button onclick="openOrderModal(${ord.order_id})" 
+                  class="px-2.5 py-1 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 text-xs font-bold rounded-lg transition border border-blue-200">
+            <i class="fa-solid fa-eye mr-1"></i> Details
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Update Formula Bar stats
+    document.getElementById('fxCount').textContent = orders.length + ' rows';
+    document.getElementById('fxSumTotal').textContent = '৳' + sumTotal.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+    document.getElementById('fxSumDelivered').textContent = '৳' + sumDelivered.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+    document.getElementById('fxSumPending').textContent = '৳' + sumPending.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
   }
 
   // ── Render Leaflet Map Markers ────────────────────────────────

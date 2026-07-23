@@ -1,61 +1,75 @@
 <?php $pageTitle = 'Select Portal'; ?>
 
-<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 bg-cover bg-center" style="background-image: url('<?= asset('img/portal-bg.jpg') ?>');">
-    <!-- Dark overlay if we had an image, for now just a nice gradient -->
-    <div class="absolute inset-0 bg-gradient-to-br from-blue-900 to-indigo-900 opacity-90"></div>
+<div class="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden p-8">
     
-    <div class="max-w-4xl w-full space-y-8 relative z-10">
-        <div>
-            <div class="mx-auto h-20 w-20 bg-white rounded-2xl shadow-xl flex items-center justify-center">
-                <span class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">HB</span>
-            </div>
-            <h2 class="mt-6 text-center text-4xl font-extrabold text-white">
-                HappyBangladesh DMS
-            </h2>
-            <p class="mt-2 text-center text-sm text-blue-200">
-                Please select your role portal to login
-            </p>
-        </div>
-
-        <div class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            
-            <!-- Admin Portal -->
-            <a href="<?= url('admin/login') ?>" class="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col items-center text-center">
-                <div class="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <i class="fa-solid fa-user-shield text-2xl text-blue-300 group-hover:text-white transition-colors"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-2">Admin</h3>
-                <p class="text-xs text-blue-200">System configuration and master controls</p>
-            </a>
-
-            <!-- Manager Portal -->
-            <a href="<?= url('manager/login') ?>" class="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col items-center text-center">
-                <div class="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <i class="fa-solid fa-users-gear text-2xl text-emerald-300 group-hover:text-white transition-colors"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-2">Manager</h3>
-                <p class="text-xs text-emerald-100">Inventory, dispatch, and reports</p>
-            </a>
-
-            <!-- SR Portal -->
-            <a href="<?= url('sr/login') ?>" class="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col items-center text-center">
-                <div class="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <i class="fa-solid fa-briefcase text-2xl text-amber-300 group-hover:text-white transition-colors"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-2">Sales Rep</h3>
-                <p class="text-xs text-amber-100">Market orders and retailer tracking</p>
-            </a>
-
-            <!-- DSR Portal -->
-            <a href="<?= url('dsr/login') ?>" class="group bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col items-center text-center">
-                <div class="w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <i class="fa-solid fa-truck-fast text-2xl text-rose-300 group-hover:text-white transition-colors"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-2">Delivery Rep</h3>
-                <p class="text-xs text-rose-100">Van stock, delivery, and settlement</p>
-            </a>
-
-        </div>
-
+    <!-- Clean Header -->
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black mx-auto mb-3 shadow-md shadow-blue-500/20">
+        HB
+      </div>
+      <h1 class="text-2xl font-bold text-slate-900">Happy Bangladesh</h1>
+      <p class="text-xs text-slate-500 mt-1">Distribution Management System</p>
     </div>
+
+    <!-- Role Options -->
+    <div class="space-y-3 mb-6">
+      <!-- Admin Portal -->
+      <a href="<?= url('admin/login') ?>" class="flex items-center gap-3.5 p-4 rounded-2xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50/50 transition group">
+        <div class="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center text-base font-bold group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm text-slate-900 group-hover:text-blue-600">Admin Portal</div>
+          <div class="text-xs text-slate-500 truncate">System configuration & control</div>
+        </div>
+        <i class="fa-solid fa-chevron-right text-xs text-slate-300 group-hover:text-blue-600"></i>
+      </a>
+
+      <!-- Manager Portal -->
+      <a href="<?= url('manager/login') ?>" class="flex items-center gap-3.5 p-4 rounded-2xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50/50 transition group">
+        <div class="w-11 h-11 rounded-xl bg-blue-700 text-white flex items-center justify-center text-base font-bold group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-users-gear"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm text-slate-900 group-hover:text-blue-600">Manager Portal</div>
+          <div class="text-xs text-slate-500 truncate">Inventory & dispatches</div>
+        </div>
+        <i class="fa-solid fa-chevron-right text-xs text-slate-300 group-hover:text-blue-600"></i>
+      </a>
+
+      <!-- SR Portal -->
+      <a href="<?= url('sr/login') ?>" class="flex items-center gap-3.5 p-4 rounded-2xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50/50 transition group">
+        <div class="w-11 h-11 rounded-xl bg-blue-800 text-white flex items-center justify-center text-base font-bold group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-briefcase"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm text-slate-900 group-hover:text-blue-600">Sales Rep (SR)</div>
+          <div class="text-xs text-slate-500 truncate">Orders & market tracking</div>
+        </div>
+        <i class="fa-solid fa-chevron-right text-xs text-slate-300 group-hover:text-blue-600"></i>
+      </a>
+
+      <!-- DSR Portal -->
+      <a href="<?= url('dsr/login') ?>" class="flex items-center gap-3.5 p-4 rounded-2xl border border-slate-200 hover:border-blue-600 hover:bg-blue-50/50 transition group">
+        <div class="w-11 h-11 rounded-xl bg-blue-900 text-white flex items-center justify-center text-base font-bold group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm text-slate-900 group-hover:text-blue-600">Delivery Rep (DSR)</div>
+          <div class="text-xs text-slate-500 truncate">Van stock & deliveries</div>
+        </div>
+        <i class="fa-solid fa-chevron-right text-xs text-slate-300 group-hover:text-blue-600"></i>
+      </a>
+    </div>
+
+    <!-- Bottom Footer -->
+    <div class="pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
+      <i class="fa-solid fa-shield-halved text-blue-600"></i>
+      <span>Happy Bangladesh DMS &bull; v2.4</span>
+    </div>
+
+  </div>
 </div>
+
+

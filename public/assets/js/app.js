@@ -452,3 +452,75 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
 });
+
+// ── Excel Spreadsheet Global Helpers ─────────────────────────────────────
+window.exportTableToCSV = function(tableId, filename = 'export.csv') {
+  const table = document.getElementById(tableId);
+  if (!table) {
+    alert('Table not found for export');
+    return;
+  }
+
+  const rows = Array.from(table.querySelectorAll('tr'));
+  const csvData = [];
+
+  rows.forEach(row => {
+    // Ignore hidden rows
+    if (row.style.display === 'none') return;
+    const cells = Array.from(row.querySelectorAll('th, td'));
+    const rowData = cells.map(cell => {
+      // Clean up text
+      let text = cell.innerText.replace(/(\r\n|\n|\r)/gm, ' ').replace(/\s+/g, ' ').trim();
+      // Escape quotes
+      text = text.replace(/"/g, '""');
+      return `"${text}"`;
+    });
+    csvData.push(rowData.join(','));
+  });
+
+  if (csvData.length === 0) return;
+
+  const csvString = '\uFEFF' + csvData.join('\n'); // Add BOM for Excel UTF-8 support
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+window.printTable = function(tableId, title = 'Excel Sheet Data') {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+
+  const printWindow = window.open('', '', 'width=900,height=650');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: system-ui, sans-serif; padding: 20px; color: #1e293b; }
+          h2 { color: #047857; border-bottom: 2px solid #047857; padding-bottom: 8px; margin-bottom: 16px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+          th { background-color: #f1f5f9; color: #0f172a; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f8fafc; }
+        </style>
+      </head>
+      <body>
+        <h2>${title}</h2>
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 250);
+};
+
