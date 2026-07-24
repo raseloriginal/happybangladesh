@@ -615,6 +615,9 @@ class AdminController extends Controller
         $syncType = $this->post('sync_type');
 
         try {
+            // Disable foreign key checks to prevent errors when adding constraints on tables with invalid data
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 0;");
+            
             if ($syncType === 'schema') {
                 $sql = $this->post('proposed_sql', '');
                 if (empty(trim($sql))) {
@@ -647,6 +650,13 @@ class AdminController extends Controller
             }
         } catch (PDOException $e) {
             $this->flash('error', 'Execution failed: ' . $e->getMessage());
+        } finally {
+            // Restore foreign key checks
+            try {
+                $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
+            } catch (PDOException $e) {
+                // Ignore errors here
+            }
         }
 
         $this->redirect('admin/database-sync');
