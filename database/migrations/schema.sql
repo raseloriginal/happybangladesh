@@ -383,6 +383,7 @@ CREATE TABLE IF NOT EXISTS `dispatch_schedules` (
     `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `dsr_id`        INT UNSIGNED NOT NULL,
     `dispatch_date` DATE         NOT NULL,
+    `delivery_date` DATE         DEFAULT NULL,
     `status`        ENUM('assigned','organized','dispatched','returned') NOT NULL DEFAULT 'assigned',
     `created_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`dsr_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
