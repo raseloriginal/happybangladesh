@@ -110,6 +110,24 @@ class ManagerController extends Controller
                             $imagePath = 'assets/uploads/' . $filename;
                         }
                     }
+                } elseif (!empty($p['image_url'])) {
+                    $url = trim($p['image_url']);
+                    if (filter_var($url, FILTER_VALIDATE_URL)) {
+                        $imgData = @file_get_contents($url);
+                        if ($imgData !== false) {
+                            $filename = 'prod_' . uniqid() . '.jpg';
+                            $fullPath = $uploadDir . $filename;
+                            if (file_put_contents($fullPath, $imgData)) {
+                                $imagePath = 'assets/uploads/' . $filename;
+                            }
+                        }
+                    }
+                }
+                
+                $piecesPerBox = (int)($p['pieces_per_box'] ?: 1);
+                $buyingPrice = 0;
+                if (!empty($p['price_piece'])) {
+                    $buyingPrice = (float)$p['price_piece'] * $piecesPerBox;
                 }
 
                 $sku = 'PRD-' . strtoupper(substr(md5(uniqid()), 0, 6));
@@ -120,9 +138,9 @@ class ManagerController extends Controller
                         trim($p['name']),
                         $sku,
                         $p['box_type'] ?: 'বক্স',
-                        $p['pieces_per_box'] ?: 1,
+                        $piecesPerBox,
                         $p['dealer_percentage'] ?: 0,
-                        0,
+                        $buyingPrice,
                         $imagePath
                     ]);
             }
