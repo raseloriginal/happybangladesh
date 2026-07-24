@@ -569,6 +569,34 @@ class AdminController extends Controller
                             $proposedSqls[] = "ALTER TABLE `{$tableName}` ADD COLUMN {$cleanDef};";
                         }
                     }
+
+                    // Check for missing constraints
+                    $createTableSql = $this->db->query("SHOW CREATE TABLE `{$tableName}`")->fetch(PDO::FETCH_ASSOC)['Create Table'];
+                    if (!empty($tableData['constraints'])) {
+                        foreach ($tableData['constraints'] as $constraintLine) {
+                            $cleanConstraint = rtrim(trim($constraintLine), ',');
+                            $constraintMissing = false;
+                            
+                            // Check for named constraints
+                            if (preg_match('/CONSTRAINT\s+`([^`]+)`/i', $cleanConstraint, $matches)) {
+                                $constraintName = $matches[1];
+                                if (stripos($createTableSql, "CONSTRAINT `$constraintName`") === false) {
+                                    $constraintMissing = true;
+                                }
+                            } 
+                            // Check for foreign keys without explicit names
+                            else if (preg_match('/FOREIGN KEY\s*\(`([^`]+)`\)/i', $cleanConstraint, $matches)) {
+                                $keyName = $matches[1];
+                                if (stripos($createTableSql, "FOREIGN KEY (`$keyName`)") === false) {
+                                    $constraintMissing = true;
+                                }
+                            }
+                            
+                            if ($constraintMissing) {
+                                $proposedSqls[] = "ALTER TABLE `{$tableName}` ADD {$cleanConstraint};";
+                            }
+                        }
+                    }
                 } catch (PDOException $e) {
                     // Ignore table errors if table not queryable
                 }

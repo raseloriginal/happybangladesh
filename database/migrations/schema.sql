@@ -59,14 +59,24 @@ CREATE TABLE IF NOT EXISTS `permissions` (
     FOREIGN KEY (`role_id`) REFERENCES `roles`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ── Categories ───────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS `categories` (
+-- ── Main Categories ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `main_categories` (
     `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `company_id` INT UNSIGNED DEFAULT NULL,
     `name`       VARCHAR(150) NOT NULL,
     `status`     TINYINT(1)   NOT NULL DEFAULT 1,
-    `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON DELETE CASCADE
+    `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ── Categories ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `categories` (
+    `id`               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `company_id`       INT UNSIGNED DEFAULT NULL,
+    `main_category_id` INT UNSIGNED DEFAULT NULL,
+    `name`             VARCHAR(150) NOT NULL,
+    `status`           TINYINT(1)   NOT NULL DEFAULT 1,
+    `created_at`       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`main_category_id`) REFERENCES `main_categories`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ── Companies ────────────────────────────────────────────────
