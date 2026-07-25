@@ -1255,10 +1255,11 @@ function openRetailerSheet(retailer) {
                     <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
                         <div class="flex items-center gap-4 mb-3">
                             <div class="w-16 h-16 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 p-1">
-                                ${p.image
-                                    ? `<img src="<?= asset('uploads/products/') ?>${p.image}" class="w-full h-full object-contain rounded-xl">`
-                                    : `<i class="fa-solid fa-box text-gray-300 text-2xl"></i>`
-                                }
+                                ${(() => {
+                                    if (!p.image) return '<i class="fa-solid fa-box text-gray-300 text-2xl"></i>';
+                                    const src = (p.image.startsWith('http://') || p.image.startsWith('https://')) ? p.image : '<?= BASE_URL ?>/' + p.image.replace(/^\/+/, '');
+                                    return `<img src="${src}" class="w-full h-full object-contain rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span style="display:none" class="w-full h-full items-center justify-center"><i class="fa-solid fa-box text-gray-300 text-2xl"></i></span>`;
+                                })()}
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="text-sm font-black text-gray-800 line-clamp-2 leading-snug">${p.name}</div>
