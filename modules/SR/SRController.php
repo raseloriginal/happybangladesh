@@ -69,6 +69,7 @@ class SRController extends Controller
                 SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END) AS confirmed,
                 COALESCE(SUM(total_amount), 0) AS total_value,
                 COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() THEN total_amount ELSE 0 END), 0) AS today_sales,
+                COALESCE(SUM(CASE WHEN MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE()) THEN total_amount ELSE 0 END), 0) AS this_month_sales,
                 COUNT(DISTINCT CASE WHEN DATE(created_at) = CURDATE() THEN NULLIF(retailer_id, 0) ELSE NULL END) AS visited_today
             FROM orders 
             WHERE sr_id = ?
@@ -87,12 +88,18 @@ class SRController extends Controller
             $visitedToday = (int)$q->fetchColumn();
         }
 
+        $qTarget = $this->db->prepare("SELECT target_amount FROM users WHERE id=?");
+        $qTarget->execute([$srId]);
+        $targetAmt = (float)$qTarget->fetchColumn();
+
         $stats = [
             'total_orders'    => (int)($rowStats['total_orders'] ?? 0),
             'pending_orders'  => (int)($rowStats['pending_orders'] ?? 0),
             'confirmed'       => (int)($rowStats['confirmed'] ?? 0),
             'total_value'     => (float)($rowStats['total_value'] ?? 0),
             'today_sales'     => (float)($rowStats['today_sales'] ?? 0),
+            'this_month_sales'=> (float)($rowStats['this_month_sales'] ?? 0),
+            'target_amount'   => $targetAmt,
             'total_retailers' => $totalRetailers,
             'visited_today'   => $visitedToday,
         ];
@@ -288,8 +295,8 @@ class SRController extends Controller
         ");
         $q->execute([$srId, $srId]);
         $allProducts = $q->fetchAll(PDO::FETCH_ASSOC);
-
-        $this->renderApp('sales', compact('allProducts'));
+        $hideBottomNav = true;
+        $this->renderApp('sales', compact('allProducts', 'hideBottomNav'));
     }
 
     // ── Retailers List & Filtering ────────────────────────────
@@ -376,7 +383,7 @@ class SRController extends Controller
         }
 
         $q = $this->db->prepare("
-            SELECT r.id, r.name, r.phone, r.lat, r.lng,
+            SELECT r.id, r.name, r.phone, r.address, r.lat, r.lng,
                    (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today,
                    ROUND(
                      6371000 * 2 * ASIN(SQRT(

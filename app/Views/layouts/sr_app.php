@@ -56,7 +56,9 @@
     </main>
 
     <!-- Bottom Navigation Bar -->
-    <?php include MOD_PATH . '/SR/views/partials/_bottom_nav.php'; ?>
+    <?php if (empty($hideBottomNav)): ?>
+      <?php include MOD_PATH . '/SR/views/partials/_bottom_nav.php'; ?>
+    <?php endif; ?>
 
   </div><!-- /.sr-app-shell -->
 

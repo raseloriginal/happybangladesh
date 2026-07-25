@@ -58,7 +58,7 @@ class AdminController extends Controller
     // ══════════════════════════════════════════════════════════
     public function warehouses(): void
     {
-        $items = $this->db->query("SELECT * FROM warehouses ORDER BY created_at DESC")->fetchAll();
+        $items = $this->db->query("SELECT * FROM warehouses WHERE status=1 ORDER BY created_at DESC")->fetchAll();
         $this->render('warehouses/index', compact('items'), 'main');
     }
 
@@ -112,7 +112,7 @@ class AdminController extends Controller
 
     public function warehouseDelete(string $id): void
     {
-        $this->db->prepare("DELETE FROM warehouses WHERE id=?")->execute([$id]);
+        $this->db->prepare("UPDATE warehouses SET status=0 WHERE id=?")->execute([$id]);
         $this->flash('success', 'Warehouse deleted.');
         $this->redirect('admin/warehouses');
     }
@@ -132,7 +132,7 @@ class AdminController extends Controller
             JOIN roles r ON r.id = u.role_id
             LEFT JOIN warehouses w ON w.id = u.warehouse_id
             LEFT JOIN companies c ON c.id = u.company_id
-            WHERE r.slug = ?
+            WHERE r.slug = ? AND u.status=1
             ORDER BY u.created_at DESC
         ");
         $stmt->execute([$role]);
@@ -148,6 +148,7 @@ class AdminController extends Controller
         $password = $this->post('password', '');
         $whId     = $this->post('warehouse_id') ?: null;
         $companyId= $this->post('company_id') ?: null;
+        $targetAmt= $this->post('target_amount') ?: 0;
 
         if (!$name || !$password) {
             $this->flash('error', 'Name and password are required.');
@@ -172,8 +173,8 @@ class AdminController extends Controller
         $roleId->execute([$roleSlug]);
         $roleId = $roleId->fetchColumn();
 
-        $this->db->prepare("INSERT INTO users (role_id, warehouse_id, company_id, name, email, phone, password) VALUES (?,?,?,?,?,?,?)")
-                 ->execute([$roleId, $whId, $companyId, $name, $email, $phone, password_hash($password, PASSWORD_BCRYPT)]);
+        $this->db->prepare("INSERT INTO users (role_id, warehouse_id, company_id, name, email, phone, password, target_amount) VALUES (?,?,?,?,?,?,?,?)")
+                 ->execute([$roleId, $whId, $companyId, $name, $email, $phone, password_hash($password, PASSWORD_BCRYPT), $targetAmt]);
 
         $this->flash('success', ucfirst($roleSlug) . ' created successfully.');
     }
@@ -186,6 +187,7 @@ class AdminController extends Controller
             'phone'        => trim($this->post('phone')),
             'warehouse_id' => $this->post('warehouse_id') ?: null,
             'company_id'   => $this->post('company_id') ?: null,
+            'target_amount'=> $this->post('target_amount') ?: 0,
             'status'       => $this->post('status', 1),
         ];
 
@@ -241,7 +243,7 @@ class AdminController extends Controller
     }
     public function managerDelete(string $id): void
     {
-        $this->db->prepare("DELETE FROM users WHERE id=?")->execute([$id]);
+        $this->db->prepare("UPDATE users SET status=0 WHERE id=?")->execute([$id]);
         $this->flash('success', 'Manager deleted.');
         $this->redirect('admin/managers');
     }
@@ -267,7 +269,7 @@ class AdminController extends Controller
     public function srUpdate(string $id): void { $this->updateUser($id, 'sr'); $this->redirect('admin/srs'); }
     public function srDelete(string $id): void
     {
-        $this->db->prepare("DELETE FROM users WHERE id=?")->execute([$id]);
+        $this->db->prepare("UPDATE users SET status=0 WHERE id=?")->execute([$id]);
         $this->flash('success', 'SR deleted.'); $this->redirect('admin/srs');
     }
 
@@ -292,7 +294,7 @@ class AdminController extends Controller
     public function dsrUpdate(string $id): void { $this->updateUser($id, 'dsr'); $this->redirect('admin/dsrs'); }
     public function dsrDelete(string $id): void
     {
-        $this->db->prepare("DELETE FROM users WHERE id=?")->execute([$id]);
+        $this->db->prepare("UPDATE users SET status=0 WHERE id=?")->execute([$id]);
         $this->flash('success', 'DSR deleted.'); $this->redirect('admin/dsrs');
     }
 
@@ -301,7 +303,7 @@ class AdminController extends Controller
     // ══════════════════════════════════════════════════════════
     public function companies(): void
     {
-        $items = $this->db->query("SELECT * FROM companies ORDER BY created_at DESC")->fetchAll();
+        $items = $this->db->query("SELECT * FROM companies WHERE status=1 ORDER BY created_at DESC")->fetchAll();
         $this->render('companies/index', compact('items'), 'main');
     }
     public function companyCreate(): void { $this->render('companies/form', ['item' => null, 'pageTitle' => 'Add Company']); }
@@ -326,7 +328,7 @@ class AdminController extends Controller
     }
     public function companyDelete(string $id): void
     {
-        $this->db->prepare("DELETE FROM companies WHERE id=?")->execute([$id]);
+        $this->db->prepare("UPDATE companies SET status=0 WHERE id=?")->execute([$id]);
         $this->flash('success', 'Company deleted.'); $this->redirect('admin/companies');
     }
 
@@ -339,6 +341,7 @@ class AdminController extends Controller
             SELECT d.*, w.name AS warehouse_name 
             FROM dealers d 
             LEFT JOIN warehouses w ON w.id = d.warehouse_id 
+            WHERE d.status=1
             ORDER BY d.created_at DESC
         ")->fetchAll();
         $this->render('dealers/index', compact('items'), 'main');
@@ -478,7 +481,7 @@ class AdminController extends Controller
 
     public function dealerDelete(string $id): void
     {
-        $this->db->prepare("DELETE FROM dealers WHERE id=?")->execute([$id]);
+        $this->db->prepare("UPDATE dealers SET status=0 WHERE id=?")->execute([$id]);
         $this->flash('success', 'Dealer deleted.'); $this->redirect('admin/dealers');
     }
 
@@ -862,7 +865,7 @@ class AdminController extends Controller
                 $phone = ($phoneIdx !== -1 && isset($row[$phoneIdx])) ? trim($row[$phoneIdx]) : null;
                 $lat = ($latIdx !== -1 && isset($row[$latIdx]) && $row[$latIdx] !== '') ? floatval(trim($row[$latIdx])) : null;
                 $lng = ($lngIdx !== -1 && isset($row[$lngIdx]) && $row[$lngIdx] !== '') ? floatval(trim($row[$lngIdx])) : null;
-                $address = "Imported dummy retailer";
+                $address = null;
 
                 $stmt->execute([
                     $name,

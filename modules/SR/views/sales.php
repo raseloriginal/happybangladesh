@@ -420,62 +420,38 @@ function renderRetailerCards(retailers) {
   
   container.innerHTML = filtered.map((ret, index) => {
     const distMeters = ret.calculated_dist;
-    const imgUrl = `${BASE_URL}/public/assets/uploads/retailer_shop_${(index % 2) + 1}.png`;
-    
-    // Stable pseudo-random rating & reviews
-    const ratingVal = (4.2 + ((ret.id * 7) % 9) / 10).toFixed(1);
-    const reviewsCount = (ret.id * 17) % 180 + 15;
+    const cleanAddress = (ret.address && !ret.address.toLowerCase().includes('imported dummy')) ? ret.address.trim() : '';
     
     // Highlight if has active cart
     const hasCart = cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
     const cardStyle = hasCart ? 'border: 2px dashed #eab308; background: #fffbeb;' : '';
     
-    let starsHtml = '';
-    for (let i = 1; i <= 5; i++) {
-      if (i <= Math.round(parseFloat(ratingVal))) {
-        starsHtml += '<i class="fa-solid fa-star"></i>';
-      } else {
-        starsHtml += '<i class="fa-regular fa-star"></i>';
-      }
-    }
-    
     const distStr = distMeters > 1000 ? `${(distMeters / 1000).toFixed(1)} km` : `${distMeters} m`;
     const timeMins = Math.max(1, Math.round(distMeters / 80));
-    const addressStr = ret.address || `Dhaka City Area, Retailer ID #${ret.id}`;
 
     return `
       <div class="sr-retailer-card-new" id="retailer-card-${ret.id}" style="${cardStyle}" onclick="handleCardClick(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
-        <div class="sr-retailer-card-img-wrap">
-          <img src="${imgUrl}" class="sr-retailer-card-img" alt="${escHtml(ret.name)}">
+        <div class="sr-card-icon-box">
+          <i class="fa-solid fa-store"></i>
         </div>
-        <div class="sr-retailer-card-body">
-          <div class="sr-retailer-card-header">
-            <div class="sr-retailer-card-title-group">
-              <div class="sr-retailer-card-title">${escHtml(ret.name)}</div>
-              <div class="sr-retailer-card-rating">
-                <span>${ratingVal}</span>
-                <div class="sr-retailer-card-stars">${starsHtml}</div>
-                <span class="sr-retailer-card-reviews">(${reviewsCount} Reviews)</span>
-              </div>
-            </div>
-            <button class="sr-retailer-card-nav-btn" onclick="event.stopPropagation(); handleNavigationClick(${JSON.stringify(ret).replace(/"/g, '&quot;')})" title="Order Page">
-              <i class="fa-solid fa-paper-plane"></i>
+        <div class="sr-card-content">
+          <div class="sr-card-top-row">
+            <h4 class="sr-card-name" title="${escHtml(ret.name)}">${escHtml(ret.name)}</h4>
+            <button class="sr-card-action-btn" onclick="event.stopPropagation(); handleNavigationClick(${JSON.stringify(ret).replace(/"/g, '&quot;')})" title="Order Page">
+              <i class="fa-solid fa-paper-plane"></i> Order
             </button>
           </div>
-          <div class="sr-retailer-card-location">
+          <div class="sr-card-address-row">
             <i class="fa-solid fa-location-dot"></i>
-            <span>${escHtml(addressStr)}</span>
+            <span>${escHtml(cleanAddress || (ret.lat && ret.lng ? `${parseFloat(ret.lat).toFixed(4)}, ${parseFloat(ret.lng).toFixed(4)}` : 'Location unavailable'))}</span>
           </div>
-          <div class="sr-retailer-card-divider"></div>
-          <div class="sr-retailer-card-footer">
-            <div class="sr-retailer-card-meta-item">
-              <i class="fa-solid fa-person-running"></i>
-              <span>${distStr} / ${timeMins} min</span>
-            </div>
-            <div class="sr-retailer-card-meta-item">
-              <i class="fa-solid fa-store"></i>
-              <span>Grocery Store</span>
-            </div>
+          <div class="sr-card-tags-row">
+            <span class="sr-card-tag"><i class="fa-solid fa-person-running"></i> ${distStr}</span>
+            ${ret.phone ? `<span class="sr-card-tag"><i class="fa-solid fa-phone"></i> ${escHtml(ret.phone)}</span>` : ''}
+            <span class="sr-card-tag ${ret.has_order_today ? 'tag-success' : 'tag-pending'}">
+              <i class="fa-solid ${ret.has_order_today ? 'fa-circle-check' : 'fa-clock'}"></i>
+              ${ret.has_order_today ? 'Visited' : 'Pending'}
+            </span>
           </div>
         </div>
       </div>
