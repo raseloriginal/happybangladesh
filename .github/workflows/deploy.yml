@@ -21,9 +21,7 @@ jobs:
         port: 22
         script: |
           # 1. Navigate to your project directory on the live server.
-          # ⚠️ IMPORTANT: Replace this with the actual path to your site on CloudPanel!
-          # Example: cd /home/your-site-user/htdocs/happybangladesh.com
-          cd /path/to/your/project/directory
+          cd /home/egglandbangladesh/htdocs/egglandbangladesh.com
           
           # 2. Pull the latest code
           git pull origin main
