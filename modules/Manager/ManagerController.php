@@ -744,11 +744,12 @@ class ManagerController extends Controller
                        SUM(oi.quantity) as ordered_qty,
                        0 as extra_qty,
                        (
-                           SELECT COALESCE(SUM(di.quantity), 0)
-                           FROM dispatch_items di
-                           JOIN dispatches d ON d.id = di.dispatch_id
-                           JOIN orders o2 ON o2.id = d.order_id
-                           WHERE o2.sr_id = {$sr['id']} AND DATE(o2.created_at) = '{$schedule['dispatch_date']}' AND di.product_id = p.id
+                           SELECT COALESCE(SUM(di2.quantity), 0)
+                           FROM dispatch_items di2
+                           JOIN dispatches d2 ON d2.id = di2.dispatch_id
+                           LEFT JOIN orders o2 ON o2.id = d2.order_id
+                           WHERE d2.dispatch_date = '{$delivery_date}' AND di2.product_id = p.id
+                             AND (o2.sr_id = {$sr['id']} OR (d2.order_id IS NULL AND d2.dsr_id = {$schedule['dsr_id']}))
                        ) as dispatched_qty,
                        (
                            SELECT COALESCE(SUM(ri.quantity), 0)
@@ -853,7 +854,20 @@ class ManagerController extends Controller
                     $this->db->prepare("UPDATE orders SET status='dispatched' WHERE id=?")->execute([$o['id']]);
                 }
                 
-                // 2. Add Extras as a single "null order" dispatch
+                // Reset existing dispatch_items to original order quantities before applying new organize adjustments.
+                // This handles re-organize scenarios and fixes dispatches created with old code.
+                // Only reset pending dispatches (not yet in_transit/delivered) that belong to orders.
+                $this->db->prepare("
+                    UPDATE dispatch_items di
+                    JOIN dispatches d ON d.id = di.dispatch_id
+                    JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+                    SET di.quantity = oi.quantity
+                    WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status = 'pending' AND d.order_id IS NOT NULL
+                ")->execute([$dsrId, $deliv_date]);
+
+                
+                // 2. Apply organized qty adjustments to dispatch_items
+                // Fetch all extras (differences set by manager during organize)
                 $extrasQuery = $this->db->prepare("
                     SELECT de.product_id, p.pieces_per_box, de.qty_boxes, de.qty_pieces 
                     FROM dispatch_extras de
@@ -863,18 +877,60 @@ class ManagerController extends Controller
                 $extrasQuery->execute([$id]);
                 $extraList = $extrasQuery->fetchAll();
                 
-                if (!empty($extraList)) {
+                // Separate into positive extras (add stock) and negative adjustments (reduce qty)
+                $positiveExtras = [];
+                $negativeAdjustments = [];
+                foreach ($extraList as $ex) {
+                    $ppb = max(1, (int)$ex['pieces_per_box']);
+                    $diffQty = ((int)$ex['qty_boxes'] * $ppb) + (int)$ex['qty_pieces'];
+                    if ($diffQty > 0) {
+                        $positiveExtras[] = array_merge($ex, ['diffQty' => $diffQty, 'ppb' => $ppb]);
+                    } elseif ($diffQty < 0) {
+                        $negativeAdjustments[] = array_merge($ex, ['diffQty' => $diffQty]);
+                    }
+                }
+                
+                // For negative adjustments: reduce dispatch_items.quantity for this product
+                // Distribute the reduction proportionally across all dispatch_items for this product/DSR/date
+                foreach ($negativeAdjustments as $adj) {
+                    $pid = (int)$adj['product_id'];
+                    $reduction = abs((int)$adj['diffQty']); // how many pcs to reduce in total
+                    
+                    // Fetch all dispatch_items for this product in this DSR's dispatches for delivery_date
+                    $diRows = $this->db->prepare("
+                        SELECT di.id, di.quantity
+                        FROM dispatch_items di
+                        JOIN dispatches d ON d.id = di.dispatch_id
+                        WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND di.quantity > 0
+                        ORDER BY di.id ASC
+                    ");
+                    $diRows->execute([$dsrId, $deliv_date, $pid]);
+                    $diItems = $diRows->fetchAll();
+                    
+                    // Apply reduction row by row
+                    $remaining = $reduction;
+                    foreach ($diItems as $di) {
+                        if ($remaining <= 0) break;
+                        $rowQty = (int)$di['quantity'];
+                        $subtract = min($rowQty, $remaining);
+                        $newQty = $rowQty - $subtract;
+                        $this->db->prepare("UPDATE dispatch_items SET quantity = ? WHERE id = ?")
+                                 ->execute([$newQty, $di['id']]);
+                        $remaining -= $subtract;
+                    }
+                }
+                
+                // For positive extras: create a separate "extra stock" dispatch
+                if (!empty($positiveExtras)) {
                     $wId = Auth::warehouseId() ?: $this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn();
                     $this->db->prepare("INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status) VALUES (NULL, ?, ?, ?, 'pending')")
-                             ->execute([$dsrId, $wId, $date]);
+                             ->execute([$dsrId, $wId, $deliv_date]);
                     $extraDispatchId = $this->db->lastInsertId();
                     
-                    foreach ($extraList as $ex) {
-                        $qty = ($ex['qty_boxes'] * max(1, $ex['pieces_per_box'])) + $ex['qty_pieces'];
-                        if ($qty != 0) {
-                            $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity) VALUES (?, ?, NULL, ?)")
-                                     ->execute([$extraDispatchId, $ex['product_id'], $qty]);
-                        }
+                    foreach ($positiveExtras as $ex) {
+                        $qty = $ex['diffQty'];
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity) VALUES (?, ?, NULL, ?)")
+                                 ->execute([$extraDispatchId, $ex['product_id'], $qty]);
                     }
                 }
             }
