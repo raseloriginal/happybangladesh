@@ -50,7 +50,7 @@ class Router
     // ── Convert route pattern to regex ────────────────────────
     private function buildRegex(string $pattern): string
     {
-        $pattern = preg_replace('/\{([a-z_]+)\}/', '(?P<$1>[^/]+)', $pattern);
+        $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<$1>[^/]+)', $pattern);
         return '#^' . $pattern . '$#';
     }
 

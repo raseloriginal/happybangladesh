@@ -723,15 +723,15 @@ class ManagerController extends Controller
                     FROM dispatch_items di
                     JOIN products p ON p.id = di.product_id
                     JOIN dispatches d ON d.id = di.dispatch_id
-                    JOIN orders o ON o.id = d.order_id
-                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$delivery_date}') as dispatch_items_value,
-                   (SELECT COALESCE(SUM(ri.quantity * p.price), 0)
-                    FROM returns r
-                    JOIN return_items ri ON ri.return_id = r.id
-                    JOIN products p ON p.id = ri.product_id
-                    JOIN dispatches d ON d.id = r.dispatch_id
-                    JOIN orders o ON o.id = d.order_id
-                    WHERE o.sr_id = u.id AND d.dispatch_date = '{$delivery_date}') as return_items_value,
+                    LEFT JOIN orders o ON o.id = d.order_id
+                    WHERE (o.sr_id = u.id OR (d.order_id IS NULL AND d.dsr_id = {$schedule['dsr_id']})) AND d.dispatch_date = '{$delivery_date}') as dispatch_items_value,
+                   (
+                       SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                       FROM returns r
+                       JOIN return_items ri ON ri.return_id = r.id
+                       JOIN products p ON p.id = ri.product_id
+                       WHERE r.dsr_id = {$schedule['dsr_id']} AND r.return_date = '{$delivery_date}'
+                   ) as return_items_value,
                    0 as damage_value
             FROM dispatch_schedule_srs dss
             JOIN users u ON u.id = dss.sr_id
@@ -742,7 +742,13 @@ class ManagerController extends Controller
             $sr['products'] = $this->db->query("
                 SELECT p.name,
                        SUM(oi.quantity) as ordered_qty,
-                       0 as extra_qty,
+                       (
+                           SELECT COALESCE(SUM(di2.quantity), 0)
+                           FROM dispatch_items di2
+                           JOIN dispatches d2 ON d2.id = di2.dispatch_id
+                           WHERE d2.dispatch_date = '{$delivery_date}' AND di2.product_id = p.id
+                             AND d2.order_id IS NULL AND d2.dsr_id = {$schedule['dsr_id']}
+                       ) as extra_qty,
                        (
                            SELECT COALESCE(SUM(di2.quantity), 0)
                            FROM dispatch_items di2
@@ -753,19 +759,24 @@ class ManagerController extends Controller
                        ) as dispatched_qty,
                        (
                            SELECT COALESCE(SUM(ri.quantity), 0)
-                           FROM return_items ri
-                           JOIN returns r ON r.id = ri.return_id
-                           JOIN dispatches d ON d.id = r.dispatch_id
-                           JOIN orders o2 ON o2.id = d.order_id
-                           WHERE o2.sr_id = {$sr['id']} AND DATE(o2.created_at) = '{$schedule['dispatch_date']}' AND ri.product_id = p.id
+                           FROM returns r
+                           JOIN return_items ri ON ri.return_id = r.id
+                           WHERE r.dsr_id = {$schedule['dsr_id']} AND r.return_date = '{$delivery_date}' AND ri.product_id = p.id
                        ) as returned_qty,
                        0 as damage_value,
-                       SUM(oi.total_price) as sale_value
+                       (
+                           SELECT COALESCE(SUM(di2.quantity * p.price), 0)
+                           FROM dispatch_items di2
+                           JOIN dispatches d2 ON d2.id = di2.dispatch_id
+                           LEFT JOIN orders o2 ON o2.id = d2.order_id
+                           WHERE d2.dispatch_date = '{$delivery_date}' AND di2.product_id = p.id
+                             AND (o2.sr_id = {$sr['id']} OR (d2.order_id IS NULL AND d2.dsr_id = {$schedule['dsr_id']}))
+                       ) as sale_value
                 FROM orders o
                 JOIN order_items oi ON oi.order_id = o.id
                 JOIN products p ON p.id = oi.product_id
                 WHERE o.sr_id = {$sr['id']} AND DATE(o.created_at) = '{$schedule['dispatch_date']}'
-                GROUP BY p.id, p.name
+                GROUP BY p.id, p.name, p.price
             ")->fetchAll();
         }
 
@@ -1174,5 +1185,71 @@ class ManagerController extends Controller
         }
 
         return false;
+    }
+
+    public function apiDispatchVanStock(string $dsrId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $date = $_GET['date'] ?? date('Y-m-d');
+        $stock = $this->db->query("
+            SELECT vs.product_id, p.name as product_name, SUM(vs.quantity) as qty
+            FROM van_stock vs
+            JOIN products p ON p.id = vs.product_id
+            WHERE vs.dsr_id = " . (int)$dsrId . " AND vs.quantity > 0
+            GROUP BY vs.product_id
+        ")->fetchAll();
+        echo json_encode(['success' => true, 'stock' => $stock]);
+        exit;
+    }
+
+    public function apiDispatchReturnSave(string $scheduleId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input = json_decode(file_get_contents('php://input'), true);
+        $products = $input['products'] ?? [];
+        
+        if (empty($products)) {
+            echo json_encode(['success' => false, 'message' => 'No products provided']);
+            exit;
+        }
+
+        $sch = $this->db->query("SELECT dsr_id, dispatch_date, delivery_date FROM dispatch_schedules WHERE id = " . (int)$scheduleId)->fetch();
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found']);
+            exit;
+        }
+
+        $dsrId = $sch['dsr_id'];
+        $deliv_date = $sch['delivery_date'] ?: $sch['dispatch_date'];
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("INSERT INTO returns (dsr_id, return_date, status) VALUES (?, ?, 'pending')")
+                     ->execute([$dsrId, $deliv_date]);
+            $returnId = $this->db->lastInsertId();
+
+            foreach ($products as $p) {
+                $pid = (int)$p['id'];
+                $qty = (int)$p['qty'];
+                
+                $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, quantity - ?) WHERE dsr_id = ? AND product_id = ?")
+                         ->execute([$qty, $dsrId, $pid]);
+                         
+                $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason) VALUES (?, ?, ?, 'good')")
+                         ->execute([$returnId, $pid, $qty]);
+            }
+
+            $this->db->prepare("UPDATE dispatch_schedules SET status = 'returned' WHERE id = ?")->execute([$scheduleId]);
+            
+            $this->db->prepare("UPDATE dispatches SET status='returned', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status='in_transit'")
+                     ->execute([$dsrId, $deliv_date]);
+
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
     }
 }

@@ -187,21 +187,13 @@ $hasDeliveries = !empty($retailers);
           </div>
       </div>
       <!-- Body -->
-      <div class="flex-1 overflow-y-auto px-4 py-4 grid grid-cols-1 md:grid-cols-2 gap-3.5 pb-20 content-start">
+      <div class="flex-1 overflow-y-auto px-4 py-4 grid grid-cols-2 gap-3 pb-20 content-start">
           <?php foreach ($retailers as $idx => $r): 
               $hasDelivered = false;
               $hasPending = false;
               $hasPartial = false;
               $hasCancelled = false;
               $actionedCount = 0;
-              $retTotalValue = 0;
-              $retTotalQty = 0;
-              $retPaidAmount = 0;
-              $retProductCount = 0;
-              $totalBoxes = 0;
-              $totalRemPcs = 0;
-              $companies = [];
-
               foreach ($r['orders'] as $o) {
                   if ($o['status'] === 'in_transit') {
                       $hasPending = true;
@@ -211,36 +203,15 @@ $hasDeliveries = !empty($retailers);
                   if ($o['status'] === 'partial') $hasPartial = true;
                   if ($o['status'] === 'delivered') $hasDelivered = true;
                   if ($o['status'] === 'cancelled') $hasCancelled = true;
-
-                  $retTotalValue += (float)($o['total_amount'] ?? 0);
-                  $retPaidAmount += (float)($o['paid_amount'] ?? 0);
-                  if (!empty($o['company_name'])) {
-                      $companies[] = $o['company_name'];
-                  }
-                  if (!empty($o['products'])) {
-                      foreach ($o['products'] as $p) {
-                          $retProductCount++;
-                          $q = (int)($p['quantity'] ?? 0);
-                          $ppb = max(1, (int)($p['pieces_per_box'] ?? 1));
-                          $retTotalQty += $q;
-                          $totalBoxes += (int)floor($q / $ppb);
-                          $totalRemPcs += ($q % $ppb);
-                      }
-                  }
               }
-              $companies = array_unique($companies);
               $totalOrders = count($r['orders']);
               
-              // Format Qty Str (Box & Pcs)
-              $qtyStrParts = [];
-              if ($totalBoxes > 0) $qtyStrParts[] = $totalBoxes . ' Box';
-              if ($totalRemPcs > 0 || $totalBoxes == 0) $qtyStrParts[] = $totalRemPcs . ' Pcs';
-              $qtyStr = implode(' | ', $qtyStrParts);
-
               // Determine status badge
               if ($hasPending && $actionedCount > 0) {
+                  // Some actioned, some still pending => Incomplete (Black)
                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-800 text-white"><i class="fa-solid fa-circle-exclamation mr-1"></i>Incomplete</span>';
               } elseif ($hasPending) {
+                  // All pending
                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700"><i class="fa-regular fa-clock mr-1"></i>Pending</span>';
               } elseif ($hasDelivered && !$hasPartial && !$hasCancelled) {
                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-100 text-green-700"><i class="fa-solid fa-check mr-1"></i>Delivered</span>';
@@ -249,66 +220,25 @@ $hasDeliveries = !empty($retailers);
               } elseif ($hasPartial && !$hasDelivered && !$hasCancelled) {
                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-yellow-100 text-yellow-700"><i class="fa-solid fa-circle-half-stroke mr-1"></i>Partial</span>';
               } else {
+                  // Mixed completed statuses
                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700"><i class="fa-solid fa-shuffle mr-1"></i>Mixed</span>';
               }
           ?>
-            <div class="bg-white rounded-2xl p-3.5 shadow-sm active:scale-[0.98] transition cursor-pointer border border-gray-150 hover:border-blue-300 flex flex-col justify-between" onclick="handleRetailerListClick(<?= $idx ?>)">
-                <div>
-                    <!-- Top row: Status & Companies + Orders count -->
-                    <div class="flex items-center justify-between gap-1 mb-2">
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <?= $statusBadge ?>
-                            <?php if (!empty($companies)): ?>
-                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                                    <?= h(implode(', ', $companies)) ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        <?php if (count($r['orders']) > 1): ?>
-                            <span class="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 shrink-0">
-                                <?= count($r['orders']) ?> Orders
-                            </span>
-                        <?php endif; ?>
-                    </div>
-
-                    <!-- Retailer Name & Business Name -->
-                    <div class="text-sm font-black text-gray-800 leading-snug line-clamp-1 mb-0.5">
-                        <?= h($r['retailer_name'] ?? $r['dealer_name'] ?? 'Unknown Retailer') ?>
-                    </div>
-                    <?php if (!empty($r['dealer_business_name']) && $r['dealer_business_name'] !== ($r['retailer_name'] ?? '')): ?>
-                        <div class="text-[11px] font-semibold text-gray-500 line-clamp-1 mb-1">
-                            <i class="fa-solid fa-store text-[10px] mr-1 text-gray-400"></i><?= h($r['dealer_business_name']) ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <!-- Address -->
-                    <div class="text-[11px] text-gray-400 line-clamp-1 leading-tight mb-3">
-                        <i class="fa-solid fa-location-dot mr-1 text-red-400"></i><?= h($r['address'] ?? 'No Address') ?>
-                    </div>
+            <div class="bg-white rounded-2xl p-3 shadow-sm active:scale-[0.98] transition cursor-pointer border border-gray-100 flex flex-col h-full" onclick="handleRetailerListClick(<?= $idx ?>)">
+                <div class="mb-2">
+                    <?= $statusBadge ?>
                 </div>
-
-                <!-- Bottom stats bar -->
-                <div class="pt-2 border-t border-gray-100 flex items-end justify-between text-xs">
-                    <div>
-                        <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total Value</div>
-                        <div class="font-black text-gray-900">৳<?= number_format($retTotalValue, 0) ?></div>
-                    </div>
-
-                    <div class="text-center">
-                        <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Products</div>
-                        <div class="font-extrabold text-blue-600"><?= $qtyStr ?></div>
-                    </div>
-
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <?php if ($hasPartial): ?>
-                            <div class="text-right">
-                                <div class="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Paid</div>
-                                <div class="font-black text-amber-600">৳<?= number_format($retPaidAmount, 0) ?></div>
-                            </div>
-                        <?php endif; ?>
-                        <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                            <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
-                        </div>
+                <div class="text-sm font-black text-gray-800 leading-tight mb-1 line-clamp-2"><?= h($r['retailer_name'] ?? $r['dealer_name'] ?? 'Unknown Retailer') ?></div>
+                <div class="text-[10px] text-gray-400 line-clamp-2 mb-auto leading-tight"><i class="fa-solid fa-location-dot mr-1 text-gray-300"></i><?= h($r['address'] ?? 'No Address') ?></div>
+                
+                <div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-50">
+                    <?php if (count($r['orders']) > 1): ?>
+                        <div class="text-[9px] font-bold text-brand bg-blue-50 px-1.5 py-0.5 rounded"><?= count($r['orders']) ?> Orders</div>
+                    <?php else: ?>
+                        <div></div>
+                    <?php endif; ?>
+                    <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
                     </div>
                 </div>
             </div>
@@ -1336,21 +1266,7 @@ function openRetailerSheet(retailer) {
                                 <div class="flex items-center gap-2 mt-1 flex-wrap">
                                     <div class="text-xs font-black text-pink-500" id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</div>
                                     <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
-                                    ${(() => {
-                                        const vPcs = parseInt(vanStockMap[p.product_id] || 0);
-                                        if (!vPcs) return `<span class="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-md">Van: 0</span>`;
-                                        
-                                        if (ppb <= 1) {
-                                            return `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Van: ${vPcs} Pcs</span>`;
-                                        }
-                                        
-                                        const vBoxes = Math.floor(vPcs / ppb);
-                                        const vRemPcs = vPcs % ppb;
-                                        let parts = [];
-                                        if (vBoxes > 0) parts.push(`${vBoxes} Box`);
-                                        if (vRemPcs > 0 || vBoxes === 0) parts.push(`${vRemPcs} Pcs`);
-                                        return `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Van: ${parts.join(' | ')}</span>`;
-                                    })()}
+                                    ${vanStockMap[p.product_id] ? `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Van: ${vanStockMap[p.product_id]}pcs</span>` : `<span class="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-md">Van: 0</span>`}
                                 </div>
                             </div>
                         </div>

@@ -2,5 +2,5 @@
 require 'app/Config/config.php';
 require 'app/Core/Database.php';
 $db = Database::getInstance();
-$cols = $db->query('DESCRIBE return_items')->fetchAll(PDO::FETCH_ASSOC);
-print_r($cols);
+$res = $db->query("SHOW CREATE TABLE returns")->fetch();
+print_r($res);

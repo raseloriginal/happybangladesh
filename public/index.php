@@ -164,6 +164,8 @@ $router->get( '/manager/api/dispatch/sr-details/{id}',       ['ManagerController
 $router->get( '/manager/api/dispatch/organize-data/{id}',    ['ManagerController', 'apiDispatchOrganizeData']);
 $router->post('/manager/api/dispatch/organize-save/{id}',    ['ManagerController', 'apiDispatchOrganizeSave']);
 $router->post('/manager/api/dispatch/status-update/{id}',    ['ManagerController', 'apiDispatchStatusUpdate']);
+$router->get('/manager/api/dispatch/van-stock/{dsrId}',      ['ManagerController', 'apiDispatchVanStock']);
+$router->post('/manager/api/dispatch/return-save/{scheduleId}',   ['ManagerController', 'apiDispatchReturnSave']);
 $router->post('/manager/api/dispatch/update-dsr',            ['ManagerController', 'apiDispatchUpdateDsr']);
 $router->get( '/manager/settlements',               ['ManagerController', 'settlements']);
 $router->post('/manager/api/settlements/update/{id}',['ManagerController', 'apiSettlementUpdate']);

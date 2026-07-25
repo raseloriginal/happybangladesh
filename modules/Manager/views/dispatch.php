@@ -219,7 +219,7 @@ function renderSchedules() {
     } else if (sch.status === 'organized') {
       actionBtn = `<button onclick="updateStatus(${sch.id}, 'dispatched')" class="text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded text-sm font-medium border border-emerald-200"><i class="fa-solid fa-truck-fast mr-1"></i> Dispatch</button>`;
     } else if (sch.status === 'dispatched') {
-      actionBtn = `<button onclick="updateStatus(${sch.id}, 'returned')" class="text-gray-600 hover:bg-gray-50 px-2 py-1 rounded text-sm font-medium border border-gray-200"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>`;
+      actionBtn = `<button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-600 hover:bg-gray-50 px-2 py-1 rounded text-sm font-medium border border-gray-200"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>`;
     }
 
     const tr = document.createElement('tr');
@@ -856,4 +856,97 @@ async function saveWireAssignments() {
 
 // Initialization
 document.addEventListener('DOMContentLoaded', loadSchedules);
+</script>
+<div id="return-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      <h3 class="font-bold text-gray-800 text-lg flex items-center gap-2"><i class="fa-solid fa-rotate-left text-gray-500"></i> Process Returns</h3>
+      <button onclick="window.closeReturnModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="p-6 overflow-y-auto">
+      <input type="hidden" id="return-schedule-id">
+      <div id="return-modal-content"></div>
+    </div>
+    <div class="p-5 border-t border-gray-100 flex justify-end gap-3 bg-white">
+      <button onclick="window.closeReturnModal()" class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
+      <button onclick="window.submitReturn()" class="px-5 py-2 rounded-lg bg-gray-800 text-white font-medium hover:bg-gray-900 transition flex items-center gap-2">
+        <i class="fa-solid fa-check"></i> Confirm Returns
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+window.openReturnModal = async function(scheduleId, dsrId, date) {
+  try {
+    document.getElementById('return-schedule-id').value = scheduleId;
+    const content = document.getElementById('return-modal-content');
+    content.innerHTML = '<div class="text-center py-6 text-gray-500"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br>Loading van stock...</div>';
+    document.getElementById('return-modal').classList.remove('hidden');
+
+    const res = await fetch(`<?= url("manager/api/dispatch/van-stock/") ?>${dsrId}?date=${date}`);
+    const data = await res.json();
+    if(data.success) {
+      let html = `<p class="mb-4 text-sm text-gray-600">The following quantities are currently in the van stock for this DSR on ${date}. Confirm to process as returns.</p>`;
+      if(data.stock.length === 0) {
+         html += `<div class="bg-amber-50 text-amber-800 p-3 rounded text-sm"><i class="fa-solid fa-info-circle mr-1"></i> No van stock found to return.</div>`;
+      } else {
+         html += `<table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider">
+                <th class="p-2 border-b">Product</th>
+                <th class="p-2 border-b text-right w-24">Return Qty</th>
+              </tr>
+            </thead>
+            <tbody>`;
+         data.stock.forEach(item => {
+           html += `<tr>
+             <td class="p-2 border-b text-sm font-medium text-gray-800">${item.product_name}</td>
+             <td class="p-2 border-b text-right">
+               <input type="number" min="0" max="${item.qty}" class="return-qty-input w-full text-right border-gray-300 rounded text-sm py-1" data-pid="${item.product_id}" value="${item.qty}">
+             </td>
+           </tr>`;
+         });
+         html += `</tbody></table>`;
+      }
+      content.innerHTML = html;
+    } else {
+      content.innerHTML = `<div class="text-red-500 p-4">${data.message || 'Error loading stock'}</div>`;
+    }
+  } catch(e) {
+    document.getElementById('return-modal-content').innerHTML = '<div class="text-red-500 p-4">Network error loading van stock.</div>';
+  }
+};
+
+window.closeReturnModal = function() {
+  document.getElementById('return-modal').classList.add('hidden');
+};
+
+window.submitReturn = async function() {
+  const scheduleId = document.getElementById('return-schedule-id').value;
+  const inputs = document.querySelectorAll('.return-qty-input');
+  let products = [];
+  inputs.forEach(inp => {
+    let q = parseInt(inp.value) || 0;
+    if(q > 0) {
+      products.push({ id: inp.dataset.pid, qty: q });
+    }
+  });
+
+  try {
+    const res = await fetch(`<?= url("manager/api/dispatch/return-save/") ?>${scheduleId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.closeReturnModal();
+      if(typeof loadSchedules === 'function') loadSchedules();
+    } else {
+      alert(data.message || 'Error processing returns');
+    }
+  } catch(e) {
+    alert('Network error processing returns');
+  }
+};
 </script>

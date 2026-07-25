@@ -138,8 +138,10 @@
   <div class="sr-popup-content-v2">
     <!-- Retailer Profile Card -->
     <div class="sr-popup-profile-card-v2">
-      <div class="sr-popup-profile-avatar-v2">
-        <img id="retPopupAvatar" src="" alt="Avatar" onerror="this.src='https://i.pravatar.cc/100?img=12'">
+      <div class="relative shrink-0">
+        <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-400 text-lg">
+          <i class="fa-solid fa-user"></i>
+        </div>
       </div>
       <div class="sr-popup-profile-info-v2">
         <div class="sr-popup-profile-name-v2" id="retPopupName">—</div>
@@ -487,9 +489,7 @@ function openProductsForRetailer() {
   document.getElementById('retPopupName').textContent  = currentRetailer.name;
   document.getElementById('retPopupShopName').textContent = currentRetailer.name;
   
-  // Set profile avatar with a stable index based on retailer ID
-  const avatarId = (currentRetailer.id % 70) + 1;
-  document.getElementById('retPopupAvatar').src = `https://i.pravatar.cc/100?img=${avatarId}`;
+  // Avatar removed
 
   // Dynamically render categories from ALL_PRODUCTS
   const categories = [...new Set(ALL_PRODUCTS.map(p => p.category_name).filter(Boolean))];
@@ -839,7 +839,8 @@ function confirmRetailerCart() {
         console.error('Audio error:', err);
       }
       
-      // Update map pins (so yellow cart indicator is removed)
+      if (currentRetailer) currentRetailer.has_order_today = true;
+      // Update map pins (so yellow cart indicator is removed and it's marked as ordered)
       updateAllPins();
     } else {
       showMiniToast('❌ ' + (d.message || 'Failed to place order'), true);
@@ -899,15 +900,15 @@ function showMiniToast(msg, isError = false) {
   document.getElementById('productSheetOverlay').addEventListener('click', () => closeSheet('productSheet','productSheetOverlay'));
 
   document.getElementById('successHomeBtn').addEventListener('click', () => {
-    document.getElementById('successOverlay').classList.remove('open');
-    document.getElementById('retailerPopup').classList.remove('open');
-    document.body.style.overflow = '';
-    // If on retailers page, might want to just reload or something, but closing is fine.
+    location.reload();
   });
   
   document.getElementById('successStoreBtn').addEventListener('click', () => {
     document.getElementById('successOverlay').classList.remove('open');
     renderProductsGrid();
     updatePopupCartInfo();
+    // Also remove the popup so we can see the map with updated pin colors
+    document.getElementById('retailerPopup').classList.remove('open');
+    document.body.style.overflow = '';
   });
 </script>

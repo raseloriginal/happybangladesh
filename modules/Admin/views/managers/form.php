@@ -71,6 +71,11 @@ $formUrl   = $isEdit ? url("admin/{$roleSlug}s/update/".$item['id']) : url("admi
             <?php endforeach; ?>
           </select>
         </div>
+        <div class="form-group">
+          <label class="form-label" for="target_amount">Monthly Target Amount (৳)</label>
+          <input type="number" step="0.01" min="0" id="target_amount" name="target_amount" class="form-input"
+                 value="<?= h($item['target_amount'] ?? '0') ?>" placeholder="e.g. 500000">
+        </div>
         <?php endif; ?>
 
         <?php if ($isEdit): ?>
