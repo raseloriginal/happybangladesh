@@ -544,125 +544,195 @@ class AdminController extends Controller
     // ══════════════════════════════════════════════════════════
     public function databaseSync(): void
     {
-        $schemaPath = ROOT_PATH . '/database/migrations/schema.sql';
-        $schemaContent = file_exists($schemaPath) ? file_get_contents($schemaPath) : '';
+        // Ensure database_migrations table exists
+        $this->ensureMigrationsTable();
 
-        $parsedTables = $this->parseSchemaSql();
-        
-        $dbTables = $this->db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
-        
-        $missingTables = [];
-        $missingColumns = [];
-        $proposedSqls = [];
-
-        foreach ($parsedTables as $tableName => $tableData) {
-            if (!in_array($tableName, $dbTables)) {
-                $missingTables[] = $tableName;
-                $proposedSqls[] = $tableData['full_sql'];
-            } else {
-                try {
-                    $dbCols = $this->db->query("SHOW COLUMNS FROM `{$tableName}`")->fetchAll(PDO::FETCH_ASSOC);
-                    $dbColNames = array_column($dbCols, 'Field');
-                    
-                    foreach ($tableData['columns'] as $colName => $colDefLine) {
-                        if (!in_array($colName, $dbColNames)) {
-                            $missingColumns[$tableName][] = $colName;
-                            // Clean definition line (remove trailing commas if any)
-                            $cleanDef = rtrim(trim($colDefLine), ',');
-                            $proposedSqls[] = "ALTER TABLE `{$tableName}` ADD COLUMN {$cleanDef};";
-                        }
-                    }
-
-                    // Check for missing constraints
-                    $createTableSql = $this->db->query("SHOW CREATE TABLE `{$tableName}`")->fetch(PDO::FETCH_ASSOC)['Create Table'];
-                    if (!empty($tableData['constraints'])) {
-                        foreach ($tableData['constraints'] as $constraintLine) {
-                            $cleanConstraint = rtrim(trim($constraintLine), ',');
-                            $constraintMissing = false;
-                            
-                            // Check for named constraints
-                            if (preg_match('/CONSTRAINT\s+`([^`]+)`/i', $cleanConstraint, $matches)) {
-                                $constraintName = $matches[1];
-                                if (stripos($createTableSql, "CONSTRAINT `$constraintName`") === false) {
-                                    $constraintMissing = true;
-                                }
-                            } 
-                            // Check for foreign keys without explicit names
-                            else if (preg_match('/FOREIGN KEY\s*\(`([^`]+)`\)/i', $cleanConstraint, $matches)) {
-                                $keyName = $matches[1];
-                                if (stripos($createTableSql, "FOREIGN KEY (`$keyName`)") === false) {
-                                    $constraintMissing = true;
-                                }
-                            }
-                            
-                            if ($constraintMissing) {
-                                $proposedSqls[] = "ALTER TABLE `{$tableName}` ADD {$cleanConstraint};";
-                            }
-                        }
-                    }
-                } catch (PDOException $e) {
-                    // Ignore table errors if table not queryable
-                }
-            }
+        $updatesDir = ROOT_PATH . '/database/updates';
+        if (!is_dir($updatesDir)) {
+            mkdir($updatesDir, 0755, true);
         }
 
-        $proposedSql = implode("\n\n", $proposedSqls);
+        // Scan all .sql files in database/updates
+        $sqlFiles = glob($updatesDir . '/*.sql');
+        sort($sqlFiles);
+
+        // Fetch execution records from database_migrations
+        $executedStmt = $this->db->query("SELECT * FROM database_migrations");
+        $executedRows = $executedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $migrationMap = [];
+        foreach ($executedRows as $row) {
+            $migrationMap[$row['migration_file']] = $row;
+        }
+
+        $filesList = [];
+        $pendingCount = 0;
+        $syncedCount = 0;
+        $failedCount = 0;
+
+        foreach ($sqlFiles as $filePath) {
+            $filename = basename($filePath);
+            $record = $migrationMap[$filename] ?? null;
+
+            $status = $record ? $record['status'] : 'pending';
+            $executedAt = $record ? $record['executed_at'] : null;
+            $errorMessage = $record ? $record['error_message'] : null;
+
+            if ($status === 'success') {
+                $syncedCount++;
+            } elseif ($status === 'failed') {
+                $failedCount++;
+            } else {
+                $pendingCount++;
+            }
+
+            $filesList[] = [
+                'filename'      => $filename,
+                'path'          => $filePath,
+                'size'          => filesize($filePath),
+                'status'        => $status, // 'success', 'failed', or 'pending'
+                'executed_at'   => $executedAt,
+                'error_message' => $errorMessage,
+            ];
+        }
 
         $pageTitle = 'Database Sync';
-        $this->render('database_sync', compact('schemaContent', 'missingTables', 'missingColumns', 'proposedSql', 'pageTitle'));
+        $this->render('database_sync', compact(
+            'filesList', 
+            'pendingCount', 
+            'syncedCount', 
+            'failedCount', 
+            'pageTitle'
+        ));
     }
 
     public function databaseSyncRun(): void
     {
         $this->verifyCsrf();
-        $syncType = $this->post('sync_type');
+        $this->ensureMigrationsTable();
 
-        try {
-            // Disable foreign key checks to prevent errors when adding constraints on tables with invalid data
-            $this->db->exec("SET FOREIGN_KEY_CHECKS = 0;");
-            
-            if ($syncType === 'schema') {
-                $sql = $this->post('proposed_sql', '');
-                if (empty(trim($sql))) {
-                    $this->flash('warning', 'No schema updates were needed.');
-                    $this->redirect('admin/database-sync');
-                    return;
+        $targetFile = $this->post('file', ''); // specific file or 'all'
+        $updatesDir = ROOT_PATH . '/database/updates';
+
+        if (!is_dir($updatesDir)) {
+            $this->flash('error', 'Updates directory not found.');
+            $this->redirect('admin/database-sync');
+            return;
+        }
+
+        // Fetch already executed successful migrations
+        $syncedFiles = $this->db->query("SELECT migration_file FROM database_migrations WHERE status = 'success'")
+                                ->fetchAll(PDO::FETCH_COLUMN);
+
+        $sqlFiles = glob($updatesDir . '/*.sql');
+        sort($sqlFiles);
+
+        $filesToRun = [];
+        foreach ($sqlFiles as $filePath) {
+            $filename = basename($filePath);
+            if (!in_array($filename, $syncedFiles)) {
+                if ($targetFile === 'all' || $targetFile === $filename) {
+                    $filesToRun[] = [
+                        'filename' => $filename,
+                        'path'     => $filePath
+                    ];
                 }
-                
-                // PDO exec doesn't always support multi-queries in a single call depending on driver settings.
-                // We should split queries by semicolon and execute them one by one.
-                $queries = array_filter(array_map('trim', explode(';', $sql)));
-                foreach ($queries as $query) {
-                    if (!empty($query)) {
-                        $this->db->exec($query);
-                    }
-                }
-                
-                $this->flash('success', 'Database schema synced successfully.');
-            } else if ($syncType === 'custom') {
-                $sql = $this->post('custom_sql', '');
-                if (!empty(trim($sql))) {
-                    $queries = array_filter(array_map('trim', explode(';', $sql)));
-                    foreach ($queries as $query) {
-                        if (!empty($query)) {
-                            $this->db->exec($query);
-                        }
-                    }
-                    $this->flash('success', 'Custom SQL executed successfully.');
-                }
-            }
-        } catch (PDOException $e) {
-            $this->flash('error', 'Execution failed: ' . $e->getMessage());
-        } finally {
-            // Restore foreign key checks
-            try {
-                $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
-            } catch (PDOException $e) {
-                // Ignore errors here
             }
         }
 
+        if (empty($filesToRun)) {
+            $this->flash('warning', 'No pending migrations found to execute.');
+            $this->redirect('admin/database-sync');
+            return;
+        }
+
+        $successCount = 0;
+        $failedFile = null;
+        $errorDetails = null;
+
+        foreach ($filesToRun as $fileInfo) {
+            $filename = $fileInfo['filename'];
+            $filePath = $fileInfo['path'];
+            $sqlContent = file_get_contents($filePath);
+
+            try {
+                $this->db->beginTransaction();
+                $this->db->exec("SET FOREIGN_KEY_CHECKS = 0;");
+
+                // Parse queries by semicolon safely
+                $queries = array_filter(array_map('trim', explode(';', $sqlContent)));
+                foreach ($queries as $query) {
+                    // Ignore empty lines or comments-only blocks
+                    $cleanQuery = preg_replace('/--.*$/m', '', $query);
+                    $cleanQuery = preg_replace('/\/\*.*?\*\//s', '', $cleanQuery);
+                    if (!empty(trim($cleanQuery))) {
+                        $this->db->exec($query);
+                    }
+                }
+
+                $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
+
+                // Record successful execution
+                $stmt = $this->db->prepare("
+                    INSERT INTO database_migrations (migration_file, status, error_message, executed_at) 
+                    VALUES (?, 'success', NULL, NOW()) 
+                    ON DUPLICATE KEY UPDATE status = 'success', error_message = NULL, executed_at = NOW()
+                ");
+                $stmt->execute([$filename]);
+
+                if ($this->db->inTransaction()) {
+                    $this->db->commit();
+                }
+                $successCount++;
+            } catch (\Throwable $e) {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+                
+                try {
+                    $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
+                } catch (\Throwable $ex) {}
+
+                $failedFile = $filename;
+                $errorDetails = $e->getMessage();
+
+                // Record failure
+                $stmt = $this->db->prepare("
+                    INSERT INTO database_migrations (migration_file, status, error_message, executed_at) 
+                    VALUES (?, 'failed', ?, NOW()) 
+                    ON DUPLICATE KEY UPDATE status = 'failed', error_message = ?, executed_at = NOW()
+                ");
+                $stmt->execute([$filename, $errorDetails, $errorDetails]);
+
+                // Stop immediately on failure
+                break;
+            }
+        }
+
+        if ($failedFile !== null) {
+            $msg = "Migration stopped! Failed on file '{$failedFile}': {$errorDetails}";
+            if ($successCount > 0) {
+                $msg = "Successfully applied {$successCount} migration(s), but stopped on '{$failedFile}': {$errorDetails}";
+            }
+            $this->flash('error', $msg);
+        } else {
+            $this->flash('success', "Successfully synced {$successCount} database update(s).");
+        }
+
         $this->redirect('admin/database-sync');
+    }
+
+    private function ensureMigrationsTable(): void
+    {
+        $sql = "CREATE TABLE IF NOT EXISTS `database_migrations` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `migration_file` VARCHAR(255) NOT NULL UNIQUE,
+            `status` ENUM('success', 'failed') NOT NULL DEFAULT 'success',
+            `error_message` TEXT NULL,
+            `executed_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
+        $this->db->exec($sql);
     }
 
     public function databaseClear(): void
