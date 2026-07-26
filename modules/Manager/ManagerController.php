@@ -761,7 +761,19 @@ class ManagerController extends Controller
                     JOIN dispatches d ON d.id = di.dispatch_id
                     LEFT JOIN orders o ON o.id = d.order_id
                     WHERE (o.sr_id = u.id OR (d.order_id IS NULL AND d.dsr_id = {$schedule['dsr_id']})) AND d.dispatch_date = '{$delivery_date}') as sale_value,
-                   0 as damage_value
+                    (
+                        SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                        FROM returns r
+                        JOIN return_items ri ON ri.return_id = r.id
+                        JOIN products p ON p.id = ri.product_id
+                        WHERE r.dsr_id = {$schedule['dsr_id']} AND r.return_date = '{$delivery_date}' AND r.reason = 'Damage'
+                        AND EXISTS (
+                            SELECT 1 FROM orders o_dmg 
+                            WHERE o_dmg.retailer_id = r.retailer_id 
+                            AND DATE(o_dmg.created_at) = '{$schedule['dispatch_date']}'
+                            AND o_dmg.sr_id = u.id
+                        )
+                    ) as damage_value
             FROM dispatch_schedule_srs dss
             JOIN users u ON u.id = dss.sr_id
             WHERE dss.schedule_id = " . (int)$id . "
