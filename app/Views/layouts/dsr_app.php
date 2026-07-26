@@ -23,7 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- DSR App CSS -->
-  <link rel="stylesheet" href="<?= asset('css/dsr_app.css') ?>">
+  <link rel="stylesheet" href="<?= asset('css/dsr_app.css') ?>?v=<?= time() ?>">
 
   <?= $extraHead ?? '' ?>
 </head>
@@ -71,15 +71,31 @@
       </a>
 
       <!-- Settlement Tab -->
+      <?php 
+        $dsr_can_settle = true;
+        if (class_exists('Database') && class_exists('Auth') && Auth::check()) {
+            $db = Database::getInstance();
+            $q = $db->prepare("SELECT COUNT(*) FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=CURDATE() OR (delivery_date IS NULL AND dispatch_date=CURDATE())) AND status != 'returned'");
+            $q->execute([Auth::id()]);
+            $dsr_can_settle = ($q->fetchColumn() == 0);
+        }
+      ?>
+      <?php if ($dsr_can_settle): ?>
       <a href="<?= url('dsr/settlement') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/settlement') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
         <i class="fa-solid fa-file-invoice-dollar text-base mb-0.5"></i>
         <span>হিসাব মিলাও</span>
       </a>
+      <?php else: ?>
+      <div onclick="alert('ডেলিভারি স্ট্যাটাস রিটার্ন হওয়ার পর হিসাব মিলাতে পারবেন।')" class="flex flex-col items-center text-slate-400 hover:text-slate-500 opacity-60 cursor-pointer font-medium text-[10px]">
+        <i class="fa-solid fa-file-invoice-dollar text-base mb-0.5"></i>
+        <span>হিসাব মিলাও</span>
+      </div>
+      <?php endif; ?>
 
-      <!-- Profile Tab -->
-      <a href="<?= url('dsr/profile') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/profile') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
-        <i class="fa-solid fa-user text-base mb-0.5"></i>
-        <span>প্রোফাইল</span>
+      <!-- Expense Tab -->
+      <a href="<?= url('dsr/expenses') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/expenses') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
+        <i class="fa-solid fa-receipt text-base mb-0.5"></i>
+        <span>দৈনিক খরচ</span>
       </a>
 
     </div>

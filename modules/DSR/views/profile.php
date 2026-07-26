@@ -99,6 +99,7 @@
     </a>
 
     <!-- Settlement -->
+    <?php if (!empty($can_settle)): ?>
     <a href="<?= url('dsr/settlement') ?>" class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition group">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm border border-emerald-200/60">
@@ -111,6 +112,20 @@
       </div>
       <i class="fa-solid fa-chevron-right text-xs text-slate-300 group-hover:text-slate-500 transition"></i>
     </a>
+    <?php else: ?>
+    <div onclick="alert('ডেলিভারি স্ট্যাটাস রিটার্ন হওয়ার পর হিসাব মিলাতে পারবেন।')" class="flex items-center justify-between p-3 rounded-xl bg-slate-50 opacity-60 cursor-not-allowed">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gray-200 text-gray-500 flex items-center justify-center text-sm border border-gray-300">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">হিসাব মিলাও (সেটেলমেন্ট)</div>
+          <div class="text-[10px] text-slate-400 font-medium">ক্যাশ হ্যান্ডওভার হিসাব</div>
+        </div>
+      </div>
+      <i class="fa-solid fa-lock text-xs text-slate-300"></i>
+    </div>
+    <?php endif; ?>
   </div>
 
   <!-- 4. Log Out -->

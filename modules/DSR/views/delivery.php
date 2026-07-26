@@ -543,6 +543,13 @@ let currentPartialDueRetailer = null;
 let currentPartialDueOrders = [];
 
 function handleRetailerClick(ret, shouldWarn) {
+    // If the retailer has a pending order (in_transit), bypass modals and open directly to it
+    const pendingIndex = ret.orders.findIndex(o => o.status === 'in_transit');
+    if (pendingIndex !== -1) {
+        openRetailerSheet(ret, pendingIndex);
+        return;
+    }
+
     const partialOrders = ret.orders.filter(o => o.status === 'partial');
     if (partialOrders.length > 0) {
         showPartialDuePopup(ret, partialOrders);
@@ -1201,9 +1208,9 @@ function locateMe() {
 let currentRetailerObj = null;
 let currentOrderIndex = 0;
 
-function openRetailerSheet(retailer) {
+function openRetailerSheet(retailer, defaultIndex = 0) {
     currentRetailerObj = retailer;
-    currentOrderIndex = 0;
+    currentOrderIndex = defaultIndex;
     
     // Set Name & Subtitle & Avatar
     document.getElementById('bsRetailerName').innerText = retailer.retailer_name || retailer.dealer_name || retailer.name;
@@ -1302,7 +1309,7 @@ function openRetailerSheet(retailer) {
             list.insertAdjacentHTML('beforeend', orderHtml);
         });
         
-        selectCompanyOrder(0); // Load first order by default
+        selectCompanyOrder(currentOrderIndex); // Load default order
     }
 
     document.getElementById('bottomSheetOverlay').classList.add('active');
@@ -1378,7 +1385,7 @@ function selectCompanyOrder(orderIndex) {
             
             const due = actualTotal - paid;
             document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(0);
-            document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(0);
+            document.getElementById('bsDueAmount').innerText = '৳' + due.toFixed(0);
         } else {
             bsPartialInfo.classList.add('hidden');
         }
@@ -1405,7 +1412,8 @@ function selectCompanyOrder(orderIndex) {
             actionContainer.innerHTML = '';
         } else if (order.status === 'partial') {
             actionContainer.innerHTML = `
-                <button onclick="markDelivery('delivered')" class="w-full py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
+                <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
+                <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
             `;
         } else {
             actionContainer.innerHTML = `
@@ -1519,7 +1527,7 @@ function calcProgress(el, idx) {
             const paid = parseFloat(order.paid_amount || 0);
             let due = gettingTotal - paid;
             const bsDueAmount = document.getElementById('bsDueAmount');
-            if (bsDueAmount) bsDueAmount.innerText = '৳' + (due > 0 ? due : 0).toFixed(0);
+            if (bsDueAmount) bsDueAmount.innerText = '৳' + due.toFixed(0);
         }
     }
 }
@@ -1575,7 +1583,7 @@ function openPaidPaymentModal() {
     }
     const remainingDue = totalPayable - existingPaid;
     
-    document.getElementById('paidPaymentInput').value = (remainingDue > 0 ? remainingDue : 0).toFixed(0);
+    document.getElementById('paidPaymentInput').value = remainingDue.toFixed(0);
     
     if (existingPaid > 0) {
         document.getElementById('paymentDueInfo').innerHTML = `Already Paid: ৳${existingPaid.toFixed(0)} | Remaining: ৳${remainingDue.toFixed(0)}`;
@@ -1610,16 +1618,19 @@ function onPaidPaymentInput(el) {
     const maxPayable = total - existingPaid;
     
     if (entered > maxPayable) {
-        entered = maxPayable > 0 ? maxPayable : 0;
+        entered = maxPayable;
         el.value = entered.toFixed(0);
     }
     
     const due = maxPayable - entered;
     
     const info = document.getElementById('paymentDueInfo');
-    if (due > 0) {
-        info.innerText = `Due: ৳${due.toFixed(0)} (Will set as Partial)`;
+    if (Math.round(due) > 0) {
+        info.innerText = `Due: ৳${Math.round(due)} (Will set as Partial)`;
         info.className = 'text-sm font-bold text-red-500 mb-4 h-5';
+    } else if (Math.round(due) < 0) {
+        info.innerText = `Overpaid by: ৳${Math.abs(Math.round(due))} (Please adjust)`;
+        info.className = 'text-sm font-bold text-orange-500 mb-4 h-5';
     } else {
         info.innerText = 'Paid in Full';
         info.className = 'text-sm font-semibold text-green-500 mb-4 h-5';
@@ -1639,7 +1650,7 @@ function submitPaidPayment() {
     const cumulativePaid = existingPaid + entered;
     
     let status = 'delivered';
-    if (cumulativePaid < total) {
+    if (Math.round(cumulativePaid) < Math.round(total)) {
         status = 'partial';
     }
     

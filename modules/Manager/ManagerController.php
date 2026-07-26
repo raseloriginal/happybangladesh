@@ -573,19 +573,42 @@ class ManagerController extends Controller
                 WHERE dss.schedule_id = $sid
             ")->fetchColumn();
             
-            $sch['total_dispatch_value'] = (float)$orderVal;
+            $sch['total_order_value'] = (float)$orderVal;
+
+            $dispatchVal = $this->db->query("
+                SELECT COALESCE(SUM(di.quantity * p.price), 0)
+                FROM dispatch_items di
+                JOIN products p ON p.id = di.product_id
+                JOIN dispatches d ON d.id = di.dispatch_id
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+            ")->fetchColumn();
+            
+            $sch['total_dispatch_value'] = (float)$dispatchVal;
             $sch['total_return_value'] = (float)$this->db->query("
                 SELECT COALESCE(SUM(ri.quantity * p.price), 0)
                 FROM returns r
                 JOIN return_items ri ON ri.return_id = r.id
                 JOIN products p ON p.id = ri.product_id
-                WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}'
+                WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND (r.reason != 'Damage' OR r.reason IS NULL)
             ")->fetchColumn();
+            
             $sch['total_damage_value'] = (float)$this->db->query("
-                SELECT COALESCE(total_damage, 0)
-                FROM settlements
-                WHERE dsr_id = {$sch['dsr_id']} AND date = '{$delivery_date}'
+                SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                FROM returns r
+                JOIN return_items ri ON ri.return_id = r.id
+                JOIN products p ON p.id = ri.product_id
+                WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND r.reason = 'Damage'
             ")->fetchColumn();
+            
+            $saleVal = $this->db->query("
+                SELECT COALESCE(SUM(di.delivered_quantity * p.price), 0)
+                FROM dispatch_items di
+                JOIN products p ON p.id = di.product_id
+                JOIN dispatches d ON d.id = di.dispatch_id
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+            ")->fetchColumn();
+            
+            $sch['total_sale_value'] = (float)$saleVal;
         }
 
         echo json_encode($schedules);
@@ -725,13 +748,19 @@ class ManagerController extends Controller
                     JOIN dispatches d ON d.id = di.dispatch_id
                     LEFT JOIN orders o ON o.id = d.order_id
                     WHERE (o.sr_id = u.id OR (d.order_id IS NULL AND d.dsr_id = {$schedule['dsr_id']})) AND d.dispatch_date = '{$delivery_date}') as dispatch_items_value,
-                   (
-                       SELECT COALESCE(SUM(ri.quantity * p.price), 0)
-                       FROM returns r
-                       JOIN return_items ri ON ri.return_id = r.id
-                       JOIN products p ON p.id = ri.product_id
-                       WHERE r.dsr_id = {$schedule['dsr_id']} AND r.return_date = '{$delivery_date}'
-                   ) as return_items_value,
+                    (
+                        SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                        FROM returns r
+                        JOIN return_items ri ON ri.return_id = r.id
+                        JOIN products p ON p.id = ri.product_id
+                        WHERE r.dsr_id = {$schedule['dsr_id']} AND r.return_date = '{$delivery_date}' AND (r.reason != 'Damage' OR r.reason IS NULL)
+                    ) as return_items_value,
+                   (SELECT COALESCE(SUM(di.delivered_quantity * p.price), 0)
+                    FROM dispatch_items di
+                    JOIN products p ON p.id = di.product_id
+                    JOIN dispatches d ON d.id = di.dispatch_id
+                    LEFT JOIN orders o ON o.id = d.order_id
+                    WHERE (o.sr_id = u.id OR (d.order_id IS NULL AND d.dsr_id = {$schedule['dsr_id']})) AND d.dispatch_date = '{$delivery_date}') as sale_value,
                    0 as damage_value
             FROM dispatch_schedule_srs dss
             JOIN users u ON u.id = dss.sr_id
@@ -761,11 +790,11 @@ class ManagerController extends Controller
                            SELECT COALESCE(SUM(ri.quantity), 0)
                            FROM returns r
                            JOIN return_items ri ON ri.return_id = r.id
-                           WHERE r.dsr_id = {$schedule['dsr_id']} AND r.return_date = '{$delivery_date}' AND ri.product_id = p.id
+                           WHERE r.dsr_id = {$schedule['dsr_id']} AND r.return_date = '{$delivery_date}' AND ri.product_id = p.id AND (r.reason != 'Damage' OR r.reason IS NULL)
                        ) as returned_qty,
                        0 as damage_value,
                        (
-                           SELECT COALESCE(SUM(di2.quantity * p.price), 0)
+                           SELECT COALESCE(SUM(di2.delivered_quantity * p.price), 0)
                            FROM dispatch_items di2
                            JOIN dispatches d2 ON d2.id = di2.dispatch_id
                            LEFT JOIN orders o2 ON o2.id = d2.order_id

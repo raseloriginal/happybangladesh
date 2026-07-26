@@ -70,9 +70,11 @@
         <tr class="bg-gray-50 border-b border-gray-100">
           <th class="p-4 font-medium text-gray-500">Dates (Order & Delivery)</th>
           <th class="p-4 font-medium text-gray-500">DSR</th>
+          <th class="p-4 font-medium text-gray-500">Order Value</th>
           <th class="p-4 font-medium text-gray-500">Dispatch Value</th>
           <th class="p-4 font-medium text-gray-500">Return Value</th>
           <th class="p-4 font-medium text-gray-500">Damage Value</th>
+          <th class="p-4 font-medium text-gray-500">Sale Value</th>
           <th class="p-4 font-medium text-gray-500">Status</th>
           <th class="p-4 font-medium text-gray-500 text-right">Action</th>
         </tr>
@@ -207,7 +209,7 @@ function renderSchedules() {
   tbody.innerHTML = '';
   
   if (schedules.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-400">No dispatches found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-gray-400">No dispatches found.</td></tr>`;
     return;
   }
   
@@ -240,9 +242,11 @@ function renderSchedules() {
           </button>
         </div>
       </td>
-      <td class="p-4 text-sm font-medium">৳ ${parseFloat(sch.total_dispatch_value).toLocaleString()}</td>
-      <td class="p-4 text-sm text-red-600">৳ ${parseFloat(sch.total_return_value).toLocaleString()}</td>
-      <td class="p-4 text-sm text-orange-500">৳ ${parseFloat(sch.total_damage_value).toLocaleString()}</td>
+      <td class="p-4 text-sm font-medium text-blue-600">৳ ${parseFloat(sch.total_order_value).toLocaleString()}</td>
+      <td class="p-4 text-sm font-medium">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_dispatch_value).toLocaleString() : '-'}</td>
+      <td class="p-4 text-sm text-red-600">${(sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_return_value).toLocaleString() : '-'}</td>
+      <td class="p-4 text-sm text-orange-500">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_damage_value).toLocaleString() : '-'}</td>
+      <td class="p-4 text-sm font-medium text-emerald-600">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_sale_value).toLocaleString() : '-'}</td>
       <td class="p-4"><span class="status-badge status-${sch.status}">${sch.status.toUpperCase()}</span></td>
       <td class="p-4 text-right">
         <div class="flex items-center justify-end gap-2">
@@ -259,7 +263,7 @@ function renderSchedules() {
     const expTr = document.createElement('tr');
     expTr.id = `exp-sch-${sch.id}`;
     expTr.className = 'expand-row';
-    expTr.innerHTML = `<td colspan="7" class="p-0 border-b border-gray-200"><div id="sr-container-${sch.id}" class="p-4 bg-gray-50/80 shadow-inner">Loading...</div></td>`;
+    expTr.innerHTML = `<td colspan="9" class="p-0 border-b border-gray-200"><div id="sr-container-${sch.id}" class="p-4 bg-gray-50/80 shadow-inner">Loading...</div></td>`;
     tbody.appendChild(expTr);
   });
 }
@@ -279,6 +283,9 @@ async function toggleSrRow(schId) {
   
   const container = document.getElementById(`sr-container-${schId}`);
   
+  const sch = schedules.find(s => s.id == schId);
+  const showValues = sch && (sch.status === 'dispatched' || sch.status === 'returned');
+  
   // Fetch SR details
   const res = await fetch(`<?= url("manager/api/dispatch/sr-details/") ?>${schId}`);
   const srs = await res.json();
@@ -291,7 +298,7 @@ async function toggleSrRow(schId) {
   let html = `<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
     <table class="w-full text-left sub-table">
       <thead><tr>
-        <th>SR Name</th><th>Orders Value</th><th>Dispatch Items</th><th>Return Items</th><th>Damage</th><th class="text-right">Action</th>
+        <th>SR Name</th><th>Orders Value</th><th>Dispatch Items</th><th>Return Items</th><th>Damage</th><th>Sale Value</th><th class="text-right">Action</th>
       </tr></thead>
       <tbody>`;
       
@@ -299,16 +306,17 @@ async function toggleSrRow(schId) {
     html += `<tr>
       <td class="font-medium text-gray-700">${sr.name}</td>
       <td class="text-blue-600 font-medium">৳ ${parseFloat(sr.orders_value).toLocaleString()}</td>
-      <td>৳ ${parseFloat(sr.dispatch_items_value).toLocaleString()}</td>
-      <td class="text-red-500">৳ ${parseFloat(sr.return_items_value).toLocaleString()}</td>
-      <td class="text-orange-500">৳ ${parseFloat(sr.damage_value).toLocaleString()}</td>
+      <td>${showValues ? '৳ ' + parseFloat(sr.dispatch_items_value).toLocaleString() : '-'}</td>
+      <td class="text-red-500">${sch.status === 'returned' ? '৳ ' + parseFloat(sr.return_items_value).toLocaleString() : '-'}</td>
+      <td class="text-orange-500">${showValues ? '৳ ' + parseFloat(sr.damage_value).toLocaleString() : '-'}</td>
+      <td class="text-emerald-600 font-medium">${showValues ? '৳ ' + parseFloat(sr.sale_value).toLocaleString() : '-'}</td>
       <td class="text-right">
         <button onclick="toggleProductRow(${schId}, ${sr.id})" class="text-xs text-gray-500 hover:text-brand px-2 py-1 bg-gray-100 rounded">
           <i class="fa-solid fa-list mr-1"></i> Products
         </button>
       </td>
     </tr>
-    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-slate-50"><td colspan="6" class="p-0 border-b border-gray-200">
+    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-slate-50"><td colspan="7" class="p-0 border-b border-gray-200">
       <div id="prod-container-${schId}-${sr.id}" class="p-3"></div>
     </td></tr>`;
     
@@ -327,6 +335,9 @@ function toggleProductRow(schId, srId) {
     const container = document.getElementById(`prod-container-${schId}-${srId}`);
     const products = window[`prod_data_${schId}_${srId}`] || [];
     
+    const sch = schedules.find(s => s.id == schId);
+    const showValues = sch && (sch.status === 'dispatched' || sch.status === 'returned');
+    
     if (products.length === 0) {
       container.innerHTML = '<div class="text-xs text-gray-400">No products found.</div>';
       return;
@@ -342,8 +353,8 @@ function toggleProductRow(schId, srId) {
       html += `<tr class="border-t border-gray-50 hover:bg-gray-50">
         <td class="p-2 font-medium">${p.name}</td>
         <td class="p-2">${p.ordered_qty}</td>
-        <td class="p-2">${p.dispatched_qty}</td>
-        <td class="p-2 text-red-500">${p.returned_qty}</td>
+        <td class="p-2">${showValues ? p.dispatched_qty : '-'}</td>
+        <td class="p-2 text-red-500">${sch.status === 'returned' ? p.returned_qty : '-'}</td>
         <td class="p-2 font-medium text-emerald-600">৳ ${parseFloat(p.sale_value).toLocaleString()}</td>
       </tr>`;
     });

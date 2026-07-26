@@ -141,6 +141,12 @@ class DSRController extends Controller
         $q = $this->db->prepare("SELECT COUNT(*) FROM settlements WHERE dsr_id=? AND status='pending'"); $q->execute([$dsrId]);
         $stats['pending_settlement'] = $q->fetchColumn();
 
+        // Check if settlement is allowed (no unreturned dispatches for today)
+        $q = $this->db->prepare("SELECT COUNT(*) FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=CURDATE() OR (delivery_date IS NULL AND dispatch_date=CURDATE())) AND status != 'returned'");
+        $q->execute([$dsrId]);
+        $unreturned_dispatches = $q->fetchColumn();
+        $stats['can_settle'] = ($unreturned_dispatches == 0);
+
         // Today Delivery Rate %
         $totToday = (int)$stats['todays_deliveries'];
         $compToday = (int)$stats['completed_deliveries'];
@@ -700,7 +706,13 @@ class DSRController extends Controller
         $user->execute([Auth::id()]);
         $user = $user->fetch();
 
-        $this->render('profile', compact('user'), 'dsr_app');
+        // Check if settlement is allowed
+        $q = $this->db->prepare("SELECT COUNT(*) FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=CURDATE() OR (delivery_date IS NULL AND dispatch_date=CURDATE())) AND status != 'returned'");
+        $q->execute([Auth::id()]);
+        $unreturned_dispatches = $q->fetchColumn();
+        $can_settle = ($unreturned_dispatches == 0);
+
+        $this->render('profile', compact('user', 'can_settle'), 'dsr_app');
     }
     public function apiStoreRetailer(): void
     {

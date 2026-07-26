@@ -81,3 +81,19 @@
         padding-bottom: env(safe-area-inset-bottom) !important;
     }
 }
+
+#retailerSheet {
+    max-height: 100vh !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+}
+#retailerSheet .bottom-sheet-handle {
+    display: none !important;
+}
+#retailerSheet .bottom-sheet-content {
+    padding-top: 20px !important;
+    height: 100% !important;
+}
+#bsProductsList {
+    max-height: 65vh !important;
+}

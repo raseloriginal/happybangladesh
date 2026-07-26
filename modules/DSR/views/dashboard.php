@@ -144,6 +144,7 @@
       </a>
 
       <!-- Settlement -->
+      <?php if (!empty($stats['can_settle'])): ?>
       <a href="<?= url('dsr/settlement') ?>" class="p-3 bg-slate-50 hover:bg-emerald-50/70 border border-slate-200/60 rounded-xl flex flex-col items-center gap-1.5 transition active:scale-95 relative">
         <?php if (!empty($stats['pending_settlement'])): ?>
           <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping"></span>
@@ -153,6 +154,14 @@
         </div>
         <span class="text-[11px] font-bold text-slate-800">হিসাব মিলাও</span>
       </a>
+      <?php else: ?>
+      <div onclick="alert('ডেলিভারি স্ট্যাটাস রিটার্ন হওয়ার পর হিসাব মিলাতে পারবেন।')" class="p-3 bg-slate-100 border border-slate-200/60 rounded-xl flex flex-col items-center gap-1.5 opacity-60 cursor-not-allowed">
+        <div class="w-10 h-10 rounded-xl bg-gray-200 text-gray-500 flex items-center justify-center text-base">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+        </div>
+        <span class="text-[11px] font-bold text-slate-500">হিসাব মিলাও</span>
+      </div>
+      <?php endif; ?>
 
     </div>
   </div>
