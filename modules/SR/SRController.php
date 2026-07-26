@@ -763,4 +763,76 @@ class SRController extends Controller
             'donutData', 'period', 'dateFrom', 'dateTo', 'customFrom', 'customTo'
         ));
     }
+
+    // ── Transactions Page ──────────────────────────────────────
+    public function transactions(): void
+    {
+        $srId = Auth::id();
+        $date = trim($_GET['date'] ?? date('Y-m-d')); // Selected date, defaults to today
+
+        // 1. Fetch Ordered Products
+        $qOrders = $this->db->prepare("
+            SELECT p.id as product_id, p.name as product_name, MAX(oi.unit_price) as ordered_price, SUM(oi.quantity) as ordered_qty
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            JOIN products p ON p.id = oi.product_id
+            WHERE o.sr_id = ? AND DATE(o.created_at) = ?
+            GROUP BY p.id, p.name
+        ");
+        $qOrders->execute([$srId, $date]);
+        $ordersData = $qOrders->fetchAll(PDO::FETCH_ASSOC);
+
+        // 2. Fetch Dispatched and Sell Products
+        $qDispatch = $this->db->prepare("
+            SELECT di.product_id, 
+                   SUM(CASE WHEN d.status != 'pending' THEN di.quantity ELSE 0 END) as dispatched_qty, 
+                   SUM(CASE WHEN d.status != 'pending' THEN di.delivered_quantity ELSE 0 END) as sell_qty
+            FROM dispatch_items di
+            JOIN dispatches d ON d.id = di.dispatch_id
+            LEFT JOIN orders o ON o.id = d.order_id
+            WHERE (o.sr_id = ? AND DATE(o.created_at) = ?)
+               OR (d.order_id IS NULL AND d.dispatch_date = ? AND d.dsr_id IN (
+                   SELECT DISTINCT d2.dsr_id 
+                   FROM dispatches d2 
+                   JOIN orders o2 ON o2.id = d2.order_id 
+                   WHERE o2.sr_id = ? AND DATE(o2.created_at) = ?
+               ))
+            GROUP BY di.product_id
+        ");
+        $qDispatch->execute([$srId, $date, $date, $srId, $date]);
+        $dispatchData = $qDispatch->fetchAll(PDO::FETCH_ASSOC);
+        // Process Data
+        $dispatchMap = [];
+        foreach ($dispatchData as $row) {
+            $dispatchMap[$row['product_id']] = $row;
+        }
+
+        $transactions = [];
+        foreach ($ordersData as $row) {
+            $pid = $row['product_id'];
+            $orderedQty = (int)$row['ordered_qty'];
+            $orderedPrice = (float)$row['ordered_price'];
+            
+            $dispatchedQty = (int)($dispatchMap[$pid]['dispatched_qty'] ?? 0);
+            $sellQty = (int)($dispatchMap[$pid]['sell_qty'] ?? 0);
+            
+            // Return quantity is whatever was dispatched but not sold
+            $returnQty = max(0, $dispatchedQty - $sellQty);
+
+            $transactions[] = [
+                'product_name' => $row['product_name'],
+                'ordered_price' => $orderedPrice,
+                'ordered_qty' => $orderedQty,
+                'ordered_val' => $orderedQty * $orderedPrice,
+                'dispatched_qty' => $dispatchedQty,
+                'dispatched_val' => $dispatchedQty * $orderedPrice,
+                'sell_qty' => $sellQty,
+                'sell_val' => $sellQty * $orderedPrice,
+                'return_qty' => $returnQty,
+                'return_val' => $returnQty * $orderedPrice,
+            ];
+        }
+
+        $this->renderApp('transactions', compact('transactions', 'date'));
+    }
 }

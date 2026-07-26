@@ -1,6 +1,0 @@
-<?php
-require 'app/Config/config.php';
-require 'app/Core/Database.php';
-$db = Database::getInstance();
-$cols = $db->query('DESCRIBE return_items')->fetchAll(PDO::FETCH_ASSOC);
-print_r($cols);

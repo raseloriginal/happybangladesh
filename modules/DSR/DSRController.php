@@ -523,9 +523,6 @@ class DSRController extends Controller
                 $newDelivered = $item['quantity'];
                 if (isset($deliveredItems[$item['product_id']])) {
                     $newDelivered = (int) $deliveredItems[$item['product_id']];
-                    if ($newDelivered > $item['quantity']) {
-                        $newDelivered = $item['quantity'];
-                    }
                 }
             }
             
@@ -620,7 +617,7 @@ class DSRController extends Controller
         $q = $this->db->prepare("
             SELECT 
                 COALESCE(SUM(di.quantity * p.price), 0) as dispatched_value,
-                COALESCE(SUM((di.quantity - COALESCE(di.delivered_quantity, di.quantity)) * p.price), 0) as spot_return_value
+                COALESCE(SUM((di.quantity - COALESCE(di.delivered_quantity, 0)) * p.price), 0) as spot_return_value
             FROM dispatch_items di
             JOIN dispatches d ON d.id=di.dispatch_id
             JOIN products p ON p.id=di.product_id

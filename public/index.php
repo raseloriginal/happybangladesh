@@ -176,6 +176,7 @@ $router->post('/manager/readysale/store',     ['ManagerController', 'readysaleSt
 
 // ── SR routes ─────────────────────────────────────────────────
 $router->get( '/sr/dashboard',                ['SRController', 'dashboard']);
+$router->get( '/sr/transactions',             ['SRController', 'transactions']);
 $router->get( '/sr/orders',                   ['SRController', 'orders']);
 $router->get( '/sr/orders/place',             ['SRController', 'placeOrder']);
 $router->post('/sr/orders/store',             ['SRController', 'storeOrder']);

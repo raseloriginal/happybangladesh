@@ -85,30 +85,38 @@
   <div class="space-y-2.5">
     <div class="text-xs font-extrabold text-slate-400 tracking-wider uppercase px-1">সেলস মেনু</div>
     
-    <div class="grid grid-cols-3 gap-2.5">
+    <div class="grid grid-cols-4 gap-2.5">
       
       <!-- Action 1: Shops -->
-      <a href="<?= url('sr/retailers') ?>" class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center space-y-1.5 hover:border-blue-500 hover:shadow-md transition active:scale-95">
+      <a href="<?= url('sr/retailers') ?>" class="bg-white p-2 sm:p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center space-y-1.5 hover:border-blue-500 hover:shadow-md transition active:scale-95">
         <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base">
           <i class="fa-solid fa-store"></i>
         </div>
-        <span class="text-xs font-bold text-slate-800">Shops</span>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">Shops</span>
       </a>
 
       <!-- Action 2: Map -->
-      <a href="<?= url('sr/sales') ?>" class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center space-y-1.5 hover:border-emerald-500 hover:shadow-md transition active:scale-95">
+      <a href="<?= url('sr/sales') ?>" class="bg-white p-2 sm:p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center space-y-1.5 hover:border-emerald-500 hover:shadow-md transition active:scale-95">
         <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-base">
           <i class="fa-solid fa-map-location-dot"></i>
         </div>
-        <span class="text-xs font-bold text-slate-800">Map</span>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">Map</span>
       </a>
 
       <!-- Action 3: Orders -->
-      <a href="<?= url('sr/orders') ?>" class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center space-y-1.5 hover:border-amber-500 hover:shadow-md transition active:scale-95">
+      <a href="<?= url('sr/orders') ?>" class="bg-white p-2 sm:p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center space-y-1.5 hover:border-amber-500 hover:shadow-md transition active:scale-95">
         <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-base">
           <i class="fa-solid fa-file-invoice"></i>
         </div>
-        <span class="text-xs font-bold text-slate-800">Orders</span>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">Orders</span>
+      </a>
+
+      <!-- Action 4: Transactions -->
+      <a href="<?= url('sr/transactions') ?>" class="bg-white p-2 sm:p-3 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center space-y-1.5 hover:border-purple-500 hover:shadow-md transition active:scale-95">
+        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-base">
+          <i class="fa-solid fa-money-bill-transfer"></i>
+        </div>
+        <span class="text-[11px] sm:text-xs font-bold text-slate-800">Trans.</span>
       </a>
 
     </div>
