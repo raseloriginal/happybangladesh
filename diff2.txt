@@ -1,0 +1,833 @@
+﻿diff --git a/modules/DSR/views/delivery.php b/modules/DSR/views/delivery.php
+index ab56341..04e0b79 100644
+--- a/modules/DSR/views/delivery.php
++++ b/modules/DSR/views/delivery.php
+@@ -83,86 +83,115 @@ $hasDeliveries = !empty($retailers);
+   <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+        BOTTOM SHEET ΓÇö Retailer Delivery Detail
+   ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+-  <div id="retailerSheet" class="bottom-sheet pb-[env(safe-area-inset-bottom)]">
+-    <div class="bottom-sheet-handle"></div>
+-    <div class="bottom-sheet-content no-scrollbar">
+-
+-      <!-- Sheet Header -->
+-      <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+-        <button onclick="closeBottomSheet()" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800">
+-          <i class="fa-solid fa-chevron-left text-lg"></i>
+-        </button>
+-        <span class="text-base font-black text-gray-800">Order Details</span>
+-        <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800">
+-          <i class="fa-solid fa-list-ul text-lg"></i>
+-        </button>
++  <div id="retailerSheet" class="bottom-sheet pb-[env(safe-area-inset-bottom)] overflow-hidden rounded-t-[28px] !max-h-[92vh]">
++    <div class="bottom-sheet-handle !my-2"></div>
++
++    <!-- Dark Header Bar (Navy #0f172a) -->
++    <div class="bg-[#0f172a] text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0">
++      <button onclick="closeBottomSheet()" class="w-9 h-9 rounded-full bg-[#1e293b] hover:bg-[#334155] flex items-center justify-center text-white active:scale-95 transition">
++        <i class="fa-solid fa-chevron-left text-sm"></i>
++      </button>
++      <div class="text-center flex-1">
++        <h2 class="text-base font-extrabold text-white leading-tight">Order Details</h2>
++        <p class="text-[11px] text-slate-400 font-medium">Delivery Panel</p>
+       </div>
++      <button onclick="openDamageModal()" class="w-9 h-9 rounded-full bg-[#1e293b] hover:bg-[#334155] flex items-center justify-center text-white text-sm font-black active:scale-95 transition" title="Report Damage / Extra">
++        αº│
++      </button>
++    </div>
++
++    <div class="bottom-sheet-content !p-0 no-scrollbar flex-1 flex flex-col min-h-0 bg-white">
+ 
+-      <!-- Retailer Info -->
+-      <div class="flex items-center justify-between mb-4">
++      <!-- Store Info Bar -->
++      <div class="p-4 bg-white flex items-center justify-between border-b border-slate-100 shrink-0">
+         <div class="flex items-center gap-3">
+-          <img id="bsRetailerAvatar" src="" class="w-12 h-12 rounded-full object-cover border border-gray-100 shadow-sm" onerror="this.src='https://i.pravatar.cc/100?img=12'">
++          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-black text-xl shadow-md shadow-orange-500/20 shrink-0 relative overflow-hidden">
++            <span id="bsStoreInitial">αª╕αºìαª¼</span>
++            <img id="bsRetailerAvatar" src="" class="absolute inset-0 w-full h-full object-cover hidden" onerror="this.classList.add('hidden');">
++          </div>
+           <div>
+-            <h2 class="text-base font-black text-gray-800 leading-tight" id="bsRetailerName">Retailer Name</h2>
+-            <p class="text-xs text-gray-400 font-bold mt-0.5" id="bsRetailerSub">Address details</p>
++            <div class="flex items-center gap-2">
++              <h3 class="text-base font-black text-slate-900 leading-tight" id="bsRetailerName">Retailer Name</h3>
++              <span id="bsStatus" class="px-2 py-0.5 rounded-md text-[10px] font-bold border border-current hidden">Pending</span>
++            </div>
++            <div class="flex items-center gap-2 mt-1 flex-wrap">
++              <span class="text-xs text-slate-500 font-medium" id="bsRetailerSub">Address</span>
++              <span class="text-[10px] text-slate-300 font-bold">ΓÇó</span>
++              <span class="bg-slate-100 text-slate-700 text-xs font-bold px-2.5 py-0.5 rounded-full border border-slate-200" id="bsItemBadge">0 Items</span>
++            </div>
+           </div>
+         </div>
+-        <!-- Action Buttons on Right -->
+-        <div class="flex gap-2">
+-          <a href="#" class="w-8 h-8 bg-green-50 text-green-500 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition">
+-            <i class="fa-solid fa-circle-plus text-lg"></i>
+-          </a>
+-          <button onclick="openDamageModal()" id="damageBtn" class="w-8 h-8 bg-red-50 text-red-400 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition" title="Report Damage">
+-            <i class="fa-solid fa-ban text-sm"></i>
+-          </button>
+-        </div>
+       </div>
+ 
+-      <!-- Stats / Summary -->
+-      <div class="flex justify-between items-center mb-4">
+-        <div class="text-sm font-bold text-gray-800 flex items-center gap-1">
+-          αªàαª░αºìαªíαª╛αª░ αª╕αª«αºéαª╣ <span class="text-emerald-500 font-black text-base ml-1" id="bsTotalQty">50</span>
+-          <span id="bsStatus" class="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold border border-current">Pending</span>
+-        </div>
+-        <div class="flex flex-col items-end gap-1">
+-            <div class="text-[10px] text-gray-400 font-bold uppercase">Ordered: <span id="bsOrderTotal" class="text-gray-500 line-through">Tk 0.00</span></div>
+-            <div class="border border-blue-400 text-blue-600 bg-blue-50/30 font-black px-3 py-1 rounded-full text-xs shadow-sm flex items-center gap-1">
+-              <span>Payable:</span>
+-              <span id="bsGettingTotal">αº│0.00</span>
+-            </div>
++      <!-- 2 Metric Cards Grid (ORDERED, PAYABLE) -->
++      <div class="px-4 py-3 bg-white shrink-0">
++        <div class="grid grid-cols-2 gap-3">
++          <!-- ORDERED -->
++          <div class="bg-slate-100/80 border border-slate-200/80 rounded-2xl p-3 text-center">
++            <div class="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">ORDERED</div>
++            <div class="text-base font-black text-slate-800" id="bsOrderTotal">αº│0</div>
++          </div>
++          <!-- PAYABLE -->
++          <div class="bg-[#047857] rounded-2xl p-3 text-center shadow-md shadow-emerald-700/20">
++            <div class="text-[10px] font-black text-emerald-200 uppercase tracking-wider mb-1">PAYABLE</div>
++            <div class="text-base font-black text-white" id="bsGettingTotal">αº│0</div>
++          </div>
+         </div>
+       </div>
+ 
+-      <!-- Partial Info -->
+-      <div id="bsPartialInfo" class="hidden mb-4 bg-orange-50 border border-orange-100 rounded-lg p-3 flex justify-between items-center text-xs shadow-sm">
+-          <div class="text-orange-700 font-bold">Partial Status</div>
+-          <div class="flex gap-4">
+-              <div>Paid: <span id="bsPaidAmount" class="font-black text-green-600">αº│0.00</span></div>
+-              <div>Due: <span id="bsDueAmount" class="font-black text-red-500">αº│0.00</span></div>
++      <!-- Partial Info (shown if order is partial) -->
++      <div id="bsPartialInfo" class="hidden mx-4 mb-3 bg-orange-50 border border-orange-200 rounded-2xl p-3 shadow-sm shrink-0">
++        <div class="flex items-center justify-between mb-2">
++          <div class="text-orange-700 font-black text-xs flex items-center gap-1"><i class="fa-solid fa-circle-half-stroke"></i> Partial / Due</div>
++          <div class="text-[10px] font-bold text-orange-500 bg-orange-100 px-2 py-0.5 rounded-full">Payable: <span id="bsPayableAmount" class="font-black">αº│0</span></div>
++        </div>
++        <div class="flex gap-3 text-xs">
++          <div class="flex-1 bg-green-50 border border-green-100 rounded-xl px-3 py-2 text-center">
++            <div class="text-[10px] font-bold text-gray-400 uppercase">Paid</div>
++            <div class="font-black text-green-600" id="bsPaidAmount">αº│0</div>
+           </div>
++          <div class="flex-1 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-center">
++            <div class="text-[10px] font-bold text-gray-400 uppercase">Due</div>
++            <div class="font-black text-red-500" id="bsDueAmount">αº│0</div>
++          </div>
++        </div>
+       </div>
+ 
+-      <!-- Hidden elements to preserve JS bindings -->
++      <!-- Hidden binding elements -->
+       <div class="hidden">
+         <div id="bsRetailerAddress"></div>
++        <span id="bsTotalQty">0</span>
++      </div>
++
++      <!-- SR / Company Tabs Container -->
++      <div id="bsCompanyTabs" class="px-4 py-2 bg-slate-100/70 border-y border-slate-200/80 flex items-center gap-2 overflow-x-auto no-scrollbar hidden shrink-0">
++        <!-- Dynamic Tabs populated by JS -->
+       </div>
+ 
+-      <!-- Company Tabs Container -->
+-      <div id="bsCompanyTabs" class="flex gap-2 mb-4 overflow-x-auto pb-1 no-scrollbar hidden">
+-          <!-- JS will populate company tabs here -->
++      <!-- Table Column Header -->
++      <div class="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider sticky top-0 z-10 shrink-0">
++        <div class="flex-1">PRODUCT DETAILS</div>
++        <div class="flex items-center gap-2.5 shrink-0">
++          <div class="w-16 sm:w-20 text-center">BOX</div>
++          <div class="w-16 sm:w-20 text-center">PCS</div>
++        </div>
+       </div>
+ 
+-      <!-- Products List -->
+-      <div class="mb-4">
+-        <div id="bsProductsList" class="space-y-3 max-h-[45vh] overflow-y-auto pr-1 no-scrollbar">
+-          <!-- JS will populate this -->
++      <!-- Products List Container -->
++      <div class="flex-1 overflow-y-auto no-scrollbar min-h-[260px]">
++        <div id="bsProductsList" class="divide-y divide-slate-100 bg-white">
++          <!-- JS populates product items -->
+         </div>
+       </div>
+ 
+-      <!-- Action Buttons -->
+-      <div class="flex gap-4 mt-4 pt-3 border-t border-gray-100" id="bsActionButtons">
+-        <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
+-        <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
++      <!-- Bottom Action Bar (Close & Green Collect Button) -->
++      <div class="p-4 bg-white border-t border-slate-100 flex items-center gap-3 sticky bottom-0 z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] shrink-0" id="bsActionButtons">
++        <button onclick="closeBottomSheet()" class="w-14 h-14 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-95 transition shrink-0">
++          <i class="fa-solid fa-xmark"></i>
++        </button>
++        <button onclick="markDelivery('delivered')" class="flex-1 h-14 bg-[#059669] hover:bg-[#047857] text-white rounded-2xl font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-[0.98] transition">
++          Collect <span id="bsCollectAmount">αº│0</span> <i class="fa-solid fa-check ml-1 text-sm"></i>
++        </button>
+       </div>
+ 
+     </div>
+@@ -187,13 +216,21 @@ $hasDeliveries = !empty($retailers);
+           </div>
+       </div>
+       <!-- Body -->
+-      <div class="flex-1 overflow-y-auto px-4 py-4 grid grid-cols-2 gap-3 pb-20 content-start">
++      <div class="flex-1 overflow-y-auto px-4 py-4 grid grid-cols-1 md:grid-cols-2 gap-3.5 pb-20 content-start">
+           <?php foreach ($retailers as $idx => $r): 
+               $hasDelivered = false;
+               $hasPending = false;
+               $hasPartial = false;
+               $hasCancelled = false;
+               $actionedCount = 0;
++              $retTotalValue = 0;
++              $retTotalQty = 0;
++              $retPaidAmount = 0;
++              $retProductCount = 0;
++              $totalBoxes = 0;
++              $totalRemPcs = 0;
++              $companies = [];
++
+               foreach ($r['orders'] as $o) {
+                   if ($o['status'] === 'in_transit') {
+                       $hasPending = true;
+@@ -203,15 +240,36 @@ $hasDeliveries = !empty($retailers);
+                   if ($o['status'] === 'partial') $hasPartial = true;
+                   if ($o['status'] === 'delivered') $hasDelivered = true;
+                   if ($o['status'] === 'cancelled') $hasCancelled = true;
++
++                  $retTotalValue += (float)($o['total_amount'] ?? 0);
++                  $retPaidAmount += (float)($o['paid_amount'] ?? 0);
++                  if (!empty($o['company_name'])) {
++                      $companies[] = $o['company_name'];
++                  }
++                  if (!empty($o['products'])) {
++                      foreach ($o['products'] as $p) {
++                          $retProductCount++;
++                          $q = (int)($p['quantity'] ?? 0);
++                          $ppb = max(1, (int)($p['pieces_per_box'] ?? 1));
++                          $retTotalQty += $q;
++                          $totalBoxes += (int)floor($q / $ppb);
++                          $totalRemPcs += ($q % $ppb);
++                      }
++                  }
+               }
++              $companies = array_unique($companies);
+               $totalOrders = count($r['orders']);
+               
++              // Format Qty Str (Box & Pcs)
++              $qtyStrParts = [];
++              if ($totalBoxes > 0) $qtyStrParts[] = $totalBoxes . ' Box';
++              if ($totalRemPcs > 0 || $totalBoxes == 0) $qtyStrParts[] = $totalRemPcs . ' Pcs';
++              $qtyStr = implode(' | ', $qtyStrParts);
++
+               // Determine status badge
+               if ($hasPending && $actionedCount > 0) {
+-                  // Some actioned, some still pending => Incomplete (Black)
+                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-800 text-white"><i class="fa-solid fa-circle-exclamation mr-1"></i>Incomplete</span>';
+               } elseif ($hasPending) {
+-                  // All pending
+                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700"><i class="fa-regular fa-clock mr-1"></i>Pending</span>';
+               } elseif ($hasDelivered && !$hasPartial && !$hasCancelled) {
+                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-100 text-green-700"><i class="fa-solid fa-check mr-1"></i>Delivered</span>';
+@@ -220,25 +278,66 @@ $hasDeliveries = !empty($retailers);
+               } elseif ($hasPartial && !$hasDelivered && !$hasCancelled) {
+                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-yellow-100 text-yellow-700"><i class="fa-solid fa-circle-half-stroke mr-1"></i>Partial</span>';
+               } else {
+-                  // Mixed completed statuses
+                   $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700"><i class="fa-solid fa-shuffle mr-1"></i>Mixed</span>';
+               }
+           ?>
+-            <div class="bg-white rounded-2xl p-3 shadow-sm active:scale-[0.98] transition cursor-pointer border border-gray-100 flex flex-col h-full" onclick="handleRetailerListClick(<?= $idx ?>)">
+-                <div class="mb-2">
+-                    <?= $statusBadge ?>
+-                </div>
+-                <div class="text-sm font-black text-gray-800 leading-tight mb-1 line-clamp-2"><?= h($r['retailer_name'] ?? $r['dealer_name'] ?? 'Unknown Retailer') ?></div>
+-                <div class="text-[10px] text-gray-400 line-clamp-2 mb-auto leading-tight"><i class="fa-solid fa-location-dot mr-1 text-gray-300"></i><?= h($r['address'] ?? 'No Address') ?></div>
+-                
+-                <div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-50">
+-                    <?php if (count($r['orders']) > 1): ?>
+-                        <div class="text-[9px] font-bold text-brand bg-blue-50 px-1.5 py-0.5 rounded"><?= count($r['orders']) ?> Orders</div>
+-                    <?php else: ?>
+-                        <div></div>
++            <div class="bg-white rounded-2xl p-3.5 shadow-sm active:scale-[0.98] transition cursor-pointer border border-gray-150 hover:border-blue-300 flex flex-col justify-between" onclick="handleRetailerListClick(<?= $idx ?>)">
++                <div>
++                    <!-- Top row: Status & Companies + Orders count -->
++                    <div class="flex items-center justify-between gap-1 mb-2">
++                        <div class="flex items-center gap-1.5 flex-wrap">
++                            <?= $statusBadge ?>
++                            <?php if (!empty($companies)): ?>
++                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
++                                    <?= h(implode(', ', $companies)) ?>
++                                </span>
++                            <?php endif; ?>
++                        </div>
++                        <?php if (count($r['orders']) > 1): ?>
++                            <span class="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 shrink-0">
++                                <?= count($r['orders']) ?> Orders
++                            </span>
++                        <?php endif; ?>
++                    </div>
++
++                    <!-- Retailer Name & Business Name -->
++                    <div class="text-sm font-black text-gray-800 leading-snug line-clamp-1 mb-0.5">
++                        <?= h($r['retailer_name'] ?? $r['dealer_name'] ?? 'Unknown Retailer') ?>
++                    </div>
++                    <?php if (!empty($r['dealer_business_name']) && $r['dealer_business_name'] !== ($r['retailer_name'] ?? '')): ?>
++                        <div class="text-[11px] font-semibold text-gray-500 line-clamp-1 mb-1">
++                            <i class="fa-solid fa-store text-[10px] mr-1 text-gray-400"></i><?= h($r['dealer_business_name']) ?>
++                        </div>
+                     <?php endif; ?>
+-                    <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
+-                        <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
++
++                    <!-- Address -->
++                    <div class="text-[11px] text-gray-400 line-clamp-1 leading-tight mb-3">
++                        <i class="fa-solid fa-location-dot mr-1 text-red-400"></i><?= h($r['address'] ?? 'No Address') ?>
++                    </div>
++                </div>
++
++                <!-- Bottom stats bar -->
++                <div class="pt-2 border-t border-gray-100 flex items-end justify-between text-xs">
++                    <div>
++                        <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total Value</div>
++                        <div class="font-black text-gray-900">αº│<?= number_format($retTotalValue, 0) ?></div>
++                    </div>
++
++                    <div class="text-center">
++                        <div class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Products</div>
++                        <div class="font-extrabold text-blue-600"><?= $qtyStr ?></div>
++                    </div>
++
++                    <div class="flex items-center gap-1.5 shrink-0">
++                        <?php if ($hasPartial): ?>
++                            <div class="text-right">
++                                <div class="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Paid</div>
++                                <div class="font-black text-amber-600">αº│<?= number_format($retPaidAmount, 0) ?></div>
++                            </div>
++                        <?php endif; ?>
++                        <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
++                            <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
++                        </div>
+                     </div>
+                 </div>
+             </div>
+@@ -413,7 +512,6 @@ $hasDeliveries = !empty($retailers);
+               
+               <div class="flex flex-col gap-3">
+                   <button onclick="handleDuePaymentAction()" class="w-full py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Due Complete</button>
+-                  <button onclick="handleDueCancelAction()" class="w-full py-3 bg-red-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-red-500/20 transition">Cancel Order</button>
+                   <button onclick="handleDueDetailsAction()" class="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">View Details</button>
+               </div>
+           </div>
+@@ -1104,6 +1202,22 @@ function getRetailerPinInfo(ret) {
+     const fallbackLat = 23.8103, fallbackLng = 90.4125;
+     let firstValidLat = null, firstValidLng = null;
+ 
++    // ΓöÇΓöÇ Preprocess: Recalculate order totals based on actual delivered quantities ΓöÇΓöÇ
++    orderedRetailers.forEach(ret => {
++        if (ret.orders) {
++            ret.orders.forEach(o => {
++                let actualTotal = 0;
++                if (o.products) {
++                    o.products.forEach(p => {
++                        const qty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
++                        actualTotal += qty * parseFloat(p.price || 0);
++                    });
++                    o.total_amount = actualTotal;
++                }
++            });
++        }
++    });
++
+     // ΓöÇΓöÇ Plot only van-loaded retailers ΓöÇΓöÇ
+     orderedRetailers.forEach((ret, i) => {
+         ret.name = ret.dealer_name || ret.name || 'Retailer';
+@@ -1201,9 +1315,34 @@ function openRetailerSheet(retailer) {
+     currentOrderIndex = 0;
+     
+     // Set Name & Subtitle & Avatar
+-    document.getElementById('bsRetailerName').innerText = retailer.retailer_name || retailer.dealer_name || retailer.name;
+-    document.getElementById('bsRetailerSub').innerText = retailer.retailer_name ? retailer.dealer_name : 'Retailer';
+-    document.getElementById('bsRetailerAvatar').src = 'https://i.pravatar.cc/100?img=' + ((parseInt(retailer.dealer_id) % 70) + 1);
++    const rName = retailer.retailer_name || retailer.dealer_name || retailer.name || 'Retailer';
++    document.getElementById('bsRetailerName').innerText = rName;
++    document.getElementById('bsRetailerSub').innerText = retailer.address || retailer.dealer_name || 'Retailer';
++    
++    const storeInitialEl = document.getElementById('bsStoreInitial');
++    if (storeInitialEl) {
++        storeInitialEl.innerText = rName.charAt(0) || 'αª╕αºìαª¼';
++    }
++    
++    const avatarEl = document.getElementById('bsRetailerAvatar');
++    if (avatarEl) {
++        if (retailer.avatar || retailer.image) {
++            avatarEl.src = retailer.avatar || retailer.image;
++            avatarEl.classList.remove('hidden');
++        } else {
++            avatarEl.classList.add('hidden');
++        }
++    }
++
++    // Total Items Count
++    let totalItemsCount = 0;
++    if (retailer.orders && retailer.orders.length > 0) {
++        retailer.orders.forEach(o => {
++            if (o.products) totalItemsCount += o.products.length;
++        });
++    }
++    const itemBadgeEl = document.getElementById('bsItemBadge');
++    if (itemBadgeEl) itemBadgeEl.innerText = totalItemsCount + ' Items';
+     
+     const tabsContainer = document.getElementById('bsCompanyTabs');
+     tabsContainer.innerHTML = '';
+@@ -1217,17 +1356,17 @@ function openRetailerSheet(retailer) {
+             const isSelected = idx === 0;
+             const count = order.products ? order.products.length : 0;
+             const isCancelled = order.status === 'cancelled';
+-            let borderClass = 'border-gray-200 bg-white text-gray-500';
++            let borderClass = 'bg-white text-slate-700 border border-slate-200 font-bold';
+             if (isCancelled) {
+-                borderClass = isSelected ? 'border-red-600 bg-white text-red-600 font-bold' : 'border-red-200 bg-red-50/30 text-red-500';
++                borderClass = isSelected ? 'bg-red-600 text-white font-black border-transparent shadow-sm' : 'bg-red-50 text-red-600 border border-red-200 font-bold';
+             } else if (isSelected) {
+-                borderClass = 'border-blue-600 bg-white text-blue-600 font-bold';
++                borderClass = 'bg-[#0f172a] text-white font-black border-transparent shadow-sm';
+             }
+             
+             tabsContainer.insertAdjacentHTML('beforeend', `
+                 <button onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
+-                        class="whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border transition ${borderClass}">
+-                    ${order.company_name} <span class="text-blue-500 ml-1 font-bold">${count}</span>
++                        class="whitespace-nowrap px-4 py-2 rounded-xl text-xs transition active:scale-95 ${borderClass}">
++                    ${order.company_name || 'Order'} <span class="ml-1 opacity-80">(${count})</span>
+                 </button>
+             `);
+         });
+@@ -1238,56 +1377,63 @@ function openRetailerSheet(retailer) {
+     // Render all orders
+     if (retailer.orders && retailer.orders.length > 0) {
+         retailer.orders.forEach((order, orderIdx) => {
+-            let orderHtml = `<div id="order-group-${orderIdx}" class="order-group-container hidden space-y-3">`;
++            let orderHtml = `<div id="order-group-${orderIdx}" class="order-group-container hidden space-y-0 divide-y divide-slate-100">`;
+             if (!order.products || order.products.length === 0) {
+-                orderHtml += `<div class="text-center py-4 text-sm text-gray-400"><i class="fa-solid fa-box-open mb-2 text-xl"></i><br>No products found for this order.</div>`;
++                orderHtml += `<div class="text-center py-8 text-sm text-slate-400 font-bold"><i class="fa-solid fa-box-open mb-2 text-2xl block"></i>No products found for this order.</div>`;
+             } else {
+                 order.products.forEach((p, idx) => {
+                     const ppb = parseInt(p.pieces_per_box) || 1;
+-                    const qty = parseInt(p.quantity); // pieces dispatched on van
++                    const qty = parseInt(p.quantity); // pieces ordered
++                    const isLocked = (order.status === 'delivered' || order.status === 'cancelled');
+ 
+                     let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+ 
+                     const initialBoxes = Math.floor(initialDeliveredQty / ppb);
+                     const initialPcs = initialDeliveredQty % ppb;
+ 
++                    const vanPcs = parseInt(vanStockMap[p.product_id] || 0);
++
+                     orderHtml += `
+-                    <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
+-                        <div class="flex items-center gap-4 mb-3">
+-                            <div class="w-16 h-16 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 p-1">
++                    <div class="product-item flex items-center justify-between p-4 hover:bg-slate-50/50 transition${isLocked ? ' opacity-70' : ''}" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}" data-van-stock="${vanPcs}">
++                        <!-- Product Info (Left) -->
++                        <div class="flex-1 min-w-0 pr-3">
++                            <h4 class="text-sm sm:text-base font-black text-slate-900 leading-snug line-clamp-2">${p.name}</h4>
++                            <div class="text-sm font-extrabold text-slate-800 mt-0.5" id="itemPrice-${orderIdx}-${idx}">αº│${Math.round(parseFloat(p.price || 0) * initialDeliveredQty).toLocaleString()}</div>
++                            <div class="flex items-center gap-1.5 mt-2 flex-wrap">
++                                <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
+                                 ${(() => {
+-                                    if (!p.image) return '<i class="fa-solid fa-box text-gray-300 text-2xl"></i>';
+-                                    const src = (p.image.startsWith('http://') || p.image.startsWith('https://')) ? p.image : '<?= BASE_URL ?>/' + p.image.replace(/^\/+/, '');
+-                                    return `<img src="${src}" class="w-full h-full object-contain rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span style="display:none" class="w-full h-full items-center justify-center"><i class="fa-solid fa-box text-gray-300 text-2xl"></i></span>`;
++                                    const vPcs = parseInt(vanStockMap[p.product_id] || 0);
++                                    if (!vPcs) return `<span class="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-md border border-red-100">Van: 0</span>`;
++                                    
++                                    if (ppb <= 1) {
++                                        return `<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">Van: ${vPcs}</span>`;
++                                    }
++                                    
++                                    const vBoxes = Math.floor(vPcs / ppb);
++                                    const vRemPcs = vPcs % ppb;
++                                    let parts = [];
++                                    if (vBoxes > 0) parts.push(`${vBoxes} Box`);
++                                    if (vRemPcs > 0 || vBoxes === 0) parts.push(`${vRemPcs} Pcs`);
++                                    return `<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">Van: ${vPcs}</span>`;
+                                 })()}
+                             </div>
+-                            <div class="flex-1 min-w-0">
+-                                <div class="text-sm font-black text-gray-800 line-clamp-2 leading-snug">${p.name}</div>
+-                                <div class="flex items-center gap-2 mt-1 flex-wrap">
+-                                    <div class="text-xs font-black text-pink-500" id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</div>
+-                                    <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
+-                                    ${vanStockMap[p.product_id] ? `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Van: ${vanStockMap[p.product_id]}pcs</span>` : `<span class="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-md">Van: 0</span>`}
+-                                </div>
+-                            </div>
+                         </div>
+ 
+-                        <!-- Delivery Input Box & Pcs -->
+-                        <div class="flex gap-3 mt-3">
+-                            <!-- Box Input -->
+-                            <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
++                        <!-- BOX & PCS Input Cards (Right) -->
++                        <div class="flex items-center gap-2.5 shrink-0">
++                            <!-- BOX Input -->
++                            <div class="w-16 h-14 sm:w-20 sm:h-16 bg-white border border-slate-250 rounded-2xl flex items-center justify-center shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all ${isLocked ? 'opacity-60 bg-slate-50' : ''}">
+                                 <input type="number" min="0" value="${initialBoxes}"
+-                                    class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-box text-sm"
+-                                    data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+-                                    oninput="calcProgress(this, '${orderIdx}-${idx}')">
+-                                <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">Box</div>
++                                    class="w-full text-center text-lg sm:text-xl font-black text-slate-800 bg-transparent outline-none delivery-input-box"
++                                    data-ppb="${ppb}" data-qty="${qty}" data-van-stock="${vanPcs}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
++                                    oninput="calcProgress(this, '${orderIdx}-${idx}')" ${isLocked ? 'disabled' : ''}>
+                             </div>
+-                            <!-- Pcs Input -->
+-                            <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
++                            <!-- PCS Input -->
++                            <div class="w-16 h-14 sm:w-20 sm:h-16 bg-white border border-slate-250 rounded-2xl flex items-center justify-center shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all ${isLocked ? 'opacity-60 bg-slate-50' : ''}">
+                                 <input type="number" min="0" value="${initialPcs}"
+-                                    class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-pcs text-sm"
+-                                    data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+-                                    oninput="calcProgress(this, '${orderIdx}-${idx}')">
+-                                <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">Pcs</div>
++                                    class="w-full text-center text-lg sm:text-xl font-black text-slate-800 bg-transparent outline-none delivery-input-pcs"
++                                    data-ppb="${ppb}" data-qty="${qty}" data-van-stock="${vanPcs}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
++                                    oninput="calcProgress(this, '${orderIdx}-${idx}')" ${isLocked ? 'disabled' : ''}>
+                             </div>
+                         </div>
+                     </div>`;
+@@ -1325,27 +1471,30 @@ function selectCompanyOrder(orderIndex) {
+             const isCancelled = ord.status === 'cancelled';
+             if (idx === orderIndex) {
+                 if (isCancelled) {
+-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-red-600 bg-white text-red-600 font-bold';
++                    btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs bg-red-600 text-white font-black shadow-sm transition active:scale-95';
+                 } else {
+-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-blue-600 bg-white text-blue-600 font-bold';
++                    btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs bg-[#0f172a] text-white font-black shadow-sm transition active:scale-95';
+                 }
+             } else {
+                 if (isCancelled) {
+-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-red-200 bg-red-50/30 text-red-500';
++                    btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs bg-red-50 text-red-600 border border-red-200 font-bold transition active:scale-95';
+                 } else {
+-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white text-gray-500 active:bg-gray-50';
++                    btn.className = 'whitespace-nowrap px-4 py-2 rounded-xl text-xs bg-white text-slate-700 border border-slate-200 font-bold transition active:scale-95';
+                 }
+             }
+         });
+     }
+ 
+-    document.getElementById('bsOrderTotal').innerText = 'Tk ' + parseFloat(order.total_amount || 0).toFixed(0);
++    const origTotal = parseFloat(order.total_amount || 0);
++    const bsOrderTotal = document.getElementById('bsOrderTotal');
++    if (bsOrderTotal) bsOrderTotal.innerText = 'αº│' + Math.round(origTotal).toLocaleString();
+     
+     // Update order quantity stats
+     const totalQty = order.products ? order.products.reduce((acc, p) => acc + parseInt(p.quantity), 0) : 0;
+-    document.getElementById('bsTotalQty').innerText = totalQty;
++    const bsTotalQty = document.getElementById('bsTotalQty');
++    if (bsTotalQty) bsTotalQty.innerText = totalQty;
+ 
+-    const statusLabel = { 'in_transit': 'Pending Delivery', 'delivered': 'Delivered', 'partial': 'Partial/Due', 'cancelled': 'Cancelled' };
++    const statusLabel = { 'in_transit': 'Pending', 'delivered': 'Delivered', 'partial': 'Partial', 'cancelled': 'Cancelled' };
+     const statusColor = { 'in_transit': '#3b82f6', 'delivered': '#16a34a', 'partial': '#f97316', 'cancelled': '#dc2626' };
+     const bsStatus = document.getElementById('bsStatus');
+     if (bsStatus) {
+@@ -1359,7 +1508,6 @@ function selectCompanyOrder(orderIndex) {
+             bsPartialInfo.classList.remove('hidden');
+             const paid = parseFloat(order.paid_amount || 0);
+             
+-            // Calculate the actual total based on products' delivered quantity
+             let actualTotal = 0;
+             if (order.products) {
+                 order.products.forEach(p => {
+@@ -1368,12 +1516,13 @@ function selectCompanyOrder(orderIndex) {
+                     actualTotal += (deliveredQty * parseFloat(p.price || 0));
+                 });
+             } else {
+-                actualTotal = parseFloat(order.total_amount || 0);
++                actualTotal = origTotal;
+             }
+             
+             const due = actualTotal - paid;
+-            document.getElementById('bsPaidAmount').innerText = 'αº│' + paid.toFixed(0);
+-            document.getElementById('bsDueAmount').innerText = 'αº│' + (due > 0 ? due : 0).toFixed(0);
++            document.getElementById('bsPayableAmount').innerText = 'αº│' + Math.round(actualTotal).toLocaleString();
++            document.getElementById('bsPaidAmount').innerText = 'αº│' + Math.round(paid).toLocaleString();
++            document.getElementById('bsDueAmount').innerText = 'αº│' + Math.round(due > 0 ? due : 0).toLocaleString();
+         } else {
+             bsPartialInfo.classList.add('hidden');
+         }
+@@ -1384,26 +1533,13 @@ function selectCompanyOrder(orderIndex) {
+     const activeDiv = document.getElementById(`order-group-${orderIndex}`);
+     if (activeDiv) {
+         activeDiv.classList.remove('hidden');
+-        // Disable or enable inputs based on cancellation
++        const isLocked = (order.status === 'delivered' || order.status === 'cancelled');
+         const inputs = activeDiv.querySelectorAll('input');
+         inputs.forEach(input => {
+-            input.disabled = (order.status === 'cancelled');
++            input.disabled = isLocked;
+         });
+     }
+ 
+-    // Dynamic Action Buttons
+-    const actionContainer = document.getElementById('bsActionButtons');
+-    if (actionContainer) {
+-        if (order.status === 'cancelled') {
+-            actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-3 rounded-full font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-rotate-left"></i> Redo</button>`;
+-        } else {
+-            actionContainer.innerHTML = `
+-                <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
+-                <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
+-            `;
+-        }
+-    }
+-
+     // Trigger initial calculation for ALL items in this group
+     if (activeDiv) {
+         const productItems = activeDiv.querySelectorAll('.product-item');
+@@ -1414,7 +1550,36 @@ function selectCompanyOrder(orderIndex) {
+             }
+         });
+     } else {
+-        document.getElementById('bsGettingTotal').innerText = 'αº│0.00';
++        const bsGettingTotal = document.getElementById('bsGettingTotal');
++        if (bsGettingTotal) bsGettingTotal.innerText = 'αº│0';
++    }
++
++    // Dynamic Action Buttons
++    const actionContainer = document.getElementById('bsActionButtons');
++    if (actionContainer) {
++        if (order.status === 'cancelled') {
++            actionContainer.innerHTML = `
++                <div class="w-full text-center py-3 px-4 bg-red-50 border border-red-100 rounded-2xl text-red-500 font-bold text-sm flex items-center justify-center gap-2">
++                    <i class="fa-solid fa-ban"></i> Order Cancelled
++                </div>
++                <button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-3.5 rounded-2xl font-black bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-rotate-left"></i> Redo Order</button>`;
++        } else if (order.status === 'delivered') {
++            actionContainer.innerHTML = `
++                <div class="w-full text-center py-3.5 px-4 bg-green-50 border border-green-200 rounded-2xl text-green-600 font-black text-sm flex items-center justify-center gap-2">
++                    <i class="fa-solid fa-circle-check"></i> Order Delivered &amp; Paid
++                </div>`;
++        } else {
++            // pending or partial ΓÇö show Close & Green Collect button
++            const currentGettingTotal = getSelectedOrderGettingTotal();
++            actionContainer.innerHTML = `
++                <button onclick="closeBottomSheet()" class="w-14 h-14 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl flex items-center justify-center text-xl font-bold active:scale-95 transition shrink-0">
++                    <i class="fa-solid fa-xmark"></i>
++                </button>
++                <button onclick="markDelivery('delivered')" class="flex-1 h-14 bg-[#059669] hover:bg-[#047857] text-white rounded-2xl font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-[0.98] transition">
++                    Collect <span id="bsCollectAmount">αº│${Math.round(currentGettingTotal).toLocaleString()}</span> <i class="fa-solid fa-check ml-1 text-sm"></i>
++                </button>
++            `;
++        }
+     }
+ }
+ 
+@@ -1431,20 +1596,12 @@ function calcProgress(el, idx) {
+ 
+     let boxes = parseInt(boxInput.value) || 0;
+     let pcs   = parseInt(pcsInput.value) || 0;
+-    const ppb   = parseInt(boxInput.getAttribute('data-ppb')) || 1;
+-    const maxQty = parseInt(boxInput.getAttribute('data-qty')) || 1;
++    const ppb       = parseInt(boxInput.getAttribute('data-ppb')) || 1;
++    const ordQty    = parseInt(boxInput.getAttribute('data-qty')) || 0;      // originally ordered pieces
++    const vanStock  = parseInt(boxInput.getAttribute('data-van-stock')) || 0; // current van stock
+ 
+     let totalDelivered = (boxes * ppb) + pcs;
+ 
+-    if (totalDelivered > maxQty) {
+-        showToast("ΓÜá∩╕Å Delivered quantity cannot exceed ordered quantity (" + maxQty + " PCS)!");
+-        boxes = Math.floor(maxQty / ppb);
+-        pcs = maxQty % ppb;
+-        boxInput.value = boxes;
+-        pcsInput.value = pcs;
+-        totalDelivered = maxQty;
+-    }
+-
+     const delQtyEl = document.getElementById(`delQty-${idx}`);
+     if (delQtyEl) delQtyEl.innerText = totalDelivered;
+ 
+@@ -1454,12 +1611,12 @@ function calcProgress(el, idx) {
+     if (itemPriceEl) {
+         const unitPrice = parseFloat(parent.getAttribute('data-price')) || 0;
+         const basePrice = parseFloat(parent.getAttribute('data-baseprice')) || 0;
+-        itemPriceEl.innerText = 'Tk ' + (totalDelivered * unitPrice).toFixed(0);
++        itemPriceEl.innerText = 'αº│' + Math.round(totalDelivered * unitPrice).toLocaleString();
+         
+         if (itemOcEl) {
+             const oc = (unitPrice - basePrice) * totalDelivered;
+             if (Math.round(oc) !== 0 && totalDelivered > 0) {
+-                itemOcEl.className = `text-[10px] font-bold px-1.5 py-0.5 rounded-md ${oc > 0 ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`;
++                itemOcEl.className = `text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${oc > 0 ? 'text-emerald-700 bg-emerald-100/80 border-emerald-200/60' : 'text-red-700 bg-red-100/80 border-red-200/60'}`;
+                 itemOcEl.innerText = `${oc > 0 ? '+' : ''}${Math.round(oc)} O/C`;
+                 itemOcEl.classList.remove('hidden');
+             } else {
+@@ -1468,60 +1625,49 @@ function calcProgress(el, idx) {
+         }
+     }
+ 
+-    let percent = (totalDelivered / maxQty) * 100;
+-    if (percent > 100) percent = 100;
+-
+-    const delPercentEl = document.getElementById(`delPercent-${idx}`);
+-    if (delPercentEl) delPercentEl.innerText = Math.round(percent) + '%';
+-
+-    const bar = document.getElementById(`delBar-${idx}`);
+-    if (bar) {
+-        bar.style.width = percent + '%';
+-        if (percent >= 100) {
+-            bar.className = 'h-full transition-all duration-300 bg-green-500';
+-        } else if (percent > 0) {
+-            bar.className = 'h-full transition-all duration-300 bg-orange-400';
+-        } else {
+-            bar.className = 'h-full transition-all duration-300 bg-brand';
+-        }
+-    }
+-    
+     // Recalculate getting total for the CURRENT active order group
+     const orderGroup = el.closest('.order-group-container');
+     let gettingTotal = 0;
+-    let anyInputFilled = false;
+-    orderGroup.querySelectorAll('.product-item').forEach(pItem => {
+-        const bInp = pItem.querySelector('.delivery-input-box');
+-        const pInp = pItem.querySelector('.delivery-input-pcs');
+-        if (bInp && pInp) {
+-            const b = parseInt(bInp.value) || 0;
+-            const p = parseInt(pInp.value) || 0;
+-            if (b > 0 || p > 0) {
+-                anyInputFilled = true;
++    if (orderGroup) {
++        orderGroup.querySelectorAll('.product-item').forEach(pItem => {
++            const bInp = pItem.querySelector('.delivery-input-box');
++            const pInp = pItem.querySelector('.delivery-input-pcs');
++            if (bInp && pInp) {
++                const b = parseInt(bInp.value) || 0;
++                const p = parseInt(pInp.value) || 0;
++                const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
++                const tQty = (b * p_ppb) + p;
++                const price = parseFloat(bInp.getAttribute('data-price')) || 0;
++                gettingTotal += (tQty * price);
+             }
+-            const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
+-            const tQty = (b * p_ppb) + p;
+-            const price = parseFloat(bInp.getAttribute('data-price')) || 0;
+-            gettingTotal += (tQty * price);
+-        }
+-    });
++        });
++    }
+     
++    // Update PAYABLE Card value
+     const bsGettingTotal = document.getElementById('bsGettingTotal');
+-    if (bsGettingTotal) bsGettingTotal.innerText = 'αº│' + gettingTotal.toFixed(0);
++    if (bsGettingTotal) bsGettingTotal.innerText = 'αº│' + Math.round(gettingTotal).toLocaleString();
+ 
+-    // Update due if partial info is visible
++    // Update Collect Button Amount
++    const bsCollectAmount = document.getElementById('bsCollectAmount');
++    if (bsCollectAmount) bsCollectAmount.innerText = 'αº│' + Math.round(gettingTotal).toLocaleString();
++
++    // Update partial info box (payable + due) whenever qty changes
+     const bsPartialInfo = document.getElementById('bsPartialInfo');
+     if (bsPartialInfo && !bsPartialInfo.classList.contains('hidden') && currentRetailerObj && currentRetailerObj.orders) {
+         const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
+         if (order) {
+             const paid = parseFloat(order.paid_amount || 0);
+-            let due = gettingTotal - paid;
+-            const bsDueAmount = document.getElementById('bsDueAmount');
+-            if (bsDueAmount) bsDueAmount.innerText = 'αº│' + (due > 0 ? due : 0).toFixed(0);
++            const due  = gettingTotal - paid;
++            const payableEl = document.getElementById('bsPayableAmount');
++            const dueEl     = document.getElementById('bsDueAmount');
++            if (payableEl) payableEl.innerText = 'αº│' + Math.round(gettingTotal).toLocaleString();
++            if (dueEl)     dueEl.innerText     = 'αº│' + Math.round(due > 0 ? due : 0).toLocaleString();
+         }
+     }
+ }
+ 
++
++
+ function getSelectedOrderGettingTotal() {
+     const activeDiv = document.getElementById(`order-group-${currentOrderIndex}`);
+     if (!activeDiv) return 0;
+@@ -1675,20 +1821,8 @@ async function redoCancelledOrder(orderIndex) {
+             throw new Error(data.message || 'Error updating delivery');
+         }
+ 
+-        // Update local object
+-        order.status = 'in_transit';
+-        order.notes = '';
+-        
+         showToast('≡ƒöä Order restored to pending!');
+-        
+-        // Re-render and refresh sheet
+-        openRetailerSheet(currentRetailerObj);
+-        selectCompanyOrder(orderIndex);
+-
+-        // Redraw map pins
+-        if (typeof initMap === 'function' && map) {
+-            redrawMapPins();
+-        }
++        setTimeout(() => location.reload(), 800);
+ 
+     } catch (err) {
+         showToast('Γ¥î ' + (err.message || 'An error occurred.'));
+@@ -1797,44 +1931,7 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
+         if (status === 'partial') msg = '≡ƒö╢ Marked as Partial/Due';
+         if (status === 'cancelled') msg = 'Γ¥î Orders Cancelled';
+         showToast(msg);
+-        if (status === 'cancelled' || status === 'delivered' || status === 'partial') {
+-            orders.forEach(o => {
+-                o.status = status;
+-                o.paid_amount = paidAmounts[o.dispatch_id] || 0;
+-                o.notes = reason;
+-                
+-                const origIdx = currentRetailerObj.orders.findIndex(orig => orig.dispatch_id === o.dispatch_id);
+-                const orderGroup = document.getElementById(`order-group-${origIdx}`);
+-                if (orderGroup) {
+-                    orderGroup.querySelectorAll('.product-item').forEach(pItem => {
+-                        const bInp = pItem.querySelector('.delivery-input-box');
+-                        const pInp = pItem.querySelector('.delivery-input-pcs');
+-                        if (bInp && pInp) {
+-                            const b = parseInt(bInp.value) || 0;
+-                            const p = parseInt(pInp.value) || 0;
+-                            const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
+-                            const tQty = (b * p_ppb) + p;
+-                            const pid = bInp.getAttribute('data-pid');
+-                            
+-                            const prod = o.products.find(pr => String(pr.product_id) === String(pid));
+-                            if (prod) {
+-                                prod.delivered_quantity = tQty;
+-                            }
+-                        }
+-                    });
+-                }
+-            });
+-            if (document.getElementById('retailerSheet').classList.contains('active')) {
+-                openRetailerSheet(currentRetailerObj);
+-                selectCompanyOrder(currentOrderIndex);
+-            }
+-            
+-            if (typeof initMap === 'function') {
+-                redrawMapPins();
+-            }
+-        } else {
+-            setTimeout(() => location.reload(), 900);
+-        }
++        setTimeout(() => location.reload(), 800);
+ 
+     } catch (err) {
+         showToast('Γ¥î ' + (err.message || 'An error occurred.'));

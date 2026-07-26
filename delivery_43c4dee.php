@@ -1,4 +1,4 @@
-<?php $pageTitle = 'Delivery'; ?>
+﻿<?php $pageTitle = 'Delivery'; ?>
 
 <?php
 // Only retailers whose products are physically on the van today
@@ -8,9 +8,9 @@ $hasDeliveries = !empty($retailers);
 
 <div class="h-full flex flex-col relative bg-gray-100">
 
-  <!-- ══════════════════════════════════════════════════════
-       EMPTY STATE — No dispatches loaded on van yet
-  ═══════════════════════════════════════════════════════ -->
+  <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+       EMPTY STATE ΓÇö No dispatches loaded on van yet
+  ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
   <?php if (!$hasDeliveries): ?>
   <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white px-8 text-center">
     
@@ -38,13 +38,13 @@ $hasDeliveries = !empty($retailers);
         <i class="fa-solid fa-boxes-stacked"></i> Go to Inventory
       </a>
     <?php endif; ?>
-    <a href="<?= url('dsr/dashboard') ?>" class="mt-3 text-sm text-gray-400 font-medium">← Back to Dashboard</a>
+    <a href="<?= url('dsr/dashboard') ?>" class="mt-3 text-sm text-gray-400 font-medium">ΓåÉ Back to Dashboard</a>
   </div>
   <?php endif; ?>
 
-  <!-- ══════════════════════════════════════════════════════
-       MAP — shown only when there are deliveries
-  ═══════════════════════════════════════════════════════ -->
+  <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+       MAP ΓÇö shown only when there are deliveries
+  ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
   <div id="dsrMap" class="absolute inset-0 z-0 <?= !$hasDeliveries ? 'hidden' : '' ?>"></div>
 
   <?php if ($hasDeliveries): ?>
@@ -71,18 +71,18 @@ $hasDeliveries = !empty($retailers);
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════
-       BOTTOM — Retailer List Panel + Sheet Overlay
-  ═══════════════════════════════════════════════════════ -->
+  <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+       BOTTOM ΓÇö Retailer List Panel + Sheet Overlay
+  ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
 
   <!-- Sheet Overlay (dim background) -->
   <div id="bottomSheetOverlay" class="bottom-sheet-overlay" onclick="closeBottomSheet()"></div>
 
   <!-- No retailerListPanel, map is full screen -->
 
-  <!-- ══════════════════════════════════════════════════════
-       BOTTOM SHEET — Retailer Delivery Detail
-  ═══════════════════════════════════════════════════════ -->
+  <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+       BOTTOM SHEET ΓÇö Retailer Delivery Detail
+  ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
   <div id="retailerSheet" class="bottom-sheet pb-[env(safe-area-inset-bottom)]">
     <div class="bottom-sheet-handle"></div>
     <div class="bottom-sheet-content no-scrollbar">
@@ -121,14 +121,14 @@ $hasDeliveries = !empty($retailers);
       <!-- Stats / Summary -->
       <div class="flex justify-between items-center mb-4">
         <div class="text-sm font-bold text-gray-800 flex items-center gap-1">
-          অর্ডার সমূহ <span class="text-emerald-500 font-black text-base ml-1" id="bsTotalQty">50</span>
+          αªàαª░αºìαªíαª╛αª░ αª╕αª«αºéαª╣ <span class="text-emerald-500 font-black text-base ml-1" id="bsTotalQty">50</span>
           <span id="bsStatus" class="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold border border-current">Pending</span>
         </div>
         <div class="flex flex-col items-end gap-1">
             <div class="text-[10px] text-gray-400 font-bold uppercase">Ordered: <span id="bsOrderTotal" class="text-gray-500 line-through">Tk 0.00</span></div>
             <div class="border border-blue-400 text-blue-600 bg-blue-50/30 font-black px-3 py-1 rounded-full text-xs shadow-sm flex items-center gap-1">
               <span>Payable:</span>
-              <span id="bsGettingTotal">৳0.00</span>
+              <span id="bsGettingTotal">αº│0.00</span>
             </div>
         </div>
       </div>
@@ -137,8 +137,8 @@ $hasDeliveries = !empty($retailers);
       <div id="bsPartialInfo" class="hidden mb-4 bg-orange-50 border border-orange-100 rounded-lg p-3 flex justify-between items-center text-xs shadow-sm">
           <div class="text-orange-700 font-bold">Partial Status</div>
           <div class="flex gap-4">
-              <div>Paid: <span id="bsPaidAmount" class="font-black text-green-600">৳0.00</span></div>
-              <div>Due: <span id="bsDueAmount" class="font-black text-red-500">৳0.00</span></div>
+              <div>Paid: <span id="bsPaidAmount" class="font-black text-green-600">αº│0.00</span></div>
+              <div>Due: <span id="bsDueAmount" class="font-black text-red-500">αº│0.00</span></div>
           </div>
       </div>
 
@@ -170,9 +170,9 @@ $hasDeliveries = !empty($retailers);
 
   <?php endif; // $hasDeliveries ?>
 
-  <!-- ══════════════════════════════════════════════════════
+  <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
        CUSTOM MODALS
-  ═══════════════════════════════════════════════════════ -->
+  ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
 
   <!-- Retailer List Modal -->
   <div id="retailerListModal" class="fixed inset-0 z-[500] hidden flex flex-col bg-gray-100 transition-opacity">
@@ -305,7 +305,7 @@ $hasDeliveries = !empty($retailers);
               </div>
               
               <div class="mb-6">
-                  <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider text-left mb-1.5">Amount Paid (৳)</label>
+                  <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider text-left mb-1.5">Amount Paid (αº│)</label>
                   <input type="number" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-2xl font-black text-gray-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition">
               </div>
               
@@ -326,7 +326,7 @@ $hasDeliveries = !empty($retailers);
               </div>
               <h3 class="text-lg font-black text-gray-800 mb-2">Partial Payment</h3>
               <p class="text-sm text-gray-500 mb-4" id="promptMessage">Enter the amount the retailer has paid:</p>
-              <input type="number" id="promptInput" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-center text-lg font-bold text-gray-700 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 mb-6 transition" placeholder="৳0.00">
+              <input type="number" id="promptInput" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-center text-lg font-bold text-gray-700 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 mb-6 transition" placeholder="αº│0.00">
               <div class="flex gap-3">
                   <button id="promptCancelBtn" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
                   <button id="promptOkBtn" class="flex-1 py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/30 transition">Submit</button>
@@ -409,19 +409,20 @@ $hasDeliveries = !empty($retailers);
                   <i class="fa-solid fa-circle-exclamation"></i>
               </div>
               <h3 class="text-lg font-black text-gray-800 mb-1" id="partialDueTitle">Due Payment</h3>
-              <p class="text-sm text-gray-500 mb-6" id="partialDueMessage">Remaining Due: ৳0.00</p>
+              <p class="text-sm text-gray-500 mb-6" id="partialDueMessage">Remaining Due: αº│0.00</p>
               
               <div class="flex flex-col gap-3">
                   <button onclick="handleDuePaymentAction()" class="w-full py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Due Complete</button>
+                  <button onclick="handleDueCancelAction()" class="w-full py-3 bg-red-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-red-500/20 transition">Cancel Order</button>
                   <button onclick="handleDueDetailsAction()" class="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">View Details</button>
               </div>
           </div>
       </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════
+  <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
        DAMAGE MODAL
-  ═══════════════════════════════════════════════════════ -->
+  ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
   <div id="damageModal" class="fixed inset-0 z-[300] hidden flex items-end justify-center bg-black/50 transition-opacity">
     <div class="bg-white rounded-t-3xl w-full max-w-[480px] shadow-2xl transform transition-transform translate-y-full duration-300" id="damageModalContent">
       <!-- Handle -->
@@ -459,7 +460,7 @@ $hasDeliveries = !empty($retailers);
         <!-- Total Delivery Value (Current Tab) -->
         <div class="flex justify-between items-center mb-2">
             <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Delivered Value</div>
-            <div id="dmgDeliveredValue" class="text-sm font-black text-blue-600">৳0.00</div>
+            <div id="dmgDeliveredValue" class="text-sm font-black text-blue-600">αº│0.00</div>
         </div>
 
         <!-- Total Damage Amount -->
@@ -472,12 +473,12 @@ $hasDeliveries = !empty($retailers);
         <!-- Net Payable -->
         <div class="flex justify-between items-center mb-2">
             <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Net Payable</div>
-            <div id="dmgNetPayable" class="text-lg font-black text-gray-800">৳0.00</div>
+            <div id="dmgNetPayable" class="text-lg font-black text-gray-800">αº│0.00</div>
         </div>
 
         <!-- Receipt Amount -->
         <div class="flex justify-between items-center mb-2 mt-4 border-t border-gray-100 pt-4">
-            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Receipt Amount (৳)</div>
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Receipt Amount (αº│)</div>
         </div>
         <input type="number" id="dmgReceiptAmount" placeholder="Enter amount..."
           class="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-center text-xl font-black text-gray-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition mb-4">
@@ -490,9 +491,9 @@ $hasDeliveries = !empty($retailers);
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════
+  <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
        DAMAGE PRODUCT SELECTION MODAL
-  ═══════════════════════════════════════════════════════ -->
+  ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
   <div id="damageProductSelectModal" class="fixed inset-0 z-[400] hidden flex items-end justify-center bg-black/60 transition-opacity">
     <div class="bg-white rounded-t-3xl w-full max-w-[480px] shadow-2xl transform transition-transform translate-y-full duration-300" id="damageProductSelectContent">
       <!-- Handle -->
@@ -531,7 +532,7 @@ $hasDeliveries = !empty($retailers);
 </div><!-- /page root -->
 
 <script>
-// ── Data from PHP ────────────────────────────────────────────
+// ΓöÇΓöÇ Data from PHP ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const orderedRetailers = <?= json_encode($retailers) ?>;
 const vanStockMap = <?= json_encode($vanStockMap ?? new stdClass()) ?>;
 
@@ -561,21 +562,11 @@ function showPartialDuePopup(ret, partialOrders) {
     
     let totalDue = 0;
     partialOrders.forEach(o => {
-        let actualTotal = 0;
-        if (o.products && o.products.length > 0) {
-            o.products.forEach(p => {
-                const qty = parseInt(p.quantity);
-                let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
-                actualTotal += (deliveredQty * parseFloat(p.price || 0));
-            });
-        } else {
-            actualTotal = parseFloat(o.total_amount || 0);
-        }
-        totalDue += (actualTotal - parseFloat(o.paid_amount || 0));
+        totalDue += (parseFloat(o.total_amount) - parseFloat(o.paid_amount));
     });
     
     document.getElementById('partialDueTitle').innerText = ret.name;
-    document.getElementById('partialDueMessage').innerHTML = `This retailer has a pending due of <span class="text-amber-600 font-black">৳${totalDue.toFixed(0)}</span>.`;
+    document.getElementById('partialDueMessage').innerHTML = `This retailer has a pending due of <span class="text-amber-600 font-black">αº│${totalDue.toFixed(0)}</span>.`;
     
     const modal = document.getElementById('partialDueModal');
     const content = document.getElementById('partialDueContent');
@@ -598,7 +589,7 @@ function closePartialDueModal() {
     }, 200);
 }
 
-// ── Damage Modal ──────────────────────────────────────────────
+// ΓöÇΓöÇ Damage Modal ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 let selectedDamageProducts = [];
 let allCompanyProducts = [];
 
@@ -640,12 +631,12 @@ function calcDamageSummary() {
     dmgTotalAmountInput.value = totalDamage > 0 ? totalDamage.toFixed(0) : '';
 
     const deliveredValue = typeof getSelectedOrderGettingTotal === 'function' ? getSelectedOrderGettingTotal() : 0;
-    document.getElementById('dmgDeliveredValue').innerText = '৳' + deliveredValue.toFixed(0);
+    document.getElementById('dmgDeliveredValue').innerText = 'αº│' + deliveredValue.toFixed(0);
 
     let netPayable = deliveredValue - totalDamage;
     if (netPayable < 0) netPayable = 0;
 
-    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(0);
+    document.getElementById('dmgNetPayable').innerText = 'αº│' + netPayable.toFixed(0);
     document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(0) : '';
 }
 
@@ -656,7 +647,7 @@ function onManualDamageAmountChange() {
     let netPayable = deliveredValue - totalDamage;
     if (netPayable < 0) netPayable = 0;
 
-    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(0);
+    document.getElementById('dmgNetPayable').innerText = 'αº│' + netPayable.toFixed(0);
     document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(0) : '';
 }
 
@@ -696,7 +687,7 @@ function updateDamageProductQty(id, qty) {
     }
 }
 
-// ── Damage Product Selection Modal ────────────────────────────
+// ΓöÇΓöÇ Damage Product Selection Modal ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 async function openDamageProductSelection() {
     if (!currentRetailerObj) return;
 
@@ -812,12 +803,12 @@ function closeDamageModal() {
 async function submitDamage() {
     const totalAmount = parseFloat(document.getElementById('dmgTotalAmount').value || 0);
     if (totalAmount <= 0) {
-        showToast('⚠️ Please enter the total damage amount.');
+        showToast('ΓÜá∩╕Å Please enter the total damage amount.');
         return;
     }
 
     if (selectedDamageProducts.length === 0) {
-        showToast('⚠️ Please select at least one product.');
+        showToast('ΓÜá∩╕Å Please select at least one product.');
         return;
     }
 
@@ -842,12 +833,12 @@ async function submitDamage() {
         const data = await res.json();
         if (data.success) {
             closeDamageModal();
-            showToast('✅ Damage report saved successfully!');
+            showToast('Γ£à Damage report saved successfully!');
         } else {
-            showToast('❌ ' + (data.message || 'Failed to save damage report.'));
+            showToast('Γ¥î ' + (data.message || 'Failed to save damage report.'));
         }
     } catch(err) {
-        showToast('❌ Network error. Please try again.');
+        showToast('Γ¥î Network error. Please try again.');
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = 'Submit Damage';
@@ -883,7 +874,7 @@ async function submitDuePayment(dispatchId, newStatus, newPaidAmount, deliveredI
         }
         return true;
     } catch (err) {
-        showToast('❌ ' + (err.message || 'An error occurred.'));
+        showToast('Γ¥î ' + (err.message || 'An error occurred.'));
         return false;
     }
 }
@@ -894,20 +885,10 @@ function handleDuePaymentAction() {
     
     let totalDue = 0;
     currentPartialDueOrders.forEach(o => {
-        let actualTotal = 0;
-        if (o.products && o.products.length > 0) {
-            o.products.forEach(p => {
-                const qty = parseInt(p.quantity);
-                let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
-                actualTotal += (deliveredQty * parseFloat(p.price || 0));
-            });
-        } else {
-            actualTotal = parseFloat(o.total_amount || 0);
-        }
-        totalDue += (actualTotal - parseFloat(o.paid_amount || 0));
+        totalDue += (parseFloat(o.total_amount) - parseFloat(o.paid_amount));
     });
     
-    showConfirmPopup(`Mark all due orders as fully paid? (Total Due: ৳${totalDue.toFixed(0)})`, async () => {
+    showConfirmPopup(`Mark all due orders as fully paid? (Total Due: αº│${totalDue.toFixed(0)})`, async () => {
         const btns = document.querySelectorAll('button');
         btns.forEach(b => { b.disabled = true; });
         
@@ -915,19 +896,8 @@ function handleDuePaymentAction() {
             for (let i = 0; i < currentPartialDueOrders.length; i++) {
                 const order = currentPartialDueOrders[i];
                 
-                let actualTotal = 0;
-                if (order.products && order.products.length > 0) {
-                    order.products.forEach(p => {
-                        const qty = parseInt(p.quantity);
-                        let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
-                        actualTotal += (deliveredQty * parseFloat(p.price || 0));
-                    });
-                } else {
-                    actualTotal = parseFloat(order.total_amount || 0);
-                }
-                
-                // Set paid_amount = actualTotal (fully paid)
-                const fullPaid = actualTotal;
+                // Set paid_amount = total_amount (fully paid)
+                const fullPaid = parseFloat(order.total_amount);
                 
                 let deliveredItems = {};
                 if (order.products) {
@@ -943,7 +913,7 @@ function handleDuePaymentAction() {
                 }
             }
             
-            showToast('✅ All dues marked as complete!');
+            showToast('Γ£à All dues marked as complete!');
             
             if (document.getElementById('retailerSheet').classList.contains('active')) {
                 openRetailerSheet(currentRetailerObj);
@@ -980,7 +950,7 @@ function initMap() {
         updateWhenZooming: false
     }).addTo(map);
 
-    // ── Pin styles ──
+    // ΓöÇΓöÇ Pin styles ΓöÇΓöÇ
     if (!document.getElementById('pin-styles')) {
         const s = document.createElement('style');
         s.id = 'pin-styles';
@@ -1008,55 +978,55 @@ function initMap() {
                 border-right: 7px solid transparent;
                 margin-top: -1px;
             }
-            /* Blue — in_transit (all pending delivery) */
+            /* Blue ΓÇö in_transit (all pending delivery) */
             .pin-pending .map-pin-card {
                 background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 60%, #3b82f6 100%);
                 color: #fff;
             }
             .pin-pending .map-pin-tail { border-top: 9px solid #1d4ed8; }
-            /* Green — all delivered / complete */
+            /* Green ΓÇö all delivered / complete */
             .pin-delivered .map-pin-card {
                 background: linear-gradient(135deg, #15803d 0%, #16a34a 60%, #22c55e 100%) !important;
                 color: #fff;
             }
             .pin-delivered .map-pin-tail { border-top: 9px solid #15803d !important; }
-            /* Yellow — all partial / due */
+            /* Yellow ΓÇö all partial / due */
             .pin-partial .map-pin-card {
                 background: linear-gradient(135deg, #b45309 0%, #d97706 60%, #eab308 100%) !important;
                 color: #fff;
             }
             .pin-partial .map-pin-tail { border-top: 9px solid #b45309 !important; }
-            /* Red — all cancelled */
+            /* Red ΓÇö all cancelled */
             .pin-cancelled .map-pin-card {
                 background: linear-gradient(135deg, #dc2626 0%, #ef4444 60%, #f87171 100%) !important;
                 color: #fff;
             }
             .pin-cancelled .map-pin-tail { border-top: 9px solid #dc2626 !important; }
-            /* Black — incomplete (some actioned, some still pending) */
+            /* Black ΓÇö incomplete (some actioned, some still pending) */
             .pin-incomplete .map-pin-card {
                 background: linear-gradient(135deg, #1a1a1a 0%, #374151 60%, #4b5563 100%) !important;
                 color: #fff;
             }
             .pin-incomplete .map-pin-tail { border-top: 9px solid #1a1a1a !important; }
-            /* Green + Red split — Delivered + Cancelled */
+            /* Green + Red split ΓÇö Delivered + Cancelled */
             .pin-delivered-cancelled .map-pin-card {
                 background: linear-gradient(135deg, #15803d 0%, #16a34a 48%, #ef4444 52%, #dc2626 100%) !important;
                 color: #fff;
             }
             .pin-delivered-cancelled .map-pin-tail { border-top: 9px solid #16a34a; }
-            /* Green + Yellow split — Delivered + Partial */
+            /* Green + Yellow split ΓÇö Delivered + Partial */
             .pin-delivered-partial .map-pin-card {
                 background: linear-gradient(135deg, #15803d 0%, #16a34a 48%, #d97706 52%, #eab308 100%) !important;
                 color: #fff;
             }
             .pin-delivered-partial .map-pin-tail { border-top: 9px solid #16a34a; }
-            /* Yellow + Red split — Partial + Cancelled */
+            /* Yellow + Red split ΓÇö Partial + Cancelled */
             .pin-partial-cancelled .map-pin-card {
                 background: linear-gradient(135deg, #b45309 0%, #eab308 48%, #ef4444 52%, #dc2626 100%) !important;
                 color: #fff;
             }
             .pin-partial-cancelled .map-pin-tail { border-top: 9px solid #b45309; }
-            /* Green + Yellow + Red — All three mixed */
+            /* Green + Yellow + Red ΓÇö All three mixed */
             .pin-mixed-all .map-pin-card {
                 background: linear-gradient(135deg, #15803d 0%, #16a34a 30%, #eab308 50%, #ef4444 70%, #dc2626 100%) !important;
                 color: #fff;
@@ -1066,12 +1036,75 @@ function initMap() {
         document.head.appendChild(s);
     }
 
-// getRetailerPinInfo moved outside
+function getRetailerPinInfo(ret) {
+    let deliveredCount = 0;
+    let partialCount = 0;
+    let cancelledCount = 0;
+    let pendingCount = 0;
+    const totalOrders = ret.orders ? ret.orders.length : 0;
+
+    ret.orders.forEach(o => {
+        if (o.status === 'delivered') {
+            deliveredCount++;
+        } else if (o.status === 'partial') {
+            partialCount++;
+        } else if (o.status === 'cancelled') {
+            cancelledCount++;
+        } else {
+            // in_transit or any other = pending
+            pendingCount++;
+        }
+    });
+
+    const actionedCount = deliveredCount + partialCount + cancelledCount;
+
+    // 1. Some actioned + some still pending => BLACK (incomplete)
+    if (pendingCount > 0 && actionedCount > 0) {
+        return { pinClass: 'pin-incomplete', pinIcon: 'fa-circle-exclamation' };
+    }
+
+    // 2. All still pending => BLUE
+    if (pendingCount === totalOrders) {
+        return { pinClass: 'pin-pending', pinIcon: 'fa-clock' };
+    }
+
+    // 3. All same status (no pending left)
+    if (deliveredCount === totalOrders) {
+        return { pinClass: 'pin-delivered', pinIcon: 'fa-check' };
+    }
+    if (cancelledCount === totalOrders) {
+        return { pinClass: 'pin-cancelled', pinIcon: 'fa-circle-xmark' };
+    }
+    if (partialCount === totalOrders) {
+        return { pinClass: 'pin-partial', pinIcon: 'fa-circle-half-stroke' };
+    }
+
+    // 4. Mixed completed statuses ΓÇö split color pins
+    const hasDelivered = deliveredCount > 0;
+    const hasPartial = partialCount > 0;
+    const hasCancelled = cancelledCount > 0;
+
+    if (hasDelivered && hasPartial && hasCancelled) {
+        return { pinClass: 'pin-mixed-all', pinIcon: 'fa-shuffle' };
+    }
+    if (hasDelivered && hasCancelled) {
+        return { pinClass: 'pin-delivered-cancelled', pinIcon: 'fa-shuffle' };
+    }
+    if (hasDelivered && hasPartial) {
+        return { pinClass: 'pin-delivered-partial', pinIcon: 'fa-shuffle' };
+    }
+    if (hasPartial && hasCancelled) {
+        return { pinClass: 'pin-partial-cancelled', pinIcon: 'fa-shuffle' };
+    }
+
+    // Fallback => BLUE
+    return { pinClass: 'pin-pending', pinIcon: 'fa-clock' };
+}
 
     const fallbackLat = 23.8103, fallbackLng = 90.4125;
     let firstValidLat = null, firstValidLng = null;
 
-    // ── Plot only van-loaded retailers ──
+    // ΓöÇΓöÇ Plot only van-loaded retailers ΓöÇΓöÇ
     orderedRetailers.forEach((ret, i) => {
         ret.name = ret.dealer_name || ret.name || 'Retailer';
 
@@ -1133,44 +1166,6 @@ function initMap() {
     locateMe();
 }
 
-function getRetailerPinInfo(ret) {
-    let deliveredCount = 0;
-    let partialCount = 0;
-    let cancelledCount = 0;
-    let pendingCount = 0;
-    const totalOrders = ret.orders ? ret.orders.length : 0;
-
-    ret.orders.forEach(o => {
-        if (o.status === 'delivered') {
-            deliveredCount++;
-        } else if (o.status === 'partial') {
-            partialCount++;
-        } else if (o.status === 'cancelled') {
-            cancelledCount++;
-        } else {
-            pendingCount++;
-        }
-    });
-
-    const actionedCount = deliveredCount + partialCount + cancelledCount;
-    if (pendingCount > 0 && actionedCount > 0) return { pinClass: 'pin-incomplete', pinIcon: 'fa-circle-exclamation' };
-    if (pendingCount === totalOrders) return { pinClass: 'pin-pending', pinIcon: 'fa-clock' };
-    if (deliveredCount === totalOrders) return { pinClass: 'pin-delivered', pinIcon: 'fa-check' };
-    if (cancelledCount === totalOrders) return { pinClass: 'pin-cancelled', pinIcon: 'fa-circle-xmark' };
-    if (partialCount === totalOrders) return { pinClass: 'pin-partial', pinIcon: 'fa-circle-half-stroke' };
-
-    const hasDelivered = deliveredCount > 0;
-    const hasPartial = partialCount > 0;
-    const hasCancelled = cancelledCount > 0;
-
-    if (hasDelivered && hasPartial && hasCancelled) return { pinClass: 'pin-mixed-all', pinIcon: 'fa-shuffle' };
-    if (hasDelivered && hasCancelled) return { pinClass: 'pin-delivered-cancelled', pinIcon: 'fa-shuffle' };
-    if (hasDelivered && hasPartial) return { pinClass: 'pin-delivered-partial', pinIcon: 'fa-shuffle' };
-    if (hasPartial && hasCancelled) return { pinClass: 'pin-partial-cancelled', pinIcon: 'fa-shuffle' };
-
-    return { pinClass: 'pin-pending', pinIcon: 'fa-clock' };
-}
-
 function locateMe() {
     if (!map) return;
     if (navigator.geolocation) {
@@ -1197,7 +1192,7 @@ function locateMe() {
     }
 }
 
-// ── Open bottom sheet for a specific retailer ──
+// ΓöÇΓöÇ Open bottom sheet for a specific retailer ΓöÇΓöÇ
 let currentRetailerObj = null;
 let currentOrderIndex = 0;
 
@@ -1377,8 +1372,8 @@ function selectCompanyOrder(orderIndex) {
             }
             
             const due = actualTotal - paid;
-            document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(0);
-            document.getElementById('bsDueAmount').innerText = '৳' + (due > 0 ? due : 0).toFixed(0);
+            document.getElementById('bsPaidAmount').innerText = 'αº│' + paid.toFixed(0);
+            document.getElementById('bsDueAmount').innerText = 'αº│' + (due > 0 ? due : 0).toFixed(0);
         } else {
             bsPartialInfo.classList.add('hidden');
         }
@@ -1389,10 +1384,10 @@ function selectCompanyOrder(orderIndex) {
     const activeDiv = document.getElementById(`order-group-${orderIndex}`);
     if (activeDiv) {
         activeDiv.classList.remove('hidden');
-        // Disable or enable inputs based on cancellation or delivery
+        // Disable or enable inputs based on cancellation
         const inputs = activeDiv.querySelectorAll('input');
         inputs.forEach(input => {
-            input.disabled = (order.status === 'cancelled' || order.status === 'delivered');
+            input.disabled = (order.status === 'cancelled');
         });
     }
 
@@ -1401,12 +1396,6 @@ function selectCompanyOrder(orderIndex) {
     if (actionContainer) {
         if (order.status === 'cancelled') {
             actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-3 rounded-full font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-rotate-left"></i> Redo</button>`;
-        } else if (order.status === 'delivered') {
-            actionContainer.innerHTML = '';
-        } else if (order.status === 'partial') {
-            actionContainer.innerHTML = `
-                <button onclick="markDelivery('delivered')" class="w-full py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
-            `;
         } else {
             actionContainer.innerHTML = `
                 <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
@@ -1425,7 +1414,7 @@ function selectCompanyOrder(orderIndex) {
             }
         });
     } else {
-        document.getElementById('bsGettingTotal').innerText = '৳0.00';
+        document.getElementById('bsGettingTotal').innerText = 'αº│0.00';
     }
 }
 
@@ -1446,6 +1435,15 @@ function calcProgress(el, idx) {
     const maxQty = parseInt(boxInput.getAttribute('data-qty')) || 1;
 
     let totalDelivered = (boxes * ppb) + pcs;
+
+    if (totalDelivered > maxQty) {
+        showToast("ΓÜá∩╕Å Delivered quantity cannot exceed ordered quantity (" + maxQty + " PCS)!");
+        boxes = Math.floor(maxQty / ppb);
+        pcs = maxQty % ppb;
+        boxInput.value = boxes;
+        pcsInput.value = pcs;
+        totalDelivered = maxQty;
+    }
 
     const delQtyEl = document.getElementById(`delQty-${idx}`);
     if (delQtyEl) delQtyEl.innerText = totalDelivered;
@@ -1509,7 +1507,7 @@ function calcProgress(el, idx) {
     });
     
     const bsGettingTotal = document.getElementById('bsGettingTotal');
-    if (bsGettingTotal) bsGettingTotal.innerText = '৳' + gettingTotal.toFixed(0);
+    if (bsGettingTotal) bsGettingTotal.innerText = 'αº│' + gettingTotal.toFixed(0);
 
     // Update due if partial info is visible
     const bsPartialInfo = document.getElementById('bsPartialInfo');
@@ -1519,7 +1517,7 @@ function calcProgress(el, idx) {
             const paid = parseFloat(order.paid_amount || 0);
             let due = gettingTotal - paid;
             const bsDueAmount = document.getElementById('bsDueAmount');
-            if (bsDueAmount) bsDueAmount.innerText = '৳' + (due > 0 ? due : 0).toFixed(0);
+            if (bsDueAmount) bsDueAmount.innerText = 'αº│' + (due > 0 ? due : 0).toFixed(0);
         }
     }
 }
@@ -1575,10 +1573,10 @@ function openPaidPaymentModal() {
     }
     const remainingDue = totalPayable - existingPaid;
     
-    document.getElementById('paidPaymentInput').value = (remainingDue > 0 ? remainingDue : 0).toFixed(0);
+    document.getElementById('paidPaymentInput').value = (remainingDue > 0 ? remainingDue : totalPayable).toFixed(0);
     
     if (existingPaid > 0) {
-        document.getElementById('paymentDueInfo').innerHTML = `Already Paid: ৳${existingPaid.toFixed(0)} | Remaining: ৳${remainingDue.toFixed(0)}`;
+        document.getElementById('paymentDueInfo').innerHTML = `Already Paid: αº│${existingPaid.toFixed(0)} | Remaining: αº│${remainingDue.toFixed(0)}`;
         document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-amber-600 mb-4 h-5';
     } else {
         document.getElementById('paymentDueInfo').innerText = 'Paid in Full';
@@ -1599,26 +1597,13 @@ function closePaidPaymentModal() {
 }
 
 function onPaidPaymentInput(el) {
-    let entered = parseFloat(el.value) || 0;
+    const entered = parseFloat(el.value) || 0;
     const total = getSelectedOrderGettingTotal();
-    
-    let existingPaid = 0;
-    if (currentRetailerObj && currentRetailerObj.orders) {
-        const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
-        if (order) existingPaid = parseFloat(order.paid_amount || 0);
-    }
-    const maxPayable = total - existingPaid;
-    
-    if (entered > maxPayable) {
-        entered = maxPayable > 0 ? maxPayable : 0;
-        el.value = entered.toFixed(0);
-    }
-    
-    const due = maxPayable - entered;
+    const due = total - entered;
     
     const info = document.getElementById('paymentDueInfo');
     if (due > 0) {
-        info.innerText = `Due: ৳${due.toFixed(0)} (Will set as Partial)`;
+        info.innerText = `Due: αº│${due.toFixed(0)} (Will set as Partial)`;
         info.className = 'text-sm font-bold text-red-500 mb-4 h-5';
     } else {
         info.innerText = 'Paid in Full';
@@ -1694,7 +1679,7 @@ async function redoCancelledOrder(orderIndex) {
         order.status = 'in_transit';
         order.notes = '';
         
-        showToast('🔄 Order restored to pending!');
+        showToast('≡ƒöä Order restored to pending!');
         
         // Re-render and refresh sheet
         openRetailerSheet(currentRetailerObj);
@@ -1706,7 +1691,7 @@ async function redoCancelledOrder(orderIndex) {
         }
 
     } catch (err) {
-        showToast('❌ ' + (err.message || 'An error occurred.'));
+        showToast('Γ¥î ' + (err.message || 'An error occurred.'));
     } finally {
         btns.forEach(b => { b.disabled = false; });
     }
@@ -1808,9 +1793,9 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
             }
         }
 
-        let msg = '✅ Deliveries processed!';
-        if (status === 'partial') msg = '🔶 Marked as Partial/Due';
-        if (status === 'cancelled') msg = '❌ Orders Cancelled';
+        let msg = 'Γ£à Deliveries processed!';
+        if (status === 'partial') msg = '≡ƒö╢ Marked as Partial/Due';
+        if (status === 'cancelled') msg = 'Γ¥î Orders Cancelled';
         showToast(msg);
         if (status === 'cancelled' || status === 'delivered' || status === 'partial') {
             orders.forEach(o => {
@@ -1840,17 +1825,8 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                 }
             });
             if (document.getElementById('retailerSheet').classList.contains('active')) {
-                let hasPending = false;
-                if (currentRetailerObj && currentRetailerObj.orders) {
-                    hasPending = currentRetailerObj.orders.some(o => o.status === 'in_transit');
-                }
-                
-                if (hasPending) {
-                    openRetailerSheet(currentRetailerObj);
-                    selectCompanyOrder(currentOrderIndex);
-                } else {
-                    closeBottomSheet();
-                }
+                openRetailerSheet(currentRetailerObj);
+                selectCompanyOrder(currentOrderIndex);
             }
             
             if (typeof initMap === 'function') {
@@ -1861,7 +1837,7 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
         }
 
     } catch (err) {
-        showToast('❌ ' + (err.message || 'An error occurred.'));
+        showToast('Γ¥î ' + (err.message || 'An error occurred.'));
     } finally {
         btns.forEach(b => { b.disabled = false; });
     }
@@ -1879,7 +1855,7 @@ function showMultiCancelPopup(orders) {
                 <input type="checkbox" name="cancel_dispatch" value="${o.dispatch_id}" checked class="w-5 h-5 text-red-600 rounded focus:ring-red-500">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-gray-800">${o.company_name}</div>
-                    <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(0)}</div>
+                    <div class="text-xs text-gray-500">Value: αº│${parseFloat(o.total_amount).toFixed(0)}</div>
                 </div>
             </label>
         `);
@@ -1911,7 +1887,7 @@ function showMultiCancelPopup(orders) {
         const checkedBoxes = container.querySelectorAll('input[name="cancel_dispatch"]:checked');
         const targetDispatchIds = Array.from(checkedBoxes).map(cb => cb.value);
         if (targetDispatchIds.length === 0) {
-            showToast("⚠️ Please select at least one order to cancel!");
+            showToast("ΓÜá∩╕Å Please select at least one order to cancel!");
             return;
         }
         close();
@@ -1931,7 +1907,7 @@ function showMultiCompletePopup(orders) {
                 <input type="checkbox" name="complete_dispatch" value="${o.dispatch_id}" checked class="w-5 h-5 text-green-600 rounded focus:ring-green-500">
                 <div class="flex-1">
                     <div class="text-sm font-bold text-gray-800">${o.company_name}</div>
-                    <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(0)}</div>
+                    <div class="text-xs text-gray-500">Value: αº│${parseFloat(o.total_amount).toFixed(0)}</div>
                 </div>
             </label>
         `);
@@ -1963,7 +1939,7 @@ function showMultiCompletePopup(orders) {
         const checkedBoxes = container.querySelectorAll('input[name="complete_dispatch"]:checked');
         const targetDispatchIds = Array.from(checkedBoxes).map(cb => cb.value);
         if (targetDispatchIds.length === 0) {
-            showToast("⚠️ Please select at least one order to complete!");
+            showToast("ΓÜá∩╕Å Please select at least one order to complete!");
             return;
         }
         close();
@@ -1984,12 +1960,12 @@ function showMultiPartialPopup(orders) {
                     <input type="checkbox" name="partial_dispatch" value="${o.dispatch_id}" checked class="w-5 h-5 text-orange-500 rounded focus:ring-orange-500" onchange="togglePartialInput(this)">
                     <div class="flex-1">
                         <div class="text-sm font-bold text-gray-800">${o.company_name}</div>
-                        <div class="text-xs text-gray-500">Value: ৳${parseFloat(o.total_amount).toFixed(0)}</div>
+                        <div class="text-xs text-gray-500">Value: αº│${parseFloat(o.total_amount).toFixed(0)}</div>
                     </div>
                 </label>
                 <div class="flex items-center gap-2 pl-8" id="partial-input-wrapper-${o.dispatch_id}">
                     <span class="text-xs font-bold text-gray-400">Paid:</span>
-                    <input type="number" name="partial_amount_${o.dispatch_id}" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold text-gray-700 outline-none focus:border-orange-500" placeholder="৳0.00" value="${o.paid_amount || ''}">
+                    <input type="number" name="partial_amount_${o.dispatch_id}" class="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold text-gray-700 outline-none focus:border-orange-500" placeholder="αº│0.00" value="${o.paid_amount || ''}">
                 </div>
             </div>
         `);
@@ -2021,7 +1997,7 @@ function showMultiPartialPopup(orders) {
         const checkedBoxes = container.querySelectorAll('input[name="partial_dispatch"]:checked');
         const targetDispatchIds = Array.from(checkedBoxes).map(cb => cb.value);
         if (targetDispatchIds.length === 0) {
-            showToast("⚠️ Please select at least one order!");
+            showToast("ΓÜá∩╕Å Please select at least one order!");
             return;
         }
         
@@ -2092,11 +2068,11 @@ async function saveQuantitiesOnly() {
             }
         }
 
-        showToast('💾 Quantities saved successfully!');
+        showToast('≡ƒÆ╛ Quantities saved successfully!');
         setTimeout(() => location.reload(), 900);
 
     } catch (err) {
-        showToast('❌ ' + (err.message || 'An error occurred.'));
+        showToast('Γ¥î ' + (err.message || 'An error occurred.'));
         btns.forEach(b => { b.disabled = false; });
     }
 }
