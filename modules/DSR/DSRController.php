@@ -706,6 +706,52 @@ class DSRController extends Controller
         $this->redirect('dsr/dashboard');
     }
 
+    public function apiSettlementReturns(): void
+    {
+        $dsrId = Auth::id();
+        $date  = $_GET['date'] ?? date('Y-m-d');
+
+        // 1. Spot returns: dispatched but not delivered
+        $q1 = $this->db->prepare("
+            SELECT p.name AS product_name,
+                   SUM(di.quantity - COALESCE(di.delivered_quantity, 0)) AS qty,
+                   p.price,
+                   SUM((di.quantity - COALESCE(di.delivered_quantity, 0)) * p.price) AS total
+            FROM dispatch_items di
+            JOIN dispatches d ON d.id = di.dispatch_id
+            JOIN products p   ON p.id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ?
+              AND (di.quantity - COALESCE(di.delivered_quantity, 0)) > 0
+            GROUP BY p.id, p.name, p.price
+        ");
+        $q1->execute([$dsrId, $date]);
+        $spotItems = $q1->fetchAll(PDO::FETCH_ASSOC);
+
+        // 2. Formal returns (non-damage)
+        $q2 = $this->db->prepare("
+            SELECT p.name AS product_name,
+                   SUM(ri.quantity) AS qty,
+                   p.price,
+                   SUM(ri.quantity * p.price) AS total
+            FROM returns r
+            JOIN return_items ri ON ri.return_id = r.id
+            JOIN products p      ON p.id = ri.product_id
+            WHERE r.dsr_id = ? AND r.return_date = ?
+              AND (r.reason != 'Damage' OR r.reason IS NULL)
+            GROUP BY p.id, p.name, p.price
+        ");
+        $q2->execute([$dsrId, $date]);
+        $formalItems = $q2->fetchAll(PDO::FETCH_ASSOC);
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'spot'    => $spotItems,
+            'formal'  => $formalItems,
+        ]);
+        exit;
+    }
+
     public function profile(): void
     {
         $user = $this->db->prepare("SELECT * FROM users WHERE id=?");

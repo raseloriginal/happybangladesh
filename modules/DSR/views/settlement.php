@@ -98,9 +98,12 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
           <span class="font-medium text-slate-600">মোট লোড করা মালের মূল্য</span>
           <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue, 2) ?></span>
         </div>
-        <div class="flex justify-between items-center py-1 text-rose-600">
-          <span class="font-medium">ফেরত মালের মূল্য (-)</span>
-          <span class="font-bold font-mono">৳ <?= number_format($returnedValue, 2) ?></span>
+        <div class="flex justify-between items-center py-1 text-rose-600 cursor-pointer rounded-lg hover:bg-rose-50 active:bg-rose-100 transition -mx-1 px-1" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
+          <span class="font-medium flex items-center gap-1">ফেরত মালের মূল্য (-) <i class="fa-solid fa-circle-info text-[10px] opacity-60"></i></span>
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold font-mono">৳ <?= number_format($returnedValue, 2) ?></span>
+            <i class="fa-solid fa-chevron-right text-[10px] opacity-50"></i>
+          </div>
         </div>
         <div class="flex justify-between items-center py-1 text-amber-700">
           <span class="font-medium">ড্যামেজ পণ্য (-)</span>
@@ -177,6 +180,44 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 
 </div>
 
+<!-- ===== Return Detail Modal ===== -->
+<div id="returnModal" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeReturnModal()"></div>
+
+  <!-- Sheet (Top Popup) -->
+  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" style="animation: slideDown .25s ease">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+      <div>
+        <h2 class="text-sm font-black text-slate-900">ফেরত মালের বিস্তারিত</h2>
+        <p class="text-[11px] text-slate-500 font-medium" id="returnModalDate"></p>
+      </div>
+      <button onclick="closeReturnModal()" class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="overflow-y-auto flex-1 p-4 space-y-4" id="returnModalBody">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- Footer Total -->
+    <div class="px-5 py-3.5 border-t border-slate-100 flex justify-between items-center bg-rose-50">
+      <span class="text-xs font-bold text-rose-800">মোট ফেরত মূল্য</span>
+      <span class="text-base font-black text-rose-700 font-mono" id="returnModalTotal">৳ 0.00</span>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+</style>
+
 <script>
 const dispatched = <?= (float)$dispatchedValue ?>;
 const returned = <?= (float)$returnedValue ?>;
@@ -235,4 +276,83 @@ function calculate() {
 
 // Initial calculation
 calculate();
+
+// ---- Return Detail Modal ----
+const selectedDate = '<?= $selectedDate ?>';
+
+function openReturnModal() {
+    const modal = document.getElementById('returnModal');
+    const body  = document.getElementById('returnModalBody');
+    const total = document.getElementById('returnModalTotal');
+    const dateEl = document.getElementById('returnModalDate');
+
+    dateEl.textContent = '<?= date('d M Y', strtotime($selectedDate)) ?>';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    body.innerHTML = `
+      <div class="flex justify-center py-8">
+        <div class="w-7 h-7 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>`;
+
+    fetch(`<?= url('dsr/api/settlement/returns') ?>?date=${selectedDate}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) { body.innerHTML = '<p class="text-center text-slate-500 text-xs py-8">ডেটা লোড করা যায়নি।</p>'; return; }
+
+            let html = '';
+            let grandTotal = 0;
+
+            const buildSection = (title, color, bgColor, borderColor, items) => {
+                if (!items.length) return '';
+                let rows = '';
+                items.forEach(item => {
+                    const t = parseFloat(item.total);
+                    grandTotal += t;
+                    rows += `
+                      <tr class="border-b border-slate-100 last:border-0">
+                        <td class="py-2 pr-2 text-xs text-slate-700 font-medium">${item.product_name}</td>
+                        <td class="py-2 text-center text-xs font-mono text-slate-600">${parseFloat(item.qty)}</td>
+                        <td class="py-2 text-right text-xs font-mono text-slate-600">৳ ${parseFloat(item.price).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+                        <td class="py-2 text-right text-xs font-mono font-bold ${color}">৳ ${t.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+                      </tr>`;
+                });
+                return `
+                  <div class="rounded-2xl overflow-hidden border ${borderColor}">
+                    <div class="${bgColor} px-3.5 py-2">
+                      <span class="text-xs font-black ${color}">${title}</span>
+                    </div>
+                    <table class="w-full">
+                      <thead>
+                        <tr class="border-b border-slate-100">
+                          <th class="text-left py-1.5 px-3.5 text-[10px] text-slate-400 font-semibold uppercase">পণ্য</th>
+                          <th class="text-center py-1.5 text-[10px] text-slate-400 font-semibold uppercase">পরিমাণ</th>
+                          <th class="text-right py-1.5 text-[10px] text-slate-400 font-semibold uppercase">মূল্য</th>
+                          <th class="text-right py-1.5 px-3.5 text-[10px] text-slate-400 font-semibold uppercase">মোট</th>
+                        </tr>
+                      </thead>
+                      <tbody class="px-3.5">${rows}</tbody>
+                    </table>
+                  </div>`;
+            };
+
+            html += buildSection('স্পট ফেরত (ডেলিভারি বাকি)', 'text-rose-700', 'bg-rose-50', 'border-rose-200', data.spot);
+            html += buildSection('আনুষ্ঠানিক ফেরত', 'text-orange-700', 'bg-orange-50', 'border-orange-200', data.formal);
+
+            if (!html) {
+                html = '<p class="text-center text-slate-400 text-xs py-10">এই তারিখে কোনো ফেরত মাল নেই।</p>';
+            }
+
+            body.innerHTML = html;
+            total.textContent = '৳ ' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+        })
+        .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-8">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
+}
+
+function closeReturnModal() {
+    document.getElementById('returnModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReturnModal(); });
 </script>

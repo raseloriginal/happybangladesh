@@ -202,6 +202,7 @@ $router->get( '/dsr/collection',              ['DSRController', 'collection']);
 $router->post('/dsr/collection/complete',     ['DSRController', 'collectionComplete']);
 $router->get( '/dsr/settlement',              ['DSRController', 'settlement']);
 $router->post('/dsr/settlement/submit',       ['DSRController', 'settlementSubmit']);
+$router->get( '/dsr/api/settlement/returns',  ['DSRController', 'apiSettlementReturns']);
 $router->get( '/dsr/profile',                 ['DSRController', 'profile']);
 $router->post('/dsr/api/retailers/store',     ['DSRController', 'apiStoreRetailer']);
 $router->post('/dsr/damage/store',            ['DSRController', 'damageStore']);
