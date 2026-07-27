@@ -1,30 +1,45 @@
 Options -MultiViews
 
 # ── PWA: MIME types ───────────────────────────────────────────
+# Serve .webmanifest with the correct MIME type (fallback for static files)
 <IfModule mod_mime.c>
   AddType application/manifest+json .webmanifest
   AddType text/javascript            .js
 </IfModule>
 
-# ── PWA: Service Worker headers ───────────────────────────────
-# Allow the SR and DSR service workers (served from /public/)
-# to control their respective /sr/ and /dsr/ scopes.
-<FilesMatch "^(sr|dsr)-sw\.js$">
-  Header set Service-Worker-Allowed "/"
-  Header set Cache-Control "no-cache, no-store, must-revalidate"
-</FilesMatch>
+# ── PWA: Service Worker & Manifest headers ────────────────────
+# Wrapped in IfModule so the .htaccess doesn't crash on shared
+# hosts where mod_headers is disabled.
+<IfModule mod_headers.c>
+  # Prevent SW scripts from being cached by the browser
+  <FilesMatch "^(sr|dsr)-sw(-register)?\.js$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+  </FilesMatch>
 
-# ── PWA: Manifest no-cache ────────────────────────────────────
-<FilesMatch "\.webmanifest$">
-  Header set Cache-Control "no-cache"
-</FilesMatch>
+  # Prevent manifest files from being cached
+  <FilesMatch "\.(webmanifest)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
 
-# ── PWA: Offline pages (no framework rewrite) ─────────────────
+  # PHP-generated manifests also must not be cached
+  <FilesMatch "^(sr|dsr)-manifest\.php$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# ── Routing ───────────────────────────────────────────────────
 RewriteEngine On
-RewriteRule ^(sr|dsr)-offline\.html$ - [L]
-RewriteRule ^(sr|dsr)\.(webmanifest)$ - [L]
-RewriteRule ^(sr|dsr)-sw(-register)?\.js$ - [L]
 
+# Pass PWA static files directly — skip the PHP front controller.
+# Note: The RewriteCond !-f below also handles this, but explicit
+# rules here make the intent clear and avoid edge cases on some hosts.
+RewriteRule ^(sr|dsr)-offline\.html$        - [L,NC]
+RewriteRule ^(sr|dsr)\.webmanifest$         - [L,NC]
+RewriteRule ^(sr|dsr)-manifest\.php$        - [L,NC]
+RewriteRule ^(sr|dsr)-sw(-register)?\.js$   - [L,NC]
+
+# Route everything else through the PHP front controller
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.+)$ index.php?url=$1 [QSA,L]

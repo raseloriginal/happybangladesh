@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#2563eb">
 
   <!-- PWA: Web App Manifest -->
-  <link rel="manifest" href="<?= BASE_URL ?>/sr.webmanifest">
+  <link rel="manifest" href="<?= BASE_URL ?>/sr-manifest.php">
 
   <!-- PWA: iOS Safari meta tags -->
   <meta name="mobile-web-app-capable" content="yes">
