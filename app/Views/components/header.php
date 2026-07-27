@@ -12,6 +12,12 @@
       <i class="fa-solid fa-bars"></i>
     </button>
 
+    <!-- Mobile brand logo -->
+    <div class="flex items-center gap-2 lg:hidden">
+      <img src="<?= asset('images/logo.png') ?>" alt="Happy Logo" class="w-7 h-7 rounded-lg object-cover shadow-sm">
+      <span class="font-black text-sm text-slate-900 tracking-tight">HAPPY</span>
+    </div>
+
     <!-- Breadcrumb -->
     <div class="hidden md:block">
       <div class="text-sm font-semibold text-gray-800"><?= $pageTitle ?? APP_NAME ?></div>

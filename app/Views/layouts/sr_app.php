@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title><?= isset($pageTitle) ? h($pageTitle) . ' — ' : '' ?><?= APP_NAME ?></title>
   <meta name="description" content="<?= APP_NAME ?> — SR Mobile App">
+  <link rel="icon" type="image/png" href="<?= asset('images/logo.png') ?>">
+  <link rel="apple-touch-icon" href="<?= asset('images/logo.png') ?>">
   <meta name="theme-color" content="#2563eb">
 
   <!-- Tailwind CSS CDN (for compatibility with existing views) -->

@@ -5,9 +5,7 @@
     
     <!-- Clean Header -->
     <div class="text-center mb-8">
-      <div class="w-14 h-14 bg-blue-800 rounded-2xl flex items-center justify-center text-white text-xl font-bold mx-auto mb-3 shadow-md shadow-blue-700/20">
-        <i class="fa-solid fa-briefcase"></i>
-      </div>
+      <img src="<?= asset('images/logo.png') ?>" alt="Happy Bangladesh Logo" class="w-16 h-16 rounded-2xl mx-auto mb-3 shadow-md shadow-blue-500/20 object-cover">
       <h1 class="text-2xl font-bold text-slate-900">Happy Bangladesh</h1>
       <p class="text-xs text-slate-500 mt-1 font-medium">Sales Rep Portal Sign In</p>
     </div>

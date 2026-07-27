@@ -66,12 +66,9 @@ $items = $menus[$role] ?? [];
 
   <!-- Brand -->
   <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-100">
-    <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
-      <i class="fa-solid fa-truck-fast text-white text-sm"></i>
-    </div>
+    <img src="<?= asset('images/logo.png') ?>" alt="Happy Logo" class="w-9 h-9 rounded-xl shadow-md shadow-blue-500/20 object-cover flex-shrink-0">
     <div>
-      <div class="text-slate-900 font-black text-base leading-none">HappyBD</div>
-      <div class="text-blue-600 font-bold text-[11px] mt-0.5 tracking-wider uppercase">DMS v<?= APP_VERSION ?></div>
+      <div class="text-slate-900 font-black text-lg leading-none tracking-tight">HAPPY</div>
     </div>
   </div>
 
