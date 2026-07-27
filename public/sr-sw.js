@@ -16,7 +16,7 @@
 
 'use strict';
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE   = `sr-shell-${CACHE_VERSION}`;
 const PAGES_CACHE   = `sr-pages-${CACHE_VERSION}`;
 
@@ -31,6 +31,7 @@ const OFFLINE_URL = SW_DIR + 'sr-offline.html';
 
 const SHELL_ASSETS = [
     SW_DIR + 'sr/dashboard',
+    SW_DIR + 'sr/login',
     OFFLINE_URL,
     SW_DIR + 'assets/css/sr_app.css',
     SW_DIR + 'assets/css/app.css',

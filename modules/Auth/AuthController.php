@@ -44,7 +44,15 @@ class AuthController extends Controller
         if (Auth::check()) {
             $this->redirect(ltrim(Auth::defaultRedirect(), '/'));
         }
-        $this->render("login_{$role}", ['pageTitle' => ucfirst($role) . ' Login'], 'auth');
+        // SR and DSR get their own PWA-aware layouts so the login page
+        // is inside the PWA (carries manifest + service worker registration).
+        // Admin and Manager continue using the plain auth layout.
+        $layout = match ($role) {
+            'sr'  => 'sr_auth',
+            'dsr' => 'dsr_auth',
+            default => 'auth',
+        };
+        $this->render("login_{$role}", ['pageTitle' => ucfirst($role) . ' Login'], $layout);
     }
 
     private function processRoleLogin(string $role): void

@@ -16,7 +16,7 @@
 
 'use strict';
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE   = `dsr-shell-${CACHE_VERSION}`;
 const PAGES_CACHE   = `dsr-pages-${CACHE_VERSION}`;
 
@@ -31,6 +31,7 @@ const OFFLINE_URL = SW_DIR + 'dsr-offline.html';
 
 const SHELL_ASSETS = [
     SW_DIR + 'dsr/dashboard',
+    SW_DIR + 'dsr/login',
     OFFLINE_URL,
     SW_DIR + 'assets/css/dsr_app.css',
     SW_DIR + 'assets/js/app.js',
