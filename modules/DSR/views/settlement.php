@@ -19,9 +19,9 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 <div class="p-3.5 sm:p-5 space-y-4 pb-32 max-w-lg mx-auto font-sans">
 
   <!-- 1. Header Bar -->
-  <div class="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs">
+  <div class="flex items-center justify-between bg-white p-3.5 border border-slate-200/90 shadow-xs">
     <div class="flex items-center gap-3">
-      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 hover:bg-slate-200 transition">
+      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 hover:bg-slate-200 transition">
         <i class="fa-solid fa-arrow-left text-sm"></i>
       </a>
       <div>
@@ -31,7 +31,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     </div>
 
     <!-- Date Badge -->
-    <span class="bg-blue-50 text-blue-700 border border-blue-200/80 text-xs font-bold px-2.5 py-1 rounded-xl">
+    <span class="bg-blue-50 text-blue-700 border border-blue-200/80 text-xs font-bold px-2.5 py-1">
       <?= date('d M Y', strtotime($selectedDate)) ?>
     </span>
   </div>
@@ -56,7 +56,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
           $isSelected = ($d === $selectedDate);
           $pillClass = $isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-50';
       ?>
-      <a href="?date=<?= $d ?>" class="snap-start flex-shrink-0 w-14 h-16 flex flex-col items-center justify-center rounded-2xl transition active:scale-95 text-center <?= $pillClass ?>">
+      <a href="?date=<?= $d ?>" class="snap-start flex-shrink-0 w-14 h-16 flex flex-col items-center justify-center transition active:scale-95 text-center <?= $pillClass ?>">
         <span class="text-[10px] font-bold uppercase tracking-wider <?= $isSelected ? 'text-blue-100' : 'text-slate-400' ?>"><?= $dayName ?></span>
         <span class="text-lg font-black font-mono mt-0.5"><?= $dayNum ?></span>
       </a>
@@ -65,8 +65,8 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 
     <!-- Status Alerts -->
     <?php if ($isSubmitted): ?>
-      <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+      <div class="bg-blue-50 border border-blue-200 p-3.5 flex items-center gap-3">
+        <div class="w-8 h-8 bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-lock text-sm"></i>
         </div>
         <div>
@@ -75,8 +75,8 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
         </div>
       </div>
     <?php elseif ($isNoDispatch): ?>
-      <div class="bg-slate-100 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+      <div class="bg-slate-100 border border-slate-200 p-3.5 flex items-center gap-3">
+        <div class="w-8 h-8 bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-box-open text-sm"></i>
         </div>
         <div>
@@ -87,7 +87,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <?php endif; ?>
 
     <!-- 3. Account Breakdown Card -->
-    <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
+    <div class="bg-white p-4 border border-slate-200/90 shadow-xs space-y-3">
       <div class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-2.5">
         <span>হিসাবের বিস্তারিত (Account Breakdown)</span>
         <span class="text-[10px] text-slate-400 font-normal capitalize">ক্যালকুলেশন</span>
@@ -98,7 +98,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
           <span class="font-medium text-slate-600">মোট লোড করা মালের মূল্য</span>
           <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue, 2) ?></span>
         </div>
-        <div class="flex justify-between items-center py-1 text-rose-600 cursor-pointer rounded-lg hover:bg-rose-50 active:bg-rose-100 transition -mx-1 px-1" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
+        <div class="flex justify-between items-center py-1 text-rose-600 cursor-pointer hover:bg-rose-50 active:bg-rose-100 transition -mx-1 px-1" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
           <span class="font-medium flex items-center gap-1">ফেরত মালের মূল্য (-) <i class="fa-solid fa-circle-info text-[10px] opacity-60"></i></span>
           <div class="flex items-center gap-1.5">
             <span class="font-bold font-mono">৳ <?= number_format($returnedValue, 2) ?></span>
@@ -116,7 +116,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
       </div>
 
       <!-- Net Payable Highlight -->
-      <div class="bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-xl p-3.5 flex justify-between items-center shadow-xs">
+      <div class="bg-gradient-to-r from-slate-900 to-blue-950 text-white p-3.5 flex justify-between items-center shadow-xs">
         <div>
           <span class="text-xs font-bold text-blue-200">ক্যাশারে জমা দেবার পরিমাণ (Net)</span>
           <span class="text-[10px] text-slate-300 block font-normal">(নিট নগদ জমা টাকা)</span>
@@ -126,7 +126,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     </div>
 
     <!-- 4. Cash Note Denominations Grid -->
-    <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
+    <div class="bg-white p-4 border border-slate-200/90 shadow-xs space-y-3">
       <div class="text-xs font-black text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">
         নোটের গণনা (Cash Counting)
       </div>
@@ -137,16 +137,16 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
           foreach ($denominations as $d): 
             $qty = $cashBreakdown[$d] ?? '';
         ?>
-        <div class="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200/60">
+        <div class="flex items-center gap-1.5 bg-slate-50 p-2 border border-slate-200/60">
           <div class="w-12 font-black text-blue-600 text-xs font-mono text-center">৳ <?= $d ?></div>
           <div class="text-slate-400 text-xs">×</div>
-          <input type="number" min="0" class="w-full bg-white border border-slate-200 rounded-lg py-1 px-1.5 text-center font-black text-slate-900 outline-none focus:border-blue-500 text-xs font-mono denomination-input <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
+          <input type="number" min="0" class="w-full bg-white border border-slate-200 py-1 px-1.5 text-center font-black text-slate-900 outline-none focus:border-blue-500 text-xs font-mono denomination-input <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
         </div>
         <?php endforeach; ?>
       </div>
 
       <!-- Total Counted Cash -->
-      <div class="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 flex justify-between items-center">
+      <div class="bg-emerald-50 border border-emerald-200/80 p-3 flex justify-between items-center">
         <span class="text-xs font-bold text-emerald-800">মোট গণনাকৃত ক্যাশ</span>
         <span class="text-lg font-black text-emerald-700 font-mono" id="displayCountedCash">৳ 0.00</span>
       </div>
@@ -157,21 +157,21 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
           <span class="font-bold text-slate-600">কম / বেশি:</span>
           <span class="font-mono font-black ml-1 text-sm text-slate-900" id="displayDifference">৳ 0.00</span>
         </div>
-        <div id="statusBadge" class="px-3 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 uppercase tracking-wide">
+        <div id="statusBadge" class="px-3 py-1 text-[10px] font-black bg-slate-100 text-slate-600 uppercase tracking-wide">
           পেন্ডিং
         </div>
       </div>
     </div>
 
     <!-- 5. Optional Note -->
-    <div class="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-xs space-y-1.5">
+    <div class="bg-white p-3.5 border border-slate-200/90 shadow-xs space-y-1.5">
       <label class="text-xs font-bold text-slate-700">মন্তব্য বা নোট (অপশনাল)</label>
-      <textarea name="note" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500 <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="ক্যাশ পার্থক্য বা কোনো মন্তব্য থাকলে লিখুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
+      <textarea name="note" class="w-full bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500 <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="ক্যাশ পার্থক্য বা কোনো মন্তব্য থাকলে লিখুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
     </div>
 
     <!-- Submit Button -->
     <?php if (!$isLocked): ?>
-      <button type="submit" class="w-full py-3.5 rounded-2xl font-black text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-600/20 active:scale-95 transition">
+      <button type="submit" class="w-full py-3.5 font-black text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-600/20 active:scale-95 transition">
         হিসাব জমা দিন
       </button>
     <?php endif; ?>
@@ -186,14 +186,14 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
   <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeReturnModal()"></div>
 
   <!-- Sheet (Top Popup) -->
-  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" style="animation: slideDown .25s ease">
+  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" style="animation: slideDown .25s ease">
     <!-- Header -->
     <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
       <div>
         <h2 class="text-sm font-black text-slate-900">ফেরত মালের বিস্তারিত</h2>
         <p class="text-[11px] text-slate-500 font-medium" id="returnModalDate"></p>
       </div>
-      <button onclick="closeReturnModal()" class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition">
+      <button onclick="closeReturnModal()" class="w-8 h-8 bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition">
         <i class="fa-solid fa-xmark text-xs"></i>
       </button>
     </div>
@@ -256,19 +256,19 @@ function calculate() {
     // Status Badge
     const badge = document.getElementById('statusBadge');
     if (shouldPay === 0 && countedCash === 0) {
-        badge.className = 'px-3 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 uppercase tracking-wide';
+        badge.className = 'px-3 py-1 text-[10px] font-black bg-slate-100 text-slate-600 uppercase tracking-wide';
         badge.innerText = 'পেন্ডিং';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-slate-900';
     } else if (Math.abs(difference) < 0.01) {
-        badge.className = 'px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wide';
+        badge.className = 'px-3 py-1 text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wide';
         badge.innerText = 'হিসাব মিলছে';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-emerald-600';
     } else if (difference < 0) {
-        badge.className = 'px-3 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 uppercase tracking-wide';
+        badge.className = 'px-3 py-1 text-[10px] font-black bg-rose-100 text-rose-800 uppercase tracking-wide';
         badge.innerText = 'কম (শর্ট)';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-rose-600';
     } else {
-        badge.className = 'px-3 py-1 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 uppercase tracking-wide';
+        badge.className = 'px-3 py-1 text-[10px] font-black bg-blue-100 text-blue-800 uppercase tracking-wide';
         badge.innerText = 'বেশি ক্যাশ';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-blue-600';
     }
@@ -292,7 +292,7 @@ function openReturnModal() {
 
     body.innerHTML = `
       <div class="flex justify-center py-8">
-        <div class="w-7 h-7 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
+        <div class="w-7 h-7 border-2 border-rose-500 border-t-transparent animate-spin"></div>
       </div>`;
 
     fetch(`<?= url('dsr/api/settlement/returns') ?>?date=${selectedDate}`)
@@ -318,7 +318,7 @@ function openReturnModal() {
                       </tr>`;
                 });
                 return `
-                  <div class="rounded-2xl overflow-hidden border ${borderColor}">
+                  <div class="overflow-hidden border ${borderColor}">
                     <div class="${bgColor} px-3.5 py-2">
                       <span class="text-xs font-black ${color}">${title}</span>
                     </div>
