@@ -96,22 +96,22 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
       <div class="space-y-2 text-xs">
         <div class="flex justify-between items-center py-1">
           <span class="font-medium text-slate-600">মোট লোড করা মালের মূল্য</span>
-          <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue, 2) ?></span>
+          <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue) ?></span>
         </div>
         <div class="flex justify-between items-center py-1 text-rose-600 cursor-pointer hover:bg-rose-50 active:bg-rose-100 transition -mx-1 px-1" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
           <span class="font-medium flex items-center gap-1">ফেরত মালের মূল্য (-) <i class="fa-solid fa-circle-info text-[10px] opacity-60"></i></span>
           <div class="flex items-center gap-1.5">
-            <span class="font-bold font-mono">৳ <?= number_format($returnedValue, 2) ?></span>
+            <span class="font-bold font-mono">৳ <?= number_format($returnedValue) ?></span>
             <i class="fa-solid fa-chevron-right text-[10px] opacity-50"></i>
           </div>
         </div>
         <div class="flex justify-between items-center py-1 text-amber-700">
           <span class="font-medium">ড্যামেজ পণ্য (-)</span>
-          <span class="font-bold font-mono">৳ <?= number_format($savedDamage, 2) ?></span>
+          <span class="font-bold font-mono">৳ <?= number_format($savedDamage) ?></span>
         </div>
         <div class="flex justify-between items-center py-1 text-purple-700">
           <span class="font-medium">সারাদিনের খরচ (-)</span>
-          <span class="font-bold font-mono">৳ <?= number_format($savedExpense, 2) ?></span>
+          <span class="font-bold font-mono">৳ <?= number_format($savedExpense) ?></span>
         </div>
       </div>
 
@@ -121,7 +121,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
           <span class="text-xs font-bold text-blue-200">ক্যাশারে জমা দেবার পরিমাণ (Net)</span>
           <span class="text-[10px] text-slate-300 block font-normal">(নিট নগদ জমা টাকা)</span>
         </div>
-        <span class="text-xl font-black text-amber-400 font-mono" id="displayShouldPay">৳ 0.00</span>
+        <span class="text-xl font-black text-amber-400 font-mono" id="displayShouldPay">৳ 0</span>
       </div>
     </div>
 
@@ -148,14 +148,14 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
       <!-- Total Counted Cash -->
       <div class="bg-emerald-50 border border-emerald-200/80 p-3 flex justify-between items-center">
         <span class="text-xs font-bold text-emerald-800">মোট গণনাকৃত ক্যাশ</span>
-        <span class="text-lg font-black text-emerald-700 font-mono" id="displayCountedCash">৳ 0.00</span>
+        <span class="text-lg font-black text-emerald-700 font-mono" id="displayCountedCash">৳ 0</span>
       </div>
 
       <!-- Difference & Live Status -->
       <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
         <div>
           <span class="font-bold text-slate-600">কম / বেশি:</span>
-          <span class="font-mono font-black ml-1 text-sm text-slate-900" id="displayDifference">৳ 0.00</span>
+          <span class="font-mono font-black ml-1 text-sm text-slate-900" id="displayDifference">৳ 0</span>
         </div>
         <div id="statusBadge" class="px-3 py-1 text-[10px] font-black bg-slate-100 text-slate-600 uppercase tracking-wide">
           পেন্ডিং
@@ -206,7 +206,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <!-- Footer Total -->
     <div class="px-5 py-3.5 border-t border-slate-100 flex justify-between items-center bg-rose-50">
       <span class="text-xs font-bold text-rose-800">মোট ফেরত মূল্য</span>
-      <span class="text-base font-black text-rose-700 font-mono" id="returnModalTotal">৳ 0.00</span>
+      <span class="text-base font-black text-rose-700 font-mono" id="returnModalTotal">৳ 0</span>
     </div>
   </div>
 </div>
@@ -228,7 +228,7 @@ function calculate() {
     
     // Should Pay
     const shouldPay = dispatched - returned - damage - expense;
-    document.getElementById('displayShouldPay').innerText = '৳ ' + shouldPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('displayShouldPay').innerText = '৳ ' + Math.round(shouldPay).toLocaleString('en-US');
     document.getElementById('formShouldPay').value = shouldPay.toFixed(2);
 
     // Cash Count
@@ -243,14 +243,14 @@ function calculate() {
         }
     });
 
-    document.getElementById('displayCountedCash').innerText = '৳ ' + countedCash.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('displayCountedCash').innerText = '৳ ' + Math.round(countedCash).toLocaleString('en-US');
     document.getElementById('formCountedCash').value = countedCash.toFixed(2);
     document.getElementById('formCashBreakdown').value = JSON.stringify(cashBreakdown);
 
     // Difference
     const difference = countedCash - shouldPay;
     const diffDisplay = document.getElementById('displayDifference');
-    diffDisplay.innerText = (difference > 0 ? '+' : '') + '৳ ' + difference.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    diffDisplay.innerText = (difference > 0 ? '+' : '') + '৳ ' + Math.round(difference).toLocaleString('en-US');
     document.getElementById('formDifference').value = difference.toFixed(2);
 
     // Status Badge
@@ -300,7 +300,7 @@ function openReturnModal() {
         .then(data => {
             if (!data.success || !data.items || !data.items.length) {
                 body.innerHTML = '<p class="text-center text-slate-400 text-xs py-10">এই তারিখে কোনো ফেরত মাল নেই।</p>';
-                total.textContent = '৳ 0.00';
+                total.textContent = '৳ 0';
                 return;
             }
 
@@ -314,8 +314,8 @@ function openReturnModal() {
                   <tr class="border-b border-slate-100 last:border-0">
                     <td class="py-2.5 pr-2 text-xs text-slate-800 font-medium">${item.product_name}</td>
                     <td class="py-2.5 text-center text-xs font-mono text-slate-600">${parseFloat(item.qty)}</td>
-                    <td class="py-2.5 text-right text-xs font-mono text-slate-600">৳ ${parseFloat(item.price).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                    <td class="py-2.5 text-right text-xs font-mono font-bold text-rose-600">৳ ${t.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+                    <td class="py-2.5 text-right text-xs font-mono text-slate-600">৳ ${Math.round(parseFloat(item.price)).toLocaleString('en-US')}</td>
+                    <td class="py-2.5 text-right text-xs font-mono font-bold text-rose-600">৳ ${Math.round(t).toLocaleString('en-US')}</td>
                   </tr>`;
             });
 
@@ -334,7 +334,7 @@ function openReturnModal() {
                 </table>
               </div>`;
 
-            total.textContent = '৳ ' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+            total.textContent = '৳ ' + Math.round(grandTotal).toLocaleString('en-US');
         })
         .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-8">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
 }
