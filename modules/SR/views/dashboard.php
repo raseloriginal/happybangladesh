@@ -63,19 +63,41 @@
       </div>
     </div>
 
-    <!-- Daily Target Bar -->
+    <!-- Target & Delivery Progress Bars -->
     <?php
       $target = $stats['target_amount'] > 0 ? $stats['target_amount'] : 0;
       $sales = $stats['this_month_sales'];
+      $delivery = $stats['this_month_delivery'] ?? 0;
       $targetPct = $target > 0 ? min(100, round(($sales / $target) * 100)) : 0;
+      $deliveryPct = $target > 0 ? min(100, round(($delivery / $target) * 100)) : ($sales > 0 ? min(100, round(($delivery / $sales) * 100)) : 0);
     ?>
-    <div class="pt-2 border-t border-white/15 relative z-10">
-      <div class="flex items-center justify-between text-xs font-bold mb-1.5">
-        <span class="text-blue-100">মাসিক টার্গেট (৳ <?= number_format($target) ?>)</span>
-        <span class="text-amber-300 font-extrabold font-mono"><?= $targetPct ?>%</span>
+    <div class="pt-2 border-t border-white/15 relative z-10 space-y-3">
+      <!-- 1. Monthly Sales Target Bar -->
+      <div>
+        <div class="flex items-center justify-between text-xs font-bold mb-1">
+          <span class="text-blue-100 flex items-center gap-1.5">
+            <i class="fa-solid fa-bullseye text-amber-300 text-[11px]"></i>
+            মাসিক টার্গেট (৳ <?= number_format($target) ?>)
+          </span>
+          <span class="text-amber-300 font-extrabold font-mono"><?= $targetPct ?>%</span>
+        </div>
+        <div class="w-full h-2.5 bg-black/20 rounded-full overflow-hidden p-0.5">
+          <div class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: <?= $targetPct ?>%;"></div>
+        </div>
       </div>
-      <div class="w-full h-2.5 bg-black/20 rounded-full overflow-hidden p-0.5">
-        <div class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width: <?= $targetPct ?>%;"></div>
+
+      <!-- 2. Delivery Amounts Bar -->
+      <div>
+        <div class="flex items-center justify-between text-xs font-bold mb-1">
+          <span class="text-blue-100 flex items-center gap-1.5">
+            <i class="fa-solid fa-truck-ramp-box text-emerald-300 text-[11px]"></i>
+            ডেলিভারি অ্যামাউন্ট (৳ <?= number_format($delivery) ?>)
+          </span>
+          <span class="text-emerald-300 font-extrabold font-mono"><?= $deliveryPct ?>%</span>
+        </div>
+        <div class="w-full h-2.5 bg-black/20 rounded-full overflow-hidden p-0.5">
+          <div class="h-full bg-emerald-400 rounded-full transition-all duration-500" style="width: <?= $deliveryPct ?>%;"></div>
+        </div>
       </div>
     </div>
 

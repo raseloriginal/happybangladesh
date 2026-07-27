@@ -92,16 +92,28 @@ class SRController extends Controller
         $qTarget->execute([$srId]);
         $targetAmt = (float)$qTarget->fetchColumn();
 
+        // Calculate delivered amounts for this month
+        $qDelivered = $this->db->prepare("
+            SELECT 
+                COALESCE(SUM(CASE WHEN MONTH(d.updated_at) = MONTH(CURDATE()) AND YEAR(d.updated_at) = YEAR(CURDATE()) AND d.status IN ('delivered', 'partial') THEN COALESCE(d.paid_amount, o.total_amount) ELSE 0 END), 0) AS this_month_delivery
+            FROM dispatches d
+            JOIN orders o ON o.id = d.order_id
+            WHERE o.sr_id = ?
+        ");
+        $qDelivered->execute([$srId]);
+        $thisMonthDelivery = (float)$qDelivered->fetchColumn();
+
         $stats = [
-            'total_orders'    => (int)($rowStats['total_orders'] ?? 0),
-            'pending_orders'  => (int)($rowStats['pending_orders'] ?? 0),
-            'confirmed'       => (int)($rowStats['confirmed'] ?? 0),
-            'total_value'     => (float)($rowStats['total_value'] ?? 0),
-            'today_sales'     => (float)($rowStats['today_sales'] ?? 0),
-            'this_month_sales'=> (float)($rowStats['this_month_sales'] ?? 0),
-            'target_amount'   => $targetAmt,
-            'total_retailers' => $totalRetailers,
-            'visited_today'   => $visitedToday,
+            'total_orders'       => (int)($rowStats['total_orders'] ?? 0),
+            'pending_orders'     => (int)($rowStats['pending_orders'] ?? 0),
+            'confirmed'          => (int)($rowStats['confirmed'] ?? 0),
+            'total_value'        => (float)($rowStats['total_value'] ?? 0),
+            'today_sales'        => (float)($rowStats['today_sales'] ?? 0),
+            'this_month_sales'   => (float)($rowStats['this_month_sales'] ?? 0),
+            'this_month_delivery'=> $thisMonthDelivery,
+            'target_amount'      => $targetAmt,
+            'total_retailers'    => $totalRetailers,
+            'visited_today'      => $visitedToday,
         ];
 
         $q = $this->db->prepare("
