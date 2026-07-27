@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="bn" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>অফলাইন — DSR App</title>
+  <meta name="theme-color" content="#1e40af">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e40af 50%, #2563eb 100%);
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      padding: 24px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 28px;
+      padding: 48px 32px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.35);
+    }
+
+    .icon-ring {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 2px solid rgba(255,255,255,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 40px;
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.85; }
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+    }
+
+    p {
+      font-size: 15px;
+      line-height: 1.65;
+      opacity: 0.85;
+      margin-bottom: 32px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      color: #1e40af;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: 50px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+    .btn:active { transform: translateY(0); }
+
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      padding: 4px 14px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fbbf24;
+      display: inline-block;
+      margin-right: 6px;
+      animation: blink 1.5s step-start infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .truck {
+      font-size: 28px;
+      display: block;
+      margin-bottom: 8px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">DSR App</div>
+    <div class="icon-ring">🚚</div>
+    <h1>ইন্টারনেট নেই</h1>
+    <p>
+      আপনি এখন অফলাইনে আছেন।<br>
+      নেটওয়ার্ক সংযোগ ফিরে এলে<br>ডেলিভারি তথ্য আবার লোড হবে।
+    </p>
+    <button class="btn" onclick="window.location.reload()">
+      <span class="status-dot"></span>
+      আবার চেষ্টা করুন
+    </button>
+  </div>
+
+  <script>
+    // Auto-reload when connection is restored
+    window.addEventListener('online', () => window.location.reload());
+  </script>
+</body>
+</html>

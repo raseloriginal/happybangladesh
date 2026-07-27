@@ -5,9 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title><?= isset($pageTitle) ? h($pageTitle) . ' — ' : '' ?><?= APP_NAME ?></title>
   <meta name="description" content="<?= APP_NAME ?> — DSR Mobile App">
-  <link rel="icon" type="image/png" href="<?= asset('images/logo.png') ?>">
-  <link rel="apple-touch-icon" href="<?= asset('images/logo.png') ?>">
-  <meta name="theme-color" content="#2563eb">
+  <link rel="icon" type="image/png" href="<?= asset('images/icons/dsr/icon-192.png') ?>">
+  <link rel="apple-touch-icon" href="<?= asset('images/icons/dsr/apple-touch-icon.png') ?>">
+  <meta name="theme-color" content="#1e40af">
+
+  <!-- PWA: Web App Manifest -->
+  <link rel="manifest" href="<?= BASE_URL ?>/dsr.webmanifest">
+
+  <!-- PWA: iOS Safari meta tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DSR App">
+
+  <!-- PWA: Service Worker base URL (resolved by sw-register.js) -->
+  <meta name="sw-base-url" content="<?= BASE_URL ?>/">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -114,5 +126,8 @@
   </style>
 
   <?= $extraScripts ?? '' ?>
+
+  <!-- PWA: Service Worker Registration -->
+  <script src="<?= BASE_URL ?>/dsr-sw-register.js" defer></script>
 </body>
 </html>

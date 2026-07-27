@@ -5,9 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title><?= isset($pageTitle) ? h($pageTitle) . ' — ' : '' ?><?= APP_NAME ?></title>
   <meta name="description" content="<?= APP_NAME ?> — SR Mobile App">
-  <link rel="icon" type="image/png" href="<?= asset('images/logo.png') ?>">
-  <link rel="apple-touch-icon" href="<?= asset('images/logo.png') ?>">
+  <link rel="icon" type="image/png" href="<?= asset('images/icons/sr/icon-192.png') ?>">
+  <link rel="apple-touch-icon" href="<?= asset('images/icons/sr/apple-touch-icon.png') ?>">
   <meta name="theme-color" content="#2563eb">
+
+  <!-- PWA: Web App Manifest -->
+  <link rel="manifest" href="<?= BASE_URL ?>/sr.webmanifest">
+
+  <!-- PWA: iOS Safari meta tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="SR App">
+
+  <!-- PWA: Service Worker base URL (resolved by sw-register.js) -->
+  <meta name="sw-base-url" content="<?= BASE_URL ?>/">
 
   <!-- Tailwind CSS CDN (for compatibility with existing views) -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -67,5 +79,8 @@
   <!-- App JS -->
   <script src="<?= asset('js/app.js') ?>"></script>
   <?= $extraScripts ?? '' ?>
+
+  <!-- PWA: Service Worker Registration -->
+  <script src="<?= BASE_URL ?>/sr-sw-register.js" defer></script>
 </body>
 </html>

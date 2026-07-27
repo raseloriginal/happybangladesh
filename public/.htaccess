@@ -1,5 +1,29 @@
 Options -MultiViews
+
+# ── PWA: MIME types ───────────────────────────────────────────
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType text/javascript            .js
+</IfModule>
+
+# ── PWA: Service Worker headers ───────────────────────────────
+# Allow the SR and DSR service workers (served from /public/)
+# to control their respective /sr/ and /dsr/ scopes.
+<FilesMatch "^(sr|dsr)-sw\.js$">
+  Header set Service-Worker-Allowed "/"
+  Header set Cache-Control "no-cache, no-store, must-revalidate"
+</FilesMatch>
+
+# ── PWA: Manifest no-cache ────────────────────────────────────
+<FilesMatch "\.webmanifest$">
+  Header set Cache-Control "no-cache"
+</FilesMatch>
+
+# ── PWA: Offline pages (no framework rewrite) ─────────────────
 RewriteEngine On
+RewriteRule ^(sr|dsr)-offline\.html$ - [L]
+RewriteRule ^(sr|dsr)\.(webmanifest)$ - [L]
+RewriteRule ^(sr|dsr)-sw(-register)?\.js$ - [L]
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
