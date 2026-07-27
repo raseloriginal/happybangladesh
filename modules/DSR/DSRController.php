@@ -406,6 +406,27 @@ class DSRController extends Controller
 
         // Group by dealer_id
         $grouped = [];
+        $dispatchIds = array_column($flatRetailers, 'dispatch_id');
+        $dispatchProducts = [];
+
+        if (!empty($dispatchIds)) {
+            $inClause = implode(',', array_map('intval', $dispatchIds));
+            $iq = $this->db->query("
+                SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
+                       p.name, p.image, p.pieces_per_box, 
+                       p.price as base_price,
+                       COALESCE(oi.unit_price, p.price) as price
+                FROM dispatch_items di
+                JOIN products p ON p.id = di.product_id
+                JOIN dispatches d ON d.id = di.dispatch_id
+                LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+                WHERE di.dispatch_id IN ($inClause)
+            ");
+            foreach ($iq->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $dispatchProducts[$row['dispatch_id']][] = $row;
+            }
+        }
+
         foreach ($flatRetailers as $ret) {
             $did = $ret['dealer_id'] ?? 'unknown_'.uniqid();
             if (!isset($grouped[$did])) {
@@ -421,19 +442,7 @@ class DSRController extends Controller
                 ];
             }
             
-            // Fetch products for this dispatch
-            $iq = $this->db->prepare("
-                SELECT di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
-                       p.name, p.image, p.pieces_per_box, 
-                       p.price as base_price,
-                       COALESCE(oi.unit_price, p.price) as price
-                FROM dispatch_items di
-                JOIN products p ON p.id = di.product_id
-                LEFT JOIN order_items oi ON oi.order_id = ? AND oi.product_id = di.product_id
-                WHERE di.dispatch_id = ?
-            ");
-            $iq->execute([$ret['order_id'], $ret['dispatch_id']]);
-            $products = $iq->fetchAll();
+            $products = $dispatchProducts[$ret['dispatch_id']] ?? [];
             
             $grouped[$did]['orders'][] = [
                 'dispatch_id' => $ret['dispatch_id'],

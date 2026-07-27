@@ -394,9 +394,17 @@ class SRController extends Controller
             $lng = 90.4125;
         }
 
+        $srId = Auth::id();
+
+        // 1. Fetch today's ordered retailer IDs for this SR to avoid dependent subquery
+        $qOrders = $this->db->prepare("SELECT DISTINCT retailer_id FROM orders WHERE sr_id = ? AND DATE(created_at) = CURDATE()");
+        $qOrders->execute([$srId]);
+        $orderedRetailerIds = $qOrders->fetchAll(PDO::FETCH_COLUMN);
+        $orderedRetailersMap = array_flip($orderedRetailerIds);
+
+        // 2. Fetch all retailers with Haversine distance
         $q = $this->db->prepare("
             SELECT r.id, r.name, r.phone, r.address, r.lat, r.lng,
-                   (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today,
                    ROUND(
                      6371000 * 2 * ASIN(SQRT(
                        POWER(SIN(RADIANS(r.lat - ?) / 2), 2) +
@@ -408,15 +416,14 @@ class SRController extends Controller
             ORDER BY dist_m ASC
         ");
         $q->execute([
-            Auth::id(),
             $lat, $lat, $lng
         ]);
         $retailers = $q->fetchAll(PDO::FETCH_ASSOC);
 
-        // Rename dist_m → dist for JS
+        // Rename dist_m → dist for JS and assign has_order_today from map
         foreach ($retailers as &$r) {
             $r['dist'] = $r['dist_m'];
-            $r['has_order_today'] = intval($r['has_order_today']) > 0;
+            $r['has_order_today'] = isset($orderedRetailersMap[$r['id']]);
             unset($r['dist_m']);
         }
 
