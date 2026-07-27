@@ -298,52 +298,42 @@ function openReturnModal() {
     fetch(`<?= url('dsr/api/settlement/returns') ?>?date=${selectedDate}`)
         .then(r => r.json())
         .then(data => {
-            if (!data.success) { body.innerHTML = '<p class="text-center text-slate-500 text-xs py-8">ডেটা লোড করা যায়নি।</p>'; return; }
-
-            let html = '';
-            let grandTotal = 0;
-
-            const buildSection = (title, color, bgColor, borderColor, items) => {
-                if (!items.length) return '';
-                let rows = '';
-                items.forEach(item => {
-                    const t = parseFloat(item.total);
-                    grandTotal += t;
-                    rows += `
-                      <tr class="border-b border-slate-100 last:border-0">
-                        <td class="py-2 pr-2 text-xs text-slate-700 font-medium">${item.product_name}</td>
-                        <td class="py-2 text-center text-xs font-mono text-slate-600">${parseFloat(item.qty)}</td>
-                        <td class="py-2 text-right text-xs font-mono text-slate-600">৳ ${parseFloat(item.price).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                        <td class="py-2 text-right text-xs font-mono font-bold ${color}">৳ ${t.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                      </tr>`;
-                });
-                return `
-                  <div class="overflow-hidden border ${borderColor}">
-                    <div class="${bgColor} px-3.5 py-2">
-                      <span class="text-xs font-black ${color}">${title}</span>
-                    </div>
-                    <table class="w-full">
-                      <thead>
-                        <tr class="border-b border-slate-100">
-                          <th class="text-left py-1.5 px-3.5 text-[10px] text-slate-400 font-semibold uppercase">পণ্য</th>
-                          <th class="text-center py-1.5 text-[10px] text-slate-400 font-semibold uppercase">পরিমাণ</th>
-                          <th class="text-right py-1.5 text-[10px] text-slate-400 font-semibold uppercase">মূল্য</th>
-                          <th class="text-right py-1.5 px-3.5 text-[10px] text-slate-400 font-semibold uppercase">মোট</th>
-                        </tr>
-                      </thead>
-                      <tbody class="px-3.5">${rows}</tbody>
-                    </table>
-                  </div>`;
-            };
-
-            html += buildSection('স্পট ফেরত (ডেলিভারি বাকি)', 'text-rose-700', 'bg-rose-50', 'border-rose-200', data.spot);
-            html += buildSection('আনুষ্ঠানিক ফেরত', 'text-orange-700', 'bg-orange-50', 'border-orange-200', data.formal);
-
-            if (!html) {
-                html = '<p class="text-center text-slate-400 text-xs py-10">এই তারিখে কোনো ফেরত মাল নেই।</p>';
+            if (!data.success || !data.items || !data.items.length) {
+                body.innerHTML = '<p class="text-center text-slate-400 text-xs py-10">এই তারিখে কোনো ফেরত মাল নেই।</p>';
+                total.textContent = '৳ 0.00';
+                return;
             }
 
-            body.innerHTML = html;
+            let grandTotal = 0;
+            let rows = '';
+
+            data.items.forEach(item => {
+                const t = parseFloat(item.total);
+                grandTotal += t;
+                rows += `
+                  <tr class="border-b border-slate-100 last:border-0">
+                    <td class="py-2.5 pr-2 text-xs text-slate-800 font-medium">${item.product_name}</td>
+                    <td class="py-2.5 text-center text-xs font-mono text-slate-600">${parseFloat(item.qty)}</td>
+                    <td class="py-2.5 text-right text-xs font-mono text-slate-600">৳ ${parseFloat(item.price).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+                    <td class="py-2.5 text-right text-xs font-mono font-bold text-rose-600">৳ ${t.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+                  </tr>`;
+            });
+
+            body.innerHTML = `
+              <div class="overflow-hidden border border-slate-200">
+                <table class="w-full">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200">
+                      <th class="text-left py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">পণ্য</th>
+                      <th class="text-center py-2 text-[10px] text-slate-500 font-bold uppercase">পরিমাণ</th>
+                      <th class="text-right py-2 text-[10px] text-slate-500 font-bold uppercase">মূল্য</th>
+                      <th class="text-right py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">মোট</th>
+                    </tr>
+                  </thead>
+                  <tbody class="px-3 text-xs">${rows}</tbody>
+                </table>
+              </div>`;
+
             total.textContent = '৳ ' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2});
         })
         .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-8">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });

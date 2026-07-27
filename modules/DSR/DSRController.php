@@ -636,20 +636,7 @@ class DSRController extends Controller
         $res = $q->fetch();
         
         $dispatchedValue = $res['dispatched_value'] ?: 0;
-        $spotReturnValue = $res['spot_return_value'] ?: 0;
-
-        // Formal returns (if any)
-        $q2 = $this->db->prepare("
-            SELECT COALESCE(SUM(ri.quantity * p.price), 0)
-            FROM returns r
-            JOIN return_items ri ON ri.return_id=r.id
-            JOIN products p ON p.id=ri.product_id
-            WHERE r.dsr_id=? AND r.return_date=? AND (r.reason != 'Damage' OR r.reason IS NULL)
-        ");
-        $q2->execute([$dsrId, $selectedDate]);
-        $formalReturnValue = $q2->fetchColumn();
-
-        $returnedValue = $spotReturnValue + $formalReturnValue;
+        $returnedValue   = $res['spot_return_value'] ?: 0;
         
         // Damage amount
         $q3 = $this->db->prepare("
@@ -711,8 +698,8 @@ class DSRController extends Controller
         $dsrId = Auth::id();
         $date  = $_GET['date'] ?? date('Y-m-d');
 
-        // 1. Spot returns: dispatched but not delivered
-        $q1 = $this->db->prepare("
+        // Spot returns: dispatched but not delivered
+        $q = $this->db->prepare("
             SELECT p.name AS product_name,
                    SUM(di.quantity - COALESCE(di.delivered_quantity, 0)) AS qty,
                    p.price,
@@ -724,30 +711,13 @@ class DSRController extends Controller
               AND (di.quantity - COALESCE(di.delivered_quantity, 0)) > 0
             GROUP BY p.id, p.name, p.price
         ");
-        $q1->execute([$dsrId, $date]);
-        $spotItems = $q1->fetchAll(PDO::FETCH_ASSOC);
-
-        // 2. Formal returns (non-damage)
-        $q2 = $this->db->prepare("
-            SELECT p.name AS product_name,
-                   SUM(ri.quantity) AS qty,
-                   p.price,
-                   SUM(ri.quantity * p.price) AS total
-            FROM returns r
-            JOIN return_items ri ON ri.return_id = r.id
-            JOIN products p      ON p.id = ri.product_id
-            WHERE r.dsr_id = ? AND r.return_date = ?
-              AND (r.reason != 'Damage' OR r.reason IS NULL)
-            GROUP BY p.id, p.name, p.price
-        ");
-        $q2->execute([$dsrId, $date]);
-        $formalItems = $q2->fetchAll(PDO::FETCH_ASSOC);
+        $q->execute([$dsrId, $date]);
+        $items = $q->fetchAll(PDO::FETCH_ASSOC);
 
         header('Content-Type: application/json');
         echo json_encode([
             'success' => true,
-            'spot'    => $spotItems,
-            'formal'  => $formalItems,
+            'items'   => $items,
         ]);
         exit;
     }
