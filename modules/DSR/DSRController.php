@@ -64,7 +64,7 @@ class DSRController extends Controller
     /**
      * POST /dsr/damage/store
      * Saves damage report for a retailer visit.
-     * Payload: csrf_token, retailer_id, total_amount, date, products (JSON array of {product_id, qty})
+     * Payload: csrf_token, retailer_id, total_amount, date, rows (JSON array of {sr_id, amount}) or products (fallback)
      */
     public function damageStore(): void
     {
@@ -73,10 +73,11 @@ class DSRController extends Controller
         $retailerId = (int)($_POST['retailer_id'] ?? 0);
         $date       = $_POST['date'] ?? date('Y-m-d');
         $totalAmt   = (float)($_POST['total_amount'] ?? 0);
+        $rows       = json_decode($_POST['rows'] ?? '[]', true);
         $products   = json_decode($_POST['products'] ?? '[]', true);
 
-        if (empty($products) || $totalAmt <= 0) {
-            echo json_encode(['success' => false, 'message' => 'No products or amount provided.']);
+        if (empty($rows) && empty($products) && $totalAmt <= 0) {
+            echo json_encode(['success' => false, 'message' => 'No damage data or amount provided.']);
             return;
         }
 
@@ -86,26 +87,39 @@ class DSRController extends Controller
             // Insert return header (damage type)
             $stmt = $this->db->prepare("
                 INSERT INTO returns (dsr_id, retailer_id, return_date, status, reason)
-                VALUES (?, ?, ?, 'approved', 'Damage')
+                VALUES (?, ?, ?, 'approved', ?)
             ");
-            $stmt->execute([$dsrId, $retailerId ?: null, $date]);
-            $returnId = $this->db->lastInsertId();
 
-            // Insert return_items
-            $itemStmt = $this->db->prepare("
-                INSERT INTO return_items (return_id, product_id, quantity, reason)
-                VALUES (?, ?, ?, 'Damage')
-            ");
-            foreach ($products as $p) {
-                $pid = (int)($p['product_id'] ?? 0);
-                $qty = (int)($p['qty'] ?? 0);
-                if ($pid > 0 && $qty > 0) {
-                    $itemStmt->execute([$returnId, $pid, $qty]);
+            if (!empty($rows)) {
+                // Temporary manual damage mode: save each SR damage row as a damage return record
+                foreach ($rows as $row) {
+                    $amt = (float)($row['amount'] ?? 0);
+                    $srId = (int)($row['sr_id'] ?? 0);
+                    if ($amt > 0) {
+                        $reasonText = 'Damage' . ($srId > 0 ? " | SR: {$srId} | Amount: {$amt}" : " | Amount: {$amt}");
+                        $stmt->execute([$dsrId, $retailerId ?: null, $date, $reasonText]);
+                    }
+                }
+            } else {
+                $stmt->execute([$dsrId, $retailerId ?: null, $date, 'Damage']);
+                $returnId = $this->db->lastInsertId();
+
+                // Insert return_items
+                $itemStmt = $this->db->prepare("
+                    INSERT INTO return_items (return_id, product_id, quantity, reason)
+                    VALUES (?, ?, ?, 'Damage')
+                ");
+                foreach ($products as $p) {
+                    $pid = (int)($p['product_id'] ?? 0);
+                    $qty = (int)($p['qty'] ?? 0);
+                    if ($pid > 0 && $qty > 0) {
+                        $itemStmt->execute([$returnId, $pid, $qty]);
+                    }
                 }
             }
 
             $this->db->commit();
-            echo json_encode(['success' => true, 'return_id' => $returnId]);
+            echo json_encode(['success' => true]);
         } catch (PDOException $e) {
             $this->db->rollBack();
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -322,18 +336,18 @@ class DSRController extends Controller
             ];
         }
 
-        // 4. DAMAGE (Returns marked as Damage)
+        // 4. DAMAGE (Returns marked as Damage, including manual damage entries)
         $damageQ = $this->db->prepare("
-            SELECT ri.product_id, SUM(ri.quantity) as qty
+            SELECT r.reason, ri.product_id, SUM(ri.quantity) as qty
             FROM returns r
-            JOIN return_items ri ON r.id = ri.return_id
-            WHERE r.dsr_id = ? AND r.return_date = ? AND ri.reason = 'Damage'
-            GROUP BY ri.product_id
+            LEFT JOIN return_items ri ON r.id = ri.return_id
+            WHERE r.dsr_id = ? AND r.return_date = ? AND r.reason LIKE 'Damage%'
+            GROUP BY r.id, ri.product_id, r.reason
         ");
         $damageQ->execute([$dsrId, $date]);
         foreach ($damageQ->fetchAll() as $row) {
             $pid = $row['product_id'];
-            if(isset($productMap[$pid])) {
+            if ($pid && isset($productMap[$pid])) {
                 $p = $productMap[$pid];
                 $val = $row['qty'] * $p['price'];
                 $totals['damage'] += $val;
@@ -345,6 +359,22 @@ class DSRController extends Controller
                     'value' => $val,
                     'oc_value' => 0
                 ];
+            } else {
+                // Manual damage row entry recorded in reason text
+                $reasonText = $row['reason'] ?? '';
+                preg_match('/Amount:\s*([\d\.]+)/', $reasonText, $matches);
+                $amt = isset($matches[1]) ? (float)$matches[1] : 0;
+                if ($amt > 0) {
+                    $totals['damage'] += $amt;
+                    $productsData['damage'][] = [
+                        'name' => 'Manual Damage Entry (' . $reasonText . ')',
+                        'qty' => 1,
+                        'pcs_per_box' => 1,
+                        'trade_price' => $amt,
+                        'value' => $amt,
+                        'oc_value' => 0
+                    ];
+                }
             }
         }
 
@@ -427,6 +457,15 @@ class DSRController extends Controller
             }
         }
 
+        // Fetch retailer IDs that have damage recorded today
+        $damagedRetailersStmt = $this->db->prepare("
+            SELECT DISTINCT retailer_id 
+            FROM returns 
+            WHERE dsr_id = ? AND return_date = ? AND reason LIKE 'Damage%' AND retailer_id IS NOT NULL
+        ");
+        $damagedRetailersStmt->execute([$dsrId, $selectedDate]);
+        $damagedRetailerIds = array_flip($damagedRetailersStmt->fetchAll(PDO::FETCH_COLUMN));
+
         foreach ($flatRetailers as $ret) {
             $did = $ret['dealer_id'] ?? 'unknown_'.uniqid();
             if (!isset($grouped[$did])) {
@@ -438,6 +477,7 @@ class DSRController extends Controller
                     'address' => $ret['address'],
                     'lat' => $ret['lat'],
                     'lng' => $ret['lng'],
+                    'has_damage' => isset($damagedRetailerIds[$ret['dealer_id']]),
                     'orders' => []
                 ];
             }
@@ -485,7 +525,20 @@ class DSRController extends Controller
             }
         }
 
-        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'selectedDate', 'vanStockMap'), 'dsr_app');
+        // Active Sales Representatives who have products loaded on this DSR's van today with company name
+        $srsStmt = $this->db->prepare("
+            SELECT DISTINCT u.id, u.name, COALESCE(c.name, 'No Company') as company_name 
+            FROM dispatches d
+            JOIN orders o ON o.id = d.order_id
+            JOIN users u ON u.id = o.sr_id
+            LEFT JOIN companies c ON c.id = u.company_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
+            ORDER BY u.name ASC
+        ");
+        $srsStmt->execute([$dsrId, $selectedDate]);
+        $srsList = $srsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'selectedDate', 'vanStockMap', 'srsList'), 'dsr_app');
     }
 
     public function deliveryUpdate(string $id): void
@@ -638,15 +691,25 @@ class DSRController extends Controller
         $dispatchedValue = $res['dispatched_value'] ?: 0;
         $returnedValue   = $res['spot_return_value'] ?: 0;
         
-        // Damage amount
+        // Damage amount (calculates product return items OR manual damage entries recorded in returns header/reason)
         $q3 = $this->db->prepare("
-            SELECT COALESCE(SUM(ri.quantity * p.price), 0)
-            FROM returns r
-            JOIN return_items ri ON ri.return_id=r.id
-            JOIN products p ON p.id=ri.product_id
-            WHERE r.dsr_id=? AND r.return_date=? AND r.reason='Damage'
+            SELECT 
+                COALESCE((
+                    SELECT SUM(ri.quantity * p.price)
+                    FROM returns r
+                    JOIN return_items ri ON ri.return_id=r.id
+                    JOIN products p ON p.id=ri.product_id
+                    WHERE r.dsr_id=? AND r.return_date=? AND r.reason='Damage'
+                ), 0)
+                +
+                COALESCE((
+                    SELECT SUM(CAST(SUBSTRING_INDEX(r.reason, 'Amount: ', -1) AS DECIMAL(14,2)))
+                    FROM returns r
+                    LEFT JOIN return_items ri ON ri.return_id=r.id
+                    WHERE r.dsr_id=? AND r.return_date=? AND r.reason LIKE 'Damage%' AND ri.id IS NULL
+                ), 0)
         ");
-        $q3->execute([$dsrId, $selectedDate]);
+        $q3->execute([$dsrId, $selectedDate, $dsrId, $selectedDate]);
         $totalDamage = (float) $q3->fetchColumn();
 
         // Total Expenses

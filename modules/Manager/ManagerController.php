@@ -593,11 +593,21 @@ class ManagerController extends Controller
             ")->fetchColumn();
             
             $sch['total_damage_value'] = (float)$this->db->query("
-                SELECT COALESCE(SUM(ri.quantity * p.price), 0)
-                FROM returns r
-                JOIN return_items ri ON ri.return_id = r.id
-                JOIN products p ON p.id = ri.product_id
-                WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND r.reason = 'Damage'
+                SELECT 
+                    COALESCE((
+                        SELECT SUM(ri.quantity * p.price)
+                        FROM returns r
+                        JOIN return_items ri ON ri.return_id = r.id
+                        JOIN products p ON p.id = ri.product_id
+                        WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND r.reason = 'Damage'
+                    ), 0)
+                    +
+                    COALESCE((
+                        SELECT SUM(CAST(SUBSTRING_INDEX(r.reason, 'Amount: ', -1) AS DECIMAL(14,2)))
+                        FROM returns r
+                        LEFT JOIN return_items ri ON ri.return_id = r.id
+                        WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND r.reason LIKE 'Damage%' AND ri.id IS NULL
+                    ), 0)
             ")->fetchColumn();
             
             $saleVal = $this->db->query("

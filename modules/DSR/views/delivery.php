@@ -445,15 +445,15 @@ $hasDeliveries = !empty($retailers);
       </div>
       <!-- Body -->
       <div class="px-5 pt-4 pb-2 max-h-[55vh] overflow-y-auto">
-        <!-- Product selection trigger -->
-        <button type="button" onclick="openDamageProductSelection()" class="w-full mb-4 py-2.5 px-4 rounded-xl border border-dashed border-red-300 hover:border-red-500 text-red-600 font-bold text-xs flex items-center justify-center gap-2 bg-red-50/20 transition active:scale-[0.98]">
-          <i class="fa-solid fa-circle-plus"></i> Select Products
+        <!-- Add Row Button -->
+        <button type="button" onclick="addDamageRow()" class="w-full mb-4 py-2.5 px-4 rounded-xl border border-dashed border-red-300 hover:border-red-500 text-red-600 font-bold text-xs flex items-center justify-center gap-2 bg-red-50/20 transition active:scale-[0.98]">
+          <i class="fa-solid fa-plus"></i> Add Row
         </button>
 
-        <!-- Selected products for inputting quantity -->
-        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Damaged Products List</div>
-        <div id="dmgProductList" class="space-y-2 mb-4">
-          <!-- Populated by JS -->
+        <!-- Rows Container -->
+        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Damage Entries</div>
+        <div id="dmgRowsContainer" class="space-y-2.5 mb-4">
+          <!-- Rows dynamically populated by JS -->
         </div>
 
         <!-- Total Delivery Value (Current Tab) -->
@@ -464,7 +464,7 @@ $hasDeliveries = !empty($retailers);
 
         <!-- Total Damage Amount -->
         <div class="flex justify-between items-center mb-2">
-            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Damage Amount</div>
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Damage Amount</div>
         </div>
         <input type="number" id="dmgTotalAmount" min="0" step="0.01" placeholder="0.00" oninput="onManualDamageAmountChange()"
           class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-xl font-black text-red-500 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20 transition mb-4">
@@ -486,44 +486,6 @@ $hasDeliveries = !empty($retailers);
       <div class="px-5 pb-6 pt-3 border-t border-gray-100 flex gap-3">
         <button onclick="closeDamageModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-2xl active:bg-gray-200 transition">Cancel</button>
         <button onclick="submitDamage()" class="flex-1 py-3 bg-red-500 text-white font-bold rounded-2xl shadow-lg shadow-red-500/30 active:scale-[0.98] transition">Submit Damage</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════
-       DAMAGE PRODUCT SELECTION MODAL
-  ═══════════════════════════════════════════════════════ -->
-  <div id="damageProductSelectModal" class="fixed inset-0 z-[400] hidden flex items-end justify-center bg-black/60 transition-opacity">
-    <div class="bg-white rounded-t-3xl w-full max-w-[480px] shadow-2xl transform transition-transform translate-y-full duration-300" id="damageProductSelectContent">
-      <!-- Handle -->
-      <div class="flex justify-center pt-3 pb-1">
-        <div class="w-10 h-1 bg-gray-200 rounded-full"></div>
-      </div>
-      <!-- Header -->
-      <div class="flex items-center justify-between px-5 pt-2 pb-4 border-b border-gray-100">
-        <div>
-          <div class="text-base font-black text-gray-800">Select Products</div>
-          <div class="text-xs text-gray-400 font-medium">Choose from retailer's company products</div>
-        </div>
-        <button onclick="closeDamageProductSelection()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-      <!-- Search Box -->
-      <div class="px-5 pt-3 pb-2">
-        <div class="flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-2 rounded-xl">
-          <i class="fa-solid fa-magnifying-glass text-gray-400 text-sm"></i>
-          <input type="text" id="dmgProductSearch" placeholder="Search products..." oninput="filterDmgProductSelection()" class="bg-transparent border-none text-sm outline-none w-full text-gray-700">
-        </div>
-      </div>
-      <!-- Body -->
-      <div class="px-5 pt-2 pb-2 max-h-[45vh] overflow-y-auto" id="dmgProductSelectItems">
-        <!-- Products list with check buttons -->
-      </div>
-      <!-- Footer -->
-      <div class="px-5 pb-6 pt-3 border-t border-gray-100 flex gap-3">
-        <button onclick="closeDamageProductSelection()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-2xl active:bg-gray-200 transition">Cancel</button>
-        <button onclick="confirmDamageProductSelection()" class="flex-1 py-3 bg-red-500 text-white font-bold rounded-2xl shadow-lg shadow-red-500/30 active:scale-[0.98] transition">Add Selected</button>
       </div>
     </div>
   </div>
@@ -606,25 +568,22 @@ function closePartialDueModal() {
 }
 
 // ── Damage Modal ──────────────────────────────────────────────
-let selectedDamageProducts = [];
-let allCompanyProducts = [];
+const activeSrsList = <?= json_encode($srsList ?? []) ?>;
+let damageRows = [];
 
 function openDamageModal() {
     if (!currentRetailerObj) return;
 
-    // Reset selected products
-    selectedDamageProducts = [];
-    allCompanyProducts = [];
+    // Reset rows
+    damageRows = [];
 
     // Set retailer label
     const name = currentRetailerObj.retailer_name || currentRetailerObj.dealer_name || currentRetailerObj.name || 'Retailer';
     document.getElementById('dmgRetailerLabel').innerText = name;
 
-    // Render empty / initial state
-    renderSelectedDamageProducts();
+    // Add initial row by default
+    addDamageRow();
 
-    document.getElementById('dmgTotalAmount').value = '';
-    
     const modal = document.getElementById('damageModal');
     const content = document.getElementById('damageModalContent');
     modal.classList.remove('hidden');
@@ -632,19 +591,85 @@ function openDamageModal() {
         content.classList.remove('translate-y-full');
         content.classList.add('translate-y-0');
     });
-    
-    // Initial calculation
+}
+
+function addDamageRow() {
+    damageRows.push({
+        id: Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        sr_id: '',
+        amount: ''
+    });
+    renderDamageRows();
     calcDamageSummary();
+}
+
+function removeDamageRow(rowId) {
+    damageRows = damageRows.filter(r => r.id !== rowId);
+    if (damageRows.length === 0) {
+        addDamageRow();
+    } else {
+        renderDamageRows();
+        calcDamageSummary();
+    }
+}
+
+function updateDamageRowSr(rowId, srId) {
+    const row = damageRows.find(r => r.id === rowId);
+    if (row) {
+        row.sr_id = srId;
+    }
+}
+
+function updateDamageRowAmount(rowId, amount) {
+    const row = damageRows.find(r => r.id === rowId);
+    if (row) {
+        row.amount = amount;
+        calcDamageSummary();
+    }
+}
+
+function renderDamageRows() {
+    const container = document.getElementById('dmgRowsContainer');
+    if (!container) return;
+
+    container.innerHTML = damageRows.map(r => `
+        <div class="flex items-center gap-2 bg-gray-50 rounded-2xl p-2.5 border border-gray-200 shadow-sm">
+            <!-- SR Dropdown -->
+            <div class="flex-1 min-w-0">
+                <select onchange="updateDamageRowSr('${r.id}', this.value)"
+                        class="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-700 outline-none focus:border-red-400 transition">
+                    <option value="">-- Select SR --</option>
+                    ${activeSrsList.map(sr => `<option value="${sr.id}" ${sr.id == r.sr_id ? 'selected' : ''}>${sr.name} (${sr.company_name})</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Damage Amount Input -->
+            <div class="w-32 min-w-0">
+                <input type="number" min="0" step="0.01" value="${r.amount}" placeholder="Amount (৳)"
+                       oninput="updateDamageRowAmount('${r.id}', this.value)"
+                       class="w-full text-center text-xs font-black text-red-500 bg-white border border-gray-200 rounded-xl px-2 py-2 outline-none focus:border-red-400 transition">
+            </div>
+
+            <!-- Delete Row Button -->
+            <button type="button" onclick="removeDamageRow('${r.id}')" 
+                    class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition">
+                <i class="fa-solid fa-trash-can text-sm"></i>
+            </button>
+        </div>
+    `).join('');
 }
 
 function calcDamageSummary() {
     let totalDamage = 0;
-    selectedDamageProducts.forEach(p => {
-        totalDamage += (p.qty || 1) * (parseFloat(p.price) || 0);
+    damageRows.forEach(r => {
+        const val = parseFloat(r.amount);
+        if (!isNaN(val) && val > 0) {
+            totalDamage += val;
+        }
     });
 
     const dmgTotalAmountInput = document.getElementById('dmgTotalAmount');
-    dmgTotalAmountInput.value = totalDamage > 0 ? totalDamage.toFixed(0) : '';
+    dmgTotalAmountInput.value = totalDamage > 0 ? totalDamage.toFixed(2) : '';
 
     const deliveredValue = typeof getSelectedOrderGettingTotal === 'function' ? getSelectedOrderGettingTotal() : 0;
     document.getElementById('dmgDeliveredValue').innerText = '৳' + deliveredValue.toFixed(0);
@@ -667,147 +692,6 @@ function onManualDamageAmountChange() {
     document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(0) : '';
 }
 
-function renderSelectedDamageProducts() {
-    const list = document.getElementById('dmgProductList');
-    if (selectedDamageProducts.length === 0) {
-        list.innerHTML = `<div class="text-sm text-gray-400 text-center py-4">No products selected. Click "Select Products" to add.</div>`;
-    } else {
-        list.innerHTML = selectedDamageProducts.map(p => `
-            <div class="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border border-red-100">
-                <button type="button" onclick="removeDamageProduct(${p.id})" class="text-red-500 hover:text-red-700">
-                    <i class="fa-solid fa-circle-minus text-lg"></i>
-                </button>
-                <div class="flex-1 min-w-0">
-                    <div class="text-sm font-bold text-gray-800 truncate">${p.name}</div>
-                    <div class="text-xs text-pink-500 font-bold">Tk ${parseFloat(p.price || 0).toFixed(0)}</div>
-                </div>
-                <input type="number" min="1" value="${p.qty || 1}" placeholder="Qty"
-                       class="dmg-qty-input w-16 text-center text-sm font-bold bg-white border border-gray-200 rounded-xl py-1.5 outline-none focus:border-red-400 transition"
-                       data-pid="${p.id}" oninput="updateDamageProductQty(${p.id}, this.value)">
-            </div>
-        `).join('');
-    }
-}
-
-function removeDamageProduct(id) {
-    selectedDamageProducts = selectedDamageProducts.filter(p => p.id !== id);
-    renderSelectedDamageProducts();
-    calcDamageSummary();
-}
-
-function updateDamageProductQty(id, qty) {
-    const p = selectedDamageProducts.find(prod => prod.id === id);
-    if (p) {
-        p.qty = parseInt(qty) || 1;
-        calcDamageSummary();
-    }
-}
-
-// ── Damage Product Selection Modal ────────────────────────────
-async function openDamageProductSelection() {
-    if (!currentRetailerObj) return;
-
-    let dispatchIds = [];
-    if (currentRetailerObj.orders) {
-        dispatchIds = currentRetailerObj.orders.map(o => o.dispatch_id).filter(id => id);
-    }
-    
-    // Fallback if missing
-    if (dispatchIds.length === 0 && currentDispatchId) {
-        dispatchIds = [currentDispatchId];
-    }
-
-    // Show loading
-    const listContainer = document.getElementById('dmgProductSelectItems');
-    listContainer.innerHTML = `<div class="text-center py-8 text-gray-500 font-bold"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading products...</div>`;
-
-    document.getElementById('dmgProductSearch').value = '';
-
-    // Show selection modal
-    const modal = document.getElementById('damageProductSelectModal');
-    const content = document.getElementById('damageProductSelectContent');
-    modal.classList.remove('hidden');
-    requestAnimationFrame(() => {
-        content.classList.remove('translate-y-full');
-        content.classList.add('translate-y-0');
-    });
-
-    try {
-        const res = await fetch(`<?= url("dsr/api/companies-products") ?>?dispatch_ids=${dispatchIds.join(',')}`);
-        const data = await res.json();
-        if (data.success && data.products) {
-            allCompanyProducts = data.products;
-            renderDmgProductSelectionList();
-        } else {
-            listContainer.innerHTML = `<div class="text-sm text-red-500 text-center py-4">${data.message || 'Failed to load products.'}</div>`;
-        }
-    } catch(err) {
-        listContainer.innerHTML = `<div class="text-sm text-red-500 text-center py-4">Error loading products.</div>`;
-    }
-}
-
-function renderDmgProductSelectionList() {
-    const container = document.getElementById('dmgProductSelectItems');
-    const query = document.getElementById('dmgProductSearch').value.toLowerCase().trim();
-    
-    const filtered = allCompanyProducts.filter(p => p.name.toLowerCase().includes(query));
-
-    if (filtered.length === 0) {
-        container.innerHTML = `<div class="text-sm text-gray-400 text-center py-8 font-semibold">No products match search.</div>`;
-        return;
-    }
-
-    container.innerHTML = filtered.map(p => {
-        const isChecked = selectedDamageProducts.some(prod => prod.id == p.id);
-        return `
-            <label class="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 cursor-pointer select-none border border-transparent has-[:checked]:border-red-300 has-[:checked]:bg-red-50/40 transition mb-2">
-                <input type="checkbox" class="dmg-select-cb w-4 h-4 accent-red-500 rounded" 
-                       data-pid="${p.id}" data-name="${p.name}" data-price="${p.price}"
-                       ${isChecked ? 'checked' : ''}>
-                <div class="flex-1 min-w-0">
-                    <div class="text-sm font-bold text-gray-800 truncate">${p.name}</div>
-                    <div class="text-xs text-gray-400 font-bold">${p.company_name} | Tk ${parseFloat(p.price || 0).toFixed(0)}</div>
-                </div>
-            </label>
-        `;
-    }).join('');
-}
-
-function filterDmgProductSelection() {
-    renderDmgProductSelectionList();
-}
-
-function closeDamageProductSelection() {
-    const modal = document.getElementById('damageProductSelectModal');
-    const content = document.getElementById('damageProductSelectContent');
-    content.classList.remove('translate-y-0');
-    content.classList.add('translate-y-full');
-    setTimeout(() => { modal.classList.add('hidden'); }, 300);
-}
-
-function confirmDamageProductSelection() {
-    const newSelection = [];
-    document.querySelectorAll('.dmg-select-cb:checked').forEach(cb => {
-        const id = parseInt(cb.dataset.pid);
-        const name = cb.dataset.name;
-        const price = parseFloat(cb.dataset.price);
-
-        // Keep existing quantity if already selected before
-        const existing = selectedDamageProducts.find(p => p.id === id);
-        newSelection.push({
-            id: id,
-            name: name,
-            price: price,
-            qty: existing ? existing.qty : 1
-        });
-    });
-
-    selectedDamageProducts = newSelection;
-    renderSelectedDamageProducts();
-    calcDamageSummary();
-    closeDamageProductSelection();
-}
-
 function closeDamageModal() {
     const modal = document.getElementById('damageModal');
     const content = document.getElementById('damageModalContent');
@@ -816,21 +700,36 @@ function closeDamageModal() {
     setTimeout(() => { modal.classList.add('hidden'); }, 300);
 }
 
+function updateDamageBtnState(hasDamage) {
+    const btn = document.getElementById('damageBtn');
+    if (!btn) return;
+    if (hasDamage) {
+        btn.className = 'px-2.5 py-1 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold gap-1 shadow-sm active:scale-95 transition';
+        btn.innerHTML = '<i class="fa-solid fa-[#ffffff] fa-check text-xs"></i><span>Damage Recorded</span>';
+        btn.title = 'Damage Recorded';
+    } else {
+        btn.className = 'w-8 h-8 bg-red-50 text-red-400 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition';
+        btn.innerHTML = '<i class="fa-solid fa-ban text-sm"></i>';
+        btn.title = 'Report Damage';
+    }
+}
+
 async function submitDamage() {
     const totalAmount = parseFloat(document.getElementById('dmgTotalAmount').value || 0);
     if (totalAmount <= 0) {
-        showToast('⚠️ Please enter the total damage amount.');
+        showToast('⚠️ Please enter a valid damage amount.');
         return;
     }
 
-    if (selectedDamageProducts.length === 0) {
-        showToast('⚠️ Please select at least one product.');
+    const validRows = damageRows.filter(r => parseFloat(r.amount) > 0);
+    if (validRows.length === 0) {
+        showToast('⚠️ Please enter damage amount for at least one row.');
         return;
     }
 
-    const payloadProducts = selectedDamageProducts.map(p => ({
-        product_id: p.id,
-        qty: p.qty || 1
+    const payloadRows = validRows.map(r => ({
+        sr_id: parseInt(r.sr_id) || 0,
+        amount: parseFloat(r.amount) || 0
     }));
 
     const retailerId = currentRetailerObj.retailer_id || currentRetailerObj.dealer_id || 0;
@@ -844,10 +743,14 @@ async function submitDamage() {
         const res = await fetch('<?= url("dsr/damage/store") ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `csrf_token=<?= Helpers::csrfToken() ?>&retailer_id=${retailerId}&date=${date}&total_amount=${totalAmount}&products=${encodeURIComponent(JSON.stringify(payloadProducts))}`
+            body: `csrf_token=<?= Helpers::csrfToken() ?>&retailer_id=${retailerId}&date=${date}&total_amount=${totalAmount}&rows=${encodeURIComponent(JSON.stringify(payloadRows))}`
         });
         const data = await res.json();
         if (data.success) {
+            if (currentRetailerObj) {
+                currentRetailerObj.has_damage = true;
+            }
+            updateDamageBtnState(true);
             closeDamageModal();
             showToast('✅ Damage report saved successfully!');
         } else {
@@ -1217,6 +1120,9 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
     document.getElementById('bsRetailerSub').innerText = retailer.retailer_name ? retailer.dealer_name : 'Retailer';
     document.getElementById('bsRetailerAvatar').src = 'https://i.pravatar.cc/100?img=' + ((parseInt(retailer.dealer_id) % 70) + 1);
     
+    // Update damage button icon & styling based on whether damage is recorded for this retailer
+    updateDamageBtnState(retailer.has_damage);
+
     const tabsContainer = document.getElementById('bsCompanyTabs');
     tabsContainer.innerHTML = '';
     
