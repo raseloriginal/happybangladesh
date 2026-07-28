@@ -81,11 +81,20 @@
                 </div>
             </div>
 
-            <div class="flex justify-between items-center mb-2">
+            <div class="flex flex-wrap justify-between items-center mb-3 gap-2">
                 <h4 class="text-lg font-bold text-gray-800">Products</h4>
-                <button type="button" onclick="addBulkRow()" class="btn btn-secondary btn-sm bg-white border border-gray-300">
-                    <i class="fas fa-plus"></i> Add Row
-                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="downloadLotCSVSample()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md border border-indigo-200 transition-colors">
+                        <i class="fas fa-download"></i> Sample CSV
+                    </button>
+                    <button type="button" onclick="document.getElementById('bulk-csv-input').click()" class="text-xs text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-md border border-emerald-200 transition-colors">
+                        <i class="fas fa-file-csv"></i> Upload CSV
+                    </button>
+                    <input type="file" id="bulk-csv-input" accept=".csv,.txt" class="hidden" onchange="handleLotCSVUpload(this)">
+                    <button type="button" onclick="addBulkRow()" class="btn btn-secondary btn-sm bg-white border border-gray-300">
+                        <i class="fas fa-plus"></i> Add Row
+                    </button>
+                </div>
             </div>
 
             <div class="overflow-x-auto mb-4 border border-gray-200 rounded">
@@ -380,26 +389,45 @@ function calculateTotals() {
     document.getElementById('grand-total').innerText = '৳' + grandTotal.toFixed(2);
 }
 
-function addBulkRow() {
+function addBulkRow(data = null) {
     const tbody = document.getElementById('bulk-rows');
     const tr = document.createElement('tr');
+    
+    const productId = data ? (data.productId || '') : '';
+    let labelText = 'Select Product...';
+    let labelClass = 'selected-product-name text-gray-500';
+    
+    if (productId) {
+        const product = productsList.find(p => p.id == productId);
+        if (product) {
+            labelText = `${product.name} (${product.pieces_per_box} Pcs)`;
+            labelClass = 'selected-product-name text-gray-900 font-medium';
+        }
+    } else if (data && data.productName) {
+        labelText = data.productName;
+        labelClass = 'selected-product-name text-amber-700 font-medium';
+    }
+    
+    const qty = data && data.qty !== undefined ? data.qty : 1;
+    const expiry = data && data.expiry ? data.expiry : '';
+    const price = data && data.price !== undefined ? data.price : 0;
     
     tr.innerHTML = `
         <td class="p-3 border-b border-gray-100">
             <div class="relative product-select-container">
                 <button type="button" onclick="openProductSelector(this)" class="form-input text-sm w-full text-left flex justify-between items-center bg-white cursor-pointer select-btn border border-gray-300 rounded px-3 py-2 hover:border-indigo-500 transition-colors">
-                    <span class="selected-product-name text-gray-500">Select Product...</span>
+                    <span class="${labelClass}">${labelText}</span>
                     <i class="fas fa-chevron-down text-gray-400"></i>
                 </button>
-                <input type="hidden" class="row-product" required>
+                <input type="hidden" class="row-product" value="${productId}" required>
             </div>
         </td>
         <td class="p-3 border-b border-gray-100">
-            <input type="number" class="form-input text-sm w-full row-qty" value="1" min="1" required oninput="calculateTotals(); updatePiecesHelper(this)">
+            <input type="number" class="form-input text-sm w-full row-qty" value="${qty}" min="1" required oninput="calculateTotals(); updatePiecesHelper(this)">
             <div class="text-[10px] text-gray-500 mt-1 row-qty-helper font-medium"></div>
         </td>
-        <td class="p-3 border-b border-gray-100"><input type="date" class="form-input text-sm w-full row-expiry"></td>
-        <td class="p-3 border-b border-gray-100"><input type="number" step="0.01" class="form-input text-sm w-full row-price" value="0" min="0" oninput="calculateTotals()"></td>
+        <td class="p-3 border-b border-gray-100"><input type="date" class="form-input text-sm w-full row-expiry" value="${expiry}"></td>
+        <td class="p-3 border-b border-gray-100"><input type="number" step="0.01" class="form-input text-sm w-full row-price" value="${price}" min="0" oninput="calculateTotals()"></td>
         <td class="p-3 border-b border-gray-100 align-middle"><span class="row-total font-medium text-gray-800">৳0.00</span></td>
         <td class="p-3 border-b border-gray-100 text-center">
             <button type="button" onclick="this.closest('tr').remove(); calculateTotals();" class="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded w-8 h-8 flex items-center justify-center">
@@ -408,7 +436,195 @@ function addBulkRow() {
         </td>
     `;
     tbody.appendChild(tr);
+    const qtyInput = tr.querySelector('.row-qty');
+    if (qtyInput) updatePiecesHelper(qtyInput);
     calculateTotals();
+}
+
+function downloadLotCSVSample() {
+    const csvContent = "\uFEFFProduct Name,Qty (Pieces),Buying Price,Expiry Date\n" +
+        "Mini Mango Juice,100,450.00,2027-12-31\n" +
+        "Choco Chocolate,50,300.00,2026-11-20\n";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Lot_Upload_Sample.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function parseCSVLine(str) {
+    const arr = [];
+    let quote = false;
+    let col = '';
+    for (let c = 0; c < str.length; c++) {
+        const cc = str[c];
+        const nc = str[c+1];
+        if (cc === '"') {
+            if (quote && nc === '"') {
+                col += '"';
+                c++;
+            } else {
+                quote = !quote;
+            }
+        } else if (cc === ',' && !quote) {
+            arr.push(col.trim());
+            col = '';
+        } else {
+            col += cc;
+        }
+    }
+    arr.push(col.trim());
+    return arr;
+}
+
+function formatDateString(str) {
+    if (!str) return '';
+    str = str.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const parts = str.split(/[\/\.-]/);
+    if (parts.length === 3) {
+        if (parts[0].length === 4) {
+            return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        } else if (parts[2].length === 4) {
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    return '';
+}
+
+function handleLotCSVUpload(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/);
+        
+        if (lines.length === 0) {
+            alert('CSV file is empty.');
+            return;
+        }
+
+        const companyId = document.getElementById('bulk-company').value;
+        const availableProducts = productsList.filter(p => !companyId || p.company_id == companyId);
+        
+        let headerIndex = -1;
+        let colMap = { product: 0, qty: 1, price: 2, expiry: 3 };
+
+        for (let i = 0; i < Math.min(3, lines.length); i++) {
+            const rowStr = lines[i].trim();
+            if (!rowStr) continue;
+            const cols = parseCSVLine(rowStr).map(c => c.toLowerCase());
+            
+            const prodIdx = cols.findIndex(c => c.includes('product') || c.includes('name') || c.includes('sku') || c.includes('item'));
+            if (prodIdx !== -1) {
+                headerIndex = i;
+                colMap.product = prodIdx;
+                
+                const qtyIdx = cols.findIndex(c => c.includes('qty') || c.includes('piece') || c.includes('quantity') || c.includes('pcs'));
+                if (qtyIdx !== -1) colMap.qty = qtyIdx;
+
+                const priceIdx = cols.findIndex(c => c.includes('price') || c.includes('cost') || c.includes('buying') || c.includes('rate'));
+                if (priceIdx !== -1) colMap.price = priceIdx;
+
+                const expIdx = cols.findIndex(c => c.includes('expir') || c.includes('exp') || c.includes('date'));
+                if (expIdx !== -1) colMap.expiry = expIdx;
+                
+                break;
+            }
+        }
+
+        const rowsToProcess = [];
+        const startLine = headerIndex >= 0 ? headerIndex + 1 : 0;
+        
+        for (let i = startLine; i < lines.length; i++) {
+            const rowStr = lines[i].trim();
+            if (!rowStr) continue;
+            const cols = parseCSVLine(rowStr);
+            if (cols.length === 0 || !cols.some(c => c.length > 0)) continue;
+            
+            const rawProd = cols[colMap.product] || '';
+            const rawQty = cols[colMap.qty] || '1';
+            const rawPrice = cols[colMap.price] || '0';
+            const rawExpiry = cols[colMap.expiry] || '';
+            
+            if (rawProd) {
+                rowsToProcess.push({
+                    rawProd,
+                    qty: parseInt(rawQty.replace(/[^0-9]/g, '')) || 1,
+                    price: parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0,
+                    expiry: formatDateString(rawExpiry)
+                });
+            }
+        }
+
+        if (rowsToProcess.length === 0) {
+            alert('No valid product rows found in the CSV file.');
+            input.value = '';
+            return;
+        }
+
+        document.getElementById('bulk-rows').innerHTML = '';
+
+        let matchedCount = 0;
+        let unmatchedList = [];
+        let matchedCompanyIds = new Set();
+
+        rowsToProcess.forEach(item => {
+            const searchStr = item.rawProd.trim().toLowerCase();
+            
+            let matchedProduct = availableProducts.find(p => String(p.id) === searchStr);
+            if (!matchedProduct) {
+                matchedProduct = availableProducts.find(p => (p.sku || '').toLowerCase() === searchStr);
+            }
+            if (!matchedProduct) {
+                matchedProduct = availableProducts.find(p => p.name.toLowerCase() === searchStr);
+            }
+            if (!matchedProduct) {
+                matchedProduct = availableProducts.find(p => p.name.toLowerCase().includes(searchStr) || (p.sku && p.sku.toLowerCase().includes(searchStr)));
+            }
+
+            if (matchedProduct) {
+                addBulkRow({
+                    productId: matchedProduct.id,
+                    qty: item.qty,
+                    price: item.price,
+                    expiry: item.expiry
+                });
+                matchedCount++;
+                if (matchedProduct.company_id) matchedCompanyIds.add(matchedProduct.company_id);
+            } else {
+                addBulkRow({
+                    productId: '',
+                    productName: `Unmatched: ${item.rawProd}`,
+                    qty: item.qty,
+                    price: item.price,
+                    expiry: item.expiry
+                });
+                unmatchedList.push(item.rawProd);
+            }
+        });
+
+        // Auto-select company if not selected and all matched products belong to a single company
+        const companySelect = document.getElementById('bulk-company');
+        if (!companySelect.value && matchedCompanyIds.size === 1) {
+            companySelect.value = Array.from(matchedCompanyIds)[0];
+        }
+
+        calculateTotals();
+
+        let msg = `CSV Import Summary:\n- Total Rows Processed: ${rowsToProcess.length}\n- Successfully Matched: ${matchedCount}`;
+        if (unmatchedList.length > 0) {
+            msg += `\n- Unmatched (${unmatchedList.length}): ${unmatchedList.join(', ')}\n\nNote: Please select the correct product manually for unmatched rows.`;
+        }
+        alert(msg);
+    };
+
+    reader.readAsText(file);
+    input.value = '';
 }
 
 // Initialize with one row
