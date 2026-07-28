@@ -28,11 +28,16 @@ class Auth
                 self::$currentRoleSlug = 'dsr';
             }
 
+            $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+                || (isset($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) === 'on');
+
             session_name($sessionName);
             session_set_cookie_params([
                 'lifetime' => SESSION_LIFETIME,
                 'path'     => '/',
-                'secure'   => false,
+                'secure'   => $isHttps,
                 'httponly'  => true,
                 'samesite'  => 'Lax',
             ]);

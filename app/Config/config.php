@@ -6,8 +6,12 @@ define('APP_PATH',  ROOT_PATH . '/app');
 define('MOD_PATH',  ROOT_PATH . '/modules');
 define('PUB_PATH',  ROOT_PATH . '/public');
 
-// Adjust BASE_URL to match your XAMPP virtual-host or sub-folder setup
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+    || (isset($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) === 'on');
+
+$protocol = $isHttps ? "https://" : "http://";
 $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
 
 $hostname = strtok($host, ':');

@@ -364,7 +364,7 @@ class ManagerController extends Controller
     {
         header('Content-Type: application/json; charset=utf-8');
         $this->verifyCsrf();
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
         if (!$input || empty($input['lots'])) {
             echo json_encode(['success' => false, 'message' => 'No lots provided']); exit;
         }
@@ -427,7 +427,7 @@ class ManagerController extends Controller
     {
         header('Content-Type: application/json; charset=utf-8');
         $this->verifyCsrf();
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
         if (!$input || empty($input['id'])) {
             echo json_encode(['success' => false, 'message' => 'Missing ID']); exit;
         }
@@ -497,7 +497,7 @@ class ManagerController extends Controller
     {
         header('Content-Type: application/json; charset=utf-8');
         $this->verifyCsrf();
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
         if (empty($input['id'])) {
             echo json_encode(['success' => false, 'message' => 'Missing ID']); exit;
         }

@@ -98,9 +98,11 @@ class Helpers
         $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? '';
         if (empty($token)) {
             // Fall back to JSON body
-            $input = json_decode(file_get_contents('php://input'), true);
+            $rawInput = file_get_contents('php://input');
+            $input = json_decode($rawInput, true);
             if (is_array($input)) {
                 $token = $input['csrf_token'] ?? $input['_csrf_token'] ?? '';
+                $GLOBALS['_PARSED_JSON_BODY'] = $input;
             }
         }
         // Also accept token from X-CSRF-Token header
@@ -116,7 +118,9 @@ class Helpers
                 }
             }
         }
-        return hash_equals(self::csrfToken(), (string) $token);
+        $sessionToken = self::csrfToken();
+        $token = trim((string)$token);
+        return !empty($token) && hash_equals($sessionToken, $token);
     }
 
     // ── Pagination ────────────────────────────────────────────
