@@ -789,14 +789,27 @@ class SRController extends Controller
         $srId = Auth::id();
         $date = trim($_GET['date'] ?? date('Y-m-d')); // Selected date, defaults to today
 
-        // 1. Fetch Ordered Products
+        // Fetch distinct companies for dropdown filter
+        $compQ = $this->db->prepare("
+            SELECT DISTINCT c.id, c.name 
+            FROM companies c
+            JOIN products p ON p.company_id = c.id
+            ORDER BY c.name ASC
+        ");
+        $compQ->execute();
+        $companies = $compQ->fetchAll(PDO::FETCH_ASSOC);
+
+        // 1. Fetch Ordered Products with Company & Packaging Info
         $qOrders = $this->db->prepare("
-            SELECT p.id as product_id, p.name as product_name, MAX(oi.unit_price) as ordered_price, SUM(oi.quantity) as ordered_qty
+            SELECT p.id as product_id, p.name as product_name, c.name as company_name, 
+                   COALESCE(p.pieces_per_box, 1) as pieces_per_box,
+                   MAX(oi.unit_price) as ordered_price, SUM(oi.quantity) as ordered_qty
             FROM order_items oi
             JOIN orders o ON o.id = oi.order_id
             JOIN products p ON p.id = oi.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
             WHERE o.sr_id = ? AND DATE(o.created_at) = ?
-            GROUP BY p.id, p.name
+            GROUP BY p.id, p.name, c.name, p.pieces_per_box
         ");
         $qOrders->execute([$srId, $date]);
         $ordersData = $qOrders->fetchAll(PDO::FETCH_ASSOC);
@@ -820,13 +833,17 @@ class SRController extends Controller
         ");
         $qDispatch->execute([$srId, $date, $date, $srId, $date]);
         $dispatchData = $qDispatch->fetchAll(PDO::FETCH_ASSOC);
-        // Process Data
+        
         $dispatchMap = [];
         foreach ($dispatchData as $row) {
             $dispatchMap[$row['product_id']] = $row;
         }
 
         $transactions = [];
+        $totalDispatchedVal = 0;
+        $totalSellVal = 0;
+        $totalReturnVal = 0;
+
         foreach ($ordersData as $row) {
             $pid = $row['product_id'];
             $orderedQty = (int)$row['ordered_qty'];
@@ -835,23 +852,40 @@ class SRController extends Controller
             $dispatchedQty = (int)($dispatchMap[$pid]['dispatched_qty'] ?? 0);
             $sellQty = (int)($dispatchMap[$pid]['sell_qty'] ?? 0);
             
-            // Return quantity is whatever was dispatched but not sold
+            // Return/Remaining quantity is whatever was dispatched but not sold
             $returnQty = max(0, $dispatchedQty - $sellQty);
 
+            $dispatchedVal = $dispatchedQty * $orderedPrice;
+            $sellVal       = $sellQty * $orderedPrice;
+            $returnVal     = $returnQty * $orderedPrice;
+
+            $totalDispatchedVal += $dispatchedVal;
+            $totalSellVal       += $sellVal;
+            $totalReturnVal     += $returnVal;
+
             $transactions[] = [
-                'product_name' => $row['product_name'],
-                'ordered_price' => $orderedPrice,
-                'ordered_qty' => $orderedQty,
-                'ordered_val' => $orderedQty * $orderedPrice,
+                'product_id'     => $pid,
+                'product_name'   => $row['product_name'],
+                'company_name'   => $row['company_name'] ?? 'অন্যান্য',
+                'pieces_per_box' => (int)($row['pieces_per_box'] ?: 1),
+                'ordered_price'  => $orderedPrice,
+                'ordered_qty'    => $orderedQty,
+                'ordered_val'    => $orderedQty * $orderedPrice,
                 'dispatched_qty' => $dispatchedQty,
-                'dispatched_val' => $dispatchedQty * $orderedPrice,
-                'sell_qty' => $sellQty,
-                'sell_val' => $sellQty * $orderedPrice,
-                'return_qty' => $returnQty,
-                'return_val' => $returnQty * $orderedPrice,
+                'dispatched_val' => $dispatchedVal,
+                'sell_qty'       => $sellQty,
+                'sell_val'       => $sellVal,
+                'return_qty'     => $returnQty,
+                'return_val'     => $returnVal,
             ];
         }
 
-        $this->renderApp('transactions', compact('transactions', 'date'));
+        $subtotal = [
+            'dispatched_val' => $totalDispatchedVal,
+            'sell_val'       => $totalSellVal,
+            'return_val'     => $totalReturnVal,
+        ];
+
+        $this->renderApp('transactions', compact('transactions', 'date', 'companies', 'subtotal'));
     }
 }

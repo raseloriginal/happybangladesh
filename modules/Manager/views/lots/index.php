@@ -452,7 +452,7 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
         const res = await fetch('<?= url('manager/api/lots/store') ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-            body: JSON.stringify({ lot_date, company_id, lots })
+            body: JSON.stringify({ csrf_token: csrf, lot_date, company_id, lots })
         });
         const data = await res.json();
         if (data.success) {
@@ -484,6 +484,7 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     
     const payload = {
+        csrf_token: csrf,
         id: document.getElementById('edit-id').value,
         product_id: document.getElementById('edit-product').value,
         expiry_date: document.getElementById('edit-exp-date').value,
@@ -518,7 +519,7 @@ async function deleteLot(id) {
         const res = await fetch('<?= url('manager/api/lots/delete') ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-            body: JSON.stringify({ id: id })
+            body: JSON.stringify({ csrf_token: csrf, id: id })
         });
         const data = await res.json();
         if(data.success) window.location.reload();

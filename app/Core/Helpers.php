@@ -99,13 +99,24 @@ class Helpers
         if (empty($token)) {
             // Fall back to JSON body
             $input = json_decode(file_get_contents('php://input'), true);
-            $token = $input['csrf_token'] ?? $input['_csrf_token'] ?? '';
+            if (is_array($input)) {
+                $token = $input['csrf_token'] ?? $input['_csrf_token'] ?? '';
+            }
         }
         // Also accept token from X-CSRF-Token header
         if (empty($token)) {
-            $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+            $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['REDIRECT_HTTP_X_CSRF_TOKEN'] ?? $_SERVER['X_CSRF_TOKEN'] ?? '';
         }
-        return hash_equals(self::csrfToken(), $token);
+        if (empty($token) && function_exists('getallheaders')) {
+            $headers = getallheaders();
+            foreach ($headers as $key => $val) {
+                if (strtolower($key) === 'x-csrf-token') {
+                    $token = $val;
+                    break;
+                }
+            }
+        }
+        return hash_equals(self::csrfToken(), (string) $token);
     }
 
     // ── Pagination ────────────────────────────────────────────
