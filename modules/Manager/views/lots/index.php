@@ -479,6 +479,15 @@ function parseCSVLine(str) {
     return arr;
 }
 
+function normalizeStr(str) {
+    if (!str) return '';
+    return str.toString()
+        .toLowerCase()
+        .trim()
+        .replace(/["'“”‘’]/g, '')
+        .replace(/[\s\-_]+/g, ' ');
+}
+
 function formatDateString(str) {
     if (!str) return '';
     str = str.trim();
@@ -508,8 +517,7 @@ function handleLotCSVUpload(input) {
             return;
         }
 
-        const companyId = document.getElementById('bulk-company').value;
-        const availableProducts = productsList.filter(p => !companyId || p.company_id == companyId);
+        const selectedCompanyId = document.getElementById('bulk-company').value;
         
         let headerIndex = -1;
         let colMap = { product: 0, qty: 1, price: 2, expiry: 3 };
@@ -574,17 +582,37 @@ function handleLotCSVUpload(input) {
         let matchedCompanyIds = new Set();
 
         rowsToProcess.forEach(item => {
-            const searchStr = item.rawProd.trim().toLowerCase();
+            const searchRaw = item.rawProd.trim();
+            const searchNorm = normalizeStr(searchRaw);
             
-            let matchedProduct = availableProducts.find(p => String(p.id) === searchStr);
+            let pool = selectedCompanyId 
+                ? productsList.filter(p => p.company_id == selectedCompanyId)
+                : productsList;
+
+            // 1. Exact ID match
+            let matchedProduct = pool.find(p => String(p.id) === searchRaw);
+            
+            // 2. Exact SKU match
             if (!matchedProduct) {
-                matchedProduct = availableProducts.find(p => (p.sku || '').toLowerCase() === searchStr);
+                matchedProduct = pool.find(p => p.sku && normalizeStr(p.sku) === searchNorm);
             }
+            
+            // 3. Exact Name match
             if (!matchedProduct) {
-                matchedProduct = availableProducts.find(p => p.name.toLowerCase() === searchStr);
+                matchedProduct = pool.find(p => normalizeStr(p.name) === searchNorm);
             }
+            
+            // 4. Normalized Substring match
             if (!matchedProduct) {
-                matchedProduct = availableProducts.find(p => p.name.toLowerCase().includes(searchStr) || (p.sku && p.sku.toLowerCase().includes(searchStr)));
+                matchedProduct = pool.find(p => {
+                    const pNorm = normalizeStr(p.name);
+                    return pNorm.length > 2 && (pNorm.includes(searchNorm) || searchNorm.includes(pNorm));
+                });
+            }
+
+            // 5. Global fallback if company was selected but product was listed under standard pool
+            if (!matchedProduct && selectedCompanyId) {
+                matchedProduct = productsList.find(p => normalizeStr(p.name) === searchNorm || (p.sku && normalizeStr(p.sku) === searchNorm));
             }
 
             if (matchedProduct) {
@@ -599,7 +627,7 @@ function handleLotCSVUpload(input) {
             } else {
                 addBulkRow({
                     productId: '',
-                    productName: `Unmatched: ${item.rawProd}`,
+                    productName: item.rawProd,
                     qty: item.qty,
                     price: item.price,
                     expiry: item.expiry
@@ -608,17 +636,17 @@ function handleLotCSVUpload(input) {
             }
         });
 
-        // Auto-select company if not selected and all matched products belong to a single company
         const companySelect = document.getElementById('bulk-company');
-        if (!companySelect.value && matchedCompanyIds.size === 1) {
+        if (!companySelect.value && matchedCompanyIds.size > 0) {
             companySelect.value = Array.from(matchedCompanyIds)[0];
+            updateProductDropdowns();
         }
 
         calculateTotals();
 
-        let msg = `CSV Import Summary:\n- Total Rows Processed: ${rowsToProcess.length}\n- Successfully Matched: ${matchedCount}`;
+        let msg = `CSV Import Summary:\n- Total Processed: ${rowsToProcess.length}\n- Matched Products: ${matchedCount}`;
         if (unmatchedList.length > 0) {
-            msg += `\n- Unmatched (${unmatchedList.length}): ${unmatchedList.join(', ')}\n\nNote: Please select the correct product manually for unmatched rows.`;
+            msg += `\n- Unmatched (${unmatchedList.length}): ${unmatchedList.join(', ')}\n\nNote: Please click the unmatched product button to select the product manually.`;
         }
         alert(msg);
     };
