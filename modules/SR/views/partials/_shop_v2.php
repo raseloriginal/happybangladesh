@@ -205,8 +205,8 @@
     
     <!-- Product Name & Package Type -->
     <div class="sr-prod-sheet-name-v2" id="productSheetName">—</div>
-    <div class="sr-prod-sheet-package-v2">
-      প্যাকেজ টাইপ: <span style="color:#2563eb; font-weight:700;">বক্স ( <span id="productSheetPcsPerBox">—</span> পিস )</span>
+    <div class="sr-prod-sheet-package-v2" id="productSheetPackageWrap">
+      প্যাকেজ টাইপ: <span style="color:#2563eb; font-weight:700;" id="productSheetPackageInner">বক্স ( <span id="productSheetPcsPerBox">—</span> পিস )</span>
     </div>
     <div class="sr-prod-sheet-baseprice-v2">
       মোট মূল্য <span style="color:#f43f5e; font-weight:700;" id="productSheetBasePrice">—</span>
@@ -227,9 +227,9 @@
     </div>
     
     <!-- Box & Piece counters -->
-    <div class="sr-prod-qty-counters-grid-v2">
+    <div class="sr-prod-qty-counters-grid-v2" id="qtyCountersGrid">
       <!-- Box counter -->
-      <div class="sr-prod-qty-counter-v2">
+      <div class="sr-prod-qty-counter-v2" id="boxCounterGroup">
         <div class="sr-prod-qty-counter-label-v2">বক্স</div>
         <div class="sr-prod-qty-counter-row-v2">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('cartons',-1)">−</button>
@@ -238,7 +238,7 @@
         </div>
       </div>
       <!-- Piece counter -->
-      <div class="sr-prod-qty-counter-v2">
+      <div class="sr-prod-qty-counter-v2" id="pieceCounterGroup">
         <div class="sr-prod-qty-counter-label-v2">পিস</div>
         <div class="sr-prod-qty-counter-row-v2">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('pieces',-1)">−</button>
@@ -597,6 +597,15 @@ function renderProductsGrid() {
 // ══════════════════════════════════════════════════════════════
 // PRODUCT BOTTOM SHEET
 // ══════════════════════════════════════════════════════════════
+function isPcsProduct(p) {
+  if (!p) return false;
+  const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || 12);
+  const boxTypeStr = (p.box_type || '').toString().trim().toLowerCase();
+  const pcsKeywords = ['pcs', 'pc', 'piece', 'pieces', 'পিস', 'পিছ'];
+
+  return pcsKeywords.includes(boxTypeStr) || (ppb <= 1);
+}
+
 function openProductSheet(idx) {
   currentProduct = ALL_PRODUCTS[idx];
   const p = currentProduct;
@@ -604,8 +613,24 @@ function openProductSheet(idx) {
   const emoji = emojis[idx % emojis.length];
 
   const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || 12);
+  const isPcs = isPcsProduct(p);
+
   document.getElementById('productSheetName').textContent = p.name;
-  document.getElementById('productSheetPcsPerBox').textContent = ppb;
+  
+  const pkgInner = document.getElementById('productSheetPackageInner');
+  const boxCounter = document.getElementById('boxCounterGroup');
+  const grid = document.getElementById('qtyCountersGrid');
+
+  if (isPcs) {
+    if (pkgInner) pkgInner.textContent = 'পিস';
+    if (boxCounter) boxCounter.style.display = 'none';
+    if (grid) grid.style.gridTemplateColumns = '1fr';
+  } else {
+    const boxLabel = p.box_type || 'বক্স';
+    if (pkgInner) pkgInner.innerHTML = `${escHtml(boxLabel)} ( <span id="productSheetPcsPerBox">${ppb}</span> পিস )`;
+    if (boxCounter) boxCounter.style.display = 'flex';
+    if (grid) grid.style.gridTemplateColumns = '1fr 1fr';
+  }
   
   // Pre-fill quantities from cart if item already exists
   const cart = cartsByRetailer[currentRetailer.id] || [];
@@ -614,12 +639,12 @@ function openProductSheet(idx) {
   const baseProductPrice = parseFloat(p.selling_price || p.price || 0);
   document.getElementById('baseUnitPrice').value = baseProductPrice;
 
-  // Carton base price estimation
-  const cartonBasePrice = baseProductPrice * ppb;
+  // Carton base price estimation (or piece price if isPcs)
+  const defaultDisplayPrice = isPcs ? baseProductPrice : (baseProductPrice * ppb);
   document.getElementById('productSheetBasePrice').textContent = `Tk 0`;
   
-  // Set the big input default to the carton base price
-  document.getElementById('totalDisplayInput').value = cartonBasePrice.toFixed(0);
+  // Set the big input default to the display price
+  document.getElementById('totalDisplayInput').value = defaultDisplayPrice.toFixed(0);
 
   const imgWrap = document.getElementById('productSheetImgWrap');
   if (p.image) {
@@ -633,10 +658,15 @@ function openProductSheet(idx) {
   let currentPiecePrice = baseProductPrice;
   
   if (existing) {
-    cartons = Math.floor(existing.qty / ppb);
-    pieces = existing.qty % ppb;
+    if (isPcs) {
+      cartons = 0;
+      pieces = existing.qty;
+    } else {
+      cartons = Math.floor(existing.qty / ppb);
+      pieces = existing.qty % ppb;
+    }
     currentPiecePrice = existing.price;
-    document.getElementById('totalDisplayInput').value = (currentPiecePrice * ppb).toFixed(0);
+    document.getElementById('totalDisplayInput').value = (currentPiecePrice * (isPcs ? 1 : ppb)).toFixed(0);
   }
 
   document.getElementById('qtyCartons').value = cartons;
@@ -677,12 +707,16 @@ function updateOcDisplay(totalPcs, actualTotal) {
 }
 
 function calcTotal() {
-  const cartons = parseInt(document.getElementById('qtyCartons').value) || 0;
+  const p = currentProduct;
+  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || 12);
+  const isPcs = isPcsProduct(p);
+
+  const cartons = isPcs ? 0 : (parseInt(document.getElementById('qtyCartons').value) || 0);
   const pieces  = parseInt(document.getElementById('qtyPieces').value)  || 0;
   
   const currentBoxPrice = parseFloat(document.getElementById('totalDisplayInput').value) || 0;
-  const pcsPerCarton = currentProduct?.pieces_per_carton || currentProduct?.pieces_per_box || 12;
-  const currentPiecePrice = pcsPerCarton > 0 ? (currentBoxPrice / pcsPerCarton) : currentBoxPrice;
+  const pcsPerCarton = isPcs ? 1 : (ppb > 0 ? ppb : 1);
+  const currentPiecePrice = isPcs ? currentBoxPrice : (pcsPerCarton > 0 ? (currentBoxPrice / pcsPerCarton) : currentBoxPrice);
   
   const totalPcs = cartons * pcsPerCarton + pieces;
   const actualTotal = totalPcs * currentPiecePrice;
@@ -701,12 +735,15 @@ function calcTotal() {
 
 function addToCart() {
   const p = currentProduct;
-  const cartons = parseInt(document.getElementById('qtyCartons').value) || 0;
+  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || 12);
+  const isPcs = isPcsProduct(p);
+
+  const cartons = isPcs ? 0 : (parseInt(document.getElementById('qtyCartons').value) || 0);
   const pieces  = parseInt(document.getElementById('qtyPieces').value)  || 0;
   
   const currentBoxPrice = parseFloat(document.getElementById('totalDisplayInput').value) || 0;
-  const pcsPerCarton = p?.pieces_per_carton || p?.pieces_per_box || 12;
-  const currentPiecePrice = pcsPerCarton > 0 ? (currentBoxPrice / pcsPerCarton) : currentBoxPrice;
+  const pcsPerCarton = isPcs ? 1 : (ppb > 0 ? ppb : 1);
+  const currentPiecePrice = isPcs ? currentBoxPrice : (pcsPerCarton > 0 ? (currentBoxPrice / pcsPerCarton) : currentBoxPrice);
   
   const totalPcs = cartons * pcsPerCarton + pieces;
 
@@ -724,6 +761,7 @@ function addToCart() {
     existing.total = actualTotal;
     existing.price = currentPiecePrice;
     existing.oc    = oc;
+    existing.pcsPerCarton = pcsPerCarton;
   } else {
     cart.push({ id: p.id, name: p.name, qty: totalPcs, price: currentPiecePrice, total: actualTotal, pcsPerCarton, oc });
   }
