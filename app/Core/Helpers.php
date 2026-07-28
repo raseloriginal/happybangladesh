@@ -160,3 +160,20 @@ function e(string $s): string    { return Helpers::e($s); }
 function h(string $s): string    { return Helpers::e($s); }
 function url(string $p = ''): string { return Helpers::url($p); }
 function asset(string $p): string    { return Helpers::asset($p); }
+
+// Cache helper aliases
+function cache(string $key = null, mixed $default = null): mixed {
+    if ($key === null) {
+        return new Cache();
+    }
+    return Cache::get($key, $default);
+}
+function cache_remember(string $key, int $ttl, callable $callback): mixed {
+    return Cache::remember($key, $ttl, $callback);
+}
+function cache_forget(string $key): bool {
+    return Cache::forget($key);
+}
+function cache_flush(): bool {
+    return Cache::flush();
+}

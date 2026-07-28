@@ -1,1 +1,8 @@
 public/assets/uploads/
+
+# Storage & Cache
+storage/cache/*.cache
+!storage/cache/.gitkeep
+
+# Logs
+logs/*.log

@@ -134,4 +134,15 @@ abstract class Model
         $stmt = $this->db->prepare($sql);
         return $stmt->execute($params);
     }
+
+    // ── Cache query results ───────────────────────────────────
+    public function remember(string $cacheKey, int $ttl, callable $callback): mixed
+    {
+        return Cache::remember($cacheKey, $ttl, $callback);
+    }
+
+    public function rememberQuery(string $cacheKey, int $ttl, string $sql, array $params = []): array
+    {
+        return Cache::remember($cacheKey, $ttl, fn() => $this->query($sql, $params));
+    }
 }
