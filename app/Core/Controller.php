@@ -70,10 +70,12 @@ abstract class Controller
     {
         http_response_code($code);
         $wantsJson = (
-            str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') ||
-            str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') ||
-            str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') ||
-            !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+            str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'json') ||
+            str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'json') ||
+            str_contains($_SERVER['HTTP_CONTENT_TYPE'] ?? '', 'json') ||
+            str_contains($_SERVER['REQUEST_URI'] ?? '', '/api/') ||
+            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) ||
+            !empty($_SERVER['HTTP_X_CSRF_TOKEN'])
         );
         if ($wantsJson) {
             header('Content-Type: application/json; charset=utf-8');

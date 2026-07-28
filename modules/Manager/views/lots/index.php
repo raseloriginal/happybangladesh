@@ -454,7 +454,15 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify({ csrf_token: csrf, lot_date, company_id, lots })
         });
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch(e) {
+            const rawText = await res.text().catch(() => '');
+            alert('Server error (' + res.status + '): ' + (rawText || res.statusText || 'Invalid response from server'));
+            btn.disabled = false; btn.innerText = 'Save Lot';
+            return;
+        }
         if (data.success) {
             window.location.reload();
         } else {
@@ -462,7 +470,7 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
             btn.disabled = false; btn.innerText = 'Save Lot';
         }
     } catch(err) {
-        alert('Request failed');
+        alert('Request failed: ' + (err.message || err));
         btn.disabled = false; btn.innerText = 'Save Lot';
     }
 });
@@ -499,7 +507,15 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify(payload)
         });
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch(e) {
+            const rawText = await res.text().catch(() => '');
+            alert('Server error (' + res.status + '): ' + (rawText || res.statusText || 'Invalid response from server'));
+            btn.disabled = false; btn.innerText = 'Save Changes';
+            return;
+        }
         if (data.success) {
             window.location.reload();
         } else {
@@ -507,7 +523,7 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
             btn.disabled = false; btn.innerText = 'Save Changes';
         }
     } catch(err) {
-        alert('Request failed');
+        alert('Request failed: ' + (err.message || err));
         btn.disabled = false; btn.innerText = 'Save Changes';
     }
 });
@@ -521,11 +537,18 @@ async function deleteLot(id) {
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify({ csrf_token: csrf, id: id })
         });
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch(e) {
+            const rawText = await res.text().catch(() => '');
+            alert('Server error (' + res.status + '): ' + (rawText || res.statusText || 'Invalid response from server'));
+            return;
+        }
         if(data.success) window.location.reload();
-        else alert('Error deleting lot');
+        else alert(data.message || 'Error deleting lot');
     } catch(err) {
-        alert('Request failed');
+        alert('Request failed: ' + (err.message || err));
     }
 }
 </script>

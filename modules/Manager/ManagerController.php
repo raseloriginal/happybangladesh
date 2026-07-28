@@ -370,7 +370,7 @@ class ManagerController extends Controller
         }
 
         $lot_date = !empty($input['lot_date']) ? $input['lot_date'] : date('Y-m-d');
-        $wid = Auth::warehouseId();
+        $wid = Auth::warehouseId() ?: ($this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn() ?: 1);
 
         $this->db->beginTransaction();
         try {
@@ -432,7 +432,7 @@ class ManagerController extends Controller
             echo json_encode(['success' => false, 'message' => 'Missing ID']); exit;
         }
 
-        $wid = Auth::warehouseId();
+        $wid = Auth::warehouseId() ?: ($this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn() ?: 1);
         $this->db->beginTransaction();
         try {
             // 1. Fetch old lot to revert its inventory contribution
@@ -502,7 +502,7 @@ class ManagerController extends Controller
             echo json_encode(['success' => false, 'message' => 'Missing ID']); exit;
         }
 
-        $wid = Auth::warehouseId();
+        $wid = Auth::warehouseId() ?: ($this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn() ?: 1);
         $this->db->beginTransaction();
         try {
             // Get lot data before deleting
