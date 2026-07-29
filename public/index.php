@@ -39,15 +39,25 @@ $router = new Router();
 if (isset($_GET['url']) && $_GET['url'] !== '') {
     $url = $_GET['url'];
 } else {
-    $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
-    $scriptName = dirname($_SERVER['SCRIPT_NAME'] ?? '');
-    $basePath   = str_replace(['/public', '\\public'], '', $scriptName);
-    $basePath   = rtrim($basePath, '/\\');
-    if ($basePath !== '' && str_starts_with($requestUri, $basePath)) {
-        $requestUri = substr($requestUri, strlen($basePath));
+    $rawUri = $_SERVER['REQUEST_URI'] ?? '/';
+    $path = parse_url($rawUri, PHP_URL_PATH) ?? '/';
+
+    // Remove script directory prefix if present
+    $scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+    if ($scriptDir !== '/' && $scriptDir !== '\\' && str_starts_with($path, $scriptDir)) {
+        $path = substr($path, strlen($scriptDir));
     }
-    $url = $requestUri ?: '/';
+
+    // Strip /public prefix if Nginx routes through root directory
+    if (str_starts_with($path, '/public/')) {
+        $path = substr($path, 7);
+    } elseif ($path === '/public') {
+        $path = '/';
+    }
+
+    $url = $path ?: '/';
 }
+$url = '/' . ltrim($url, '/');
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 // ── Auth routes ───────────────────────────────────────────────
