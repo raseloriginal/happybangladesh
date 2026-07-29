@@ -145,7 +145,18 @@
 
 <script>
 const BASE_URL = '<?= BASE_URL ?>';
-const ALL_PRODUCTS = <?= json_encode($allProducts ?? [], JSON_UNESCAPED_UNICODE) ?>;
+const ALL_PRODUCTS_URL = `${BASE_URL}/sr/api/products`;
+let ALL_PRODUCTS = [];
+
+// Fetch products asynchronously
+fetch(ALL_PRODUCTS_URL)
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      ALL_PRODUCTS = data.products || [];
+    }
+  })
+  .catch(err => console.error('Failed to load products', err));
 const gradients = [
   'linear-gradient(135deg,#2563eb,#3b82f6)',
   'linear-gradient(135deg,#06b6d4,#0891b2)',

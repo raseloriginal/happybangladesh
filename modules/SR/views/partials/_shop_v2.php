@@ -152,10 +152,6 @@
       </div>
     </div>
 
-    <!-- Category / Company Horizontal Scroll Bar -->
-    <div class="sr-popup-categories-wrap-v2" id="popupCategoriesWrap">
-      <!-- Populated dynamically based on companies -->
-    </div>
 
     <!-- Section Title & Filters -->
     <div class="sr-popup-section-header-v2">
@@ -491,21 +487,6 @@ function openProductsForRetailer() {
   
   // Avatar removed
 
-  // Dynamically render categories from ALL_PRODUCTS
-  const categories = [...new Set(ALL_PRODUCTS.map(p => p.category_name).filter(Boolean))];
-  const catWrap = document.getElementById('popupCategoriesWrap');
-  if (catWrap) {
-    if (categories.length > 0) {
-      catWrap.innerHTML = categories.map((cName, idx) => `
-        <div class="sr-popup-category-card-v2 ${idx === 0 ? 'active' : ''}">
-          <div class="sr-cat-icon-box-v2">🏷️</div>
-          <div class="sr-cat-label-v2">${escHtml(cName)}</div>
-        </div>
-      `).join('');
-    } else {
-      catWrap.innerHTML = '';
-    }
-  }
 
   renderProductsGrid();
   updatePopupCartInfo();

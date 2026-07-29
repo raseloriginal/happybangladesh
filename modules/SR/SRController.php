@@ -56,6 +56,48 @@ class SRController extends Controller
         $this->render($view, $data, 'sr_app');
     }
 
+    // ── Get SR Products Optimized ─────────────────────────────
+    private function getSRProducts(int $srId): array
+    {
+        $qSR = $this->db->prepare("
+            SELECT DISTINCT d.warehouse_id, dc.company_id 
+            FROM dealers d 
+            JOIN dealer_companies dc ON dc.dealer_id = d.id 
+            WHERE dc.sr_id = ?
+        ");
+        $qSR->execute([$srId]);
+        $srData = $qSR->fetchAll(PDO::FETCH_ASSOC);
+
+        $warehouseIds = array_unique(array_filter(array_column($srData, 'warehouse_id')));
+        $companyIds = array_unique(array_filter(array_column($srData, 'company_id')));
+
+        if (empty($companyIds)) {
+            return [];
+        }
+
+        $compIn = implode(',', array_map('intval', $companyIds));
+        
+        $inventoryJoin = "LEFT JOIN inventory i ON 1=0";
+        if (!empty($warehouseIds)) {
+            $whIn = implode(',', array_map('intval', $warehouseIds));
+            $inventoryJoin = "LEFT JOIN inventory i ON i.product_id = p.id AND i.warehouse_id IN ($whIn)";
+        }
+
+        $q = $this->db->prepare("
+            SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
+                   COALESCE(SUM(i.qty_boxes * p.pieces_per_box + i.qty_pieces), 0) AS stock
+            FROM products p
+            LEFT JOIN companies c ON c.id=p.company_id
+            $inventoryJoin
+            WHERE p.status=1
+              AND p.company_id IN ($compIn)
+            GROUP BY p.id
+            ORDER BY p.name
+        ");
+        $q->execute();
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     // ── Dashboard ─────────────────────────────────────────────
     public function dashboard(): void
     {
@@ -286,29 +328,8 @@ class SRController extends Controller
         $wid = Auth::warehouseId();
         $srId = Auth::id();
 
-        // Load all products this SR can sell, summing stock from the warehouses of their assigned dealers
-        $q = $this->db->prepare("
-            SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
-                   COALESCE(SUM(i.qty_boxes * p.pieces_per_box + i.qty_pieces), 0) AS stock
-            FROM products p
-            LEFT JOIN companies c ON c.id=p.company_id
-            LEFT JOIN inventory i ON i.product_id = p.id
-              AND EXISTS (
-                  SELECT 1 FROM dealers d 
-                  JOIN dealer_companies dc ON dc.dealer_id = d.id 
-                  WHERE dc.sr_id = ? AND d.warehouse_id = i.warehouse_id
-              )
-            WHERE p.status=1
-              AND p.company_id IN (
-                  SELECT DISTINCT company_id FROM dealer_companies WHERE sr_id = ?
-              )
-            GROUP BY p.id
-            ORDER BY p.name
-        ");
-        $q->execute([$srId, $srId]);
-        $allProducts = $q->fetchAll(PDO::FETCH_ASSOC);
         $hideBottomNav = true;
-        $this->renderApp('sales', compact('allProducts', 'hideBottomNav'));
+        $this->renderApp('sales', compact('hideBottomNav'));
     }
 
     // ── Retailers List & Filtering ────────────────────────────
@@ -350,29 +371,7 @@ class SRController extends Controller
 
         $totalPages = ceil($totalRetailers / $limit);
 
-        // Load all products this SR can sell, summing stock from the warehouses of their assigned dealers
-        $pq = $this->db->prepare("
-            SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
-                   COALESCE(SUM(i.qty_boxes * p.pieces_per_box + i.qty_pieces), 0) AS stock
-            FROM products p
-            LEFT JOIN companies c ON c.id=p.company_id
-            LEFT JOIN inventory i ON i.product_id = p.id
-              AND EXISTS (
-                  SELECT 1 FROM dealers d 
-                  JOIN dealer_companies dc ON dc.dealer_id = d.id 
-                  WHERE dc.sr_id = ? AND d.warehouse_id = i.warehouse_id
-              )
-            WHERE p.status=1
-              AND p.company_id IN (
-                  SELECT DISTINCT company_id FROM dealer_companies WHERE sr_id = ?
-              )
-            GROUP BY p.id
-            ORDER BY p.name
-        ");
-        $pq->execute([$srId, $srId]);
-        $allProducts = $pq->fetchAll(PDO::FETCH_ASSOC);
-
-        $this->renderApp('retailers', compact('retailers', 'search', 'page', 'totalPages', 'totalRetailers', 'allProducts'));
+        $this->renderApp('retailers', compact('retailers', 'search', 'page', 'totalPages', 'totalRetailers'));
     }
 
     // ── Profile ───────────────────────────────────────────────
@@ -387,7 +386,7 @@ class SRController extends Controller
     {
         $lat    = floatval($_GET['lat'] ?? 0);
         $lng    = floatval($_GET['lng'] ?? 0);
-        $radius = floatval($_GET['radius'] ?? 100); // meters
+        $radius = floatval($_GET['radius'] ?? 1000); // meters, default 1km
 
         if ($lat === 0.0 || $lng === 0.0) {
             $lat = 23.8103;
@@ -402,7 +401,18 @@ class SRController extends Controller
         $orderedRetailerIds = $qOrders->fetchAll(PDO::FETCH_COLUMN);
         $orderedRetailersMap = array_flip($orderedRetailerIds);
 
-        // 2. Fetch all retailers with Haversine distance
+        // Calculate Bounding Box
+        // 1 degree of latitude is ~111320 meters
+        $latVariance = $radius / 111320;
+        // 1 degree of longitude is ~111320 * cos(lat) meters
+        $lngVariance = $radius / (111320 * cos(deg2rad($lat)));
+
+        $minLat = $lat - $latVariance;
+        $maxLat = $lat + $latVariance;
+        $minLng = $lng - $lngVariance;
+        $maxLng = $lng + $lngVariance;
+
+        // 2. Fetch all retailers with Haversine distance using BBOX to prevent full table scan
         $q = $this->db->prepare("
             SELECT r.id, r.name, r.phone, r.address, r.lat, r.lng,
                    ROUND(
@@ -413,10 +423,16 @@ class SRController extends Controller
                      ))
                    ) AS dist_m
             FROM retailers r
+            WHERE r.lat BETWEEN ? AND ?
+              AND r.lng BETWEEN ? AND ?
+            HAVING dist_m <= ?
             ORDER BY dist_m ASC
+            LIMIT 300
         ");
         $q->execute([
-            $lat, $lat, $lng
+            $lat, $lat, $lng,
+            $minLat, $maxLat, $minLng, $maxLng,
+            $radius
         ]);
         $retailers = $q->fetchAll(PDO::FETCH_ASSOC);
 
@@ -429,6 +445,33 @@ class SRController extends Controller
 
         $this->json(['success' => true, 'retailers' => $retailers]);
     }
+
+    // ── API: Search Retailers (Server-Side) ───────────────────
+    public function apiSearchRetailers(): void
+    {
+        $q = trim($_GET['q'] ?? '');
+        if (strlen($q) < 2) {
+            $this->json(['success' => true, 'results' => []]);
+            return;
+        }
+
+        try {
+            $stmt = $this->db->prepare("
+                SELECT id, name, phone, address, lat, lng 
+                FROM retailers 
+                WHERE name LIKE ? OR phone LIKE ?
+                LIMIT 15
+            ");
+            
+            $like = '%' . $q . '%';
+            $stmt->execute([$like, $like]);
+            
+            $this->json(['success' => true, 'results' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        }
+    }
+
 
     // ── API: Get today's order details for a retailer ─────────
     public function apiGetTodayOrder(): void
@@ -505,18 +548,12 @@ class SRController extends Controller
     // ── API: Products for retailer ────────────────────────────
     public function apiProducts(): void
     {
-        $q = $this->db->prepare("
-            SELECT p.*, c.name AS company_name, cat.name AS category_name
-            FROM products p
-            LEFT JOIN companies c ON c.id=p.company_id
-            LEFT JOIN categories cat ON cat.id=p.category_id
-            WHERE p.status=1
-              AND p.company_id IN (SELECT company_id FROM dealer_companies WHERE sr_id = ?)
-            ORDER BY p.name
-        ");
-        $q->execute([Auth::id()]);
-        $products = $q->fetchAll(PDO::FETCH_ASSOC);
-        $this->json(['success' => true, 'products' => $products]);
+        try {
+            $products = $this->getSRProducts(Auth::id());
+            $this->json(['success' => true, 'products' => $products]);
+        } catch (\Exception $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 
     // ── Place Order (keep existing) ───────────────────────────

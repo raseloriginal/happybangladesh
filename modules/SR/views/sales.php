@@ -112,7 +112,18 @@ $allProducts = $allProducts ?? [];
 
 const BASE_URL = '<?= BASE_URL ?>';
 const SR_ID    = <?= Auth::id() ?>;
-const ALL_PRODUCTS = <?= json_encode($allProducts, JSON_UNESCAPED_UNICODE) ?>;
+const ALL_PRODUCTS_URL = `${BASE_URL}/sr/api/products`;
+let ALL_PRODUCTS = [];
+
+// Fetch products asynchronously to avoid massive HTML payloads
+fetch(ALL_PRODUCTS_URL)
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      ALL_PRODUCTS = data.products || [];
+    }
+  })
+  .catch(err => console.error('Failed to load products', err));
 
 // ── State ─────────────────────────────────────────────────────
 let mainMap, miniMap, fullMap;
@@ -593,48 +604,80 @@ function initEventListeners() {
   // Search Input & Suggestions
   const searchInput = document.getElementById('mapSearchInput');
   const suggestionsBox = document.getElementById('searchSuggestions');
+  let searchTimeout = null;
+  let globalFuse = null;
+
+  function initOrUpdateFuse() {
+    if (!allRetailersData) return;
+    const retailers = allRetailersData.map(r => {
+      if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
+      return r;
+    });
+    globalFuse = new Fuse(retailers, {
+      keys: ['name', 'normalized_name', 'phone'],
+      threshold: 0.4,
+      ignoreLocation: true
+    });
+  }
+
   if (searchInput && suggestionsBox) {
     searchInput.addEventListener('input', () => {
-      const q = searchInput.value.trim().toLowerCase();
-      if (!q) {
+      const q = searchInput.value.trim();
+      if (q.length < 2) {
         suggestionsBox.innerHTML = '';
         suggestionsBox.classList.remove('open');
         return;
       }
 
-      const normalizedQ = normalizeBanglish(q);
-
-      // Prepare data for Fuse.js
-      const retailers = allRetailersData.map(r => {
-        if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
-        return r;
-      });
-
-      const fuse = new Fuse(retailers, {
-        keys: ['name', 'normalized_name', 'phone'],
-        threshold: 0.4,
-        ignoreLocation: true
-      });
-
-      const results = fuse.search(normalizedQ);
-      const matches = results.map(result => result.item).slice(0, 15); // Limit to top 15 matches
-
-      if (matches.length === 0) {
-        suggestionsBox.innerHTML = `<div style="padding: 12px; color: #94a3b8; font-size: 0.82rem; text-align: center;">No matching retailers</div>`;
-        suggestionsBox.classList.add('open');
-        return;
+      const normalizedQ = normalizeBanglish(q.toLowerCase());
+      
+      if (!globalFuse && allRetailersData && allRetailersData.length > 0) {
+          initOrUpdateFuse();
       }
 
-      suggestionsBox.innerHTML = matches.map(ret => {
-        const addressStr = ret.address || `Dhaka City Area, Retailer ID #${ret.id}`;
-        return `
-          <div class="sr-suggestion-item" onclick="handleSuggestionSelect(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
-            <span class="sr-suggestion-title"><i class="fa-solid fa-store" style="color:#2563eb; margin-right:6px; font-size:0.8rem;"></i>${escHtml(ret.name)}</span>
-            <span class="sr-suggestion-desc">${escHtml(addressStr)}</span>
-          </div>
-        `;
-      }).join('');
-      suggestionsBox.classList.add('open');
+      // 1. Try Fuse.js local search first
+      let localMatches = [];
+      if (globalFuse) {
+          localMatches = globalFuse.search(normalizedQ).map(res => res.item).slice(0, 15);
+      }
+
+      const renderMatches = (matches) => {
+        if (matches.length > 0) {
+          suggestionsBox.innerHTML = matches.map(ret => {
+            const addressStr = ret.address || `Dhaka City Area, Retailer ID #${ret.id}`;
+            return `
+              <div class="sr-suggestion-item" onclick="handleSuggestionSelect(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
+                <span class="sr-suggestion-title"><i class="fa-solid fa-store" style="color:#2563eb; margin-right:6px; font-size:0.8rem;"></i>${escHtml(ret.name)}</span>
+                <span class="sr-suggestion-desc">${escHtml(addressStr)}</span>
+              </div>
+            `;
+          }).join('');
+        } else {
+          suggestionsBox.innerHTML = `<div style="padding: 12px; color: #94a3b8; font-size: 0.82rem; text-align: center;">No matching retailers</div>`;
+        }
+        suggestionsBox.classList.add('open');
+      };
+
+      if (localMatches.length > 0) {
+        // Fast local fuzzy match
+        renderMatches(localMatches);
+      } else {
+        // 2. Fallback to server search if not found locally
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          fetch(`${BASE_URL}/sr/api/retailers/search?q=${encodeURIComponent(q)}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                renderMatches(data.results);
+              }
+            })
+            .catch(() => {
+              suggestionsBox.innerHTML = `<div style="padding: 12px; color: #ef4444; font-size: 0.82rem; text-align: center;">Search failed</div>`;
+              suggestionsBox.classList.add('open');
+            });
+        }, 300);
+      }
     });
 
     searchInput.addEventListener('keypress', e => {
@@ -657,27 +700,7 @@ function doMapSearch() {
   const q = document.getElementById('mapSearchInput').value.trim();
   if (!q) return;
   
-  // Try searching locally first
-  const normalizedQ = normalizeBanglish(q);
-  const retailers = allRetailersData.map(r => {
-    if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
-    return r;
-  });
-
-  const fuse = new Fuse(retailers, {
-    keys: ['name', 'normalized_name', 'phone'],
-    threshold: 0.4,
-    ignoreLocation: true
-  });
-
-  const results = fuse.search(normalizedQ);
-  const match = results.length > 0 ? results[0].item : null;
-  
-  if (match) {
-    handleSuggestionSelect(match);
-    return;
-  }
-
+  // Directly use Nominatim for map geocoding if the user presses Enter
   fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
     .then(r => r.json())
     .then(d => {

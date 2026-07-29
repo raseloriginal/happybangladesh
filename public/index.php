@@ -218,6 +218,7 @@ $router->get( '/sr/retailers',                ['SRController', 'retailers']);
 $router->get( '/sr/profile',                  ['SRController', 'profile']);
 $router->get( '/sr/reports',                  ['SRController', 'reports']);
 $router->get( '/sr/api/retailers',            ['SRController', 'apiRetailers']);
+$router->get( '/sr/api/retailers/search',     ['SRController', 'apiSearchRetailers']);
 $router->post('/sr/api/retailers/store',      ['SRController', 'apiStoreRetailer']);
 $router->get( '/sr/api/products',             ['SRController', 'apiProducts']);
 $router->get( '/sr/api/today-order',          ['SRController', 'apiGetTodayOrder']);
