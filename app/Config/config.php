@@ -9,7 +9,7 @@ define('PUB_PATH',  ROOT_PATH . '/public');
 $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
 $hostname = strtok($host, ':');
 $isLocalhost = ($hostname === 'localhost' || filter_var($hostname, FILTER_VALIDATE_IP) !== false);
-
+$isMainDomain = ($hostname === 'happybangladesh.com' || $hostname === 'www.happybangladesh.com');
 $isHttps = (!$isLocalhost)
     || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
@@ -43,6 +43,12 @@ if ($isLocalhost) {
     define('DB_NAME', 'happybangladesh_dms');
     define('DB_USER', 'root');
     define('DB_PASS', '');
+} elseif ($isMainDomain) {
+    define('DB_HOST', 'localhost');
+    define('DB_PORT', '3306');
+    define('DB_NAME', 'happybd');
+    define('DB_USER', 'happybd');
+    define('DB_PASS', '9pH{53ff.uB5Qehh');
 } else {
     define('DB_HOST', 'localhost');
     define('DB_PORT', '3306');
