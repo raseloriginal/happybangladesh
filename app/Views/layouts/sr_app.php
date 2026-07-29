@@ -21,15 +21,16 @@
   <!-- PWA: Service Worker base URL (resolved by sw-register.js) -->
   <meta name="sw-base-url" content="<?= BASE_URL ?>/">
 
-  <!-- Resource hints for faster CDN loading -->
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS CDN (for compatibility with existing views) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT:'#2563eb', light:'#3b82f6', dark:'#1d4ed8' } } } } }</script>
 
-  <!-- NOTE: Chart.js and Leaflet are loaded on-demand via $extraHead in each view that needs them -->
+  <!-- Leaflet.js for maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 
   <!-- Font Awesome 6 -->
@@ -43,7 +44,7 @@
   <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
 
   <!-- SR App CSS -->
-  <link rel="stylesheet" href="<?= asset('css/sr_app.css') ?>?v=2.2">
+  <link rel="stylesheet" href="<?= asset('css/sr_app.css') ?>?v=<?= time() ?>">
 
   <?= $extraHead ?? '' ?>
 </head>

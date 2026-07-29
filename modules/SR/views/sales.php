@@ -104,6 +104,7 @@
 $allProducts = $allProducts ?? [];
 ?>
 
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
 <script>
 // ══════════════════════════════════════════════════════════════
 // SR SALES PAGE — Full JS Logic
@@ -127,7 +128,6 @@ let allRetailersData = [];
 let fullMapMarker   = null;
 let myCircle        = null;
 let isSubmitting    = false;
-let _fuseInstance   = null; // Cached Fuse.js index — rebuilt only when retailer data changes
 
 // ── Colour palette for product cards ──────────────────────────
 const gradients = [
@@ -187,24 +187,23 @@ function initMainMap() {
     markerZoomAnimation: true
   }).setView([myLat, myLng], 18);
 
-  // Use OpenStreetMap tiles — reliable, fast, no rate limits, no auth required
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
+  // Fast HTTPS Google Tile Layer with buffer caching and idle updates to save mobile data
+  L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
     maxNativeZoom: 19,
-    keepBuffer: 2,           // Low buffer to save RAM on low-spec phones
-    updateWhenIdle: true,    // Only load tiles after pan stops — saves mobile data
+    subdomains: ['mt0','mt1','mt2','mt3'],
+    keepBuffer: 6,           // Buffer surrounding tiles to eliminate white squares on panning
+    updateWhenIdle: true,    // Saves mobile data by postponing tile requests until pan stops
     updateWhenZooming: false
   }).addTo(mainMap);
 
   L.control.zoom({ position: 'bottomleft' }).addTo(mainMap);
   
-  // Show initial cached/default location and place my-dot immediately
+  // Show initial cached/default location and load pins immediately
   placeMyLocationMarker();
-  
-  // Fetch retailers (will use cache if available, then background refresh)
   loadRetailersOnMap();
   
-  // Refine location in background — will update map view and reload pins if position changed
+  // Refine location in background
   detectLocation(false);
 }
 
@@ -219,13 +218,8 @@ function detectLocation(animate = true) {
   };
 
   navigator.geolocation.getCurrentPosition(pos => {
-    const newLat = pos.coords.latitude;
-    const newLng = pos.coords.longitude;
-    
-    // Only update if position actually changed significantly (>10m)
-    const moved = Math.abs(newLat - myLat) > 0.0001 || Math.abs(newLng - myLng) > 0.0001;
-    myLat = newLat;
-    myLng = newLng;
+    myLat = pos.coords.latitude;
+    myLng = pos.coords.longitude;
     
     // Cache the location
     localStorage.setItem('sr_last_lat', myLat);
@@ -235,10 +229,10 @@ function detectLocation(animate = true) {
     else mainMap.setView([myLat, myLng], 18);
     
     placeMyLocationMarker();
-    // Only reload retailers if we actually moved (avoid redundant network request)
-    if (moved) loadRetailersOnMap();
+    loadRetailersOnMap();
   }, () => {
-    // Geolocation failed — retailers already loaded from cache above, no action needed
+    // If geolocation fails or is denied, load retailers using cached location
+    loadRetailersOnMap();
   }, geoOptions);
 }
 
@@ -295,7 +289,6 @@ function processRetailerData(data) {
   retailerMarkers = [];
   const retailers = data.retailers || [];
   allRetailersData = retailers;
-  _fuseInstance = null; // Invalidate cached Fuse index when data changes
   
   const nearbyRetailers = retailers.filter(ret => {
     const dist = ret.dist !== undefined ? ret.dist : calculateDistance(myLat, myLng, ret.lat, ret.lng);
@@ -479,17 +472,16 @@ function openAddRetailerSheet() {
     if (!miniMapInitialized) {
       miniMap = L.map('srMiniMap', { zoomControl: false, attributionControl: false, preferCanvas: true })
         .setView([myLat, myLng], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, maxNativeZoom: 19, keepBuffer: 2, updateWhenIdle: true
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20, maxNativeZoom: 19, subdomains: ['mt0','mt1','mt2','mt3'], keepBuffer: 4, updateWhenIdle: true
       }).addTo(miniMap);
       miniMapInitialized = true;
-      miniMap.on('move', updatePinFromMiniMap); // Register event only ONCE on first init
     } else {
       miniMap.setView([myLat, myLng], 15);
     }
     miniMap.invalidateSize();
     updatePinFromMiniMap();
-    // NOTE: 'move' event listener is registered only once above, not on every open
+    miniMap.on('move', updatePinFromMiniMap);
   }, 350);
 }
 
@@ -508,8 +500,8 @@ function openFullMap() {
     if (!fullMapInitialized) {
       fullMap = L.map('srFullMap', { zoomControl: true, attributionControl: false, preferCanvas: true })
         .setView([pinLat, pinLng], 16);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, maxNativeZoom: 19, keepBuffer: 2, updateWhenIdle: true
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20, maxNativeZoom: 19, subdomains: ['mt0','mt1','mt2','mt3'], keepBuffer: 4, updateWhenIdle: true
       }).addTo(fullMap);
       fullMapInitialized = true;
     } else {
@@ -612,20 +604,19 @@ function initEventListeners() {
 
       const normalizedQ = normalizeBanglish(q);
 
-      // Build Fuse index once, reuse on subsequent keystrokes (major perf win on low-spec phones)
-      if (!_fuseInstance) {
-        const retailers = allRetailersData.map(r => {
-          if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
-          return r;
-        });
-        _fuseInstance = new Fuse(retailers, {
-          keys: ['name', 'normalized_name', 'phone'],
-          threshold: 0.4,
-          ignoreLocation: true
-        });
-      }
+      // Prepare data for Fuse.js
+      const retailers = allRetailersData.map(r => {
+        if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
+        return r;
+      });
 
-      const results = _fuseInstance.search(normalizedQ);
+      const fuse = new Fuse(retailers, {
+        keys: ['name', 'normalized_name', 'phone'],
+        threshold: 0.4,
+        ignoreLocation: true
+      });
+
+      const results = fuse.search(normalizedQ);
       const matches = results.map(result => result.item).slice(0, 15); // Limit to top 15 matches
 
       if (matches.length === 0) {
@@ -666,21 +657,20 @@ function doMapSearch() {
   const q = document.getElementById('mapSearchInput').value.trim();
   if (!q) return;
   
-  // Use cached Fuse index (same instance used by search suggestions)
+  // Try searching locally first
   const normalizedQ = normalizeBanglish(q);
-  if (!_fuseInstance) {
-    const retailers = allRetailersData.map(r => {
-      if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
-      return r;
-    });
-    _fuseInstance = new Fuse(retailers, {
-      keys: ['name', 'normalized_name', 'phone'],
-      threshold: 0.4,
-      ignoreLocation: true
-    });
-  }
+  const retailers = allRetailersData.map(r => {
+    if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
+    return r;
+  });
 
-  const results = _fuseInstance.search(normalizedQ);
+  const fuse = new Fuse(retailers, {
+    keys: ['name', 'normalized_name', 'phone'],
+    threshold: 0.4,
+    ignoreLocation: true
+  });
+
+  const results = fuse.search(normalizedQ);
   const match = results.length > 0 ? results[0].item : null;
   
   if (match) {
