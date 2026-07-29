@@ -153,8 +153,8 @@ class SRController extends Controller
 
         $extraHead = implode("\n", [
             '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">',
-            '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""><\/script>',
-            '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>',
+            '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>',
+            '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>',
         ]);
         $this->renderApp('dashboard', compact('stats', 'recentOrders', 'chartLabels', 'chartValues', 'extraHead'));
     }
@@ -315,8 +315,8 @@ class SRController extends Controller
         $hideBottomNav = true;
         $extraHead = implode("\n", [
             '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">',
-            '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""><\/script>',
-            '<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"><\/script>',
+            '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>',
+            '<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>',
         ]);
         $this->renderApp('sales', compact('allProducts', 'hideBottomNav', 'extraHead'));
     }
