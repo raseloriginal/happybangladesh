@@ -12,20 +12,22 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Copy files via SCP
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        source: ".,!.git,!.github"
-        target: /home/happybangladesh/htdocs/happybangladesh.site
-        rm: false
-        overwrite: true
-        strip_components: 0
+    - name: Setup SSH Key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Post-deploy permissions via SSH
+    - name: Deploy via rsync
+      run: |
+        rsync -avz --delete \
+          --exclude='.git' \
+          --exclude='.github' \
+          -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -p 22" \
+          ./ ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:/home/happybangladesh/htdocs/happybangladesh.site/
+
+    - name: Set File Permissions via SSH
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -34,10 +36,7 @@ jobs:
         port: 22
         script: |
           cd /home/happybangladesh/htdocs/happybangladesh.site
-
-          # Ensure storage and log directories exist with proper write permissions
           mkdir -p storage/logs storage/framework/views storage/cache logs
           chmod -R 775 storage logs 2>/dev/null || true
           chmod -R 755 public 2>/dev/null || true
-
-          echo "Deployment completed successfully!"
+          echo "Deploy OK at $(date)"

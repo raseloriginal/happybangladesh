@@ -2,12 +2,24 @@
 /**
  * ============================================================
  *  HappyBangladesh DMS — Front Controller
+ *  DEPLOYED: v7 — rsync fix
  * ============================================================
  */
 declare(strict_types=1);
 
 // ── Config ────────────────────────────────────────────────────
 require_once dirname(__DIR__) . '/app/Config/config.php';
+
+// ── Quick deploy verification (remove after confirming) ───────
+if (isset($_GET['_v'])) {
+    header('Content-Type: text/plain');
+    echo 'DEPLOYED_VERSION=v7' . PHP_EOL;
+    echo 'REQUEST_URI=' . ($_SERVER['REQUEST_URI'] ?? 'n/a') . PHP_EOL;
+    echo 'BASE_URL=' . (defined('BASE_URL') ? BASE_URL : 'NOT_DEFINED') . PHP_EOL;
+    echo 'HTTPS=' . ($_SERVER['HTTPS'] ?? 'n/a') . PHP_EOL;
+    exit;
+}
+
 
 // ── Core autoloader ───────────────────────────────────────────
 spl_autoload_register(function (string $class): void {
