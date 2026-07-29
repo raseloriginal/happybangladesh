@@ -44,6 +44,9 @@ spl_autoload_register(function (string $class): void {
 require_once APP_PATH . '/Core/Helpers.php';
 Auth::start();
 
+// ── Router ────────────────────────────────────────────────────
+$router = new Router();
+
 // ── Catch & Clean URL ─────────────────────────────────────────
 // CloudPanel uses a two-level Nginx proxy (443 → 8080 → PHP-FPM).
 // REQUEST_URI is always the true original path (e.g. /login, /admin/dashboard).

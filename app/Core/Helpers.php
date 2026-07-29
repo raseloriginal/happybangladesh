@@ -162,7 +162,7 @@ function url(string $p = ''): string { return Helpers::url($p); }
 function asset(string $p): string    { return Helpers::asset($p); }
 
 // Cache helper aliases
-function cache(string $key = null, mixed $default = null): mixed {
+function cache(?string $key = null, mixed $default = null): mixed {
     if ($key === null) {
         return new Cache();
     }
