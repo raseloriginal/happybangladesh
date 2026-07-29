@@ -35,28 +35,26 @@ Auth::start();
 // ── Router ────────────────────────────────────────────────────
 $router = new Router();
 
-// ── Catch URL ─────────────────────────────────────────────────
-if (isset($_GET['url']) && $_GET['url'] !== '') {
-    $url = $_GET['url'];
-} else {
-    $rawUri = $_SERVER['REQUEST_URI'] ?? '/';
-    $path = parse_url($rawUri, PHP_URL_PATH) ?? '/';
+// ── Catch & Clean URL ─────────────────────────────────────────
+$rawUrl = $_GET['url'] ?? '';
 
-    // Remove script directory prefix if present
-    $scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
-    if ($scriptDir !== '/' && $scriptDir !== '\\' && str_starts_with($path, $scriptDir)) {
-        $path = substr($path, strlen($scriptDir));
-    }
-
-    // Strip /public prefix if Nginx routes through root directory
-    if (str_starts_with($path, '/public/')) {
-        $path = substr($path, 7);
-    } elseif ($path === '/public') {
-        $path = '/';
-    }
-
-    $url = $path ?: '/';
+// If $_GET['url'] is empty or 'index.php', resolve from REQUEST_URI
+if (empty($rawUrl) || $rawUrl === 'index.php' || $rawUrl === '/index.php') {
+    $rawUrl = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 }
+
+$url = parse_url($rawUrl, PHP_URL_PATH) ?? '/';
+
+// Strip /index.php if present in path
+$url = preg_replace('#^/index\.php#i', '', $url);
+
+// Strip /public prefix if present
+if (str_starts_with($url, '/public/')) {
+    $url = substr($url, 7);
+} elseif ($url === '/public' || $url === '/public/') {
+    $url = '/';
+}
+
 $url = '/' . ltrim($url, '/');
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
