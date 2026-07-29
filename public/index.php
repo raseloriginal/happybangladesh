@@ -49,12 +49,13 @@ $router = new Router();
 
 // ── Catch & Clean URL ─────────────────────────────────────────
 // CloudPanel uses a two-level Nginx proxy (443 → 8080 → PHP-FPM).
-// REQUEST_URI is always the true original path (e.g. /login, /admin/dashboard).
-// $_GET['url'] is never set by Nginx (no ?url= query string routing).
-$url = '/' . ltrim(
-    parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/',
-    '/'
-);
+// Nginx try_files can corrupt REQUEST_URI (rewrites /login → /index.php?).
+// We pass the true original URI via the X-Request-URI proxy header instead.
+// Fallback: REQUEST_URI is used if the header is not present.
+$trueUri = $_SERVER['HTTP_X_REQUEST_URI']  // set by port 443 proxy_set_header
+        ?? $_SERVER['REQUEST_URI']          // standard fallback
+        ?? '/';
+$url = '/' . ltrim(parse_url($trueUri, PHP_URL_PATH) ?? '/', '/');
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 // ── Auth routes ───────────────────────────────────────────────
