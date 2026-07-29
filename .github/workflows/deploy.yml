@@ -19,11 +19,21 @@ jobs:
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: 22
+        script_stop: true
         script: |
-          # 1. Navigate to your project directory on the live server.
+          # Navigate to project directory
           cd /home/happybangladesh/htdocs/happybangladesh.site
           
-          # 2. Pull the latest code
-          git pull origin main
-          
-          # 3. Add any other commands you might need here (e.g., clearing cache, composer install, etc.)
+          # Check if directory is a git repository
+          if [ -d ".git" ]; then
+            echo "Git repository found. Pulling latest code..."
+            git pull origin main
+          else
+            echo "Not a git repository yet. Initializing and pulling code..."
+            git init
+            git remote add origin https://github.com/${{ github.repository }}.git || git remote set-url origin https://github.com/${{ github.repository }}.git
+            git fetch origin main
+            git reset --hard origin/main
+            git branch --set-upstream-to=origin/main main
+          fi
+
