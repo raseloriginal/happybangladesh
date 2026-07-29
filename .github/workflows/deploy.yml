@@ -2,7 +2,7 @@ name: Deploy to Live Server
 
 on:
   push:
-    branches: [ "main" ] # Change this to 'master' if your main branch is named 'master'
+    branches: [ "main" ]
 
 jobs:
   deploy:
@@ -12,48 +12,32 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Deploy via SSH
+    - name: Copy files via SCP
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 22
+        source: ".,!.git,!.github"
+        target: /home/happybangladesh/htdocs/happybangladesh.site
+        rm: false
+        overwrite: true
+        strip_components: 0
+
+    - name: Post-deploy permissions via SSH
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: 22
-        script_stop: true
         script: |
-          # 1. Ensure directory exists and navigate to it
-          mkdir -p /home/happybangladesh/htdocs/happybangladesh.site
           cd /home/happybangladesh/htdocs/happybangladesh.site
-          
-          # 2. Mark directory as safe for Git
-          git config --global --add safe.directory /home/happybangladesh/htdocs/happybangladesh.site || true
-          
-          # 3. Configure Git repository if not initialized
-          if [ ! -d ".git" ]; then
-            echo "Initializing new Git repository..."
-            git init
-            git checkout -B main
-            git remote add origin https://github.com/${{ github.repository }}.git
-          fi
-          
-          # 4. Fetch latest code (HTTPS fallback to SSH if private repo)
-          echo "Fetching latest changes..."
-          if ! git fetch origin main; then
-            echo "HTTPS fetch failed. Attempting fetch via SSH URL..."
-            git remote set-url origin git@github.com:${{ github.repository }}.git
-            git fetch origin main
-          fi
-          
-          # 5. Reset working tree to match origin/main
-          echo "Updating files to match origin/main..."
-          git reset --hard origin/main
-          git branch --set-upstream-to=origin/main main || true
 
-          # 6. Ensure storage and log directories exist with proper write permissions
+          # Ensure storage and log directories exist with proper write permissions
           mkdir -p storage/logs storage/framework/views storage/cache logs
-          chmod -R 775 storage logs || true
-          chmod -R 755 public || true
+          chmod -R 775 storage logs 2>/dev/null || true
+          chmod -R 755 public 2>/dev/null || true
 
           echo "Deployment completed successfully!"
-
-
