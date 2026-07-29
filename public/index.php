@@ -55,7 +55,21 @@ $router = new Router();
 $trueUri = $_SERVER['HTTP_X_REQUEST_URI']  // set by port 443 proxy_set_header
         ?? $_SERVER['REQUEST_URI']          // standard fallback
         ?? '/';
-$url = '/' . ltrim(parse_url($trueUri, PHP_URL_PATH) ?? '/', '/');
+$urlPath = parse_url($trueUri, PHP_URL_PATH) ?? '/';
+
+// Strip base path to allow subfolder hosting (e.g. localhost)
+$basePath = parse_url(BASE_URL, PHP_URL_PATH);
+if (!empty($basePath) && $basePath !== '/' && strpos($urlPath, $basePath) === 0) {
+    $urlPath = substr($urlPath, strlen($basePath));
+}
+
+$url = '/' . ltrim($urlPath, '/');
+if (strpos($url, '/public/') === 0) {
+    $url = substr($url, 7); // leaves the trailing slash
+}
+if ($url === '/public') {
+    $url = '/';
+}
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 // ── Auth routes ───────────────────────────────────────────────
