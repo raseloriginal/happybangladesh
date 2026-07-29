@@ -9,7 +9,10 @@ define('PUB_PATH',  ROOT_PATH . '/public');
 $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
 $hostname = strtok($host, ':');
 $isLocalhost = ($hostname === 'localhost' || filter_var($hostname, FILTER_VALIDATE_IP) !== false);
-$isMainDomain = ($hostname === 'happybangladesh.com' || $hostname === 'www.happybangladesh.com');
+$isMainDomain = (
+    $hostname === 'happybangladesh.com'  || $hostname === 'www.happybangladesh.com' ||
+    $hostname === 'happybangladesh.site' || $hostname === 'www.happybangladesh.site'
+);
 $isHttps = (!$isLocalhost)
     || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
