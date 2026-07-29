@@ -21,19 +21,33 @@ jobs:
         port: 22
         script_stop: true
         script: |
-          # Navigate to project directory
+          # 1. Ensure directory exists and navigate to it
+          mkdir -p /home/happybangladesh/htdocs/happybangladesh.site
           cd /home/happybangladesh/htdocs/happybangladesh.site
           
-          # Check if directory is a git repository
-          if [ -d ".git" ]; then
-            echo "Git repository found. Pulling latest code..."
-            git pull origin main
-          else
-            echo "Not a git repository yet. Initializing and pulling code..."
+          # 2. Mark directory as safe for Git
+          git config --global --add safe.directory /home/happybangladesh/htdocs/happybangladesh.site || true
+          
+          # 3. Configure Git repository if not initialized
+          if [ ! -d ".git" ]; then
+            echo "Initializing new Git repository..."
             git init
-            git remote add origin https://github.com/${{ github.repository }}.git || git remote set-url origin https://github.com/${{ github.repository }}.git
-            git fetch origin main
-            git reset --hard origin/main
-            git branch --set-upstream-to=origin/main main
+            git checkout -B main
+            git remote add origin https://github.com/${{ github.repository }}.git
           fi
+          
+          # 4. Fetch latest code (HTTPS fallback to SSH if private repo)
+          echo "Fetching latest changes..."
+          if ! git fetch origin main; then
+            echo "HTTPS fetch failed. Attempting fetch via SSH URL..."
+            git remote set-url origin git@github.com:${{ github.repository }}.git
+            git fetch origin main
+          fi
+          
+          # 5. Reset working tree to match origin/main
+          echo "Updating files to match origin/main..."
+          git reset --hard origin/main
+          git branch --set-upstream-to=origin/main main || true
+          echo "Deployment completed successfully!"
+
 
