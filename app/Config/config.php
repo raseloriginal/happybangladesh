@@ -6,7 +6,12 @@ define('APP_PATH',  ROOT_PATH . '/app');
 define('MOD_PATH',  ROOT_PATH . '/modules');
 define('PUB_PATH',  ROOT_PATH . '/public');
 
-$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+$hostname = strtok($host, ':');
+$isLocalhost = ($hostname === 'localhost' || filter_var($hostname, FILTER_VALIDATE_IP) !== false);
+
+$isHttps = (!$isLocalhost)
+    || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
     || (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
@@ -14,16 +19,12 @@ $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) === 'on');
 
 $protocol = $isHttps ? "https://" : "http://";
-$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
-
-$hostname = strtok($host, ':');
-$isLocalhost = ($hostname === 'localhost' || filter_var($hostname, FILTER_VALIDATE_IP));
 
 if ($isLocalhost) {
     define('BASE_URL', $protocol . $host . '/happybangladesh');
 } else {
     // Determine path dynamically for live server (e.g. root or subfolder)
-    $scriptName = dirname($_SERVER['SCRIPT_NAME']);
+    $scriptName = dirname($_SERVER['SCRIPT_NAME'] ?? '');
     $basePath = str_replace(['/public', '\\public'], '', $scriptName);
     $basePath = $basePath === '/' || $basePath === '\\' ? '' : $basePath;
     define('BASE_URL', $protocol . $host . $basePath);
