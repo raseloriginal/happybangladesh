@@ -36,8 +36,19 @@ Auth::start();
 $router = new Router();
 
 // ── Catch URL ─────────────────────────────────────────────────
-$url    = $_GET['url'] ?? '/';
-$method = $_SERVER['REQUEST_METHOD'];
+if (isset($_GET['url']) && $_GET['url'] !== '') {
+    $url = $_GET['url'];
+} else {
+    $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+    $scriptName = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+    $basePath   = str_replace(['/public', '\\public'], '', $scriptName);
+    $basePath   = rtrim($basePath, '/\\');
+    if ($basePath !== '' && str_starts_with($requestUri, $basePath)) {
+        $requestUri = substr($requestUri, strlen($basePath));
+    }
+    $url = $requestUri ?: '/';
+}
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 // ── Auth routes ───────────────────────────────────────────────
 $router->get( '/login',         ['AuthController', 'portal']);
