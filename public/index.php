@@ -44,30 +44,14 @@ spl_autoload_register(function (string $class): void {
 require_once APP_PATH . '/Core/Helpers.php';
 Auth::start();
 
-// ── Router ────────────────────────────────────────────────────
-$router = new Router();
-
 // ── Catch & Clean URL ─────────────────────────────────────────
-$rawUrl = $_GET['url'] ?? '';
-
-// If $_GET['url'] is empty or 'index.php', resolve from REQUEST_URI
-if (empty($rawUrl) || $rawUrl === 'index.php' || $rawUrl === '/index.php') {
-    $rawUrl = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
-}
-
-$url = parse_url($rawUrl, PHP_URL_PATH) ?? '/';
-
-// Strip /index.php if present in path
-$url = preg_replace('#^/index\.php#i', '', $url);
-
-// Strip /public prefix if present
-if (str_starts_with($url, '/public/')) {
-    $url = substr($url, 7);
-} elseif ($url === '/public' || $url === '/public/') {
-    $url = '/';
-}
-
-$url = '/' . ltrim($url, '/');
+// CloudPanel uses a two-level Nginx proxy (443 → 8080 → PHP-FPM).
+// REQUEST_URI is always the true original path (e.g. /login, /admin/dashboard).
+// $_GET['url'] is never set by Nginx (no ?url= query string routing).
+$url = '/' . ltrim(
+    parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/',
+    '/'
+);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 // ── Auth routes ───────────────────────────────────────────────
