@@ -2,7 +2,7 @@
    HappyBangladesh DMS — SR Mobile App CSS
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap');
 
 /* ── CSS Variables ─────────────────────────────────────────── */
 :root {
@@ -18,7 +18,7 @@
   --sr-text: #0f172a;
   --sr-text-muted: #64748b;
   --sr-border: #e2e8f0;
-  --sr-nav-h: 0px;
+  --sr-nav-h: 65px;
   --sr-header-h: 60px;
   --sr-radius: 16px;
   --sr-shadow: 0 4px 24px rgba(37, 99, 235, 0.10);
@@ -35,7 +35,7 @@
 }
 
 .sr-app-body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Hind Siliguri', 'Inter', sans-serif;
   background: var(--sr-bg);
   min-height: 100vh;
   overflow-x: hidden;

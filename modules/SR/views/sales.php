@@ -1,38 +1,38 @@
-<?php $pageTitle = 'Sales'; ?>
+<?php $pageTitle = 'ম্যাপ'; ?>
 
 
 <!-- ── Fullscreen Map Page ──────────────────────────────────── -->
-<div class="sr-map-page">
+<div class="sr-map-page" style="font-family: 'Hind Siliguri', sans-serif;">
   <div id="srMap"></div>
 
   <!-- Search Bar & Filter Button Overlay -->
   <div class="sr-map-header-wrap">
-    <a href="<?= url('sr/dashboard') ?>" class="w-[54px] h-[54px] bg-white text-slate-700 rounded-[14px] flex items-center justify-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-95 transition-all text-lg flex-shrink-0" title="Back">
+    <a href="<?= url('sr/dashboard') ?>" class="w-[54px] h-[54px] bg-white text-slate-700 rounded-[14px] flex items-center justify-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-95 transition-all text-lg flex-shrink-0" title="পিছনে">
       <i class="fa-solid fa-arrow-left"></i>
     </a>
     <div class="sr-map-searchbar-new">
       <i class="fa-solid fa-magnifying-glass sr-map-search-icon"></i>
-      <input type="text" id="mapSearchInput" placeholder="Search Retailer, Area…" autocomplete="off">
+      <input type="text" id="mapSearchInput" placeholder="দোকান বা এলাকা খুঁজুন..." autocomplete="off">
     </div>
     <div class="sr-search-suggestions" id="searchSuggestions"></div>
-    <button class="sr-map-filter-btn" id="mapFilterBtn" title="Filter">
+    <button class="sr-map-filter-btn" id="mapFilterBtn" title="ফিল্টার">
       <i class="fa-solid fa-sliders"></i>
     </button>
   </div>
 
   <!-- FAB Buttons (Float above bottom cards) -->
   <div class="sr-map-fabs-new">
-    <button class="sr-map-fab-new sr-fab-locate-new" id="locateBtn" title="My Location">
+    <button class="sr-map-fab-new sr-fab-locate-new" id="locateBtn" title="আমার অবস্থান">
       <i class="fa-solid fa-location-crosshairs"></i>
     </button>
-    <button class="sr-map-fab-new sr-fab-add-new" id="addRetailerBtn" title="Add Retailer">
+    <button class="sr-map-fab-new sr-fab-add-new" id="addRetailerBtn" title="নতুন দোকান">
       <i class="fa-solid fa-plus"></i>
     </button>
   </div>
 
   <!-- Nearest Retailers Carousel Overlay -->
   <div class="sr-retailers-carousel-wrap" id="carouselWrap">
-    <button class="sr-carousel-toggle-btn" id="carouselToggleBtn" title="Toggle Cards">
+    <button class="sr-carousel-toggle-btn" id="carouselToggleBtn" title="টগল কার্ড">
       <i class="fa-solid fa-chevron-down"></i>
     </button>
     <div class="sr-retailers-carousel" id="retailerCards">
@@ -45,37 +45,37 @@
      ADD RETAILER BOTTOM SHEET
 ══════════════════════════════════════════════════════════════ -->
 <div class="sr-sheet-overlay" id="addRetOverlay"></div>
-<div class="sr-bottom-sheet" id="addRetSheet">
+<div class="sr-bottom-sheet" id="addRetSheet" style="font-family: 'Hind Siliguri', sans-serif;">
   <div class="sr-sheet-handle"></div>
   <div class="sr-sheet-header">
-    <span class="sr-sheet-title"><i class="fa-solid fa-store" style="color:var(--sr-primary);margin-right:8px;"></i>Add New Retailer</span>
+    <span class="sr-sheet-title"><i class="fa-solid fa-store" style="color:var(--sr-primary);margin-right:8px;"></i>নতুন দোকান যুক্ত করুন</span>
     <button class="sr-sheet-close" id="addRetClose"><i class="fa-solid fa-xmark"></i></button>
   </div>
   <div class="sr-sheet-body">
     <form id="addRetailerForm">
       <div class="sr-form-group">
-        <label class="sr-form-label">Shop / Retailer Name <span style="color:#ef4444;">*</span></label>
-        <input type="text" class="sr-form-input" id="retName" placeholder="e.g. Ahmed General Store" required>
+        <label class="sr-form-label">দোকানের নাম <span style="color:#ef4444;">*</span></label>
+        <input type="text" class="sr-form-input" id="retName" placeholder="যেমন: আহমেদ জেনারেল স্টোর" required>
       </div>
       <div class="sr-form-group">
-        <label class="sr-form-label">Phone Number</label>
+        <label class="sr-form-label">মোবাইল নাম্বার</label>
         <input type="tel" class="sr-form-input" id="retPhone" placeholder="01XXXXXXXXX">
       </div>
       <div class="sr-form-group">
-        <label class="sr-form-label">Location <span style="color:#ef4444;">*</span></label>
+        <label class="sr-form-label">অবস্থান <span style="color:#ef4444;">*</span></label>
         <div class="sr-mini-map-wrap">
           <div id="srMiniMap"></div>
-          <button type="button" class="sr-mini-map-fullscreen" id="miniMapFullscreenBtn" title="Fullscreen map">
+          <button type="button" class="sr-mini-map-fullscreen" id="miniMapFullscreenBtn" title="পূর্ণ মানচিত্র">
             <i class="fa-solid fa-expand"></i>
           </button>
-          <div class="sr-mini-map-hint">Drag map to pin location</div>
+          <div class="sr-mini-map-hint">পিনের অবস্থান পরিবর্তন করতে মানচিত্রটি ড্র্যাগ করুন</div>
         </div>
         <div id="selectedLocText" style="font-size:0.72rem;color:var(--sr-text-muted);margin-top:6px;text-align:center;">
-          <i class="fa-solid fa-location-dot" style="color:var(--sr-primary);"></i> Detecting location…
+          <i class="fa-solid fa-location-dot" style="color:var(--sr-primary);"></i> অবস্থান সনাক্ত করা হচ্ছে…
         </div>
       </div>
-      <button type="submit" class="sr-add-cart-btn" style="margin-top:4px;">
-        <i class="fa-solid fa-floppy-disk"></i> Save Retailer
+      <button type="submit" class="sr-add-cart-btn" style="margin-top:4px; font-family: 'Hind Siliguri', sans-serif;">
+        <i class="fa-solid fa-floppy-disk"></i> দোকান সংরক্ষণ করুন
       </button>
     </form>
   </div>
@@ -84,15 +84,15 @@
 <!-- ══════════════════════════════════════════════════════════════
      FULLSCREEN PIN MAP OVERLAY
 ══════════════════════════════════════════════════════════════ -->
-<div class="sr-fullmap-overlay hidden" id="fullMapOverlay">
+<div class="sr-fullmap-overlay hidden" id="fullMapOverlay" style="font-family: 'Hind Siliguri', sans-serif;">
   <div id="srFullMap"></div>
   <div class="sr-fullmap-crosshair">
     <i class="fa-solid fa-location-dot"></i>
   </div>
   <div class="sr-fullmap-topbar">
     <button class="sr-fullmap-back" id="fullMapBack"><i class="fa-solid fa-arrow-left"></i></button>
-    <span class="sr-fullmap-title">Pin Retailer Location</span>
-    <button class="sr-fullmap-confirm" id="fullMapConfirm">Confirm</button>
+    <span class="sr-fullmap-title">দোকানের অবস্থান সিলেক্ট করুন</span>
+    <button class="sr-fullmap-confirm" id="fullMapConfirm">নিশ্চিত করুন</button>
   </div>
 </div>
 
@@ -440,35 +440,34 @@ function renderRetailerCards(retailers) {
     
     // Highlight if has active cart
     const hasCart = cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
-    const cardStyle = hasCart ? 'border: 2px dashed #eab308; background: #fffbeb;' : '';
+    const cardClass = hasCart ? 'has-cart-card' : (ret.has_order_today ? 'visited-card' : '');
     
     const distStr = distMeters > 1000 ? `${(distMeters / 1000).toFixed(1)} km` : `${distMeters} m`;
-    const timeMins = Math.max(1, Math.round(distMeters / 80));
 
     return `
-      <div class="sr-retailer-card-new" id="retailer-card-${ret.id}" style="${cardStyle}" onclick="handleCardClick(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
-        <div class="sr-card-icon-box">
-          <i class="fa-solid fa-store"></i>
-        </div>
-        <div class="sr-card-content">
-          <div class="sr-card-top-row">
+      <div class="sr-retailer-card-new ${cardClass}" id="retailer-card-${ret.id}" onclick="handleCardClick(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
+        <div class="sr-card-header-row">
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
+            <div class="sr-card-icon-box">
+              <i class="fa-solid fa-store"></i>
+            </div>
             <h4 class="sr-card-name" title="${escHtml(ret.name)}">${escHtml(ret.name)}</h4>
-            <button class="sr-card-action-btn" onclick="event.stopPropagation(); handleNavigationClick(${JSON.stringify(ret).replace(/"/g, '&quot;')})" title="Order Page">
-              <i class="fa-solid fa-paper-plane"></i> Order
-            </button>
           </div>
-          <div class="sr-card-address-row">
-            <i class="fa-solid fa-location-dot"></i>
-            <span>${escHtml(cleanAddress || (ret.lat && ret.lng ? `${parseFloat(ret.lat).toFixed(4)}, ${parseFloat(ret.lng).toFixed(4)}` : 'Location unavailable'))}</span>
-          </div>
-          <div class="sr-card-tags-row">
-            <span class="sr-card-tag"><i class="fa-solid fa-person-running"></i> ${distStr}</span>
-            ${ret.phone ? `<span class="sr-card-tag"><i class="fa-solid fa-phone"></i> ${escHtml(ret.phone)}</span>` : ''}
-            <span class="sr-card-tag ${ret.has_order_today ? 'tag-success' : 'tag-pending'}">
-              <i class="fa-solid ${ret.has_order_today ? 'fa-circle-check' : 'fa-clock'}"></i>
-              ${ret.has_order_today ? 'Visited' : 'Pending'}
-            </span>
-          </div>
+          <button class="sr-card-action-btn" onclick="event.stopPropagation(); handleNavigationClick(${JSON.stringify(ret).replace(/"/g, '&quot;')})" title="Order Page">
+            <i class="fa-solid fa-paper-plane"></i> Order
+          </button>
+        </div>
+        <div class="sr-card-address-row">
+          <i class="fa-solid fa-location-dot"></i>
+          <span>${escHtml(cleanAddress || (ret.lat && ret.lng ? `${parseFloat(ret.lat).toFixed(4)}, ${parseFloat(ret.lng).toFixed(4)}` : 'Location unavailable'))}</span>
+        </div>
+        <div class="sr-card-tags-row">
+          <span class="sr-card-tag"><i class="fa-solid fa-person-running"></i> ${distStr}</span>
+          ${ret.phone ? `<span class="sr-card-tag"><i class="fa-solid fa-phone"></i> ${escHtml(ret.phone)}</span>` : ''}
+          <span class="sr-card-tag ${ret.has_order_today ? 'tag-success' : 'tag-pending'}">
+            <i class="fa-solid ${ret.has_order_today ? 'fa-circle-check' : 'fa-clock'}"></i>
+            ${ret.has_order_today ? 'Visited' : 'Pending'}
+          </span>
         </div>
       </div>
     `;
@@ -638,42 +637,42 @@ function initEventListeners() {
         return;
       }
 
-      const normalizedQ = normalizeBanglish(q.toLowerCase());
-      
-      if (!globalFuse && allRetailersData && allRetailersData.length > 0) {
-          initOrUpdateFuse();
-      }
-
-      // 1. Try Fuse.js local search first
-      let localMatches = [];
-      if (globalFuse) {
-          localMatches = globalFuse.search(normalizedQ).map(res => res.item).slice(0, 15);
-      }
-
-      const renderMatches = (matches) => {
-        if (matches.length > 0) {
-          suggestionsBox.innerHTML = matches.map(ret => {
-            const addressStr = ret.address || `Dhaka City Area, Retailer ID #${ret.id}`;
-            return `
-              <div class="sr-suggestion-item" onclick="handleSuggestionSelect(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
-                <span class="sr-suggestion-title"><i class="fa-solid fa-store" style="color:#2563eb; margin-right:6px; font-size:0.8rem;"></i>${escHtml(ret.name)}</span>
-                <span class="sr-suggestion-desc">${escHtml(addressStr)}</span>
-              </div>
-            `;
-          }).join('');
-        } else {
-          suggestionsBox.innerHTML = `<div style="padding: 12px; color: #94a3b8; font-size: 0.82rem; text-align: center;">No matching retailers</div>`;
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const normalizedQ = normalizeBanglish(q.toLowerCase());
+        
+        if (!globalFuse && allRetailersData && allRetailersData.length > 0) {
+            initOrUpdateFuse();
         }
-        suggestionsBox.classList.add('open');
-      };
 
-      if (localMatches.length > 0) {
-        // Fast local fuzzy match
-        renderMatches(localMatches);
-      } else {
-        // 2. Fallback to server search if not found locally
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
+        // 1. Try Fuse.js local search first
+        let localMatches = [];
+        if (globalFuse) {
+            localMatches = globalFuse.search(normalizedQ).map(res => res.item).slice(0, 15);
+        }
+
+        const renderMatches = (matches) => {
+          if (matches.length > 0) {
+            suggestionsBox.innerHTML = matches.map(ret => {
+              const addressStr = ret.address || `Dhaka City Area, Retailer ID #${ret.id}`;
+              return `
+                <div class="sr-suggestion-item" onclick="handleSuggestionSelect(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
+                  <span class="sr-suggestion-title"><i class="fa-solid fa-store" style="color:#2563eb; margin-right:6px; font-size:0.8rem;"></i>${escHtml(ret.name)}</span>
+                  <span class="sr-suggestion-desc">${escHtml(addressStr)}</span>
+                </div>
+              `;
+            }).join('');
+          } else {
+            suggestionsBox.innerHTML = `<div style="padding: 12px; color: #94a3b8; font-size: 0.82rem; text-align: center;">No matching retailers</div>`;
+          }
+          suggestionsBox.classList.add('open');
+        };
+
+        if (localMatches.length > 0) {
+          // Fast local fuzzy match
+          renderMatches(localMatches);
+        } else {
+          // 2. Fallback to server search if not found locally
           fetch(`${BASE_URL}/sr/api/retailers/search?q=${encodeURIComponent(q)}`)
             .then(res => res.json())
             .then(data => {
@@ -685,8 +684,8 @@ function initEventListeners() {
               suggestionsBox.innerHTML = `<div style="padding: 12px; color: #ef4444; font-size: 0.82rem; text-align: center;">Search failed</div>`;
               suggestionsBox.classList.add('open');
             });
-        }, 300);
-      }
+        }
+      }, 150);
     });
 
     searchInput.addEventListener('keypress', e => {
@@ -753,27 +752,196 @@ function handleSuggestionSelect(ret) {
   25%{transform:translateX(-6px)}
   75%{transform:translateX(6px)}
 }
-.sr-retailer-marker.already-ordered {
-  background: #ffedd5 !important;
-  border-color: #ea580c !important;
-  color: #c2410c !important;
+
+/* ── Sleek custom slate theme filter for Leaflet maps ── */
+#srMap .leaflet-tile, #srMiniMap .leaflet-tile, #srFullMap .leaflet-tile {
+  filter: grayscale(1) invert(0.08) contrast(1.15) brightness(0.96) saturate(0.85) !important;
 }
-.sr-retailer-marker.already-ordered::after {
-  border-top-color: #ea580c !important;
+
+/* ── Advanced Level Retailer Marker Design ── */
+.sr-retailer-marker {
+  font-family: 'Hind Siliguri', sans-serif !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  padding: 6px 12px !important;
+  border-radius: 20px !important;
+  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.15) !important;
+  border: 1.5px solid #2563eb !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+.sr-retailer-marker i {
+  color: #2563eb !important;
+  margin-right: 4px;
+}
+.sr-retailer-marker::after {
+  border-top-color: #2563eb !important;
+}
+.sr-retailer-marker:hover {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+.sr-retailer-marker:hover i {
+  color: #ffffff !important;
+}
+
+/* Active Cart Marker (Yellow Highlight) */
+.sr-retailer-marker.has-cart {
+  background: #fffbeb !important;
+  border-color: #eab308 !important;
+  color: #713f12 !important;
+  box-shadow: 0 4px 20px rgba(234, 179, 8, 0.25) !important;
+}
+.sr-retailer-marker.has-cart i {
+  color: #eab308 !important;
+}
+.sr-retailer-marker.has-cart::after {
+  border-top-color: #eab308 !important;
+}
+.sr-retailer-marker.has-cart:hover {
+  background: #eab308 !important;
+  color: #ffffff !important;
+}
+.sr-retailer-marker.has-cart:hover i {
+  color: #ffffff !important;
+}
+
+/* Visited Marker (Green Highlight) */
+.sr-retailer-marker.already-ordered {
+  background: #f0fdf4 !important;
+  border-color: #10b981 !important;
+  color: #14532d !important;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25) !important;
 }
 .sr-retailer-marker.already-ordered i {
-  color: #ea580c !important;
+  color: #10b981 !important;
+}
+.sr-retailer-marker.already-ordered::after {
+  border-top-color: #10b981 !important;
 }
 .sr-retailer-marker.already-ordered:hover {
-  background: #f97316 !important;
+  background: #10b981 !important;
   color: #ffffff !important;
 }
 .sr-retailer-marker.already-ordered:hover i {
   color: #ffffff !important;
 }
-.sr-retailer-marker.already-ordered:hover::after {
-  border-top-color: #f97316 !important;
+
+/* ── Advanced Level Retailer Card Design ── */
+.sr-retailer-card-new {
+  flex: 0 0 310px !important;
+  width: 310px !important;
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05) !important;
+  border: 1px solid #e2e8f0 !important;
+  border-left: 5px solid #2563eb !important; /* Indicator bar */
+  padding: 12px 14px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
 }
 
+.sr-retailer-card-new:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12) !important;
+}
 
+/* Indicator bars for different statuses */
+.sr-retailer-card-new.has-cart-card {
+  border-left: 5px solid #eab308 !important;
+  background: #fffbeb !important;
+}
+.sr-retailer-card-new.visited-card {
+  border-left: 5px solid #10b981 !important;
+}
+
+/* Icon / Header Row in Card */
+.sr-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sr-card-icon-box {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+  font-size: 0.95rem !important;
+}
+.has-cart-card .sr-card-icon-box {
+  background: #fef9c3 !important;
+  color: #ca8a04 !important;
+}
+.visited-card .sr-card-icon-box {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+}
+
+.sr-card-name {
+  font-size: 0.95rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  font-family: 'Hind Siliguri', sans-serif !important;
+}
+
+/* Action button inside card */
+.sr-card-action-btn {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.18) !important;
+  transition: all 0.2s !important;
+}
+.sr-card-action-btn:hover {
+  background: #1d4ed8 !important;
+  box-shadow: 0 6px 15px rgba(37, 99, 235, 0.25) !important;
+}
+
+/* Address styling */
+.sr-card-address-row {
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+  margin-top: 1px;
+}
+.sr-card-address-row i {
+  color: #94a3b8 !important;
+}
+
+/* Tags spacing and style */
+.sr-card-tags-row {
+  margin-top: 4px !important;
+  gap: 6px !important;
+}
+.sr-card-tag {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #64748b !important;
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
+  font-weight: 700 !important;
+}
+.sr-card-tag i {
+  font-size: 0.65rem;
+}
+.sr-card-tag.tag-success {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+.sr-card-tag.tag-pending {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+}
 </style>

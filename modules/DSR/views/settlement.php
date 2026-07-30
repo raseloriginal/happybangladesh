@@ -16,24 +16,35 @@ $isLocked = $isSubmitted || $isNoDispatch;
 $readonlyAttr = $isLocked ? 'readonly' : '';
 ?>
 
-<div class="p-3.5 sm:p-5 space-y-4 pb-32 max-w-lg mx-auto font-sans">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+  .font-siliguri {
+    font-family: 'Hind Siliguri', 'Inter', sans-serif;
+  }
+</style>
 
-  <!-- 1. Header Bar -->
-  <div class="flex items-center justify-between bg-white p-3.5 border border-slate-200/90 shadow-xs">
+<div class="p-3 sm:p-5 space-y-4 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none">
+
+  <!-- 1. Premium Minimal Header Card -->
+  <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
     <div class="flex items-center gap-3">
-      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 hover:bg-slate-200 transition">
-        <i class="fa-solid fa-arrow-left text-sm"></i>
+      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-900 hover:text-white transition-all duration-200 flex items-center justify-center text-slate-600 shadow-2xs active:scale-95 print:hidden">
+        <i class="fa-solid fa-arrow-left text-xs sm:text-sm"></i>
       </a>
       <div>
-        <h1 class="text-base font-black text-slate-900 leading-tight">হিসাব মিলাও (সেটেলমেন্ট)</h1>
-        <p class="text-[11px] text-slate-500 font-medium">সারাদিনের ক্যাশ ও মালের হিসাব জমা</p>
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight tracking-tight">হিসাব মিলাও</h1>
+        <p class="text-xs text-slate-400 font-medium leading-tight mt-1">সারাদিনের ক্যাশ ও মালের হিসাব জমা • <span class="font-mono text-slate-500 font-bold"><?= date('d M Y', strtotime($selectedDate)) ?></span></p>
       </div>
     </div>
 
-    <!-- Date Badge -->
-    <span class="bg-blue-50 text-blue-700 border border-blue-200/80 text-xs font-bold px-2.5 py-1">
-      <?= date('d M Y', strtotime($selectedDate)) ?>
-    </span>
+      <!-- Date Picker Form (Icon Only) -->
+      <form method="GET" action="<?= url('dsr/settlement') ?>" id="dateForm" class="relative flex items-center">
+        <button type="button" onclick="const inp=document.getElementById('dateInput'); if(inp.showPicker){inp.showPicker()}else{inp.click()}" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition active:scale-95 shadow-2xs border border-slate-200/60" title="তারিখ পরিবর্তন করুন">
+          <i class="fa-regular fa-calendar-days text-sm"></i>
+        </button>
+        <input type="date" id="dateInput" name="date" value="<?= h($selectedDate) ?>" onchange="document.getElementById('dateForm').submit()" class="absolute opacity-0 pointer-events-none inset-0 w-full h-full">
+      </form>
+    </div>
   </div>
 
   <form action="<?= url('dsr/settlement/submit') ?>" method="POST" id="settlementForm" class="space-y-4">
@@ -46,132 +57,110 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <input type="hidden" name="cash_breakdown" id="formCashBreakdown" value="{}">
     <input type="hidden" name="settlement_date" value="<?= htmlspecialchars($selectedDate) ?>">
 
-    <!-- 2. Date Selection Strip -->
-    <div class="flex gap-2 overflow-x-auto pb-1 scrollbar-none snap-x">
-      <?php 
-        for ($i = 6; $i >= 0; $i--):
-          $d = date('Y-m-d', strtotime("-$i days"));
-          $dayName = date('D', strtotime($d));
-          $dayNum = date('d', strtotime($d));
-          $isSelected = ($d === $selectedDate);
-          $pillClass = $isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-50';
-      ?>
-      <a href="?date=<?= $d ?>" class="snap-start flex-shrink-0 w-14 h-16 flex flex-col items-center justify-center transition active:scale-95 text-center <?= $pillClass ?>">
-        <span class="text-[10px] font-bold uppercase tracking-wider <?= $isSelected ? 'text-blue-100' : 'text-slate-400' ?>"><?= $dayName ?></span>
-        <span class="text-lg font-black font-mono mt-0.5"><?= $dayNum ?></span>
-      </a>
-      <?php endfor; ?>
-    </div>
-
     <!-- Status Alerts -->
     <?php if ($isSubmitted): ?>
-      <div class="bg-blue-50 border border-blue-200 p-3.5 flex items-center gap-3">
-        <div class="w-8 h-8 bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+      <div class="bg-blue-50/80 backdrop-blur-xs border border-blue-200 rounded-2xl p-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
           <i class="fa-solid fa-lock text-sm"></i>
         </div>
-        <div>
+        <div class="text-left">
           <div class="text-xs font-bold text-blue-900">হিসাব ইতিমধ্যে জমা দেওয়া হয়েছে</div>
-          <div class="text-[11px] text-blue-700">এই দিনের সেটেলমেন্ট ফাইনাল লক করা হয়েছে।</div>
-        </div>
-      </div>
-    <?php elseif ($isNoDispatch): ?>
-      <div class="bg-slate-100 border border-slate-200 p-3.5 flex items-center gap-3">
-        <div class="w-8 h-8 bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-          <i class="fa-solid fa-box-open text-sm"></i>
-        </div>
-        <div>
-          <div class="text-xs font-bold text-slate-800">আজকে কোনো মাল লোড করা হয়নি</div>
-          <div class="text-[11px] text-slate-500">এই তারিখের জন্য কোনো সেটেলমেন্ট প্রয়োজন নেই।</div>
+          <div class="text-[11px] text-blue-700 mt-0.5">এই দিনের সেটেলমেন্ট ফাইনাল লক করা হয়েছে।</div>
         </div>
       </div>
     <?php endif; ?>
 
-    <!-- 3. Account Breakdown Card -->
-    <div class="bg-white p-4 border border-slate-200/90 shadow-xs space-y-3">
-      <div class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-2.5">
-        <span>হিসাবের বিস্তারিত (Account Breakdown)</span>
-        <span class="text-[10px] text-slate-400 font-normal capitalize">ক্যালকুলেশন</span>
+    <!-- 3. Account Breakdown Card (Excel Table Style) -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left">
+      <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center text-xs">
+        <span class="font-bold text-slate-800">হিসাবের বিবরণ (Breakdown)</span>
+        <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">হিসাব</span>
       </div>
 
-      <div class="space-y-2 text-xs">
-        <div class="flex justify-between items-center py-1">
-          <span class="font-medium text-slate-600">মোট লোড করা মালের মূল্য</span>
-          <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue) ?></span>
+      <div class="divide-y divide-slate-100 text-xs">
+        <div class="flex justify-between items-center p-3">
+          <span class="font-semibold text-slate-600">মোট লোড করা মালের মূল্য</span>
+          <span class="font-black text-slate-900 font-mono text-[13px]">৳ <?= number_format($dispatchedValue) ?></span>
         </div>
-        <div class="flex justify-between items-center py-1 text-rose-600 cursor-pointer hover:bg-rose-50 active:bg-rose-100 transition -mx-1 px-1" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
-          <span class="font-medium flex items-center gap-1">ফেরত মালের মূল্য (-) <i class="fa-solid fa-circle-info text-[10px] opacity-60"></i></span>
-          <div class="flex items-center gap-1.5">
-            <span class="font-bold font-mono">৳ <?= number_format($returnedValue) ?></span>
-            <i class="fa-solid fa-chevron-right text-[10px] opacity-50"></i>
+        <div class="flex justify-between items-center p-3 cursor-pointer hover:bg-slate-50/50 transition" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
+          <span class="font-semibold text-slate-600 flex items-center gap-1.5">ফেরত মালের মূল্য (-) <i class="fa-solid fa-circle-info text-[10px] text-slate-450"></i></span>
+          <div class="flex items-center gap-1.5 text-rose-600">
+            <span class="font-black font-mono text-[13px]">৳ <?= number_format($returnedValue) ?></span>
+            <i class="fa-solid fa-chevron-right text-[10px] opacity-65"></i>
           </div>
         </div>
-        <div class="flex justify-between items-center py-1 text-amber-700">
-          <span class="font-medium">ড্যামেজ পণ্য (-)</span>
-          <span class="font-bold font-mono">৳ <?= number_format($savedDamage) ?></span>
+        <div class="flex justify-between items-center p-3">
+          <span class="font-semibold text-slate-600">ড্যামেজ পণ্য (-)</span>
+          <span class="font-black font-mono text-[13px] text-amber-600">৳ <?= number_format($savedDamage) ?></span>
         </div>
-        <div class="flex justify-between items-center py-1 text-purple-700">
-          <span class="font-medium">সারাদিনের খরচ (-)</span>
-          <span class="font-bold font-mono">৳ <?= number_format($savedExpense) ?></span>
+        <div class="flex justify-between items-center p-3">
+          <span class="font-semibold text-slate-600">সারাদিনের খরচ (-)</span>
+          <span class="font-black font-mono text-[13px] text-purple-600">৳ <?= number_format($savedExpense) ?></span>
         </div>
       </div>
 
-      <!-- Net Payable Highlight -->
-      <div class="bg-gradient-to-r from-slate-900 to-blue-950 text-white p-3.5 flex justify-between items-center shadow-xs">
+      <!-- Net Payable Highlight (Excel Sum Vibe) -->
+      <div class="bg-slate-50 border-t border-slate-200 p-3.5 flex justify-between items-center">
         <div>
-          <span class="text-xs font-bold text-blue-200">ক্যাশারে জমা দেবার পরিমাণ (Net)</span>
-          <span class="text-[10px] text-slate-300 block font-normal">(নিট নগদ জমা টাকা)</span>
+          <span class="text-xs font-bold text-slate-600">ক্যাশারে জমা দেবার পরিমাণ (Net)</span>
+          <span class="text-[9px] text-slate-400 block font-normal">(নিট নগদ জমা টাকা)</span>
         </div>
-        <span class="text-xl font-black text-amber-400 font-mono" id="displayShouldPay">৳ 0</span>
+        <span class="text-lg font-black text-slate-900 font-mono" id="displayShouldPay">৳ 0</span>
       </div>
     </div>
 
-    <!-- 4. Cash Note Denominations Grid -->
-    <div class="bg-white p-4 border border-slate-200/90 shadow-xs space-y-3">
-      <div class="text-xs font-black text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+    <!-- 4. Cash Note Denominations Grid (Excel Grid Vibe) -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left">
+      <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 text-xs font-bold text-slate-800">
         নোটের গণনা (Cash Counting)
       </div>
 
-      <div class="grid grid-cols-2 gap-2">
-        <?php 
-          $denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
-          foreach ($denominations as $d): 
-            $qty = $cashBreakdown[$d] ?? '';
-        ?>
-        <div class="flex items-center gap-1.5 bg-slate-50 p-2 border border-slate-200/60">
-          <div class="w-12 font-black text-blue-600 text-xs font-mono text-center">৳ <?= $d ?></div>
-          <div class="text-slate-400 text-xs">×</div>
-          <input type="number" min="0" class="w-full bg-white border border-slate-200 py-1 px-1.5 text-center font-black text-slate-900 outline-none focus:border-blue-500 text-xs font-mono denomination-input <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
+      <div class="p-3 bg-slate-50/30">
+        <div class="grid grid-cols-2 gap-2">
+          <?php 
+            $denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+            foreach ($denominations as $d): 
+              $qty = $cashBreakdown[$d] ?? '';
+          ?>
+          <div class="flex items-center gap-1.5 bg-white p-2 border border-slate-200 rounded-xl shadow-3xs">
+            <div class="w-12 font-black text-slate-600 text-xs font-mono text-center">৳ <?= $d ?></div>
+            <div class="text-slate-350 text-xs font-bold select-none">×</div>
+            <input type="number" min="0" class="w-full bg-slate-50/50 border border-slate-200/80 rounded-lg py-1 px-1.5 text-center font-black text-slate-900 outline-none focus:border-blue-500 text-xs font-mono denomination-input <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
+          </div>
+          <?php endforeach; ?>
         </div>
-        <?php endforeach; ?>
       </div>
 
-      <!-- Total Counted Cash -->
-      <div class="bg-emerald-50 border border-emerald-200/80 p-3 flex justify-between items-center">
-        <span class="text-xs font-bold text-emerald-800">মোট গণনাকৃত ক্যাশ</span>
-        <span class="text-lg font-black text-emerald-700 font-mono" id="displayCountedCash">৳ 0</span>
-      </div>
-
-      <!-- Difference & Live Status -->
-      <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
-        <div>
-          <span class="font-bold text-slate-600">কম / বেশি:</span>
-          <span class="font-mono font-black ml-1 text-sm text-slate-900" id="displayDifference">৳ 0</span>
+      <!-- Summary rows inside grid card -->
+      <div class="divide-y divide-slate-100 border-t border-slate-200 text-xs">
+        <!-- Total counted cash -->
+        <div class="bg-slate-50 p-3.5 flex justify-between items-center">
+          <span class="font-bold text-slate-700">মোট গণনাকৃত ক্যাশ:</span>
+          <span class="text-base font-black text-slate-900 font-mono" id="displayCountedCash">৳ 0</span>
         </div>
-        <div id="statusBadge" class="px-3 py-1 text-[10px] font-black bg-slate-100 text-slate-600 uppercase tracking-wide">
-          পেন্ডিং
+
+        <!-- Difference & Live Status -->
+        <div class="p-3.5 flex justify-between items-center">
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold text-slate-600">কম / বেশি:</span>
+            <span class="font-mono font-black text-slate-950 text-sm" id="displayDifference">৳ 0</span>
+          </div>
+          <div id="statusBadge" class="px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-slate-100 text-slate-600 uppercase tracking-wide border border-slate-200">
+            পেন্ডিং
+          </div>
         </div>
       </div>
     </div>
 
     <!-- 5. Optional Note -->
-    <div class="bg-white p-3.5 border border-slate-200/90 shadow-xs space-y-1.5">
+    <div class="bg-white p-4 border border-slate-200 rounded-2xl shadow-3xs space-y-2 text-left">
       <label class="text-xs font-bold text-slate-700">মন্তব্য বা নোট (অপশনাল)</label>
-      <textarea name="note" class="w-full bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-800 outline-none focus:border-blue-500 <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="ক্যাশ পার্থক্য বা কোনো মন্তব্য থাকলে লিখুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
+      <textarea name="note" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 outline-none focus:border-blue-500 <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="ক্যাশ পার্থক্য বা কোনো মন্তব্য থাকলে লিখুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
     </div>
 
     <!-- Submit Button -->
     <?php if (!$isLocked): ?>
-      <button type="submit" class="w-full py-3.5 font-black text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-600/20 active:scale-95 transition">
+      <button type="submit" class="w-full py-3.5 font-bold text-white bg-blue-600 border border-blue-700 hover:bg-blue-700 rounded-xl active:scale-95 transition-all shadow-sm text-xs font-siliguri">
         হিসাব জমা দিন
       </button>
     <?php endif; ?>
@@ -180,20 +169,20 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 
 </div>
 
-<!-- ===== Return Detail Modal ===== -->
-<div id="returnModal" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
+<!-- ===== Return Detail Modal (Excel Style) ===== -->
+<div id="returnModal" class="fixed inset-0 z-[100] hidden" aria-modal="true" role="dialog">
   <!-- Backdrop -->
-  <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeReturnModal()"></div>
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-xs" onclick="closeReturnModal()"></div>
 
   <!-- Sheet (Top Popup) -->
-  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" style="animation: slideDown .25s ease">
+  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-200" style="animation: slideDown .25s ease">
     <!-- Header -->
-    <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-      <div>
-        <h2 class="text-sm font-black text-slate-900">ফেরত মালের বিস্তারিত</h2>
-        <p class="text-[11px] text-slate-500 font-medium" id="returnModalDate"></p>
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-150 bg-slate-50">
+      <div class="text-left">
+        <h2 class="text-sm font-bold text-slate-900">ফেরত মালের বিস্তারিত</h2>
+        <p class="text-[10px] text-slate-400 font-semibold" id="returnModalDate"></p>
       </div>
-      <button onclick="closeReturnModal()" class="w-8 h-8 bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition">
+      <button onclick="closeReturnModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition">
         <i class="fa-solid fa-xmark text-xs"></i>
       </button>
     </div>
@@ -204,8 +193,8 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     </div>
 
     <!-- Footer Total -->
-    <div class="px-5 py-3.5 border-t border-slate-100 flex justify-between items-center bg-rose-50">
-      <span class="text-xs font-bold text-rose-800">মোট ফেরত মূল্য</span>
+    <div class="px-4 py-3 border-t border-slate-150 flex justify-between items-center bg-rose-50/80">
+      <span class="text-xs font-bold text-rose-800">মোট ফেরত মূল্য:</span>
       <span class="text-base font-black text-rose-700 font-mono" id="returnModalTotal">৳ 0</span>
     </div>
   </div>
@@ -213,7 +202,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 
 <style>
 @keyframes slideDown {
-  from { transform: translateY(-100%); opacity: 0; }
+  from { transform: translateY(-20px); opacity: 0; }
   to   { transform: translateY(0);     opacity: 1; }
 }
 </style>
@@ -256,19 +245,19 @@ function calculate() {
     // Status Badge
     const badge = document.getElementById('statusBadge');
     if (shouldPay === 0 && countedCash === 0) {
-        badge.className = 'px-3 py-1 text-[10px] font-black bg-slate-100 text-slate-600 uppercase tracking-wide';
+        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-slate-100 text-slate-600 uppercase tracking-wide border border-slate-200';
         badge.innerText = 'পেন্ডিং';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-slate-900';
     } else if (Math.abs(difference) < 0.01) {
-        badge.className = 'px-3 py-1 text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wide';
+        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-emerald-100 text-emerald-800 uppercase tracking-wide border border-emerald-200';
         badge.innerText = 'হিসাব মিলছে';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-emerald-600';
     } else if (difference < 0) {
-        badge.className = 'px-3 py-1 text-[10px] font-black bg-rose-100 text-rose-800 uppercase tracking-wide';
+        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-rose-100 text-rose-800 uppercase tracking-wide border border-rose-200';
         badge.innerText = 'কম (শর্ট)';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-rose-600';
     } else {
-        badge.className = 'px-3 py-1 text-[10px] font-black bg-blue-100 text-blue-800 uppercase tracking-wide';
+        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-blue-100 text-blue-800 uppercase tracking-wide border border-blue-200';
         badge.innerText = 'বেশি ক্যাশ';
         diffDisplay.className = 'font-mono font-black ml-1 text-sm text-blue-600';
     }
@@ -299,7 +288,7 @@ function openReturnModal() {
         .then(r => r.json())
         .then(data => {
             if (!data.success || !data.items || !data.items.length) {
-                body.innerHTML = '<p class="text-center text-slate-400 text-xs py-10">এই তারিখে কোনো ফেরত মাল নেই।</p>';
+                body.innerHTML = '<p class="text-center text-slate-400 text-xs py-10 font-siliguri">এই তারিখে কোনো ফেরত মাল নেই।</p>';
                 total.textContent = '৳ 0';
                 return;
             }
@@ -311,8 +300,8 @@ function openReturnModal() {
                 const t = parseFloat(item.total);
                 grandTotal += t;
                 rows += `
-                  <tr class="border-b border-slate-100 last:border-0">
-                    <td class="py-2.5 pr-2 text-xs text-slate-800 font-medium">${item.product_name}</td>
+                  <tr class="border-b border-slate-100 last:border-0 font-siliguri">
+                    <td class="py-2.5 pr-2 text-xs text-slate-800 font-semibold text-left">${item.product_name}</td>
                     <td class="py-2.5 text-center text-xs font-mono text-slate-600">${parseFloat(item.qty)}</td>
                     <td class="py-2.5 text-right text-xs font-mono text-slate-600">৳ ${Math.round(parseFloat(item.price)).toLocaleString('en-US')}</td>
                     <td class="py-2.5 text-right text-xs font-mono font-bold text-rose-600">৳ ${Math.round(t).toLocaleString('en-US')}</td>
@@ -320,14 +309,14 @@ function openReturnModal() {
             });
 
             body.innerHTML = `
-              <div class="overflow-hidden border border-slate-200">
+              <div class="overflow-hidden border border-slate-200 rounded-xl">
                 <table class="w-full">
                   <thead>
                     <tr class="bg-slate-50 border-b border-slate-200">
-                      <th class="text-left py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">পণ্য</th>
-                      <th class="text-center py-2 text-[10px] text-slate-500 font-bold uppercase">পরিমাণ</th>
-                      <th class="text-right py-2 text-[10px] text-slate-500 font-bold uppercase">মূল্য</th>
-                      <th class="text-right py-2 px-3 text-[10px] text-slate-500 font-bold uppercase">মোট</th>
+                      <th class="text-left py-2 px-3 text-[10px] text-slate-500 font-bold uppercase font-siliguri">পণ্য</th>
+                      <th class="text-center py-2 text-[10px] text-slate-500 font-bold uppercase font-siliguri">পরিমাণ</th>
+                      <th class="text-right py-2 text-[10px] text-slate-500 font-bold uppercase font-siliguri">মূল্য</th>
+                      <th class="text-right py-2 px-3 text-[10px] text-slate-500 font-bold uppercase font-siliguri">মোট</th>
                     </tr>
                   </thead>
                   <tbody class="px-3 text-xs">${rows}</tbody>
@@ -336,7 +325,7 @@ function openReturnModal() {
 
             total.textContent = '৳ ' + Math.round(grandTotal).toLocaleString('en-US');
         })
-        .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-8">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
+        .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-8 font-siliguri">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
 }
 
 function closeReturnModal() {

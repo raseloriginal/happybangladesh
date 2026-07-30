@@ -200,7 +200,7 @@ class SRController extends Controller
     public function orders(): void
     {
         $srId   = Auth::id();
-        $period = trim($_GET['period'] ?? 'all');
+        $period = trim($_GET['period'] ?? 'today');
         $from   = trim($_GET['from'] ?? '');
         $to     = trim($_GET['to'] ?? '');
 

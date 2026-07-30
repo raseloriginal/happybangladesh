@@ -1,4 +1,47 @@
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+
+  .sr-retailer-popup-v2,
+  .sr-bottom-sheet-v2,
+  .sr-modal-overlay,
+  .sr-success-overlay-v2,
+  .sr-confirm-modal {
+    font-family: 'Hind Siliguri', 'Inter', sans-serif !important;
+  }
+
+  /* Redesign the floating bottom cart bar */
+  .sr-popup-cart-bar-v2 {
+    background: #0f172a !important; /* Dark Slate theme */
+    border: 1px solid #1e293b !important;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.3) !important;
+    border-radius: 20px !important;
+    height: 60px !important;
+  }
+  .sr-cart-badge-btn-v2 {
+    background: #1e293b !important;
+    color: #cbd5e1 !important;
+  }
+  .sr-cart-checkout-btn-v2 {
+    background: #2563eb !important;
+    border-radius: 12px !important;
+    font-weight: 800 !important;
+    padding: 0 20px !important;
+    height: 44px !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2) !important;
+  }
+  .sr-cart-checkout-btn-v2:hover {
+    background: #1d4ed8 !important;
+  }
+  .sr-cart-checkout-btn-v2:active {
+    transform: scale(0.97) !important;
+  }
+  .sr-cart-thumb-img-v2, .sr-cart-thumb-more-v2 {
+    border: 1.5px solid #1e293b !important;
+    background: #1e293b !important;
+    color: #cbd5e1 !important;
+  }
+
   /* Prevent Flash of Unstyled Content (FOUC) for overlays on page load */
   .sr-sheet-overlay,
   .sr-bottom-sheet,
@@ -128,38 +171,25 @@
     <button class="sr-popup-back-btn-v2" id="retPopupBack">
       <i class="fa-solid fa-chevron-left"></i>
     </button>
-    <div class="sr-popup-header-title-v2">Products</div>
-    <button class="sr-popup-search-btn-v2">
+    <div class="sr-popup-header-title-v2" id="retPopupHeaderTitle">Products</div>
+    
+    <!-- Search Input (Hidden by default) -->
+    <div class="hidden flex-1 mx-2" id="retPopupSearchContainer">
+      <input type="text" id="retPopupSearchInput" placeholder="প্রোডাক্ট খুঁজুন..." class="w-full bg-slate-100 border border-slate-200 text-slate-800 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-500 font-sans" oninput="filterProductsTable()">
+    </div>
+
+    <button class="sr-popup-search-btn-v2" id="retPopupSearchBtn" onclick="toggleSearchInput()">
       <i class="fa-solid fa-magnifying-glass"></i>
     </button>
   </div>
 
   <!-- Content Area -->
   <div class="sr-popup-content-v2">
-    <!-- Retailer Profile Card -->
-    <div class="sr-popup-profile-card-v2">
-      <div class="relative shrink-0">
-        <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-slate-400 text-lg">
-          <i class="fa-solid fa-user"></i>
-        </div>
-      </div>
-      <div class="sr-popup-profile-info-v2">
-        <div class="sr-popup-profile-name-v2" id="retPopupName">—</div>
-        <div class="sr-popup-profile-shop-v2">
-          <i class="fa-solid fa-store" style="font-size:0.75rem; margin-right:4px; color:#64748b;"></i>
-          <span id="retPopupShopName">—</span>
-        </div>
-      </div>
-    </div>
 
 
-    <!-- Section Title & Filters -->
-    <div class="sr-popup-section-header-v2">
-      <div class="sr-popup-section-title-v2">প্রোডাক্ট সমূহ</div>
-    </div>
 
-    <!-- Products Grid -->
-    <div class="sr-products-grid-v2" id="productsGrid">
+    <!-- Products Table -->
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white" id="productsGrid">
       <!-- Populated by JS -->
     </div>
   </div>
@@ -190,7 +220,7 @@
 <div class="sr-bottom-sheet-v2" id="productSheet">
   <div class="sr-sheet-handle-v2"></div>
   <div class="sr-sheet-header-v2">
-    <span class="sr-sheet-title-v2">Add Product</span>
+    <span class="sr-sheet-title-v2">প্রোডাক্ট যোগ করুন</span>
     <button class="sr-sheet-close-v2" id="productSheetClose"><i class="fa-solid fa-xmark"></i></button>
   </div>
   <div class="sr-sheet-body-v2">
@@ -199,13 +229,27 @@
       <div id="productSheetImgWrap"></div>
     </div>
     
-    <!-- Product Name & Package Type -->
-    <div class="sr-prod-sheet-name-v2" id="productSheetName">—</div>
-    <div class="sr-prod-sheet-package-v2" id="productSheetPackageWrap">
-      প্যাকেজ টাইপ: <span style="color:#2563eb; font-weight:700;" id="productSheetPackageInner">বক্স ( <span id="productSheetPcsPerBox">—</span> পিস )</span>
-    </div>
-    <div class="sr-prod-sheet-baseprice-v2">
-      মোট মূল্য <span style="color:#f43f5e; font-weight:700;" id="productSheetBasePrice">—</span>
+    <!-- Product Name -->
+    <div class="sr-prod-sheet-name-v2 font-sans font-bold text-slate-800" id="productSheetName">—</div>
+    
+    <!-- Product Info Table (Excel Style) -->
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white my-3 text-xs select-none">
+      <table class="w-full text-left border-collapse">
+        <tbody class="divide-y divide-slate-200 text-slate-700">
+          <tr>
+            <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 w-1/3 font-sans">প্যাকেজ টাইপ</td>
+            <td class="p-2.5 text-slate-800 font-bold font-sans" id="productSheetPackageWrap">
+              <span id="productSheetPackageInner">বক্স ( <span id="productSheetPcsPerBox">—</span> পিস )</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 font-sans">মোট মূল্য</td>
+            <td class="p-2.5 text-slate-800 font-black font-mono">
+              <span id="productSheetBasePrice">—</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
     
     <!-- Price setting override controls -->
@@ -226,7 +270,7 @@
     <div class="sr-prod-qty-counters-grid-v2" id="qtyCountersGrid">
       <!-- Box counter -->
       <div class="sr-prod-qty-counter-v2" id="boxCounterGroup">
-        <div class="sr-prod-qty-counter-label-v2">বক্স</div>
+        <div class="sr-prod-qty-counter-label-v2 font-sans">বক্স</div>
         <div class="sr-prod-qty-counter-row-v2">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('cartons',-1)">−</button>
           <input type="number" id="qtyCartons" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2">
@@ -235,7 +279,7 @@
       </div>
       <!-- Piece counter -->
       <div class="sr-prod-qty-counter-v2" id="pieceCounterGroup">
-        <div class="sr-prod-qty-counter-label-v2">পিস</div>
+        <div class="sr-prod-qty-counter-label-v2 font-sans">পিস</div>
         <div class="sr-prod-qty-counter-row-v2">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('pieces',-1)">−</button>
           <input type="number" id="qtyPieces" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2">
@@ -247,10 +291,10 @@
     <input type="hidden" id="baseUnitPrice" value="0">
     <input type="hidden" id="unitPrice" value="0">
     <div id="unitPriceDisplay" style="display:none;">৳ 0.00</div>
-
+ 
     <!-- Bottom blue Add to Cart CTA -->
     <button class="sr-prod-sheet-add-btn-v2" id="addToCartBtn" onclick="addToCart()">
-      <span id="addToCartBtnText">Tk 0 • Add Now</span> <i class="fa-solid fa-cart-shopping" style="margin-left: 4px;"></i>
+      <span id="addToCartBtnText">৳ 0 • কার্টে যোগ করুন</span> <i class="fa-solid fa-cart-shopping" style="margin-left: 4px;"></i>
     </button>
   </div>
 </div>
@@ -290,49 +334,67 @@
      CHECKOUT SUCCESS FULLSCREEN OVERLAY
 ══════════════════════════════════════════════════════════════ -->
 <div class="sr-success-overlay-v2" id="successOverlay">
-  <div class="sr-success-container-v2">
-    <div class="sr-success-icon-box-v2">
+  <div class="sr-success-container-v2" style="font-family: 'Hind Siliguri', sans-serif;">
+    <!-- Large success badge -->
+    <div class="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 border border-emerald-100 flex items-center justify-center text-3xl shadow-sm mb-4">
       <i class="fa-solid fa-circle-check"></i>
     </div>
     
-    <div class="sr-success-title-v2">অভিনন্দন!</div>
-    <div class="sr-success-subtitle-v2">আপনার অর্ডার সফলভাবে সম্পন্ন হয়েছে!</div>
+    <h2 class="text-xl font-bold text-slate-900 leading-tight mb-1 text-center font-siliguri">অভিনন্দন!</h2>
+    <p class="text-xs text-slate-500 text-center mb-6 leading-tight font-siliguri">আপনার অর্ডার সফলভাবে সম্পন্ন হয়েছে!</p>
     
-    <!-- Delivery Info -->
-    <div class="sr-success-info-card-v2">
-      <div class="sr-info-card-header-v2">ডেলিভারি তথ্য:</div>
-      <div class="sr-info-row-v2">
-        <span class="sr-info-label-v2">গ্রাহক:</span>
-        <span class="sr-info-value-v2" id="successCustName">—</span>
+    <!-- Unified Excel Receipt Card -->
+    <div class="w-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+      
+      <!-- Receipt Header Banner -->
+      <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center text-xs">
+        <span class="font-bold text-slate-700">অর্ডার ভাউচার</span>
+        <span class="font-mono text-slate-400" id="successDateStr"><?= date('d M Y') ?></span>
       </div>
-      <div class="sr-info-row-v2">
-        <span class="sr-info-label-v2">ডেলিভারির ঠিকানা:</span>
-        <span class="sr-info-value-v2" id="successAddress">—</span>
-      </div>
-    </div>
-    
-    <!-- Products List -->
-    <div class="sr-success-products-card-v2">
-      <div class="sr-success-card-header-v2">Products</div>
-      <div class="sr-success-prod-list-v2" id="successProductList">
-        <!-- JS filled -->
-      </div>
-      <div class="sr-success-subtotal-box-v2">
-        <div class="sr-subtotal-oc-row-v2" id="successOcRow" style="display:none;">
-          <span>O/C</span>
-          <span id="successOcAmount">0</span>
+
+      <!-- Customer Detail Row -->
+      <div class="p-3.5 border-b border-slate-200 bg-slate-50/50 flex flex-col gap-1.5 text-xs text-left">
+        <div class="flex items-start gap-2">
+          <span class="font-bold text-slate-400 min-w-[80px]">গ্রাহক:</span>
+          <span class="font-bold text-slate-900 text-sm" id="successCustName">—</span>
         </div>
-        <div class="sr-subtotal-row-v2">
-          <span>Total:</span>
-          <span id="successSubtotalVal">Tk 0</span>
+        <div class="flex items-start gap-2">
+          <span class="font-bold text-slate-400 min-w-[80px]">ঠিকানা:</span>
+          <span class="text-slate-600 font-medium" id="successAddress">—</span>
         </div>
       </div>
+
+      <!-- Itemized Products List Table -->
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase select-none">
+            <th class="p-2.5 border-r border-slate-200/60 w-[10%] text-center">#</th>
+            <th class="p-2.5 border-r border-slate-200/60 w-[60%]">প্রোডাক্ট বিবরণ</th>
+            <th class="p-2.5 w-[30%] text-center">পরিমাণ</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-slate-700 font-sans" id="successProductList">
+          <!-- JS filled -->
+        </tbody>
+        <tfoot>
+          <!-- O/C Row -->
+          <tr class="bg-slate-50 border-t border-slate-200" id="successOcRow" style="display:none;">
+            <td colspan="2" class="p-2.5 text-right font-bold text-slate-500 border-r border-slate-200">O/C:</td>
+            <td class="p-2.5 text-center font-black text-rose-600 font-mono" id="successOcAmount">0</td>
+          </tr>
+          <!-- Total Row -->
+          <tr class="bg-slate-50 border-t border-slate-200 font-bold">
+            <td colspan="2" class="p-2.5 text-right text-slate-700 border-r border-slate-200">সর্বমোট (Total):</td>
+            <td class="p-2.5 text-center font-black text-slate-950 font-mono text-[13px]" id="successSubtotalVal">Tk 0</td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
     
     <!-- Actions -->
-    <div class="sr-success-actions-v2">
-      <button class="sr-btn-home-back-v2" id="successHomeBtn">হোমে ফিরে যাই</button>
-      <button class="sr-btn-store-back-v2" id="successStoreBtn">দোকানে ফিরে যাই</button>
+    <div class="w-full flex gap-3">
+      <button class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/60 font-bold text-xs rounded-xl transition active:scale-95 shadow-3xs" id="successHomeBtn">হোমে ফিরে যাই</button>
+      <button class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition active:scale-95 shadow-sm" id="successStoreBtn">দোকানে ফিরে যাই</button>
     </div>
   </div>
 </div>
@@ -394,54 +456,83 @@ function renderRetailerCart() {
   }
   
   let totalVal = 0;
-  list.innerHTML = cart.map((c, i) => {
+  
+  let tableHtml = `
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table class="w-full text-left border-collapse font-sans text-xs">
+        <thead>
+          <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider select-none">
+            <th class="p-2.5 border-r border-slate-200">প্রোডাক্ট</th>
+            <th class="p-2.5 text-center border-r border-slate-200">পরিমাণ</th>
+            <th class="p-2.5 text-right border-r border-slate-200">মূল্য</th>
+            <th class="p-2.5 text-center">মুছুন</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 text-slate-700">
+  `;
+  
+  cart.forEach((c, i) => {
     totalVal += c.total;
     const pcsPerCarton = c.pcsPerCarton || 12;
     const boxes = Math.floor(c.qty / pcsPerCarton);
     const pcs = c.qty % pcsPerCarton;
     
+    const prod = ALL_PRODUCTS.find(p => p.id === c.id);
     const imgHtml = (prod && prod.image)
-      ? `<img src="${BASE_URL}/${escHtml(prod.image)}" class="sr-cart-item-image-v2" alt="" loading="lazy" onerror="this.onerror=null; this.outerHTML='<div class=\\'sr-no-img-box-v2 cart-placeholder\\'><i class=\\'fa-regular fa-image\\'></i></div>';">`
-      : `<div class="sr-no-img-box-v2 cart-placeholder"><i class="fa-regular fa-image"></i></div>`;
+      ? `<img src="${BASE_URL}/${escHtml(prod.image)}" class="w-7 h-7 rounded-lg object-contain bg-slate-50 border border-slate-200 shrink-0" alt="" loading="lazy" onerror="handleProductImageError(this)">`
+      : `<div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-regular fa-image text-[9px]"></i></div>`;
       
-      // O/C status
-      const ocHtml = c.oc !== 0 && c.oc !== undefined ? `<span class="sr-cart-item-oc-badge-v2 ${c.oc < 0 ? 'neg' : 'pos'}">${c.oc > 0 ? '+' : ''}${Math.round(c.oc)} O/C</span>` : '';
+    const ocHtml = c.oc !== 0 && c.oc !== undefined 
+      ? `<span class="inline-block text-[9px] font-extrabold px-1 py-0.2 rounded ${c.oc < 0 ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}">${c.oc > 0 ? '+' : ''}${Math.round(c.oc)} O/C</span>` 
+      : '';
         
-      return `
-      <div class="sr-cart-item-card-v2">
-        <div class="sr-cart-item-image-wrap-v2">
+    tableHtml += `
+      <tr class="hover:bg-slate-50/50 transition">
+        <td class="p-2 border-r border-slate-200 font-semibold text-slate-800 flex items-center gap-2">
           ${imgHtml}
-        </div>
-        <div class="sr-cart-item-info-v2">
-          <div class="sr-cart-item-name-v2">${escHtml(c.name)}</div>
-          <div class="sr-cart-item-tags-v2">
-            <span class="sr-cart-item-tag-v2"><strong>${boxes.toString().padStart(2, '0')}</strong> Box</span>
-            <span class="sr-cart-item-tag-v2"><strong>${pcs.toString().padStart(2, '0')}</strong> Pack</span>
-          </div>
-          <div class="sr-cart-item-price-row-v2">
-            <span class="sr-cart-item-price-v2">Tk ${Math.round(c.total)}</span>
+          <div class="flex flex-col gap-0.5">
+            <span>${escHtml(c.name)}</span>
             ${ocHtml}
           </div>
-        </div>
-        <button class="sr-cart-item-delete-btn-v2" onclick="removeCartItem(${i})" title="Remove item">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-      </div>`;
-    }).join('');
-    
-    document.getElementById('retCartGrandTotal').textContent = 'Tk ' + Math.round(totalVal);
-    
-    // Total O/C display
-    const totalOc = cart.reduce((sum, item) => sum + (item.oc || 0), 0);
-    const retCartOcVal = document.getElementById('retCartOcVal');
-    if (totalOc !== 0) {
-      retCartOcVal.style.display = 'block';
-      retCartOcVal.textContent = `O/C ${totalOc > 0 ? '+' : ''}${Math.round(totalOc)}`;
-      retCartOcVal.className = `sr-cart-summary-oc-v2 ${totalOc < 0 ? 'neg' : 'pos'}`;
-    } else {
-      retCartOcVal.style.display = 'none';
-    }
+        </td>
+        <td class="p-2 text-center border-r border-slate-200 font-mono text-[10px] text-slate-600">
+          <div class="flex flex-col gap-0.5 items-center">
+            <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${boxes.toString().padStart(2, '0')} B</span>
+            <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${pcs.toString().padStart(2, '0')} P</span>
+          </div>
+        </td>
+        <td class="p-2 text-right font-bold border-r border-slate-200 text-slate-950 font-mono text-[11px]">
+          Tk ${Math.round(c.total)}
+        </td>
+        <td class="p-2 text-center">
+          <button class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-100 flex items-center justify-center transition active:scale-95 mx-auto" onclick="removeCartItem(${i})" title="Remove item">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+  
+  tableHtml += `
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  list.innerHTML = tableHtml;
+  
+  document.getElementById('retCartGrandTotal').textContent = 'Tk ' + Math.round(totalVal);
+  
+  const totalOc = cart.reduce((sum, item) => sum + (item.oc || 0), 0);
+  const retCartOcVal = document.getElementById('retCartOcVal');
+  if (totalOc !== 0) {
+    retCartOcVal.style.display = 'block';
+    retCartOcVal.textContent = `O/C ${totalOc > 0 ? '+' : ''}${Math.round(totalOc)}`;
+    retCartOcVal.className = `sr-cart-summary-oc-v2 ${totalOc < 0 ? 'neg' : 'pos'}`;
+  } else {
+    retCartOcVal.style.display = 'none';
   }
+}
 
 function updateCartItem(index, type, value) {
   const cart = cartsByRetailer[currentRetailer.id];
@@ -481,9 +572,10 @@ function removeCartItem(index) {
 function openProductsForRetailer() {
   closeSheet('retCartSheet', 'retCartOverlay');
   
-  document.getElementById('retPopupName').textContent  = currentRetailer.name;
-  document.getElementById('retPopupShopName').textContent = currentRetailer.name;
-  
+  const headerTitleEl = document.getElementById('retPopupHeaderTitle');
+  if (headerTitleEl) {
+    headerTitleEl.textContent = currentRetailer.name;
+  }
   // Avatar removed
 
 
@@ -529,49 +621,113 @@ function updatePopupCartInfo() {
   }
 }
 
+function handleProductImageError(img) {
+  img.outerHTML = `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-regular fa-image text-[10px]"></i></div>`;
+}
+
+let productSearchQuery = '';
+
+function toggleSearchInput() {
+  const container = document.getElementById('retPopupSearchContainer');
+  const title = document.getElementById('retPopupHeaderTitle');
+  const btn = document.getElementById('retPopupSearchBtn');
+  const input = document.getElementById('retPopupSearchInput');
+  
+  if (container.classList.contains('hidden')) {
+    container.classList.remove('hidden');
+    container.classList.add('flex');
+    title.classList.add('hidden');
+    btn.innerHTML = '<i class="fa-solid fa-xmark text-slate-500"></i>';
+    input.focus();
+  } else {
+    container.classList.add('hidden');
+    container.classList.remove('flex');
+    title.classList.remove('hidden');
+    btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+    input.value = '';
+    productSearchQuery = '';
+    renderProductsGrid();
+  }
+}
+
+let filterProductsTimeout = null;
+function filterProductsTable() {
+  clearTimeout(filterProductsTimeout);
+  filterProductsTimeout = setTimeout(() => {
+    productSearchQuery = document.getElementById('retPopupSearchInput').value.trim().toLowerCase();
+    renderProductsGrid();
+  }, 150);
+}
+
 function renderProductsGrid() {
   const grid = document.getElementById('productsGrid');
   if (!ALL_PRODUCTS.length) {
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:#94a3b8;">No products available.</div>`;
+    grid.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;">No products available.</div>`;
+    return;
+  }
+
+  const filteredProducts = ALL_PRODUCTS.filter(p => {
+    if (!productSearchQuery) return true;
+    return (p.name || '').toLowerCase().includes(productSearchQuery);
+  });
+
+  if (!filteredProducts.length) {
+    grid.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>`;
     return;
   }
   
   const cart = cartsByRetailer[currentRetailer?.id] || [];
   
-  grid.innerHTML = ALL_PRODUCTS.map((p, i) => {
-    const grad  = gradients[i % gradients.length];
-    const emoji = emojis[i % emojis.length];
-    const imgHtml = (p && p.image)
-      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-card-image-v2" alt="${escHtml(p.name)}" loading="lazy" onerror="this.onerror=null; this.outerHTML='<div class=\\'sr-no-img-box-v2 card-placeholder\\'><i class=\\'fa-regular fa-image\\'></i><span>No Image</span></div>';">`
-      : `<div class="sr-no-img-box-v2 card-placeholder"><i class="fa-regular fa-image"></i><span>No Image</span></div>`;
-
+  let tableHtml = `
+    <table class="w-full text-left border-collapse font-sans text-xs">
+      <thead>
+        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider select-none">
+          <th class="p-3 border-r border-slate-200">প্রোডাক্ট নাম</th>
+          <th class="p-3 text-center border-r border-slate-200">স্টক</th>
+          <th class="p-3 text-center">অ্যাকশন</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 text-slate-700">
+  `;
+  
+  filteredProducts.forEach((p) => {
+    const origIdx = ALL_PRODUCTS.findIndex(prod => prod.id === p.id);
     const isInCart = cart.some(item => item.id === p.id);
     const btnHtml = isInCart 
-      ? `<button class="sr-prod-card-btn-v2 added" onclick="event.stopPropagation(); openProductSheet(${i})">যোগ হয়েছে</button>`
-      : `<button class="sr-prod-card-btn-v2" onclick="event.stopPropagation(); openProductSheet(${i})">যোগ করুন <i class="fa-solid fa-plus" style="font-size: 0.65rem; margin-left: 2px;"></i></button>`;
+      ? `<button class="px-2.5 py-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 transition" onclick="event.stopPropagation(); openProductSheet(${origIdx})">যোগ হয়েছে</button>`
+      : `<button class="px-2.5 py-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition" onclick="event.stopPropagation(); openProductSheet(${origIdx})">যোগ করুন</button>`;
       
     const stockQty = parseInt(p.stock || 0);
     const stockHtml = stockQty > 0 
-      ? `<span style="font-size: 0.65rem; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">Stock: ${stockQty}</span>`
-      : `<span style="font-size: 0.65rem; font-weight: 700; color: #ef4444; background: #fee2e2; padding: 2px 6px; border-radius: 4px;">Out of Stock</span>`;
+      ? `<span class="inline-block text-[9px] font-extrabold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">${stockQty} টি</span>`
+      : `<span class="inline-block text-[9px] font-extrabold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">স্টক নেই</span>`;
 
-    return `
-    <div class="sr-product-card-v2" onclick="openProductSheet(${i})">
-      <div class="sr-product-card-image-wrap-v2">
-        ${imgHtml}
-      </div>
-      <div class="sr-product-card-info-v2">
-        <div class="sr-product-card-name-v2">${escHtml(p.name)}</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-            <div class="sr-product-card-price-v2" style="margin-bottom:0;">Tk ${parseFloat(p.selling_price || p.price || 0)}</div>
+    const imgHtml = (p && p.image)
+      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-slate-200/80 shrink-0" alt="${escHtml(p.name)}" loading="lazy" onerror="handleProductImageError(this)">`
+      : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-regular fa-image text-[10px]"></i></div>`;
+
+    tableHtml += `
+        <tr class="hover:bg-slate-50/50 transition cursor-pointer" onclick="openProductSheet(${origIdx})">
+          <td class="p-3 border-r border-slate-200 font-semibold text-slate-800 flex items-center gap-2.5">
+            ${imgHtml}
+            <span>${escHtml(p.name)}</span>
+          </td>
+          <td class="p-3 text-center border-r border-slate-200">
             ${stockHtml}
-        </div>
-        <div class="sr-product-card-action-v2">
-          ${btnHtml}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+          </td>
+          <td class="p-3 text-center" onclick="event.stopPropagation();">
+            ${btnHtml}
+          </td>
+        </tr>
+    `;
+  });
+  
+  tableHtml += `
+      </tbody>
+    </table>
+  `;
+  
+  grid.innerHTML = tableHtml;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -708,7 +864,7 @@ function calcTotal() {
   
   const btnText = document.getElementById('addToCartBtnText');
   if (btnText) {
-    btnText.textContent = `Tk ${Math.round(actualTotal)} • Add Now`;
+    btnText.textContent = `Tk ${Math.round(actualTotal)} • কার্টে যোগ করুন`;
   }
   updateOcDisplay(totalPcs, actualTotal);
 }
@@ -804,7 +960,9 @@ function confirmRetailerCart() {
     if (d.success) {
       // 1. Populating the success screen before clearing the cart
       document.getElementById('successCustName').textContent = currentRetailer.name;
-      document.getElementById('successAddress').textContent = currentRetailer.address || 'Detected Location';
+      const cleanAddress = (currentRetailer.address && !currentRetailer.address.toLowerCase().includes('imported dummy')) ? currentRetailer.address.trim() : '';
+      document.getElementById('successAddress').textContent = cleanAddress || 'ঠিকানা দেওয়া নেই';
+      document.getElementById('successDateStr').textContent = new Date().toLocaleDateString('bn-BD', {day: 'numeric', month: 'short', year: 'numeric'});
       
       const prodList = document.getElementById('successProductList');
       let grandTotal = 0;
@@ -816,26 +974,26 @@ function confirmRetailerCart() {
         const pcs = item.qty % pcsPerCarton;
         
         return `
-        <div class="sr-success-prod-item-v2">
-          <div class="sr-success-prod-index-v2">${idx + 1}</div>
-          <div class="sr-success-prod-details-v2">
-            <div class="sr-success-prod-name-v2">${escHtml(item.name)}</div>
-            <div class="sr-success-prod-tags-v2">
-              <span class="sr-success-tag-v2"><strong>${boxes.toString().padStart(2, '0')}</strong> Box</span>
-              <span class="sr-success-tag-v2"><strong>${pcs.toString().padStart(2, '0')}</strong> Pack</span>
+        <tr class="hover:bg-slate-50/50 transition">
+          <td class="p-2.5 border-r border-slate-200 text-center font-mono font-bold text-slate-500">${idx + 1}</td>
+          <td class="p-2.5 border-r border-slate-200 font-semibold text-slate-800">${escHtml(item.name)}</td>
+          <td class="p-2.5 text-center font-mono text-[10px] text-slate-600">
+            <div class="flex gap-1 justify-center">
+              <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${boxes.toString().padStart(2, '0')} B</span>
+              <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${pcs.toString().padStart(2, '0')} P</span>
             </div>
-          </div>
-        </div>`;
+          </td>
+        </tr>`;
       }).join('');
       
       // Total O/C computation
       const totalOc = cart.reduce((sum, item) => sum + (item.oc || 0), 0);
+      const successOcRow = document.getElementById('successOcRow');
       if (totalOc !== 0) {
-        document.getElementById('successOcRow').style.display = 'flex';
-        document.getElementById('successOcRow').className = `sr-subtotal-oc-row-v2 ${totalOc < 0 ? 'neg' : 'pos'}`;
+        successOcRow.style.display = 'table-row';
         document.getElementById('successOcAmount').textContent = `${totalOc > 0 ? '+' : ''}${Math.round(totalOc)}`;
       } else {
-        document.getElementById('successOcRow').style.display = 'none';
+        successOcRow.style.display = 'none';
       }
       
       document.getElementById('successSubtotalVal').textContent = `Tk ${Math.round(grandTotal)}`;
@@ -848,6 +1006,7 @@ function confirmRetailerCart() {
       
       // Open Success Screen overlay
       document.getElementById('successOverlay').classList.add('open');
+      triggerDualCannonShower();
 
       // Play success notification sound
       try {
@@ -994,4 +1153,30 @@ document.getElementById('successStoreBtn').addEventListener('click', () => {
   updatePopupCartInfo();
   dismissModalWithHistory();
 });
+function triggerDualCannonShower() {
+  if (typeof confetti === 'undefined') return;
+  const end = Date.now() + (3.5 * 1000);
+  
+  (function frame() {
+    confetti({
+      particleCount: 3,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 0.8 },
+      zIndex: 9999
+    });
+    confetti({
+      particleCount: 3,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 0.8 },
+      zIndex: 9999
+    });
+
+    if (Date.now() < end) {
+      requestAnimationFrame(frame);
+    }
+  }());
+}
 </script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
