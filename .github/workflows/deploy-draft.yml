@@ -17,7 +17,7 @@ jobs:
     - name: Setup SSH Key
       run: |
         mkdir -p ~/.ssh
-        printf '%s' "${{ secrets.DRAFT_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+        printf '%s' "${{ secrets.SSH_DRAFT_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
         echo "" >> ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
         ssh-keyscan -H ${{ secrets.DRAFT_SERVER_HOST }} >> ~/.ssh/known_hosts
@@ -35,7 +35,7 @@ jobs:
       with:
         host: ${{ secrets.DRAFT_SERVER_HOST }}
         username: ${{ secrets.DRAFT_SERVER_USERNAME }}
-        key: ${{ secrets.DRAFT_SSH_PRIVATE_KEY }}
+        key: ${{ secrets.SSH_DRAFT_PRIVATE_KEY }}
         port: 22
         script: |
           cd /home/happydraft/htdocs/happydraft.raseloriginal.digital
