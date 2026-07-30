@@ -81,7 +81,10 @@ $truncateName = function($name) {
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100 font-sans" id="tableBody">
-        <?php if (empty($items)): ?>
+        <?php 
+          $grandTotalAmount = 0; 
+          if (empty($items)): 
+        ?>
           <tr id="emptyRow">
             <td colspan="3" class="p-12 text-center text-slate-400 bg-white font-siliguri">
               <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center text-xl mx-auto mb-2"><i class="fa-solid fa-box-open"></i></div>
@@ -90,7 +93,6 @@ $truncateName = function($name) {
           </tr>
         <?php else: ?>
           <?php 
-            $grandTotalAmount = 0;
             foreach ($items as $ord): 
               $grandTotalAmount += (float)$ord['total_amount'];
               $rName = !empty($ord['retailer_name']) ? $ord['retailer_name'] : (!empty($ord['dealer_name']) ? $ord['dealer_name'] : 'সাধারণ কাস্টমার');
