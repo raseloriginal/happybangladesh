@@ -910,23 +910,88 @@ function showMiniToast(msg, isError = false) {
   document.body.appendChild(t);
   setTimeout(() => { t.style.opacity='0'; setTimeout(()=>t.remove(),400); }, 2500);
 }
-  document.getElementById('retPopupBack').addEventListener('click', () => {
-    document.getElementById('retailerPopup').classList.remove('open');
+function closeRetailerPopup() {
+  const popup = document.getElementById('retailerPopup');
+  if (popup && popup.classList.contains('open')) {
+    popup.classList.remove('open');
     document.body.style.overflow = '';
-  });
-  document.getElementById('productSheetClose').addEventListener('click', () => closeSheet('productSheet','productSheetOverlay'));
-  document.getElementById('productSheetOverlay').addEventListener('click', () => closeSheet('productSheet','productSheetOverlay'));
+  }
+}
 
-  document.getElementById('successHomeBtn').addEventListener('click', () => {
-    location.reload();
-  });
-  
-  document.getElementById('successStoreBtn').addEventListener('click', () => {
-    document.getElementById('successOverlay').classList.remove('open');
-    renderProductsGrid();
-    updatePopupCartInfo();
-    // Also remove the popup so we can see the map with updated pin colors
-    document.getElementById('retailerPopup').classList.remove('open');
-    document.body.style.overflow = '';
-  });
+// ══════════════════════════════════════════════════════════════
+// BROWSER & HARDWARE BACK BUTTON (POPSTATE) INTEGRATION
+// ══════════════════════════════════════════════════════════════
+function closeTopModalOrSheetSilently() {
+  // 1. Check Product Sheet
+  const productSheet = document.getElementById('productSheet');
+  if (productSheet && productSheet.classList.contains('open')) {
+    closeSheet('productSheet', 'productSheetOverlay');
+    return true;
+  }
+  // 2. Check Retailer Cart Sheet
+  const retCartSheet = document.getElementById('retCartSheet');
+  if (retCartSheet && retCartSheet.classList.contains('open')) {
+    closeSheet('retCartSheet', 'retCartOverlay');
+    return true;
+  }
+  // 3. Check Add Retailer Sheet
+  const addRetSheet = document.getElementById('addRetSheet');
+  if (addRetSheet && addRetSheet.classList.contains('open')) {
+    closeSheet('addRetSheet', 'addRetOverlay');
+    return true;
+  }
+  // 4. Check Retailer Popup
+  const retailerPopup = document.getElementById('retailerPopup');
+  if (retailerPopup && retailerPopup.classList.contains('open')) {
+    closeRetailerPopup();
+    return true;
+  }
+  return false;
+}
+
+window.addEventListener('popstate', (e) => {
+  closeTopModalOrSheetSilently();
+});
+
+function pushModalState(modalName) {
+  history.pushState({ modal: modalName }, '');
+}
+
+function dismissModalWithHistory() {
+  if (history.state && history.state.modal) {
+    history.back();
+  } else {
+    closeTopModalOrSheetSilently();
+  }
+}
+
+// Wrap openSheet & openRetailerPopup to pushState
+const originalOpenSheet = openSheet;
+openSheet = function(sheetId, overlayId) {
+  originalOpenSheet(sheetId, overlayId);
+  pushModalState(sheetId);
+};
+
+const originalOpenProductsForRetailer = openProductsForRetailer;
+openProductsForRetailer = function() {
+  originalOpenProductsForRetailer();
+  pushModalState('retailerPopup');
+};
+
+document.getElementById('retPopupBack').addEventListener('click', () => {
+  dismissModalWithHistory();
+});
+document.getElementById('productSheetClose').addEventListener('click', () => dismissModalWithHistory());
+document.getElementById('productSheetOverlay').addEventListener('click', () => dismissModalWithHistory());
+
+document.getElementById('successHomeBtn').addEventListener('click', () => {
+  location.reload();
+});
+
+document.getElementById('successStoreBtn').addEventListener('click', () => {
+  document.getElementById('successOverlay').classList.remove('open');
+  renderProductsGrid();
+  updatePopupCartInfo();
+  dismissModalWithHistory();
+});
 </script>
