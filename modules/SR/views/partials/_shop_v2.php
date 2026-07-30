@@ -400,10 +400,9 @@ function renderRetailerCart() {
     const boxes = Math.floor(c.qty / pcsPerCarton);
     const pcs = c.qty % pcsPerCarton;
     
-    const prod = ALL_PRODUCTS.find(p => p.id === c.id);
-    const imgHtml = prod && prod.image
-      ? `<img src="${BASE_URL}/${escHtml(prod.image)}" class="sr-cart-item-image-v2" alt="" loading="lazy">`
-      : `<div class="sr-cart-item-image-placeholder-v2">📦</div>`;
+    const imgHtml = (prod && prod.image)
+      ? `<img src="${BASE_URL}/${escHtml(prod.image)}" class="sr-cart-item-image-v2" alt="" loading="lazy" onerror="this.onerror=null; this.outerHTML='<div class=\\'sr-no-img-box-v2 cart-placeholder\\'><i class=\\'fa-regular fa-image\\'></i></div>';">`
+      : `<div class="sr-no-img-box-v2 cart-placeholder"><i class="fa-regular fa-image"></i></div>`;
       
       // O/C status
       const ocHtml = c.oc !== 0 && c.oc !== undefined ? `<span class="sr-cart-item-oc-badge-v2 ${c.oc < 0 ? 'neg' : 'pos'}">${c.oc > 0 ? '+' : ''}${Math.round(c.oc)} O/C</span>` : '';
@@ -542,9 +541,9 @@ function renderProductsGrid() {
   grid.innerHTML = ALL_PRODUCTS.map((p, i) => {
     const grad  = gradients[i % gradients.length];
     const emoji = emojis[i % emojis.length];
-    const imgHtml = p.image
-      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-card-image-v2" alt="${escHtml(p.name)}" loading="lazy">`
-      : `<div class="sr-product-card-image-placeholder-v2" style="background:${grad};">${emoji}</div>`;
+    const imgHtml = (p && p.image)
+      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-card-image-v2" alt="${escHtml(p.name)}" loading="lazy" onerror="this.onerror=null; this.outerHTML='<div class=\\'sr-no-img-box-v2 card-placeholder\\'><i class=\\'fa-regular fa-image\\'></i><span>No Image</span></div>';">`
+      : `<div class="sr-no-img-box-v2 card-placeholder"><i class="fa-regular fa-image"></i><span>No Image</span></div>`;
 
     const isInCart = cart.some(item => item.id === p.id);
     const btnHtml = isInCart 
@@ -628,10 +627,10 @@ function openProductSheet(idx) {
   document.getElementById('totalDisplayInput').value = defaultDisplayPrice.toFixed(0);
 
   const imgWrap = document.getElementById('productSheetImgWrap');
-  if (p.image) {
-    imgWrap.innerHTML = `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-sheet-img-v2" alt="${escHtml(p.name)}" loading="lazy">`;
+  if (p && p.image) {
+    imgWrap.innerHTML = `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-sheet-img-v2" alt="${escHtml(p.name)}" loading="lazy" onerror="this.onerror=null; this.parentNode.innerHTML='<div class=\\'sr-no-img-box-v2 sheet-placeholder\\'><i class=\\'fa-regular fa-image\\'></i><span>No Product Image</span></div>';">`;
   } else {
-    imgWrap.innerHTML = `<div class="sr-product-sheet-placeholder-v2" style="background:${grad};">${emoji}</div>`;
+    imgWrap.innerHTML = `<div class="sr-no-img-box-v2 sheet-placeholder"><i class="fa-regular fa-image"></i><span>No Product Image</span></div>`;
   }
   
   let cartons = 0;

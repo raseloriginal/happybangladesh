@@ -2922,3 +2922,64 @@
 .sr-btn-store-back-v2:active {
   background-color: #dc2626;
 }
+
+/* ── Beautiful No Product Image Placeholder ───────────────────── */
+.sr-no-img-box-v2 {
+  width: 100%;
+  height: 100%;
+  min-height: 140px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  padding: 16px;
+  text-align: center;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.sr-no-img-box-v2 i {
+  font-size: 2.2rem;
+  margin-bottom: 6px;
+  color: #94a3b8;
+}
+
+.sr-no-img-box-v2 span {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.2px;
+}
+
+.sr-no-img-box-v2.card-placeholder {
+  min-height: 110px;
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.sr-no-img-box-v2.card-placeholder i {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+}
+
+.sr-no-img-box-v2.card-placeholder span {
+  font-size: 0.72rem;
+}
+
+.sr-no-img-box-v2.cart-placeholder {
+  min-height: 48px;
+  height: 48px;
+  width: 48px;
+  border-radius: 10px;
+  padding: 0;
+  border-style: solid;
+}
+
+.sr-no-img-box-v2.cart-placeholder i {
+  font-size: 1.1rem;
+  margin-bottom: 0;
+}
