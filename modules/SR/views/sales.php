@@ -104,7 +104,7 @@
 $allProducts = $allProducts ?? [];
 ?>
 
-<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js" defer></script>
 <script>
 // ══════════════════════════════════════════════════════════════
 // SR SALES PAGE — Full JS Logic
@@ -174,8 +174,11 @@ function normalizeBanglish(text) {
 // MAIN MAP INIT
 // ══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-  initMainMap();
-  initEventListeners();
+  // Delay map and event initialization to unblock First Contentful Paint (FCP)
+  setTimeout(() => {
+    initMainMap();
+    initEventListeners();
+  }, 100);
 });
 
 window.addEventListener('beforeunload', function (e) {
@@ -428,8 +431,10 @@ function renderRetailerCards(retailers) {
     container.innerHTML = `<div style="width: 100%; text-align: center; background: #fff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-weight: 500; color: #94a3b8; pointer-events: auto;">No nearby retailers within 1km.</div>`;
     return;
   }
+  // DOM Chunking: Limit to 15 cards to prevent TBT (Total Blocking Time) overload
+  const displayRetailers = filtered.slice(0, 15);
   
-  container.innerHTML = filtered.map((ret, index) => {
+  container.innerHTML = displayRetailers.map((ret, index) => {
     const distMeters = ret.calculated_dist;
     const cleanAddress = (ret.address && !ret.address.toLowerCase().includes('imported dummy')) ? ret.address.trim() : '';
     
@@ -468,6 +473,10 @@ function renderRetailerCards(retailers) {
       </div>
     `;
   }).join('');
+
+  if (filtered.length > 15) {
+    container.innerHTML += `<div style="width: 100%; text-align: center; background: #fff; padding: 12px; border-radius: 12px; margin-top:8px; color: #64748b; font-size: 0.85rem; pointer-events: auto;">Showing nearest 15 of ${filtered.length}. Use map to see all.</div>`;
+  }
 }
 
 

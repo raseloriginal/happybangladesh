@@ -402,7 +402,7 @@ function renderRetailerCart() {
     
     const prod = ALL_PRODUCTS.find(p => p.id === c.id);
     const imgHtml = prod && prod.image
-      ? `<img src="${BASE_URL}/${escHtml(prod.image)}" class="sr-cart-item-image-v2" alt="">`
+      ? `<img src="${BASE_URL}/${escHtml(prod.image)}" class="sr-cart-item-image-v2" alt="" loading="lazy">`
       : `<div class="sr-cart-item-image-placeholder-v2">📦</div>`;
       
       // O/C status
@@ -516,7 +516,7 @@ function updatePopupCartInfo() {
       cart.slice(0, maxThumbs).forEach(item => {
         const prod = ALL_PRODUCTS.find(p => p.id === item.id);
         if (prod && prod.image) {
-          thumbsHtml += `<div class="sr-cart-thumb-img-v2"><img src="${BASE_URL}/${escHtml(prod.image)}" alt=""></div>`;
+          thumbsHtml += `<div class="sr-cart-thumb-img-v2"><img src="${BASE_URL}/${escHtml(prod.image)}" alt="" loading="lazy"></div>`;
         } else {
           thumbsHtml += `<div class="sr-cart-thumb-img-placeholder-v2">📦</div>`;
         }
@@ -543,7 +543,7 @@ function renderProductsGrid() {
     const grad  = gradients[i % gradients.length];
     const emoji = emojis[i % emojis.length];
     const imgHtml = p.image
-      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-card-image-v2" alt="${escHtml(p.name)}">`
+      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-card-image-v2" alt="${escHtml(p.name)}" loading="lazy">`
       : `<div class="sr-product-card-image-placeholder-v2" style="background:${grad};">${emoji}</div>`;
 
     const isInCart = cart.some(item => item.id === p.id);
@@ -629,7 +629,7 @@ function openProductSheet(idx) {
 
   const imgWrap = document.getElementById('productSheetImgWrap');
   if (p.image) {
-    imgWrap.innerHTML = `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-sheet-img-v2" alt="${escHtml(p.name)}">`;
+    imgWrap.innerHTML = `<img src="${BASE_URL}/${escHtml(p.image)}" class="sr-product-sheet-img-v2" alt="${escHtml(p.name)}" loading="lazy">`;
   } else {
     imgWrap.innerHTML = `<div class="sr-product-sheet-placeholder-v2" style="background:${grad};">${emoji}</div>`;
   }

@@ -21,9 +21,8 @@
   <!-- PWA: Service Worker base URL (resolved by sw-register.js) -->
   <meta name="sw-base-url" content="<?= BASE_URL ?>/">
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT:'#2563eb', light:'#3b82f6', dark:'#1d4ed8' } } } } }</script>
+  <!-- Tailwind CSS -->
+  <link rel="stylesheet" href="<?= asset('css/tailwind.css') ?>">
 
   <!-- Leaflet.js for maps -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">

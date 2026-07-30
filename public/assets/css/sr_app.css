@@ -703,6 +703,7 @@
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   max-height: 92vh;
   overflow-y: auto;
+  will-change: transform;
 }
 
 .sr-bottom-sheet.open {
@@ -1347,14 +1348,28 @@
   top: 16px;
   left: 16px;
   right: 16px;
+  max-width: 640px;
+  margin: 0 auto;
   z-index: 1000;
   display: flex;
   gap: 12px;
   align-items: center;
+  box-sizing: border-box;
+}
+
+@media (min-width: 672px) {
+  .sr-map-header-wrap {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    margin: 0;
+  }
 }
 
 .sr-map-searchbar-new {
   flex: 1;
+  min-width: 0;
   background: #ffffff;
   border-radius: 14px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
@@ -1363,10 +1378,18 @@
   gap: 12px;
   padding: 0 16px;
   height: 54px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.sr-map-searchbar-new:focus-within {
+  box-shadow: 0 8px 30px rgba(37, 99, 235, 0.15);
+  border: 1.5px solid #3b82f6;
 }
 
 .sr-map-searchbar-new input {
   flex: 1;
+  min-width: 0;
+  width: 100%;
   border: none;
   outline: none;
   font-size: 0.95rem;
@@ -1382,6 +1405,7 @@
 .sr-map-search-icon {
   color: #3b82f6;
   font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .sr-map-filter-btn {
@@ -1389,6 +1413,7 @@
   color: #ffffff;
   width: 54px;
   height: 54px;
+  flex-shrink: 0;
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -1407,18 +1432,41 @@
 /* ── Search Suggestions Dropdown ──────────────────────────────── */
 .sr-search-suggestions {
   position: absolute;
-  top: 60px;
-  left: 0;
+  top: 62px;
+  left: 66px;
   right: 66px;
-  /* align exactly below the search input, leaving filter button clear */
+  /* align exactly below the search input, leaving back and filter buttons clear */
   background: #ffffff;
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-  max-height: 220px;
+  max-height: 240px;
   overflow-y: auto;
   z-index: 1001;
   display: none;
   border: 1.5px solid var(--sr-border);
+}
+
+@media (max-width: 480px) {
+  .sr-map-header-wrap {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    gap: 8px;
+  }
+  .sr-map-searchbar-new {
+    height: 48px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .sr-map-filter-btn {
+    width: 48px;
+    height: 48px;
+  }
+  .sr-search-suggestions {
+    top: 56px;
+    left: 56px;
+    right: 56px;
+  }
 }
 
 .sr-search-suggestions.open {
@@ -2186,6 +2234,7 @@
   max-width: 500px;
   left: 50%;
   transform: translate(-50%, 100%);
+  will-change: transform;
 }
 
 @media(max-width: 500px) {

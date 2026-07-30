@@ -8,19 +8,8 @@
   <link rel="icon" type="image/png" href="<?= asset('images/logo.png') ?>">
   <link rel="apple-touch-icon" href="<?= asset('images/logo.png') ?>">
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: { DEFAULT: '#2563eb', light: '#3b82f6', dark: '#1d4ed8' }
-          }
-        }
-      }
-    }
-  </script>
+  <!-- Tailwind CSS -->
+  <link rel="stylesheet" href="<?= asset('css/tailwind.css') ?>">
 
   <!-- Font Awesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"

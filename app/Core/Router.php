@@ -82,7 +82,7 @@ class Router
         return '<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><title>404 Not Found</title>
-<script src="https://cdn.tailwindcss.com"></script></head>
+<link rel="stylesheet" href="' . BASE_URL . '/public/assets/css/tailwind.css"></head>
 <body class="flex items-center justify-center min-h-screen bg-gray-50">
   <div class="text-center">
     <div class="text-8xl font-bold text-blue-600 mb-4">404</div>
