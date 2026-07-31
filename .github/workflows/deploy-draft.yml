@@ -9,28 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Draft Branch
-      uses: actions/checkout@v4
-      with:
-        ref: draft
-
-    - name: Setup SSH Key
-      run: |
-        mkdir -p ~/.ssh
-        printf '%s' "${{ secrets.DRAFT_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
-        echo "" >> ~/.ssh/deploy_key
-        chmod 600 ~/.ssh/deploy_key
-        ssh-keyscan -H ${{ secrets.DRAFT_SERVER_HOST }} >> ~/.ssh/known_hosts
-
-    - name: Deploy via rsync
-      run: |
-        rsync -avz --delete \
-          --exclude='.git' \
-          --exclude='.github' \
-          -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -p 22" \
-          ./ ${{ secrets.DRAFT_SERVER_USERNAME }}@${{ secrets.DRAFT_SERVER_HOST }}:/home/happydraft/htdocs/happydraft.raseloriginal.digital/
-
-    - name: Set File Permissions via SSH
+    - name: Deploy via SSH Git Pull
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.DRAFT_SERVER_HOST }}
@@ -39,7 +18,21 @@ jobs:
         port: 22
         script: |
           cd /home/happydraft/htdocs/happydraft.raseloriginal.digital
+          
+          # Trust the directory for git commands
+          git config --global --add safe.directory /home/happydraft/htdocs/happydraft.raseloriginal.digital
+          
+          # Fetch changes and reset local branch to match the remote draft branch
+          git fetch origin draft
+          git reset --hard origin/draft
+          
+          # Ensure correct ownership and permissions
+          chown -R happydraft:happydraft /home/happydraft/htdocs/happydraft.raseloriginal.digital
+          
+          # Create and set permissions for logs/storage if needed
           mkdir -p storage/logs storage/framework/views storage/cache logs
           chmod -R 775 storage logs 2>/dev/null || true
           chmod -R 755 public 2>/dev/null || true
+          
           echo "Draft Deploy OK at $(date)"
+
