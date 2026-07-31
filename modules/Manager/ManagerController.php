@@ -1069,11 +1069,11 @@ class ManagerController extends Controller
             if ($status === 'dispatched') {
                 // 1. Get all items that are pending dispatch for this DSR today
                 $q = $this->db->prepare("
-                    SELECT di.product_id, di.lot_id, SUM(di.quantity) as total_qty
+                    SELECT di.product_id, di.lot_id, d.warehouse_id, SUM(di.quantity) as total_qty
                     FROM dispatch_items di
                     JOIN dispatches d ON d.id = di.dispatch_id
                     WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status='pending'
-                    GROUP BY di.product_id, di.lot_id
+                    GROUP BY di.product_id, di.lot_id, d.warehouse_id
                 ");
                 $q->execute([$dsrId, $deliv_date]);
                 $itemsToLoad = $q->fetchAll();
@@ -1093,6 +1093,13 @@ class ManagerController extends Controller
                         $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, loaded_at) VALUES (?, ?, ?, ?, ?)")
                                  ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $deliv_date]);
                     }
+
+                    // Deduct from warehouse inventory
+                    $invLotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
+                    $invParams = [$item['total_qty'], $item['product_id'], $item['warehouse_id']];
+                    if ($item['lot_id'] !== null) $invParams[] = $item['lot_id'];
+                    $this->db->prepare("UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id $invLotCondition")
+                             ->execute($invParams);
                 }
 
                 // 2. Mark dispatches as in_transit
@@ -1316,6 +1323,10 @@ class ManagerController extends Controller
         $dsrId = $sch['dsr_id'];
         $deliv_date = $sch['delivery_date'] ?: $sch['dispatch_date'];
 
+        $wIdRow = $this->db->prepare("SELECT warehouse_id FROM dispatches WHERE dsr_id=? AND dispatch_date=? LIMIT 1");
+        $wIdRow->execute([$dsrId, $deliv_date]);
+        $wId = $wIdRow->fetchColumn() ?: (\App\Core\Auth::warehouseId() ?: 1);
+
         $this->db->beginTransaction();
         try {
             $this->db->prepare("INSERT INTO returns (dsr_id, return_date, status) VALUES (?, ?, 'pending')")
@@ -1331,6 +1342,17 @@ class ManagerController extends Controller
                          
                 $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason) VALUES (?, ?, ?, 'good')")
                          ->execute([$returnId, $pid, $qty]);
+                         
+                // Restore to warehouse inventory
+                $exists = $this->db->prepare("SELECT id FROM inventory WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL");
+                $exists->execute([$pid, $wId]);
+                if ($exists->fetch()) {
+                    $this->db->prepare("UPDATE inventory SET qty_pieces = qty_pieces + ? WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL")
+                             ->execute([$qty, $pid, $wId]);
+                } else {
+                    $this->db->prepare("INSERT INTO inventory (warehouse_id, product_id, qty_boxes, qty_pieces, lot_id) VALUES (?, ?, 0, ?, NULL)")
+                             ->execute([$wId, $pid, $qty]);
+                }
             }
 
             $this->db->prepare("UPDATE dispatch_schedules SET status = 'returned' WHERE id = ?")->execute([$scheduleId]);
