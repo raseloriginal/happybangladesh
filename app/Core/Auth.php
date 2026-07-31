@@ -28,12 +28,18 @@ class Auth
                 self::$currentRoleSlug = 'dsr';
             }
 
+            // Detect HTTPS — works behind Nginx reverse proxy (CloudPanel/VPS)
             $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
                 || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+                || (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+                || (isset($_SERVER['REQUEST_SCHEME']) && strtolower($_SERVER['REQUEST_SCHEME']) === 'https')
                 || (isset($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) === 'on');
 
             session_name($sessionName);
+            // Force PHP-FPM to keep session files alive for our full session window.
+            // Without this, Nginx/PHP-FPM GC may delete session files after 1440s (24 min)
+            // regardless of the cookie lifetime setting.
+            ini_set('session.gc_maxlifetime', SESSION_LIFETIME);
             session_set_cookie_params([
                 'lifetime' => SESSION_LIFETIME,
                 'path'     => '/',
