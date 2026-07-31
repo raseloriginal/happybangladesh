@@ -27,7 +27,7 @@ jobs:
           git reset --hard origin/draft
           
           # Ensure correct ownership and permissions
-          chown -R happydraft:happydraft /home/happydraft/htdocs/happydraft.raseloriginal.digital
+          chown -R happydraft:happydraft /home/happydraft/htdocs/happydraft.raseloriginal.digital 2>/dev/null || true
           
           # Create and set permissions for logs/storage if needed
           mkdir -p storage/logs storage/framework/views storage/cache logs
