@@ -838,23 +838,32 @@ class ManagerController extends Controller
     public function apiDispatchOrganizeData(string $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $schedule = $this->db->query("SELECT dispatch_date FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
-        
-        $products = $this->db->query("
-            SELECT p.id as product_id, p.name, p.image, p.pieces_per_box, 
-                   SUM(oi.quantity) as total_ordered_qty,
-                   IFNULL(de.qty_boxes, 0) as extra_boxes,
-                   IFNULL(de.qty_pieces, 0) as extra_pieces
-            FROM dispatch_schedule_srs dss
-            JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$schedule['dispatch_date']}'
-            JOIN order_items oi ON oi.order_id = o.id
-            JOIN products p ON p.id = oi.product_id
-            LEFT JOIN dispatch_extras de ON de.schedule_id = dss.schedule_id AND de.product_id = p.id
-            WHERE dss.schedule_id = " . (int)$id . "
-            GROUP BY p.id
-        ")->fetchAll();
-        
-        echo json_encode($products);
+        try {
+            $schedule = $this->db->query("SELECT dispatch_date FROM dispatch_schedules WHERE id = " . (int)$id)->fetch();
+
+            if (!$schedule) {
+                echo json_encode([]);
+                exit;
+            }
+
+            $products = $this->db->query("
+                SELECT p.id as product_id, p.name, p.image, p.pieces_per_box,
+                       SUM(oi.quantity)          as total_ordered_qty,
+                       IFNULL(MAX(de.qty_boxes),  0) as extra_boxes,
+                       IFNULL(MAX(de.qty_pieces), 0) as extra_pieces
+                FROM dispatch_schedule_srs dss
+                JOIN orders o     ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$schedule['dispatch_date']}'
+                JOIN order_items oi ON oi.order_id = o.id
+                JOIN products p   ON p.id = oi.product_id
+                LEFT JOIN dispatch_extras de ON de.schedule_id = dss.schedule_id AND de.product_id = p.id
+                WHERE dss.schedule_id = " . (int)$id . "
+                GROUP BY p.id, p.name, p.image, p.pieces_per_box
+            ")->fetchAll();
+
+            echo json_encode($products);
+        } catch (\Exception $e) {
+            echo json_encode(['error' => $e->getMessage()]);
+        }
         exit;
     }
 
