@@ -53,6 +53,12 @@ if ($isLocalhost) {
     define('DB_NAME', 'happybd');
     define('DB_USER', 'happybd');
     define('DB_PASS', '9pH{53ff.uB5Qehh');
+} elseif ($isDraft) {
+  define('DB_HOST', 'localhost');
+    define('DB_PORT', '3306');
+    define('DB_NAME', 'happybddraft');
+    define('DB_USER', 'happybddraft');
+    define('DB_PASS', '9pH{53ff.uB5Qehh');
 } else {
     define('DB_HOST', 'localhost');
     define('DB_PORT', '3306');
