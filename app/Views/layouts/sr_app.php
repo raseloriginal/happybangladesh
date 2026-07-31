@@ -56,7 +56,7 @@
   <div class="sr-app-shell" id="srAppShell">
 
     <!-- Page Content -->
-    <main class="sr-app-main" id="srMain">
+    <main class="sr-app-main <?= !empty($hideBottomNav) ? 'has-no-nav' : '' ?>" id="srMain">
       <!-- Flash alerts -->
       <?php
         $flash = Auth::getFlash();
@@ -84,5 +84,57 @@
 
   <!-- PWA: Service Worker Registration -->
   <script src="<?= BASE_URL ?>/sr-sw-register.js" defer></script>
+
+  <!-- Background Geolocation Preloader & Tracker -->
+  <script>
+    (function() {
+      if (!navigator.geolocation) return;
+
+      const geoOptions = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+
+      function updateLocationCache(pos) {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        
+        // Save to cache for instant preloading
+        localStorage.setItem('sr_last_lat', lat);
+        localStorage.setItem('sr_last_lng', lng);
+        
+        // If the Sales map is currently open on this page, update coordinates dynamically
+        if (typeof mainMap !== 'undefined' && mainMap && typeof placeMyLocationMarker === 'function') {
+          const oldLat = typeof myLat !== 'undefined' ? myLat : null;
+          const oldLng = typeof myLng !== 'undefined' ? myLng : null;
+          
+          myLat = lat;
+          myLng = lng;
+          placeMyLocationMarker();
+          
+          // Calculate distance from previous coordinate; if > 10 meters, refresh retailers
+          if (oldLat && oldLng) {
+            const distance = Math.round(6371000 * 2 * Math.asin(Math.sqrt(
+              Math.pow(Math.sin((lat - oldLat) * Math.PI / 360), 2) +
+              Math.cos(oldLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
+              Math.pow(Math.sin((lng - oldLng) * Math.PI / 360), 2)
+            )));
+            if (distance > 10 && typeof loadRetailersOnMap === 'function') {
+              loadRetailersOnMap();
+            }
+          }
+        }
+      }
+
+      function handleGeoError(err) {
+        console.warn("Background geolocation tracking error:", err.message);
+      }
+
+      // Immediately ask for location permission and watch position in the background
+      // across all SR app pages to pre-fill coordinates in localStorage
+      navigator.geolocation.watchPosition(updateLocationCache, handleGeoError, geoOptions);
+    })();
+  </script>
 </body>
 </html>

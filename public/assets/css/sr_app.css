@@ -61,6 +61,13 @@
   overflow-x: hidden;
 }
 
+.sr-app-main.has-no-nav {
+  padding-bottom: 0;
+}
+.sr-app-main.has-no-nav .sr-map-page {
+  bottom: 0;
+}
+
 /* ── Bottom Navigation ─────────────────────────────────────── */
 .sr-bottom-nav {
   position: fixed;
