@@ -88,11 +88,17 @@ class Auth
 
         // ── Set "Remember Me" cookie if requested ─────────────
         if ($remember) {
+            $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+                || (isset($_SERVER['HTTP_FRONT_END_HTTPS']) && strtolower($_SERVER['HTTP_FRONT_END_HTTPS']) === 'on')
+                || (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+                || (isset($_SERVER['REQUEST_SCHEME']) && strtolower($_SERVER['REQUEST_SCHEME']) === 'https');
             $cookieName = REMEMBER_COOKIE_NAME . '_' . $user['role_slug'];
             setcookie($cookieName, $token, [
                 'expires'  => time() + REMEMBER_LIFETIME,
                 'path'     => '/',
-                'secure'   => false,
+                'secure'   => $isHttps,
                 'httponly'  => true,
                 'samesite'  => 'Lax',
             ]);

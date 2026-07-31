@@ -37,8 +37,8 @@ if ($isLocalhost) {
 // ─── Application ──────────────────────────────────────────────────────────────
 define('APP_NAME', 'HappyBangladesh DMS');
 define('APP_VERSION', '1.0.0');
-define('APP_ENV', 'development');   // development | production
-define('DEBUG_MODE', true);
+define('APP_ENV', $isLocalhost ? 'development' : 'production');
+define('DEBUG_MODE', $isLocalhost);  // true locally, false on live
 
 // ─── Database ─────────────────────────────────────────────────────────────────
 if ($isLocalhost) {
