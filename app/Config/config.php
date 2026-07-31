@@ -10,9 +10,10 @@ $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
 $hostname = strtok($host, ':');
 $isLocalhost = ($hostname === 'localhost' || filter_var($hostname, FILTER_VALIDATE_IP) !== false);
 $isMainDomain = (
-    $hostname === 'happydraft.raseloriginal.digital'  || $hostname === 'www.happybangladesh.com' ||
+    $hostname === 'happybangladesh.com'  || $hostname === 'www.happybangladesh.com' ||
     $hostname === 'happybangladesh.site' || $hostname === 'www.happybangladesh.site'
 );
+$isDraft = ($hostname === 'happydraft.raseloriginal.digital');
 $isHttps = (!$isLocalhost)
     || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
