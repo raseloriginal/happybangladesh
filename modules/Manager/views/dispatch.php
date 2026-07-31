@@ -242,8 +242,16 @@ function renderSchedules() {
           </button>
         </div>
       </td>
-      <td class="p-4 text-sm font-medium text-blue-600">৳ ${parseFloat(sch.total_order_value).toLocaleString()}</td>
-      <td class="p-4 text-sm font-medium">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_dispatch_value).toLocaleString() : '-'}</td>
+      <td class="p-4 text-sm font-medium text-blue-600">
+        ৳ ${parseFloat(sch.total_order_value).toLocaleString()}
+        ${(()=>{ const oc = parseFloat(sch.total_order_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return `<div style="font-size:11px;font-weight:700;color:${color};margin-top:2px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; })()}
+      </td>
+      <td class="p-4 text-sm font-medium">
+        ${(sch.status === 'dispatched' || sch.status === 'returned') ? `
+          ৳ ${parseFloat(sch.total_dispatch_value).toLocaleString()}
+          ${(()=>{ const oc = parseFloat(sch.total_dispatch_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return '<div style="font-size:11px;font-weight:700;color:'+color+';margin-top:2px;">('+sign+'৳'+Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+')</div>'; })()}
+        ` : '-'}
+      </td>
       <td class="p-4 text-sm text-red-600">${(sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_return_value).toLocaleString() : '-'}</td>
       <td class="p-4 text-sm text-orange-500">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_damage_value).toLocaleString() : '-'}</td>
       <td class="p-4 text-sm font-medium text-emerald-600">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_sale_value).toLocaleString() : '-'}</td>
@@ -305,8 +313,16 @@ async function toggleSrRow(schId) {
   srs.forEach(sr => {
     html += `<tr>
       <td class="font-medium text-gray-700">${sr.name}</td>
-      <td class="text-blue-600 font-medium">৳ ${parseFloat(sr.orders_value).toLocaleString()}</td>
-      <td>${showValues ? '৳ ' + parseFloat(sr.dispatch_items_value).toLocaleString() : '-'}</td>
+      <td class="text-blue-600 font-medium">
+        ৳ ${parseFloat(sr.orders_value).toLocaleString()}
+        ${(()=>{ const oc = parseFloat(sr.orders_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; })()}
+      </td>
+      <td>
+        ${showValues ? `
+          ৳ ${parseFloat(sr.dispatch_items_value).toLocaleString()}
+          ${(()=>{ const oc = parseFloat(sr.dispatch_items_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return '<div style="font-size:10px;font-weight:700;color:'+color+';margin-top:1px;">('+sign+'৳'+Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+')</div>'; })()}
+        ` : '-'}
+      </td>
       <td class="text-red-500">${sch.status === 'returned' ? '৳ ' + parseFloat(sr.return_items_value).toLocaleString() : '-'}</td>
       <td class="text-orange-500">${showValues ? '৳ ' + parseFloat(sr.damage_value).toLocaleString() : '-'}</td>
       <td class="text-emerald-600 font-medium">${showValues ? '৳ ' + parseFloat(sr.sale_value).toLocaleString() : '-'}</td>
@@ -355,7 +371,10 @@ function toggleProductRow(schId, srId) {
         <td class="p-2">${p.ordered_qty}</td>
         <td class="p-2">${showValues ? p.dispatched_qty : '-'}</td>
         <td class="p-2 text-red-500">${sch.status === 'returned' ? p.returned_qty : '-'}</td>
-        <td class="p-2 font-medium text-emerald-600">৳ ${parseFloat(p.sale_value).toLocaleString()}</td>
+        <td class="p-2 font-medium text-emerald-600">
+          ৳ ${parseFloat(p.sale_value).toLocaleString()}
+          ${(()=>{ const oc = parseFloat(p.order_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; })()}
+        </td>
       </tr>`;
     });
     html += `</tbody></table>`;

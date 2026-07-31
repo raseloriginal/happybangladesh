@@ -82,7 +82,8 @@ $truncateName = function($name) {
       </thead>
       <tbody class="divide-y divide-slate-100 font-sans" id="tableBody">
         <?php 
-          $grandTotalAmount = 0; 
+          $grandTotalAmount = 0;
+          $grandTotalOC = 0;
           if (empty($items)): 
         ?>
           <tr id="emptyRow">
@@ -95,6 +96,14 @@ $truncateName = function($name) {
           <?php 
             foreach ($items as $ord): 
               $grandTotalAmount += (float)$ord['total_amount'];
+              // Calculate O/C for this order
+              $orderOC = 0;
+              if (!empty($ord['products'])) {
+                foreach ($ord['products'] as $_p) {
+                  $orderOC += ((float)($_p['unit_price'] ?? 0) - (float)($_p['base_price'] ?? 0)) * (int)($_p['quantity'] ?? 0);
+                }
+              }
+              $grandTotalOC += $orderOC;
               $rName = !empty($ord['retailer_name']) ? $ord['retailer_name'] : (!empty($ord['dealer_name']) ? $ord['dealer_name'] : 'সাধারণ কাস্টমার');
               $rPhone = !empty($ord['retailer_phone']) ? $ord['retailer_phone'] : 'N/A';
             ?>
@@ -130,6 +139,11 @@ $truncateName = function($name) {
               <!-- Total Amount Cell -->
               <td class="p-3 text-right border-r border-slate-100 align-middle bg-white font-mono font-bold text-emerald-700 text-xs sm:text-sm">
                 ৳ <?= number_format((float)$ord['total_amount'], 2) ?>
+                <?php if ($orderOC != 0): ?>
+                  <div class="text-[10px] font-bold mt-0.5 <?= $orderOC > 0 ? 'text-emerald-500' : 'text-rose-500' ?>">
+                    (<?= $orderOC > 0 ? '+' : '' ?>৳<?= number_format($orderOC, 2) ?>)
+                  </div>
+                <?php endif; ?>
               </td>
 
               <!-- Action Invoice Button -->
@@ -154,6 +168,11 @@ $truncateName = function($name) {
           </td>
           <td class="p-3 text-right border-r border-slate-200 font-mono font-black text-slate-950 text-[13px]">
             ৳ <?= number_format($grandTotalAmount, 2) ?>
+            <?php if ($grandTotalOC != 0): ?>
+              <div class="text-[10px] font-bold mt-0.5 <?= $grandTotalOC > 0 ? 'text-emerald-500' : 'text-rose-500' ?>">
+                (<?= $grandTotalOC > 0 ? '+' : '' ?>৳<?= number_format($grandTotalOC, 2) ?>)
+              </div>
+            <?php endif; ?>
           </td>
           <td class="p-3 bg-slate-50/80"></td>
         </tr>
@@ -383,6 +402,17 @@ function openInvoiceModal(order) {
       const packingStr = (boxes > 0 ? boxes + ' কার্টন ' : '') + (pcs > 0 || boxes === 0 ? pcs + ' পিস' : '');
       const itemTotal = parseFloat(prod.total_price || (qty * parseFloat(prod.unit_price || 0)));
 
+      // O/C = (unit_price - base_price) × qty
+      const unitPrice  = parseFloat(prod.unit_price  || 0);
+      const basePrice  = parseFloat(prod.base_price  || 0);
+      const itemOC     = (unitPrice - basePrice) * qty;
+      const ocAbs      = Math.abs(itemOC).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+      const ocSign     = itemOC >= 0 ? '+' : '-';
+      const ocColor    = itemOC >= 0 ? '#10b981' : '#f43f5e';
+      const ocHtml     = itemOC !== 0
+        ? `<div style="font-size:9px;font-weight:700;color:${ocColor};margin-top:1px;">(${ocSign}৳${ocAbs})</div>`
+        : '';
+
       const tr = document.createElement('tr');
       tr.className = 'bg-white hover:bg-slate-50/30 transition-colors';
       tr.innerHTML = `
@@ -393,7 +423,10 @@ function openInvoiceModal(order) {
         <td class="py-2 px-2.5 text-center font-semibold text-slate-600 text-[11px]">${packingStr}</td>
         <td class="py-2 px-2.5 text-center font-mono font-bold text-slate-700 text-[11px]">${qty} পিস</td>
         <td class="py-2 px-2.5 text-right font-mono text-slate-600 text-[11px]">৳ ${parseFloat(prod.unit_price || 0).toLocaleString()}</td>
-        <td class="py-2 px-2.5 text-right font-mono font-bold text-slate-900 text-[11px]">৳ ${itemTotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+        <td class="py-2 px-2.5 text-right font-mono font-bold text-slate-900 text-[11px]">
+          ৳ ${itemTotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+          ${ocHtml}
+        </td>
       `;
       tableBody.appendChild(tr);
     });

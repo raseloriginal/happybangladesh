@@ -575,6 +575,16 @@ class ManagerController extends Controller
             
             $sch['total_order_value'] = (float)$orderVal;
 
+            $orderOC = $this->db->query("
+                SELECT COALESCE(SUM((oi.unit_price - p.price) * oi.quantity), 0)
+                FROM dispatch_schedule_srs dss
+                JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$sch['dispatch_date']}'
+                JOIN order_items oi ON oi.order_id = o.id
+                JOIN products p ON p.id = oi.product_id
+                WHERE dss.schedule_id = $sid
+            ")->fetchColumn();
+            $sch['total_order_oc'] = (float)$orderOC;
+
             $dispatchVal = $this->db->query("
                 SELECT COALESCE(SUM(di.quantity * p.price), 0)
                 FROM dispatch_items di
@@ -584,6 +594,16 @@ class ManagerController extends Controller
             ")->fetchColumn();
             
             $sch['total_dispatch_value'] = (float)$dispatchVal;
+
+            $dispatchOC = $this->db->query("
+                SELECT COALESCE(SUM(di.quantity * (IFNULL(oi.unit_price, p.price) - p.price)), 0)
+                FROM dispatch_items di
+                JOIN products p ON p.id = di.product_id
+                JOIN dispatches d ON d.id = di.dispatch_id
+                LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+            ")->fetchColumn();
+            $sch['total_dispatch_oc'] = (float)$dispatchOC;
             $sch['total_return_value'] = (float)$this->db->query("
                 SELECT COALESCE(SUM(ri.quantity * p.price), 0)
                 FROM returns r
@@ -752,12 +772,24 @@ class ManagerController extends Controller
         $srs = $this->db->query("
             SELECT u.id, u.name,
                    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE sr_id = u.id AND DATE(created_at) = '{$schedule['dispatch_date']}') as orders_value,
+                   (SELECT COALESCE(SUM((oi2.unit_price - p2.price) * oi2.quantity), 0)
+                    FROM orders o2
+                    JOIN order_items oi2 ON oi2.order_id = o2.id
+                    JOIN products p2 ON p2.id = oi2.product_id
+                    WHERE o2.sr_id = u.id AND DATE(o2.created_at) = '{$schedule['dispatch_date']}') as orders_oc,
                    (SELECT COALESCE(SUM(di.quantity * p.price), 0)
                     FROM dispatch_items di
                     JOIN products p ON p.id = di.product_id
                     JOIN dispatches d ON d.id = di.dispatch_id
                     LEFT JOIN orders o ON o.id = d.order_id
                     WHERE (o.sr_id = u.id OR (d.order_id IS NULL AND d.dsr_id = {$schedule['dsr_id']})) AND d.dispatch_date = '{$delivery_date}') as dispatch_items_value,
+                   (SELECT COALESCE(SUM(di.quantity * (IFNULL(oi.unit_price, p.price) - p.price)), 0)
+                    FROM dispatch_items di
+                    JOIN products p ON p.id = di.product_id
+                    JOIN dispatches d ON d.id = di.dispatch_id
+                    LEFT JOIN orders o ON o.id = d.order_id
+                    LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+                    WHERE (o.sr_id = u.id OR (d.order_id IS NULL AND d.dsr_id = {$schedule['dsr_id']})) AND d.dispatch_date = '{$delivery_date}') as dispatch_items_oc,
                     (
                         SELECT COALESCE(SUM(ri.quantity * p.price), 0)
                         FROM returns r
@@ -822,7 +854,9 @@ class ManagerController extends Controller
                            LEFT JOIN orders o2 ON o2.id = d2.order_id
                            WHERE d2.dispatch_date = '{$delivery_date}' AND di2.product_id = p.id
                              AND (o2.sr_id = {$sr['id']} OR (d2.order_id IS NULL AND d2.dsr_id = {$schedule['dsr_id']}))
-                       ) as sale_value
+                       ) as sale_value,
+                        SUM((oi.unit_price - p.price) * oi.quantity) as order_oc,
+                        SUM(oi.unit_price * oi.quantity) as order_value
                 FROM orders o
                 JOIN order_items oi ON oi.order_id = o.id
                 JOIN products p ON p.id = oi.product_id
