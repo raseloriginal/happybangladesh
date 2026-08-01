@@ -137,7 +137,7 @@ class ManagerController extends Controller
                         $p['category_id'] ?: null,
                         trim($p['name']),
                         $sku,
-                        $p['box_type'] ?: 'বক্স',
+                        $p['box_type'] ?: 'পিস',
                         $piecesPerBox,
                         $p['dealer_percentage'] ?: 0,
                         $buyingPrice,

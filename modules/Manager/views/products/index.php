@@ -160,6 +160,9 @@
             <div class="flex justify-between items-center mb-5">
                 <h3 class="text-xl font-bold text-gray-900">Bulk Add Products</h3>
                 <div class="flex items-center gap-3">
+                    <button type="button" onclick="downloadSampleCSV()" class="text-purple-600 hover:text-purple-800 font-medium text-sm flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200" title="Download Sample CSV">
+                        <i class="fas fa-download"></i> Sample CSV
+                    </button>
                     <button type="button" onclick="document.getElementById('bulk-csv-upload').click()" class="text-emerald-600 hover:text-emerald-800 font-medium text-sm flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
                         <i class="fas fa-file-csv"></i> Upload CSV
                     </button>
@@ -253,15 +256,19 @@
                 <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Box Type</label>
                 <select id="edit-box-type" class="form-input text-sm w-full">
-                    <option value="বক্স">বক্স</option>
                     <option value="পলি">পলি</option>
-                    <option value="কার্টুন">কার্টুন</option>
+                    <option value="কেস">কেস</option>
+                    <option value="বান্ডিল">বান্ডিল</option>
+                    <option value="বক্স">বক্স</option>
+                    <option value="কার্টন">কার্টন</option>
                     <option value="পিস">পিস</option>
                     <option value="বস্তা">বস্তা</option>
                     <option value="জার">জার</option>
+                    <option value="ড্রাম">ড্রাম</option>
                     <option value="কেজি">কেজি</option>
                     <option value="ডজন">ডজন</option>
                     <option value="কম্বো">কম্বো</option>
+                    <option value="পাতা">পাতা</option>
                 </select>
             </div>
                 <div>
@@ -342,28 +349,40 @@ function addBulkRow(data = null) {
     tr.className = "bulk-row";
     const idx = bulkRowIndex++;
     const boxTypes = `
-        <option value="বক্স">বক্স</option>
         <option value="পলি">পলি</option>
-        <option value="কার্টুন">কার্টুন</option>
+        <option value="কেস">কেস</option>
+        <option value="বান্ডিল">বান্ডিল</option>
+        <option value="বক্স">বক্স</option>
+        <option value="কার্টন">কার্টন</option>
         <option value="পিস">পিস</option>
         <option value="বস্তা">বস্তা</option>
         <option value="জার">জার</option>
+        <option value="ড্রাম">ড্রাম</option>
         <option value="কেজি">কেজি</option>
         <option value="ডজন">ডজন</option>
         <option value="কম্বো">কম্বো</option>
+        <option value="পাতা">পাতা</option>
     `;
     
     // Safely extract data
     const nameVal = data && data.name ? data.name.replace(/"/g, '&quot;') : '';
     const imgUrl = data && data.image_url ? data.image_url.replace(/"/g, '&quot;') : '';
-    const priceVal = data && data.price ? data.price.replace(/"/g, '&quot;') : '';
+    const priceVal = data && data.price ? data.price.toString().replace(/[^0-9.]/g, '') : '';
+    const boxTypeVal = data && data.box_type ? data.box_type.replace(/"/g, '&quot;').trim() : '';
+    const targetBoxType = boxTypeVal || 'পিস';
+    
+    const rawPcsBox = data && data.pcs_box !== undefined && data.pcs_box !== '' ? data.pcs_box : (data && data.pieces_per_box !== undefined && data.pieces_per_box !== '' ? data.pieces_per_box : '1');
+    const pcsBoxVal = rawPcsBox ? (rawPcsBox.toString().replace(/[^0-9]/g, '') || '1') : '1';
+    
+    const rawDealerPct = data && data.dealer_pct !== undefined && data.dealer_pct !== '' ? data.dealer_pct : (data && data.dealer_percentage !== undefined && data.dealer_percentage !== '' ? data.dealer_percentage : '');
+    const dealerPctVal = rawDealerPct ? rawDealerPct.toString().replace(/%/g, '').trim() : '';
     
     tr.innerHTML = `
         <td class="p-2"><select class="form-input text-sm p-1.5 bulk-cat">${categoriesOptions}</select></td>
         <td class="p-2"><input type="text" class="form-input text-sm p-1.5 bulk-name" placeholder="Name" value="${nameVal}" required></td>
         <td class="p-2"><select class="form-input text-sm p-1.5 bulk-boxtype">${boxTypes}</select></td>
-        <td class="p-2"><input type="number" class="form-input text-sm p-1.5 bulk-pcsbox" value="1" min="1" required></td>
-        <td class="p-2"><input type="number" step="0.01" class="form-input text-sm p-1.5 bulk-dealerpct" placeholder="0"></td>
+        <td class="p-2"><input type="number" class="form-input text-sm p-1.5 bulk-pcsbox" value="${pcsBoxVal}" min="1" required></td>
+        <td class="p-2"><input type="number" step="0.01" class="form-input text-sm p-1.5 bulk-dealerpct" placeholder="0" value="${dealerPctVal}"></td>
         <td class="p-2">
             <label class="flex flex-col items-center justify-center w-20 h-16 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors group relative overflow-hidden" title="Upload Image">
                 <img class="bulk-img-preview absolute inset-0 w-full h-full object-cover rounded ${imgUrl ? '' : 'hidden'}" src="${imgUrl}">
@@ -380,6 +399,14 @@ function addBulkRow(data = null) {
         <td class="p-2 text-center"><button type="button" onclick="this.closest('tr').remove()" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></td>
     `;
     document.getElementById('bulk-rows').appendChild(tr);
+
+    const sel = tr.querySelector('.bulk-boxtype');
+    if (sel) {
+        const matched = Array.from(sel.options).find(opt => opt.value.trim().toLowerCase() === targetBoxType.toLowerCase() || opt.text.trim().toLowerCase() === targetBoxType.toLowerCase());
+        if (matched) {
+            sel.value = matched.value;
+        }
+    }
 }
 
 function previewBulkImage(input) {
@@ -521,34 +548,114 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
     }, 2000);
 });
 
+function downloadSampleCSV() {
+    const csvContent = "\uFEFFProduct Name,Image URL,Price / Piece,Dealer Com,Box Type,Pcs / Box\n" +
+                       "\"Sample Product 1\",\"https://via.placeholder.com/150\",\"100\",\"5.5\",\"বক্স\",\"10\"\n" +
+                       "\"Sample Product 2\",\"\",\"50\",\"3.0\",\"পলি\",\"12\"";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "Product_Bulk_Upload_Sample.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function parseCSVLine(text) {
+    let result = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        let c = text[i];
+        if (c === '"') {
+            if (inQuotes && text[i+1] === '"') {
+                cur += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (c === ',' && !inQuotes) {
+            result.push(cur.trim());
+            cur = '';
+        } else {
+            cur += c;
+        }
+    }
+    result.push(cur.trim());
+    return result;
+}
+
 function handleCSVUpload(input) {
     if (!input.files || !input.files[0]) return;
     const reader = new FileReader();
     reader.onload = function(e) {
         const text = e.target.result;
-        const rows = text.split(/\r?\n/);
+        const rawLines = text.split(/\r?\n/);
+        const lines = rawLines.map(l => l.trim()).filter(l => l.length > 0);
+        
+        if (lines.length === 0) {
+            alert("CSV file is empty.");
+            input.value = '';
+            return;
+        }
         
         document.getElementById('bulk-rows').innerHTML = ''; // Clear rows
         
+        let startRow = 0;
+        const firstLineCols = parseCSVLine(lines[0]);
+        
+        // Check if line 0 is header
+        const isHeader = firstLineCols.some(c => {
+            const l = c.toLowerCase();
+            return l.includes('name') || l.includes('product') || l.includes('dealer') || l.includes('commission') || l.includes('commision') || l.includes('com') || l.includes('box') || l.includes('pcs') || l.includes('image') || l.includes('নাম') || l.includes('কমিশন');
+        });
+        
+        let nameIdx = 0, imgIdx = 1, priceIdx = -1, dealerIdx = -1, boxTypeIdx = -1, pcsBoxIdx = -1;
+        
+        if (isHeader) {
+            startRow = 1;
+            firstLineCols.forEach((col, idx) => {
+                const norm = col.toLowerCase().replace(/^"|"$/g, '').trim();
+                if (norm.includes('pcs') || norm.includes('piece') || norm.includes('পিস')) pcsBoxIdx = idx;
+                else if (norm.includes('name') || norm.includes('product') || norm.includes('নাম')) nameIdx = idx;
+                else if (norm.includes('image') || norm.includes('img') || norm.includes('photo') || norm.includes('url') || norm.includes('ছবি')) imgIdx = idx;
+                else if (norm.includes('dealer') || norm.includes('commission') || norm.includes('commision') || (norm.includes('com') && !norm.includes('company')) || norm.includes('ডিলার') || norm.includes('কমিশন')) dealerIdx = idx;
+                else if (norm.includes('box') || norm.includes('boxtype') || norm.includes('pack') || norm.includes('বক্স')) boxTypeIdx = idx;
+                else if (norm.includes('price') || norm.includes('buy') || norm.includes('মূল্য')) priceIdx = idx;
+            });
+        } else {
+            // Positional fallback
+            const colCount = firstLineCols.length;
+            if (colCount >= 6) {
+                // Name, Image, Price, Dealer %, Box Type, PCS per Box
+                nameIdx = 0; imgIdx = 1; priceIdx = 2; dealerIdx = 3; boxTypeIdx = 4; pcsBoxIdx = 5;
+            } else if (colCount === 5) {
+                // Name, Image, Dealer %, Box Type, PCS per Box
+                nameIdx = 0; imgIdx = 1; dealerIdx = 2; boxTypeIdx = 3; pcsBoxIdx = 4;
+            } else if (colCount === 4) {
+                // Name, Dealer %, Box Type, PCS per Box
+                nameIdx = 0; imgIdx = -1; dealerIdx = 1; boxTypeIdx = 2; pcsBoxIdx = 3;
+            } else if (colCount === 3) {
+                // Name, Image, Price
+                nameIdx = 0; imgIdx = 1; priceIdx = 2;
+            }
+        }
+
         let added = 0;
-        for (let i = 0; i < rows.length; i++) {
-            const rowStr = rows[i].trim();
-            if (!rowStr) continue;
+        for (let i = startRow; i < lines.length; i++) {
+            const cols = parseCSVLine(lines[i]);
+            if (!cols || cols.length === 0) continue;
             
-            // Simple split by comma. 
-            const cols = rowStr.split(',');
-            // Skip header
-            if (i === 0 && cols[0].toLowerCase().includes('name')) continue;
+            const name = nameIdx >= 0 && cols[nameIdx] ? cols[nameIdx].replace(/^"|"$/g, '').trim() : '';
+            const image_url = imgIdx >= 0 && cols[imgIdx] ? cols[imgIdx].replace(/^"|"$/g, '').trim() : '';
+            const price = priceIdx >= 0 && cols[priceIdx] ? cols[priceIdx].replace(/^"|"$/g, '').trim() : '';
+            const dealer_pct = dealerIdx >= 0 && cols[dealerIdx] ? cols[dealerIdx].replace(/^"|"$/g, '').trim() : '';
+            const box_type = boxTypeIdx >= 0 && cols[boxTypeIdx] ? cols[boxTypeIdx].replace(/^"|"$/g, '').trim() : '';
+            const pcs_box = pcsBoxIdx >= 0 && cols[pcsBoxIdx] ? cols[pcsBoxIdx].replace(/^"|"$/g, '').trim() : '';
             
-            if (cols.length >= 1) {
-                const name = cols[0] ? cols[0].replace(/^"|"$/g, '').trim() : '';
-                const image_url = cols[1] ? cols[1].replace(/^"|"$/g, '').trim() : '';
-                const price = cols[2] ? cols[2].replace(/^"|"$/g, '').trim() : '';
-                
-                if (name) {
-                    addBulkRow({ name, image_url, price });
-                    added++;
-                }
+            if (name) {
+                addBulkRow({ name, image_url, price, dealer_pct, box_type, pcs_box });
+                added++;
             }
         }
         
