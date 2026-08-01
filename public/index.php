@@ -213,6 +213,7 @@ $router->get( '/sr/transactions',             ['SRController', 'transactions']);
 $router->get( '/sr/orders',                   ['SRController', 'orders']);
 $router->get( '/sr/orders/place',             ['SRController', 'placeOrder']);
 $router->post('/sr/orders/store',             ['SRController', 'storeOrder']);
+$router->post('/sr/orders/update',            ['SRController', 'updateOrder']);
 $router->get( '/sr/sales',                    ['SRController', 'sales']);
 $router->get( '/sr/retailers',                ['SRController', 'retailers']);
 $router->get( '/sr/profile',                  ['SRController', 'profile']);

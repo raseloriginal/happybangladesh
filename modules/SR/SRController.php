@@ -245,7 +245,7 @@ class SRController extends Controller
             }
 
             $iq = $this->db->prepare("
-                SELECT oi.*, p.name AS product_name, p.pieces_per_box, p.price AS base_price, c.name AS company_name
+                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, p.price AS base_price, c.name AS company_name
                 FROM order_items oi
                 JOIN products p ON p.id = oi.product_id
                 LEFT JOIN companies c ON c.id = p.company_id
@@ -318,8 +318,9 @@ class SRController extends Controller
 
         $retailerCount = count($retailersSet);
         $productSummary = array_values($productSummary); // Reset keys for view
+        $allProducts = $this->getSRProducts(Auth::id());
 
-        $this->renderApp('orders', compact('items', 'retailerCount', 'productSummary', 'period', 'from', 'to'));
+        $this->renderApp('orders', compact('items', 'retailerCount', 'productSummary', 'period', 'from', 'to', 'allProducts'));
     }
 
     // ── Sales / Map Page ──────────────────────────────────────
@@ -687,6 +688,113 @@ class SRController extends Controller
             $this->json(['success' => true, 'message' => "Order #$orderId placed successfully!", 'order_id' => $orderId]);
         }
         $this->redirect('sr/orders');
+    }
+
+    // ── Update Existing Order ──────────────────────────────────
+    public function updateOrder(): void
+    {
+        $orderId    = intval($this->post('order_id') ?: 0);
+        $productIds = $this->post('product_id', []);
+        $quantities = $this->post('quantity', []);
+        $prices     = $this->post('unit_price', []);
+
+        if ($orderId <= 0) {
+            $this->json(['success' => false, 'message' => 'অর্ডার আইডি পাওয়া যায়নি।']);
+            return;
+        }
+
+        // Verify order exists and belongs to this SR
+        $stmt = $this->db->prepare("SELECT * FROM orders WHERE id = ? AND sr_id = ?");
+        $stmt->execute([$orderId, Auth::id()]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$order) {
+            $this->json(['success' => false, 'message' => 'অর্ডারটি পাওয়া যায়নি বা আপনার সম্পাদনা করার অনুমতি নেই।']);
+            return;
+        }
+
+        if (empty($productIds)) {
+            $this->json(['success' => false, 'message' => 'অন্তত একটি পণ্য অর্ডারে থাকতে হবে।']);
+            return;
+        }
+
+        $validCompanyIdsStmt = $this->db->prepare("SELECT DISTINCT company_id FROM dealer_companies WHERE sr_id = ?");
+        $validCompanyIdsStmt->execute([Auth::id()]);
+        $validCompanies = $validCompanyIdsStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $placeholders = str_repeat('?,', count($productIds) - 1) . '?';
+        $checkProds = $this->db->prepare("SELECT id, company_id FROM products WHERE id IN ($placeholders)");
+        $checkProds->execute($productIds);
+        $prodData = $checkProds->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($prodData as $pd) {
+            if (!empty($validCompanies) && !in_array($pd['company_id'], $validCompanies)) {
+                $this->json(['success' => false, 'message' => 'অননুমোদিত পণ্য নির্বাচন করা হয়েছে।']);
+                return;
+            }
+        }
+
+        $total = 0;
+        $validItemsCount = 0;
+        foreach ($productIds as $k => $pid) {
+            $qty   = intval($quantities[$k] ?? 0);
+            $price = floatval($prices[$k] ?? 0);
+            if ($qty > 0) {
+                $total += $qty * $price;
+                $validItemsCount++;
+            }
+        }
+
+        if ($validItemsCount === 0) {
+            $this->json(['success' => false, 'message' => 'অর্ডারে পণ্যের পরিমাণ শূন্য হতে পারবে না।']);
+            return;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            // Delete old items
+            $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$orderId]);
+
+            // Insert updated items
+            $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)");
+            foreach ($productIds as $k => $pid) {
+                $qty   = intval($quantities[$k] ?? 0);
+                $price = floatval($prices[$k] ?? 0);
+                if ($qty <= 0) continue;
+                $insStmt->execute([$orderId, $pid, $qty, $price, $qty * $price]);
+            }
+
+            // Update order total amount
+            $this->db->prepare("UPDATE orders SET total_amount = ?, updated_at = NOW() WHERE id = ?")->execute([$total, $orderId]);
+
+            $this->db->commit();
+
+            // Fetch refreshed products for invoice and UI sync
+            $iq = $this->db->prepare("
+                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, p.price AS base_price, c.name AS company_name
+                FROM order_items oi
+                JOIN products p ON p.id = oi.product_id
+                LEFT JOIN companies c ON c.id = p.company_id
+                WHERE oi.order_id = ?
+            ");
+            $iq->execute([$orderId]);
+            $updatedProducts = $iq->fetchAll(PDO::FETCH_ASSOC);
+
+            $order['total_amount'] = $total;
+            $order['products'] = $updatedProducts;
+
+            $this->json([
+                'success' => true,
+                'message' => "অর্ডার #$orderId সফলভাবে আপডেট করা হয়েছে!",
+                'order' => $order
+            ]);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->json(['success' => false, 'message' => 'অর্ডার আপডেট করতে ত্রুটি হয়েছে: ' . $e->getMessage()]);
+        }
     }
 
     public function reports(): void
