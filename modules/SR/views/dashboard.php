@@ -108,7 +108,7 @@
         </thead>
         <tbody class="divide-y divide-slate-200 text-slate-700">
           <!-- Item 1: Shop List -->
-          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="window.location.href='<?= url('sr/retailers') ?>'">
+          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="SRLoader.start('দোকান তালিকা লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন'); window.location.href='<?= url('sr/retailers') ?>'">
             <td class="p-3 border-r border-slate-200 font-bold text-slate-800 flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
                 <i class="fa-solid fa-store"></i>
@@ -123,7 +123,7 @@
           </tr>
 
           <!-- Item 2: Order History -->
-          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="window.location.href='<?= url('sr/orders') ?>'">
+          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="SRLoader.start('অর্ডার ইতিহাস লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন'); window.location.href='<?= url('sr/orders') ?>'">
             <td class="p-3 border-r border-slate-200 font-bold text-slate-800 flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
                 <i class="fa-solid fa-file-invoice"></i>
@@ -138,7 +138,7 @@
           </tr>
 
           <!-- Item 3: Transactions -->
-          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="window.location.href='<?= url('sr/transactions') ?>'">
+          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="SRLoader.start('সমারি লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন'); window.location.href='<?= url('sr/transactions') ?>'">
             <td class="p-3 border-r border-slate-200 font-bold text-slate-800 flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
                 <i class="fa-solid fa-money-bill-transfer"></i>

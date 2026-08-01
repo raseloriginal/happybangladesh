@@ -52,11 +52,28 @@
 </head>
 <body class="sr-app-body">
 
+  <!-- Top Glowing Progress Bar (YouTube/Next.js Style) -->
+  <div id="srTopProgressBar"></div>
+
+  <!-- Global Frosted Glass Loading Overlay with Spinning Animation -->
+  <div id="srGlobalLoadingOverlay">
+    <div class="sr-loading-card">
+      <div class="sr-spinner-wrapper">
+        <div class="sr-spinner-ring sr-ring-1"></div>
+        <div class="sr-spinner-ring sr-ring-2"></div>
+        <div class="sr-spinner-ring sr-ring-3"></div>
+        <div class="sr-spinner-center-dot"></div>
+      </div>
+      <div class="sr-loading-title" id="srGlobalLoadingTitle">লোড হচ্ছে...</div>
+      <div class="sr-loading-subtext" id="srGlobalLoadingSubtext">অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন</div>
+    </div>
+  </div>
+
   <!-- App Shell -->
   <div class="sr-app-shell" id="srAppShell">
 
     <!-- Page Content -->
-    <main class="sr-app-main <?= !empty($hideBottomNav) ? 'has-no-nav' : '' ?>" id="srMain">
+    <main class="sr-app-main sr-page-enter <?= !empty($hideBottomNav) ? 'has-no-nav' : '' ?>" id="srMain">
       <!-- Flash alerts -->
       <?php
         $flash = Auth::getFlash();
@@ -80,6 +97,188 @@
 
   <!-- App JS -->
   <script src="<?= asset('js/app.js') ?>"></script>
+
+  <!-- Global SRLoader Loading & Navigation Controller -->
+  <script>
+    window.SRLoader = (function() {
+      let progress = 0;
+      let timer = null;
+      let safetyTimer = null;
+      let bar = null;
+      let overlay = null;
+      let overlayTitle = null;
+      let overlaySubtext = null;
+
+      function getEls() {
+        if (!bar) bar = document.getElementById('srTopProgressBar');
+        if (!overlay) overlay = document.getElementById('srGlobalLoadingOverlay');
+        if (!overlayTitle) overlayTitle = document.getElementById('srGlobalLoadingTitle');
+        if (!overlaySubtext) overlaySubtext = document.getElementById('srGlobalLoadingSubtext');
+      }
+
+      function set(n) {
+        getEls();
+        if (!bar) return;
+        progress = Math.max(0, Math.min(100, n));
+        bar.style.width = progress + '%';
+        if (progress > 0 && progress < 100) {
+          bar.classList.add('active');
+        }
+      }
+
+      function inc() {
+        if (progress < 25) set(progress + 15);
+        else if (progress < 60) set(progress + 8);
+        else if (progress < 88) set(progress + 3);
+      }
+
+      function start(title = 'লোড হচ্ছে...', subtext = 'অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন') {
+        getEls();
+        if (progress === 0 || progress >= 100) {
+          set(15);
+          clearInterval(timer);
+          timer = setInterval(inc, 180);
+        }
+        showOverlay(title, subtext);
+      }
+
+      function done() {
+        getEls();
+        clearInterval(timer);
+        timer = null;
+        clearTimeout(safetyTimer);
+        safetyTimer = null;
+        if (bar) {
+          set(100);
+          setTimeout(() => {
+            if (bar) bar.classList.remove('active');
+            setTimeout(() => {
+              if (bar) set(0);
+            }, 280);
+          }, 180);
+        }
+        hideOverlay();
+      }
+
+      function showOverlay(title = 'লোড হচ্ছে...', subtext = 'অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন') {
+        getEls();
+        if (overlayTitle) overlayTitle.innerText = title;
+        if (overlaySubtext) {
+          overlaySubtext.innerText = subtext;
+          overlaySubtext.style.display = subtext ? 'block' : 'none';
+        }
+        if (overlay) overlay.classList.add('active');
+
+        clearTimeout(safetyTimer);
+        safetyTimer = setTimeout(() => {
+          hideOverlay();
+          if (bar) bar.classList.remove('active');
+        }, 8000);
+      }
+
+      function hideOverlay() {
+        getEls();
+        if (overlay) overlay.classList.remove('active');
+      }
+
+      function buttonLoading(btn, text = 'লোড হচ্ছে...') {
+        if (!btn) return;
+        if (!btn.dataset.originalHtml) {
+          btn.dataset.originalHtml = btn.innerHTML;
+        }
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i> ${text}`;
+      }
+
+      function buttonReset(btn) {
+        if (!btn || !btn.dataset.originalHtml) return;
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.originalHtml;
+        delete btn.dataset.originalHtml;
+      }
+
+      return {
+        start,
+        set,
+        inc,
+        done,
+        showOverlay,
+        hideOverlay,
+        buttonLoading,
+        buttonReset
+      };
+    })();
+
+    // ── Global Page Jump / Transition Event Interceptor ────────
+    document.addEventListener('DOMContentLoaded', () => {
+      // Complete loader on page load
+      SRLoader.done();
+
+      // Intercept link clicks across the SR panel for instant spinning loading feedback
+      document.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (!link) return;
+
+        const href = link.getAttribute('href');
+        // Ignore anchor tags with no href, hash jumps, javascript, or external/blank targets
+        if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('tel:') || href.startsWith('mailto:') || link.target === '_blank' || link.hasAttribute('download')) {
+          return;
+        }
+
+        // Add tactile feedback
+        link.classList.add('sr-nav-tab-active-tap');
+        SRLoader.start('লোড হচ্ছে...', 'পেজ লোড হচ্ছে...');
+      });
+
+      // Intercept form submissions (e.g., date filters, search forms)
+      document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (form.getAttribute('data-no-loader') !== null) return;
+        const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+        if (submitBtn) {
+          SRLoader.buttonLoading(submitBtn);
+        }
+        SRLoader.start('লোড হচ্ছে...', 'ডাটা প্রসেস হচ্ছে...');
+      });
+    });
+
+    // Handle bfcache (browser back/forward navigation)
+    window.addEventListener('pageshow', (e) => {
+      SRLoader.done();
+    });
+
+    // Handle beforeunload to kick off loader if page is transitioning
+    window.addEventListener('beforeunload', () => {
+      SRLoader.start('লোড হচ্ছে...', 'পেজ লোড হচ্ছে...');
+    });
+
+    // Hook global fetch for seamless non-intrusive progress animation on API calls
+    (function() {
+      const origFetch = window.fetch;
+      let activeFetches = 0;
+
+      window.fetch = function(...args) {
+        activeFetches++;
+        SRLoader.set(20);
+
+        return origFetch.apply(this, args)
+          .then(res => {
+            activeFetches = Math.max(0, activeFetches - 1);
+            if (activeFetches === 0) {
+              SRLoader.done();
+            }
+            return res;
+          })
+          .catch(err => {
+            activeFetches = Math.max(0, activeFetches - 1);
+            if (activeFetches === 0) {
+              SRLoader.done();
+            }
+            throw err;
+          });
+      };
+    })();
+  </script>
   <?= $extraScripts ?? '' ?>
 
   <!-- PWA: Service Worker Registration -->

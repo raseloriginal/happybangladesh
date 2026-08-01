@@ -224,9 +224,11 @@ function openShop(id, name, address, hasOrderToday = false) {
   
   if (ret.has_order_today) {
     showConfirmModal(`"${ret.name}" দোকানে আজ একটি অর্ডার দেওয়া হয়েছে। আপনি কি এই অর্ডার পরিবর্তন করতে চান?`, () => {
+      SRLoader.showOverlay('দোকানের পূর্বের অর্ডার লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন...');
       fetch(`${BASE_URL}/sr/api/today-order?retailer_id=${ret.id}`)
         .then(res => res.json())
         .then(data => {
+          SRLoader.hideOverlay();
           if (data.success) {
             cartsByRetailer[ret.id] = data.items;
             ret.has_order_today = false;
@@ -235,7 +237,10 @@ function openShop(id, name, address, hasOrderToday = false) {
             showMiniToast('❌ ' + (data.message || 'অর্ডার আনতে সমস্যা হয়েছে'), true);
           }
         })
-        .catch(() => showMiniToast('❌ নেটওয়ার্ক ত্রুটি', true));
+        .catch(() => {
+          SRLoader.hideOverlay();
+          showMiniToast('❌ নেটওয়ার্ক ত্রুটি', true);
+        });
     });
     return;
   }

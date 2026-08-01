@@ -65,7 +65,7 @@ $truncateName = function($name) {
           <i class="fa-regular fa-calendar text-slate-600 text-sm"></i>
         </label>
         <input type="date" id="dateFromInput" name="from" value="<?= h($from ?? date('Y-m-d')) ?>" 
-               onchange="document.getElementById('dateToInput').value = this.value; document.getElementById('dateForm').submit();" 
+               onchange="document.getElementById('dateToInput').value = this.value; SRLoader.start(); document.getElementById('dateForm').submit();" 
                class="absolute opacity-0 pointer-events-auto inset-0 w-full h-full cursor-pointer">
         <input type="hidden" id="dateToInput" name="to" value="<?= h($to ?? date('Y-m-d')) ?>">
       </form>
@@ -953,6 +953,7 @@ async function submitOrderEdit() {
   btnText.innerText = 'সংরক্ষণ হচ্ছে...';
   btnIcon.classList.add('hidden');
   btnSpinner.classList.remove('hidden');
+  SRLoader.showOverlay('অর্ডার আপডেট করা হচ্ছে...', 'পরিবর্তন সংরক্ষণ হচ্ছে...');
 
   try {
     const formData = new FormData();
@@ -990,6 +991,7 @@ async function submitOrderEdit() {
     console.error('Order update error:', err);
     alert('সার্ভার এরর: অর্ডার আপডেট করা সম্ভব হয়নি।');
   } finally {
+    SRLoader.hideOverlay();
     btnConfirm.disabled = false;
     btnText.innerText = 'অর্ডার কনফার্ম করুন';
     btnIcon.classList.remove('hidden');

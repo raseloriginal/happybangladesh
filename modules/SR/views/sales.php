@@ -5,6 +5,12 @@
 <div class="sr-map-page" style="font-family: 'Hind Siliguri', sans-serif;">
   <div id="srMap"></div>
 
+  <!-- Map Status Badge (GPS Locating & Retailer Loading Indicator) -->
+  <div class="sr-map-loading-badge" id="srMapLoadingBadge">
+    <i class="fa-solid fa-satellite-dish fa-spin"></i>
+    <span id="srMapLoadingText">অবস্থান ও দোকান লোড হচ্ছে...</span>
+  </div>
+
   <!-- Search Bar & Filter Button Overlay -->
   <div class="sr-map-header-wrap">
     <a href="<?= url('sr/dashboard') ?>" class="w-[54px] h-[54px] bg-white text-slate-700 rounded-[14px] flex items-center justify-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-95 transition-all text-lg flex-shrink-0" title="পিছনে">
@@ -13,6 +19,7 @@
     <div class="sr-map-searchbar-new">
       <i class="fa-solid fa-magnifying-glass sr-map-search-icon"></i>
       <input type="text" id="mapSearchInput" placeholder="দোকান বা এলাকা খুঁজুন..." autocomplete="off">
+      <i class="fa-solid fa-spinner fa-spin sr-search-loading-icon" id="mapSearchSpinner"></i>
     </div>
     <div class="sr-search-suggestions" id="searchSuggestions"></div>
     <button class="sr-map-filter-btn" id="mapFilterBtn" title="ফিল্টার">
@@ -36,7 +43,7 @@
       <i class="fa-solid fa-chevron-down"></i>
     </button>
     <div class="sr-retailers-carousel" id="retailerCards">
-      <!-- Dynamically filled with nearest retailer cards -->
+      <!-- Dynamically filled with nearest retailer cards or skeletons -->
     </div>
   </div>
 </div>
@@ -221,9 +228,42 @@ function initMainMap() {
   detectLocation(false);
 }
 
+// ── Skeleton Loader for Retailers Carousel ───────────────────
+function renderRetailerSkeletons() {
+  const container = document.getElementById('retailerCards');
+  if (!container) return;
+  container.innerHTML = [1, 2, 3].map(() => `
+    <div class="sr-skeleton-retailer-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px; flex:1;">
+          <div class="sr-skeleton-circle" style="width:34px; height:34px; flex-shrink:0;"></div>
+          <div class="sr-skeleton-line" style="width:65%; height:14px;"></div>
+        </div>
+        <div class="sr-skeleton-line" style="width:55px; height:24px; border-radius:8px;"></div>
+      </div>
+      <div class="sr-skeleton-line" style="width:85%; height:10px; margin: 8px 0 6px 0;"></div>
+      <div style="display:flex; gap:6px;">
+        <div class="sr-skeleton-line" style="width:50px; height:18px; border-radius:6px;"></div>
+        <div class="sr-skeleton-line" style="width:65px; height:18px; border-radius:6px;"></div>
+        <div class="sr-skeleton-line" style="width:55px; height:18px; border-radius:6px;"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
 // ── Detect / Go-to My Location ────────────────────────────────
 function detectLocation(animate = true) {
   if (!navigator.geolocation) return;
+  
+  const locateBtn = document.getElementById('locateBtn');
+  const loadingBadge = document.getElementById('srMapLoadingBadge');
+  const loadingText = document.getElementById('srMapLoadingText');
+
+  if (locateBtn) locateBtn.classList.add('sr-fab-locating');
+  if (loadingBadge && loadingText) {
+    loadingText.innerText = 'অবস্থান সনাক্ত করা হচ্ছে...';
+    loadingBadge.classList.add('show');
+  }
   
   const geoOptions = {
     enableHighAccuracy: true,
@@ -244,9 +284,14 @@ function detectLocation(animate = true) {
     
     placeMyLocationMarker();
     loadRetailersOnMap();
+
+    if (locateBtn) locateBtn.classList.remove('sr-fab-locating');
+    if (loadingBadge) loadingBadge.classList.remove('show');
   }, () => {
     // If geolocation fails or is denied, load retailers using cached location
     loadRetailersOnMap();
+    if (locateBtn) locateBtn.classList.remove('sr-fab-locating');
+    if (loadingBadge) loadingBadge.classList.remove('show');
   }, geoOptions);
 }
 
@@ -278,12 +323,21 @@ function loadRetailersOnMap() {
   const cacheKey = `sr_ret_cache_${myLat.toFixed(3)}_${myLng.toFixed(3)}`;
   const cachedData = sessionStorage.getItem(cacheKey);
 
+  const loadingBadge = document.getElementById('srMapLoadingBadge');
+  const loadingText = document.getElementById('srMapLoadingText');
+
   // Instant render from local cache if available (0ms load time for mobile)
   if (cachedData) {
     try {
       const parsed = JSON.parse(cachedData);
       processRetailerData(parsed);
     } catch (e) {}
+  } else {
+    renderRetailerSkeletons();
+    if (loadingBadge && loadingText) {
+      loadingText.innerText = 'নিকটবর্তী দোকান লোড হচ্ছে...';
+      loadingBadge.classList.add('show');
+    }
   }
 
   // Network Fetch
@@ -292,9 +346,11 @@ function loadRetailersOnMap() {
     .then(data => {
       sessionStorage.setItem(cacheKey, JSON.stringify(data));
       processRetailerData(data);
+      if (loadingBadge) loadingBadge.classList.remove('show');
     })
     .catch(() => {
       if (!cachedData) showDemoPins();
+      if (loadingBadge) loadingBadge.classList.remove('show');
     });
 }
 
@@ -373,9 +429,11 @@ function addRetailerPin(ret) {
 function triggerRetailerAction(ret) {
   if (ret.has_order_today) {
     showConfirmModal(`An order has already been placed for "${ret.name}" today. Are you sure you want to modify this order?`, () => {
+      SRLoader.showOverlay('দোকানের পূর্বের অর্ডার লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন...');
       fetch(`${BASE_URL}/sr/api/today-order?retailer_id=${ret.id}`)
         .then(res => res.json())
         .then(data => {
+          SRLoader.hideOverlay();
           if (data.success) {
             cartsByRetailer[ret.id] = data.items;
             ret.has_order_today = false; // allow editing
@@ -384,7 +442,10 @@ function triggerRetailerAction(ret) {
             showMiniToast('❌ ' + (data.message || 'Error fetching order details'), true);
           }
         })
-        .catch(() => showMiniToast('❌ Network error', true));
+        .catch(() => {
+          SRLoader.hideOverlay();
+          showMiniToast('❌ Network error', true);
+        });
     });
     return;
   }
@@ -547,6 +608,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const phone = document.getElementById('retPhone').value.trim();
     if (!name) return;
 
+    const submitBtn = this.querySelector('button[type="submit"]');
+    SRLoader.buttonLoading(submitBtn, 'সংরক্ষণ হচ্ছে...');
+
     fetch(`${BASE_URL}/sr/api/retailers/store`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -554,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .then(r => r.json())
     .then(d => {
+      SRLoader.buttonReset(submitBtn);
       if (d.success) {
         closeSheet('addRetSheet','addRetOverlay');
         document.getElementById('addRetailerForm').reset();
@@ -563,7 +628,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showMiniToast('❌ ' + (d.message || 'Failed to save'), true);
       }
     })
-    .catch(() => showMiniToast('❌ Network error', true));
+    .catch(() => {
+      SRLoader.buttonReset(submitBtn);
+      showMiniToast('❌ Network error', true);
+    });
   });
 });
 
@@ -611,6 +679,7 @@ function initEventListeners() {
 
   // Search Input & Suggestions
   const searchInput = document.getElementById('mapSearchInput');
+  const searchSpinner = document.getElementById('mapSearchSpinner');
   const suggestionsBox = document.getElementById('searchSuggestions');
   let searchTimeout = null;
   let globalFuse = null;
@@ -634,9 +703,11 @@ function initEventListeners() {
       if (q.length < 2) {
         suggestionsBox.innerHTML = '';
         suggestionsBox.classList.remove('open');
+        if (searchSpinner) searchSpinner.classList.remove('show');
         return;
       }
 
+      if (searchSpinner) searchSpinner.classList.add('show');
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
         const normalizedQ = normalizeBanglish(q.toLowerCase());
@@ -652,6 +723,7 @@ function initEventListeners() {
         }
 
         const renderMatches = (matches) => {
+          if (searchSpinner) searchSpinner.classList.remove('show');
           if (matches.length > 0) {
             suggestionsBox.innerHTML = matches.map(ret => {
               const addressStr = ret.address || `Dhaka City Area, Retailer ID #${ret.id}`;
@@ -678,9 +750,12 @@ function initEventListeners() {
             .then(data => {
               if (data.success) {
                 renderMatches(data.results);
+              } else {
+                renderMatches([]);
               }
             })
             .catch(() => {
+              if (searchSpinner) searchSpinner.classList.remove('show');
               suggestionsBox.innerHTML = `<div style="padding: 12px; color: #ef4444; font-size: 0.82rem; text-align: center;">Search failed</div>`;
               suggestionsBox.classList.add('open');
             });
