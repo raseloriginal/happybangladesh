@@ -33,19 +33,23 @@
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Base CSS -->
+  <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
 
   <!-- DSR App CSS -->
   <link rel="stylesheet" href="<?= asset('css/dsr_app.css') ?>?v=<?= time() ?>">
 
   <?= $extraHead ?? '' ?>
 </head>
-<body class="dsr-app-body bg-gray-50 text-gray-800 antialiased" style="font-family: 'Inter', sans-serif;">
+<body class="dsr-app-body bg-gray-50 text-gray-800 antialiased" style="font-family: 'Hind Siliguri', 'Inter', sans-serif;">
 
   <div class="dsr-app-shell flex flex-col h-screen overflow-hidden max-w-[480px] mx-auto bg-gray-50 relative shadow-2xl">
     
     <!-- Main Content Area -->
-    <main class="dsr-main flex-1 overflow-y-auto pb-24 relative scroll-smooth" id="dsrMain">
+    <main class="dsr-main flex-1 overflow-y-auto pb-20 relative scroll-smooth" id="dsrMain">
       
       <!-- Flash alerts -->
       <?php $flash = Auth::getFlash(); if ($flash): ?>
@@ -63,66 +67,12 @@
       
     </main>
 
-    <!-- Floating Bottom Navigation Bar (SR Panel Floating Pill Style) -->
-    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 max-w-sm sm:max-w-md w-[92%] bg-white/95 backdrop-blur-md rounded-full shadow-2xl border border-slate-200/80 px-5 py-2 flex items-center justify-between z-50">
-      
-      <!-- Home Tab -->
-      <a href="<?= url('dsr/dashboard') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/dashboard') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
-        <i class="fa-solid fa-house text-base mb-0.5"></i>
-        <span>হোম</span>
-      </a>
+    <!-- Bottom Navigation Bar -->
+    <?php if (empty($hideBottomNav)): ?>
+      <?php include MOD_PATH . '/DSR/views/partials/_bottom_nav.php'; ?>
+    <?php endif; ?>
 
-      <!-- Inventory Tab -->
-      <a href="<?= url('dsr/van-stock') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/van-stock') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
-        <i class="fa-solid fa-boxes-stacked text-base mb-0.5"></i>
-        <span>মাল (স্টক)</span>
-      </a>
-
-      <!-- Delivery Center Floating FAB -->
-      <a href="<?= url('dsr/delivery') ?>" title="ডেলিভারি রুট" class="dsr-float-loc-btn w-12 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 -mt-6 hover:scale-105 transition">
-        <i class="fa-solid fa-truck-fast text-lg"></i>
-      </a>
-
-      <!-- Settlement Tab -->
-      <?php 
-        $dsr_can_settle = true;
-        if (class_exists('Database') && class_exists('Auth') && Auth::check()) {
-            $db = Database::getInstance();
-            $q = $db->prepare("SELECT COUNT(*) FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=CURDATE() OR (delivery_date IS NULL AND dispatch_date=CURDATE())) AND status != 'returned'");
-            $q->execute([Auth::id()]);
-            $dsr_can_settle = ($q->fetchColumn() == 0);
-        }
-      ?>
-      <?php if ($dsr_can_settle): ?>
-      <a href="<?= url('dsr/settlement') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/settlement') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
-        <i class="fa-solid fa-file-invoice-dollar text-base mb-0.5"></i>
-        <span>হিসাব মিলাও</span>
-      </a>
-      <?php else: ?>
-      <div onclick="alert('ডেলিভারি স্ট্যাটাস রিটার্ন হওয়ার পর হিসাব মিলাতে পারবেন।')" class="flex flex-col items-center text-slate-400 hover:text-slate-500 opacity-60 cursor-pointer font-medium text-[10px]">
-        <i class="fa-solid fa-file-invoice-dollar text-base mb-0.5"></i>
-        <span>হিসাব মিলাও</span>
-      </div>
-      <?php endif; ?>
-
-      <!-- Expense Tab -->
-      <a href="<?= url('dsr/expenses') ?>" class="flex flex-col items-center <?= strpos($_SERVER['REQUEST_URI'], '/dsr/expenses') !== false ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-700 font-medium' ?> text-[10px]">
-        <i class="fa-solid fa-receipt text-base mb-0.5"></i>
-        <span>দৈনিক খরচ</span>
-      </a>
-
-    </div>
   </div>
-
-  <style>
-  @keyframes dsrSubtleFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
-  }
-  .dsr-float-loc-btn {
-    animation: dsrSubtleFloat 2.5s infinite ease-in-out;
-  }
-  </style>
 
   <?= $extraScripts ?? '' ?>
 

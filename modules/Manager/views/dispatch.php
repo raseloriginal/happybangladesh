@@ -37,17 +37,51 @@
   stroke: #10b981;
 }
 
-/* Table expansions */
-.expand-row { display: none; background: #f8fafc; }
-.expand-row.open { display: table-row; }
-.sub-table th { font-size: 0.75rem; text-transform: uppercase; color: #64748b; background: #f1f5f9; padding: 0.5rem; }
-.sub-table td { padding: 0.5rem; font-size: 0.875rem; border-bottom: 1px solid #e2e8f0; }
+/* Sub-table Excel overrides */
+.sub-table th { 
+  font-size: 0.725rem; 
+  font-weight: 800;
+  text-transform: uppercase; 
+  letter-spacing: 0.05em;
+  color: #1e293b; 
+  background: #f1f5f9; 
+  padding: 0.6rem 0.8rem;
+  border-bottom: 2px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+}
+.sub-table td { 
+  padding: 0.6rem 0.8rem; 
+  font-size: 0.825rem; 
+  border-bottom: 1px solid #e2e8f0; 
+  border-right: 1px solid #e2e8f0;
+}
+.sub-table tr:hover td {
+  background: #eff6ff !important;
+}
 
-.status-badge { padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
-.status-assigned { background: #dbeafe; color: #1e40af; }
-.status-organized { background: #fef3c7; color: #92400e; }
-.status-dispatched { background: #d1fae5; color: #065f46; }
-.status-returned { background: #fee2e2; color: #991b1b; }
+.status-badge { 
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.25rem 0.6rem; 
+  border-radius: 9999px; 
+  font-size: 0.725rem; 
+  font-weight: 800; 
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+.status-assigned { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.status-organized { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.status-dispatched { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.status-returned { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+/* Print styling */
+@media print {
+  body * { visibility: hidden; }
+  #viewExcelContainer, #viewExcelContainer * { visibility: visible; }
+  #viewExcelContainer { position: absolute; left: 0; top: 0; width: 100%; }
+  .excel-ribbon-actions, .no-print { display: none !important; }
+}
 </style>
 
 <div class="page-header flex justify-between items-center mb-6">
@@ -55,34 +89,85 @@
     <h1 class="page-title text-2xl font-bold text-gray-800">Dispatch Management</h1>
     <div class="breadcrumb text-sm text-gray-500">Manager &rsaquo; Dispatch</div>
   </div>
-  <button onclick="openWireModal()" class="btn btn-primary bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-all">
-    <i class="fa-solid fa-bolt"></i> New Dispatch Assignment
-  </button>
 </div>
 
-<div class="card bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-  <div class="card-header border-b border-gray-100 p-5 flex justify-between items-center">
-    <h2 class="card-title text-lg font-semibold text-gray-800">Dispatch Schedules</h2>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-left border-collapse" id="main-table">
-      <thead>
-        <tr class="bg-gray-50 border-b border-gray-100">
-          <th class="p-4 font-medium text-gray-500">Dates (Order & Delivery)</th>
-          <th class="p-4 font-medium text-gray-500">DSR</th>
-          <th class="p-4 font-medium text-gray-500">Order Value</th>
-          <th class="p-4 font-medium text-gray-500">Dispatch Value</th>
-          <th class="p-4 font-medium text-gray-500">Return Value</th>
-          <th class="p-4 font-medium text-gray-500">Damage Value</th>
-          <th class="p-4 font-medium text-gray-500">Sale Value</th>
-          <th class="p-4 font-medium text-gray-500">Status</th>
-          <th class="p-4 font-medium text-gray-500 text-right">Action</th>
-        </tr>
-      </thead>
-      <tbody id="schedules-tbody">
-        <!-- Rendered via JS -->
-      </tbody>
-    </table>
+<!-- ============================================================================ -->
+<!-- MODERN EXCEL SPREADSHEET DISPATCH VIEW CONTAINER                             -->
+<!-- ============================================================================ -->
+<div id="viewExcelContainer" class="space-y-4">
+  <div class="excel-container">
+    
+    <!-- Excel Ribbon Toolbar -->
+    <div class="excel-ribbon">
+      <div class="flex items-center gap-3">
+        <div class="excel-ribbon-badge">
+          <i class="fa-solid fa-file-excel text-blue-200 text-lg"></i>
+          <span>Dispatch Management Spreadsheet</span>
+        </div>
+        <span class="text-xs text-blue-100 hidden sm:inline-block">• Live Manager Dispatch Data Grid</span>
+      </div>
+
+      <div class="flex items-center gap-2 excel-ribbon-actions">
+        <button onclick="exportDispatchCSV()" class="excel-action-btn">
+          <i class="fa-solid fa-file-csv"></i> Export CSV / Excel
+        </button>
+        <button onclick="printDispatchSheet()" class="excel-action-btn excel-action-btn-secondary">
+          <i class="fa-solid fa-print"></i> Print Sheet
+        </button>
+        <button onclick="openWireModal()" class="excel-action-btn bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 shadow">
+          <i class="fa-solid fa-bolt"></i> New Dispatch Assignment
+        </button>
+      </div>
+    </div>
+
+    <!-- Excel Formula & Summary Bar -->
+    <div class="excel-formula-bar">
+      <span class="fx-symbol">fx</span>
+      <div class="excel-pill">
+        <i class="fa-solid fa-calculator text-blue-600"></i>
+        <span>SCHEDULES: <strong id="fxCount" class="text-blue-700 font-mono">0</strong></span>
+      </div>
+      <div class="excel-pill">
+        <i class="fa-solid fa-bangladeshi-taka-sign text-blue-600"></i>
+        <span>TOTAL ORDER: <strong id="fxSumOrder" class="text-blue-700 font-mono">৳0</strong></span>
+      </div>
+      <div class="excel-pill">
+        <i class="fa-solid fa-truck text-indigo-600"></i>
+        <span>DISPATCH VALUE: <strong id="fxSumDispatch" class="text-indigo-700 font-mono">৳0</strong></span>
+      </div>
+      <div class="excel-pill">
+        <i class="fa-solid fa-circle-check text-emerald-600"></i>
+        <span>TOTAL SALE: <strong id="fxSumSale" class="text-emerald-700 font-mono">৳0</strong></span>
+      </div>
+      <div class="excel-pill">
+        <i class="fa-solid fa-arrow-rotate-left text-rose-600"></i>
+        <span>RETURN / DAMAGE: <strong id="fxSumReturn" class="text-rose-700 font-mono">৳0</strong></span>
+      </div>
+    </div>
+
+    <!-- Excel Grid Table -->
+    <div class="overflow-x-auto max-h-[680px]">
+      <table class="excel-table" id="dispatchExcelTable">
+        <thead>
+          <tr>
+            <th class="excel-row-num">#</th>
+            <th>Dates (Order & Delivery)</th>
+            <th>DSR Name</th>
+            <th class="text-right">Order Value</th>
+            <th class="text-right">Dispatch Value</th>
+            <th class="text-right">Return Value</th>
+            <th class="text-right">Damage Value</th>
+            <th class="text-right">Sale Value</th>
+            <th class="text-center">Status</th>
+            <th class="text-center no-print">Action</th>
+          </tr>
+        </thead>
+        <tbody id="schedules-tbody">
+          <!-- Rendered via JS -->
+        </tbody>
+      </table>
+    </div>
+
   </div>
 </div>
 
@@ -130,34 +215,35 @@
 <!-- 2. ORGANIZE MODAL                          -->
 <!-- ========================================== -->
 <div id="organize-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-    <div class="p-5 border-b border-gray-100 flex justify-between items-center">
-      <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-box-open text-amber-500 mr-2"></i> Organize Dispatch Items</h2>
-      <button onclick="closeOrganizeModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="p-4 bg-amber-500 text-white flex justify-between items-center">
+      <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-box-open"></i> Organize Dispatch Items</h2>
+      <button onclick="closeOrganizeModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
     </div>
     
-    <div class="flex-1 overflow-y-auto p-5 bg-gray-50">
-      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table class="w-full text-left">
-          <thead class="bg-gray-50 border-b border-gray-200">
+    <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div class="excel-container">
+        <table class="excel-table">
+          <thead>
             <tr>
-              <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
-              <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Ordered Qty</th>
-              <th class="p-3 text-xs font-semibold text-gray-500 uppercase">Dispatch Qty (Box | Pcs)</th>
-              <th class="p-3 text-xs font-semibold text-gray-500 uppercase text-center">Change (কম / বেশি)</th>
-              <th class="p-3 text-xs font-semibold text-gray-500 uppercase text-center">Organized?</th>
+              <th class="excel-row-num">#</th>
+              <th>Product</th>
+              <th>Ordered Qty</th>
+              <th>Dispatch Qty (Box | Pcs)</th>
+              <th class="text-center">Change (কম / বেশি)</th>
+              <th class="text-center">Organized?</th>
             </tr>
           </thead>
-          <tbody id="organize-tbody" class="divide-y divide-gray-100">
+          <tbody id="organize-tbody">
             <!-- Rows injected via JS -->
           </tbody>
         </table>
       </div>
     </div>
     
-    <div class="p-5 border-t border-gray-100 flex justify-end gap-3 bg-white">
-      <button onclick="closeOrganizeModal()" class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
-      <button onclick="saveOrganize(event)" class="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium shadow">Save Organized</button>
+    <div class="p-4 border-t border-gray-200 flex justify-end gap-3 bg-white">
+      <button onclick="closeOrganizeModal()" class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium">Cancel</button>
+      <button onclick="saveOrganize(event)" class="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md">Save Organized</button>
     </div>
   </div>
 </div>
@@ -182,9 +268,31 @@
   </div>
 </div>
 
+<!-- ========================================== -->
+<!-- 4. RETURN MODAL                            -->
+<!-- ========================================== -->
+<div id="return-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      <h3 class="font-bold text-gray-800 text-lg flex items-center gap-2"><i class="fa-solid fa-rotate-left text-gray-500"></i> Process Returns</h3>
+      <button onclick="window.closeReturnModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="p-6 overflow-y-auto">
+      <input type="hidden" id="return-schedule-id">
+      <div id="return-modal-content"></div>
+    </div>
+    <div class="p-5 border-t border-gray-100 flex justify-end gap-3 bg-white">
+      <button onclick="window.closeReturnModal()" class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
+      <button onclick="window.submitReturn()" class="px-5 py-2 rounded-lg bg-gray-800 text-white font-medium hover:bg-gray-900 transition flex items-center gap-2">
+        <i class="fa-solid fa-check"></i> Confirm Returns
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================================
-// MAIN TABLE LOGIC
+// MAIN SPREADSHEET LOGIC
 // ============================================================================
 let schedules = [];
 let allDsrs = [];
@@ -209,58 +317,93 @@ function renderSchedules() {
   tbody.innerHTML = '';
   
   if (schedules.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-gray-400">No dispatches found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="p-12 text-center text-gray-400 bg-white font-medium">
+      <i class="fa-solid fa-file-excel text-4xl text-gray-300 mb-3 block"></i>
+      No dispatches found in spreadsheet sheet.
+    </td></tr>`;
+    updateFormulaBar(0, 0, 0, 0, 0);
     return;
   }
+
+  let totalOrderVal = 0;
+  let totalDispatchVal = 0;
+  let totalSaleVal = 0;
+  let totalReturnDmgVal = 0;
   
-  schedules.forEach(sch => {
+  schedules.forEach((sch, idx) => {
+    const orderVal = parseFloat(sch.total_order_value || 0);
+    const dispatchVal = parseFloat(sch.total_dispatch_value || 0);
+    const returnVal = parseFloat(sch.total_return_value || 0);
+    const damageVal = parseFloat(sch.total_damage_value || 0);
+    const saleVal = parseFloat(sch.total_sale_value || 0);
+
+    totalOrderVal += orderVal;
+    if (sch.status === 'dispatched' || sch.status === 'returned') {
+      totalDispatchVal += dispatchVal;
+      totalSaleVal += saleVal;
+      totalReturnDmgVal += (returnVal + damageVal);
+    }
+
     // Determine buttons based on status
     let actionBtn = '';
     if (sch.status === 'assigned') {
-      actionBtn = `<button onclick="openOrganizeModal(${sch.id})" class="text-amber-600 hover:bg-amber-50 px-2 py-1 rounded text-sm font-medium border border-amber-200"><i class="fa-solid fa-box-open mr-1"></i> Organize</button>`;
+      actionBtn = `<button onclick="openOrganizeModal(${sch.id})" class="text-amber-700 hover:bg-amber-100 px-2.5 py-1 rounded text-xs font-bold border border-amber-300 transition"><i class="fa-solid fa-box-open mr-1"></i> Organize</button>`;
     } else if (sch.status === 'organized') {
-      actionBtn = `<button onclick="updateStatus(${sch.id}, 'dispatched')" class="text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded text-sm font-medium border border-emerald-200"><i class="fa-solid fa-truck-fast mr-1"></i> Dispatch</button>`;
+      actionBtn = `<button onclick="updateStatus(${sch.id}, 'dispatched')" class="text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded text-xs font-bold border border-emerald-300 transition"><i class="fa-solid fa-truck-fast mr-1"></i> Dispatch</button>`;
     } else if (sch.status === 'dispatched') {
-      actionBtn = `<button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-600 hover:bg-gray-50 px-2 py-1 rounded text-sm font-medium border border-gray-200"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>`;
+      actionBtn = `<button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded text-xs font-bold border border-gray-300 transition"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>`;
     }
 
     const tr = document.createElement('tr');
-    tr.className = 'border-b border-gray-50 hover:bg-gray-50/50 transition-colors group';
+    tr.className = 'hover:bg-blue-50/50 transition-colors group';
     tr.innerHTML = `
-      <td class="p-4">
-        <div class="text-sm font-medium text-gray-800">Order: ${sch.dispatch_date}</div>
-        <div class="text-xs text-gray-500 mt-1">Deliv: ${sch.delivery_date || sch.dispatch_date}</div>
+      <td class="excel-row-num">${idx + 1}</td>
+      <td class="whitespace-nowrap">
+        <div class="text-xs font-bold text-gray-800">Order: ${sch.dispatch_date}</div>
+        <div class="text-[11px] text-gray-500 font-medium mt-0.5">Deliv: ${sch.delivery_date || sch.dispatch_date}</div>
       </td>
-      <td class="p-4 font-medium text-gray-800">
+      <td>
         <div class="flex items-center justify-between gap-2 w-full">
           <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">${sch.dsr_name.charAt(0)}</div>
-            <span>${sch.dsr_name}</span>
+            <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs border border-blue-200">${sch.dsr_name.charAt(0)}</div>
+            <span class="font-bold text-gray-800 text-xs">${sch.dsr_name}</span>
           </div>
-          <button onclick="openEditDsrModal(${sch.id}, ${sch.dsr_id})" class="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-gray-150 transition-colors opacity-0 group-hover:opacity-100" title="Change DSR">
+          <button onclick="openEditDsrModal(${sch.id}, ${sch.dsr_id})" class="text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change DSR">
             <i class="fa-solid fa-pen text-xs"></i>
           </button>
         </div>
       </td>
-      <td class="p-4 text-sm font-medium text-blue-600">
-        ৳ ${parseFloat(sch.total_order_value).toLocaleString()}
-        ${(()=>{ const oc = parseFloat(sch.total_order_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return `<div style="font-size:11px;font-weight:700;color:${color};margin-top:2px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; })()}
+      <td class="excel-money">
+        ৳ ${orderVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+        ${(()=>{ 
+          const oc = parseFloat(sch.total_order_oc||0); 
+          if(oc===0) return ''; 
+          const sign=oc>0?'+':'-'; 
+          const color=oc>0?'#10b981':'#ef4444'; 
+          return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
+        })()}
       </td>
-      <td class="p-4 text-sm font-medium">
+      <td class="excel-money">
         ${(sch.status === 'dispatched' || sch.status === 'returned') ? `
-          ৳ ${parseFloat(sch.total_dispatch_value).toLocaleString()}
-          ${(()=>{ const oc = parseFloat(sch.total_dispatch_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return '<div style="font-size:11px;font-weight:700;color:'+color+';margin-top:2px;">('+sign+'৳'+Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+')</div>'; })()}
+          ৳ ${dispatchVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+          ${(()=>{ 
+            const oc = parseFloat(sch.total_dispatch_oc||0); 
+            if(oc===0) return ''; 
+            const sign=oc>0?'+':'-'; 
+            const color=oc>0?'#10b981':'#ef4444'; 
+            return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
+          })()}
         ` : '-'}
       </td>
-      <td class="p-4 text-sm text-red-600">${(sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_return_value).toLocaleString() : '-'}</td>
-      <td class="p-4 text-sm text-orange-500">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_damage_value).toLocaleString() : '-'}</td>
-      <td class="p-4 text-sm font-medium text-emerald-600">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + parseFloat(sch.total_sale_value).toLocaleString() : '-'}</td>
-      <td class="p-4"><span class="status-badge status-${sch.status}">${sch.status.toUpperCase()}</span></td>
-      <td class="p-4 text-right">
-        <div class="flex items-center justify-end gap-2">
+      <td class="excel-money text-rose-600">${(sch.status === 'returned') ? '৳ ' + returnVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+      <td class="excel-money text-amber-600">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + damageVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+      <td class="excel-money text-emerald-600">${(sch.status === 'dispatched' || sch.status === 'returned') ? '৳ ' + saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+      <td class="text-center"><span class="status-badge status-${sch.status}">${sch.status.toUpperCase()}</span></td>
+      <td class="text-center no-print">
+        <div class="flex items-center justify-center gap-2">
           ${actionBtn}
-          <button onclick="toggleSrRow(${sch.id})" class="w-8 h-8 rounded hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors">
-            <i class="fa-solid fa-chevron-down transform transition-transform" id="icon-sch-${sch.id}"></i>
+          <button onclick="toggleSrRow(${sch.id})" class="w-7 h-7 rounded hover:bg-slate-200 text-gray-600 flex items-center justify-center transition-colors border border-gray-200">
+            <i class="fa-solid fa-chevron-down text-xs transform transition-transform" id="icon-sch-${sch.id}"></i>
           </button>
         </div>
       </td>
@@ -270,23 +413,33 @@ function renderSchedules() {
     // Expandable Row container
     const expTr = document.createElement('tr');
     expTr.id = `exp-sch-${sch.id}`;
-    expTr.className = 'expand-row';
-    expTr.innerHTML = `<td colspan="9" class="p-0 border-b border-gray-200"><div id="sr-container-${sch.id}" class="p-4 bg-gray-50/80 shadow-inner">Loading...</div></td>`;
+    expTr.className = 'expand-row hidden';
+    expTr.innerHTML = `<td colspan="10" class="p-0 border-b border-gray-300 bg-slate-100/70"><div id="sr-container-${sch.id}" class="p-3">Loading...</div></td>`;
     tbody.appendChild(expTr);
   });
+
+  updateFormulaBar(schedules.length, totalOrderVal, totalDispatchVal, totalSaleVal, totalReturnDmgVal);
+}
+
+function updateFormulaBar(count, order, dispatch, sale, returnDmg) {
+  document.getElementById('fxCount').innerText = `${count} schedules`;
+  document.getElementById('fxSumOrder').innerText = `৳${order.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  document.getElementById('fxSumDispatch').innerText = `৳${dispatch.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  document.getElementById('fxSumSale').innerText = `৳${sale.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  document.getElementById('fxSumReturn').innerText = `৳${returnDmg.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
 }
 
 async function toggleSrRow(schId) {
   const row = document.getElementById(`exp-sch-${schId}`);
   const icon = document.getElementById(`icon-sch-${schId}`);
   
-  if (row.classList.contains('open')) {
-    row.classList.remove('open');
+  if (!row.classList.contains('hidden')) {
+    row.classList.add('hidden');
     icon.classList.remove('rotate-180');
     return;
   }
   
-  row.classList.add('open');
+  row.classList.remove('hidden');
   icon.classList.add('rotate-180');
   
   const container = document.getElementById(`sr-container-${schId}`);
@@ -299,44 +452,70 @@ async function toggleSrRow(schId) {
   const srs = await res.json();
   
   if (srs.length === 0) {
-    container.innerHTML = '<div class="text-sm text-gray-500 py-2">No SRs assigned to this dispatch.</div>';
+    container.innerHTML = '<div class="text-xs text-gray-500 p-2 italic">No SRs assigned to this dispatch.</div>';
     return;
   }
   
-  let html = `<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-    <table class="w-full text-left sub-table">
+  let html = `<div class="excel-container shadow-sm border border-slate-300">
+    <table class="excel-table sub-table">
       <thead><tr>
-        <th>SR Name</th><th>Orders Value</th><th>Dispatch Items</th><th>Return Items</th><th>Damage</th><th>Sale Value</th><th class="text-right">Action</th>
+        <th class="excel-row-num">#</th>
+        <th>SR Name</th>
+        <th class="text-right">Orders Value</th>
+        <th class="text-right">Dispatch Items</th>
+        <th class="text-right">Return Items</th>
+        <th class="text-right">Damage</th>
+        <th class="text-right">Sale Value</th>
+        <th class="text-center no-print">Action</th>
       </tr></thead>
       <tbody>`;
       
-  srs.forEach(sr => {
+  srs.forEach((sr, srIdx) => {
+    const ordersVal = parseFloat(sr.orders_value || 0);
+    const dispatchItemsVal = parseFloat(sr.dispatch_items_value || 0);
+    const returnItemsVal = parseFloat(sr.return_items_value || 0);
+    const damageVal = parseFloat(sr.damage_value || 0);
+    const saleVal = parseFloat(sr.sale_value || 0);
+
     html += `<tr>
-      <td class="font-medium text-gray-700">${sr.name}</td>
-      <td class="text-blue-600 font-medium">
-        ৳ ${parseFloat(sr.orders_value).toLocaleString()}
-        ${(()=>{ const oc = parseFloat(sr.orders_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; })()}
+      <td class="excel-row-num">${srIdx + 1}</td>
+      <td class="font-bold text-gray-800 text-xs">${sr.name}</td>
+      <td class="excel-money">
+        ৳ ${ordersVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+        ${(()=>{ 
+          const oc = parseFloat(sr.orders_oc||0); 
+          if(oc===0) return ''; 
+          const sign=oc>0?'+':'-'; 
+          const color=oc>0?'#10b981':'#ef4444'; 
+          return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
+        })()}
       </td>
-      <td>
+      <td class="excel-money">
         ${showValues ? `
-          ৳ ${parseFloat(sr.dispatch_items_value).toLocaleString()}
-          ${(()=>{ const oc = parseFloat(sr.dispatch_items_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return '<div style="font-size:10px;font-weight:700;color:'+color+';margin-top:1px;">('+sign+'৳'+Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+')</div>'; })()}
+          ৳ ${dispatchItemsVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+          ${(()=>{ 
+            const oc = parseFloat(sr.dispatch_items_oc||0); 
+            if(oc===0) return ''; 
+            const sign=oc>0?'+':'-'; 
+            const color=oc>0?'#10b981':'#ef4444'; 
+            return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
+          })()}
         ` : '-'}
       </td>
-      <td class="text-red-500">${sch.status === 'returned' ? '৳ ' + parseFloat(sr.return_items_value).toLocaleString() : '-'}</td>
-      <td class="text-orange-500">${showValues ? '৳ ' + parseFloat(sr.damage_value).toLocaleString() : '-'}</td>
-      <td class="text-emerald-600 font-medium">${showValues ? '৳ ' + parseFloat(sr.sale_value).toLocaleString() : '-'}</td>
-      <td class="text-right">
-        <button onclick="toggleProductRow(${schId}, ${sr.id})" class="text-xs text-gray-500 hover:text-brand px-2 py-1 bg-gray-100 rounded">
-          <i class="fa-solid fa-list mr-1"></i> Products
+      <td class="excel-money text-rose-600">${sch.status === 'returned' ? '৳ ' + returnItemsVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+      <td class="excel-money text-amber-600">${showValues ? '৳ ' + damageVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+      <td class="excel-money text-emerald-600 font-bold">${showValues ? '৳ ' + saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+      <td class="text-center no-print">
+        <button onclick="toggleProductRow(${schId}, ${sr.id})" class="text-xs text-gray-700 hover:text-blue-700 px-2 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-semibold transition">
+          <i class="fa-solid fa-list mr-1 text-blue-600"></i> Products
         </button>
       </td>
     </tr>
-    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-slate-50"><td colspan="7" class="p-0 border-b border-gray-200">
-      <div id="prod-container-${schId}-${sr.id}" class="p-3"></div>
+    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
+      <div id="prod-container-${schId}-${sr.id}" class="p-2"></div>
     </td></tr>`;
     
-    // Store products for later rendering to avoid another fetch if we already have them
+    // Store products for later rendering
     window[`prod_data_${schId}_${sr.id}`] = sr.products;
   });
   
@@ -355,29 +534,41 @@ function toggleProductRow(schId, srId) {
     const showValues = sch && (sch.status === 'dispatched' || sch.status === 'returned');
     
     if (products.length === 0) {
-      container.innerHTML = '<div class="text-xs text-gray-400">No products found.</div>';
+      container.innerHTML = '<div class="text-xs text-gray-400 p-2 italic">No products found.</div>';
       return;
     }
     
-    let html = `<table class="w-full text-xs text-left bg-white border border-gray-100 rounded">
-      <thead class="bg-gray-50 text-gray-500"><tr>
-        <th class="p-2">Product</th><th class="p-2">Ordered Qty</th><th class="p-2">Dispatched Qty</th>
-        <th class="p-2">Returned Qty</th><th class="p-2">Sale Value</th>
+    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+      <thead><tr>
+        <th class="excel-row-num">#</th>
+        <th>Product Name</th>
+        <th class="text-center">Ordered Qty</th>
+        <th class="text-center">Dispatched Qty</th>
+        <th class="text-center">Returned Qty</th>
+        <th class="text-right">Sale Value</th>
       </tr></thead><tbody>`;
       
-    products.forEach(p => {
-      html += `<tr class="border-t border-gray-50 hover:bg-gray-50">
-        <td class="p-2 font-medium">${p.name}</td>
-        <td class="p-2">${p.ordered_qty}</td>
-        <td class="p-2">${showValues ? p.dispatched_qty : '-'}</td>
-        <td class="p-2 text-red-500">${sch.status === 'returned' ? p.returned_qty : '-'}</td>
-        <td class="p-2 font-medium text-emerald-600">
-          ৳ ${parseFloat(p.sale_value).toLocaleString()}
-          ${(()=>{ const oc = parseFloat(p.order_oc||0); if(oc===0) return ''; const sign=oc>0?'+':'-'; const color=oc>0?'#10b981':'#ef4444'; return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; })()}
+    products.forEach((p, pIdx) => {
+      const saleVal = parseFloat(p.sale_value || 0);
+      html += `<tr>
+        <td class="excel-row-num">${pIdx + 1}</td>
+        <td class="font-bold text-gray-800">${p.name}</td>
+        <td class="excel-qty">${p.ordered_qty}</td>
+        <td class="excel-qty">${showValues ? p.dispatched_qty : '-'}</td>
+        <td class="excel-qty text-rose-600">${sch.status === 'returned' ? p.returned_qty : '-'}</td>
+        <td class="excel-money text-emerald-600 font-bold">
+          ৳ ${saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+          ${(()=>{ 
+            const oc = parseFloat(p.order_oc||0); 
+            if(oc===0) return ''; 
+            const sign=oc>0?'+':'-'; 
+            const color=oc>0?'#10b981':'#ef4444'; 
+            return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
+          })()}
         </td>
       </tr>`;
     });
-    html += `</tbody></table>`;
+    html += `</tbody></table></div>`;
     container.innerHTML = html;
   } else {
     row.classList.add('hidden');
@@ -450,6 +641,47 @@ async function saveDsrChange() {
 }
 
 // ============================================================================
+// EXPORT & PRINT HELPERS
+// ============================================================================
+function exportDispatchCSV() {
+  if (schedules.length === 0) {
+    alert("No data available to export.");
+    return;
+  }
+
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Index,Order Date,Delivery Date,DSR Name,Order Value,Dispatch Value,Return Value,Damage Value,Sale Value,Status\n";
+
+  schedules.forEach((sch, idx) => {
+    const row = [
+      idx + 1,
+      `"${sch.dispatch_date}"`,
+      `"${sch.delivery_date || sch.dispatch_date}"`,
+      `"${sch.dsr_name.replace(/"/g, '""')}"`,
+      parseFloat(sch.total_order_value || 0).toFixed(2),
+      parseFloat(sch.total_dispatch_value || 0).toFixed(2),
+      parseFloat(sch.total_return_value || 0).toFixed(2),
+      parseFloat(sch.total_damage_value || 0).toFixed(2),
+      parseFloat(sch.total_sale_value || 0).toFixed(2),
+      `"${sch.status}"`
+    ];
+    csvContent += row.join(",") + "\n";
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Dispatch_Management_Sheet_${new Date().toISOString().slice(0,10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function printDispatchSheet() {
+  window.print();
+}
+
+// ============================================================================
 // ORGANIZATION LOGIC
 // ============================================================================
 let currentOrgId = null;
@@ -463,10 +695,10 @@ async function openOrganizeModal(schId) {
   tbody.innerHTML = '';
   
   if (products.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center p-5 text-gray-400">No products found for these orders.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-5 text-gray-400">No products found for these orders.</td></tr>';
   } else {
-    products.forEach(p => {
-      const img = p.image ? `<img src="<?= BASE_URL ?>/${p.image}" class="w-10 h-10 rounded object-cover border border-gray-200">` : `<div class="w-10 h-10 rounded bg-gray-100 flex items-center justify-center"><i class="fa-solid fa-box text-gray-300"></i></div>`;
+    products.forEach((p, pIdx) => {
+      const img = p.image ? `<img src="<?= BASE_URL ?>/${p.image}" class="w-8 h-8 rounded object-cover border border-gray-200">` : `<div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center"><i class="fa-solid fa-box text-gray-300"></i></div>`;
       
       const ppb = Math.max(1, parseInt(p.pieces_per_box) || 1);
       const origPcs = parseInt(p.total_ordered_qty) || 0;
@@ -481,27 +713,28 @@ async function openOrganizeModal(schId) {
       const initDispatchRemPcs = initDispatchPcs % ppb;
 
       tbody.innerHTML += `
-        <tr class="hover:bg-gray-50/50" data-pid="${p.product_id}" data-orig-pcs="${origPcs}" data-ppb="${ppb}">
+        <tr class="hover:bg-blue-50/50" data-pid="${p.product_id}" data-orig-pcs="${origPcs}" data-ppb="${ppb}">
+          <td class="excel-row-num">${pIdx + 1}</td>
           <td class="p-3">
             <div class="flex items-center gap-3">
               ${img}
               <div>
-                <div class="font-medium text-gray-800">${p.name}</div>
-                <div class="text-xs text-gray-400">${ppb} Pcs / Box</div>
+                <div class="font-bold text-gray-800 text-xs">${p.name}</div>
+                <div class="text-[11px] text-gray-400 font-medium">${ppb} Pcs / Box</div>
               </div>
             </div>
           </td>
           <td class="p-3 whitespace-nowrap">
-            <span class="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200">${origStr}</span>
-            <div class="text-[11px] text-gray-400 mt-1">Total: ${origPcs} pcs</div>
+            <span class="bg-slate-100 text-gray-700 px-2 py-0.5 rounded text-xs font-bold border border-slate-200">${origStr}</span>
+            <div class="text-[11px] text-gray-400 mt-0.5">Total: ${origPcs} pcs</div>
           </td>
           <td class="p-3">
             <div class="flex items-center gap-2">
               <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm">
-                <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-16 text-sm py-1.5 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
-                <span class="bg-gray-100 text-gray-500 text-xs px-2 py-2 border-l border-r border-gray-200 font-medium">Box</span>
-                <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-16 text-sm py-1.5 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
-                <span class="bg-gray-100 text-gray-500 text-xs px-2 py-2 border-l border-gray-200 font-medium">Pcs</span>
+                <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-14 text-xs py-1 px-2 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
+                <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-r border-gray-200 font-semibold">Box</span>
+                <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-14 text-xs py-1 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
+                <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-gray-200 font-semibold">Pcs</span>
               </div>
             </div>
           </td>
@@ -538,7 +771,7 @@ function updateOrgDiff(elem) {
   const badgeContainer = tr.querySelector('.org-diff-badge');
   
   if (diffPcs === 0) {
-    badgeContainer.innerHTML = '<span class="text-xs text-gray-500 font-medium px-2 py-0.5 rounded bg-gray-100 border border-gray-200">ঠিক আছে</span>';
+    badgeContainer.innerHTML = '<span class="text-xs text-gray-500 font-bold px-2 py-0.5 rounded bg-gray-100 border border-gray-200">ঠিক আছে</span>';
     return;
   }
   
@@ -620,7 +853,6 @@ async function saveOrganize(event) {
 // ============================================================================
 let activeSrId = null;
 let activeDsrId = null;
-// connections: sr_id -> dsr_id
 let connections = {}; 
 let srElements = {};
 let dsrElements = {};
@@ -670,7 +902,6 @@ function renderSrList(srs) {
       <div class="pointer-events-none">
         <span class="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-lg font-bold">${sr.order_count} Orders</span>
       </div>
-      <!-- Connection dot -->
       <div class="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-1/2 w-4 h-4 rounded-full bg-gray-300 border-4 border-white dot" id="sr-dot-${sr.id}"></div>
     `;
     div.onclick = () => handleSrClick(sr.id);
@@ -689,7 +920,6 @@ function renderDsrList(dsrs) {
     div.className = 'connector-card bg-white p-4 rounded-xl border border-gray-200 flex items-center shadow-sm relative pl-8';
     div.id = `dsr-card-${dsr.id}`;
     div.innerHTML = `
-      <!-- Connection dot -->
       <div class="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-300 border-4 border-white dot" id="dsr-dot-${dsr.id}"></div>
       
       <div class="flex items-center gap-3 pointer-events-none w-1/2">
@@ -723,20 +953,14 @@ function handleSrClick(id) {
 
 function handleDsrClick(id) {
   if (activeSrId) {
-    // Connect!
     connections[activeSrId] = id;
-    
-    // Reset active SR
     document.getElementById(`sr-card-${activeSrId}`).classList.remove('active');
     activeSrId = null;
-    
     updateVisuals();
   } else {
-    // Highlight DSR and prepare to disconnect SRs clicked next
     document.querySelectorAll('#dsr-list .connector-card').forEach(el => el.classList.remove('active'));
     document.getElementById(`dsr-card-${id}`).classList.add('active');
     
-    // Add temporary event to SRs connected to this DSR to disconnect
     Object.keys(connections).forEach(sId => {
       if (connections[sId] === id) {
         const card = document.getElementById(`sr-card-${sId}`);
@@ -744,7 +968,6 @@ function handleDsrClick(id) {
           delete connections[sId];
           document.getElementById(`dsr-card-${id}`).classList.remove('active');
           
-          // Restore original click handler for all SRs
           Object.keys(connections).forEach(resSId => {
              const resCard = document.getElementById(`sr-card-${resSId}`);
              if(resCard) resCard.onclick = () => handleSrClick(parseInt(resSId));
@@ -781,7 +1004,6 @@ function updateVisuals() {
   const svg = document.getElementById('wire-canvas');
   svg.innerHTML = '';
   
-  // Reset styles
   document.querySelectorAll('.connector-card').forEach(el => el.classList.remove('connected'));
   document.querySelectorAll('.dot').forEach(el => {
     el.classList.remove('bg-brand', 'bg-emerald-500');
@@ -805,17 +1027,15 @@ function updateVisuals() {
       sDot.classList.replace('bg-gray-300', 'bg-emerald-500');
       dDot.classList.replace('bg-gray-300', 'bg-emerald-500');
       
-      // Draw SVG path
       const rectContainer = document.getElementById('wire-container').getBoundingClientRect();
       const rectS = sDot.getBoundingClientRect();
       const rectD = dDot.getBoundingClientRect();
       
-      const startX = rectS.left - rectContainer.left + 8; // 8 is half of dot width
+      const startX = rectS.left - rectContainer.left + 8;
       const startY = rectS.top - rectContainer.top + 8;
       const endX = rectD.left - rectContainer.left + 8;
       const endY = rectD.top - rectContainer.top + 8;
       
-      // Bezier curve to make it look like a physical wire drooping slightly
       const cpX1 = startX + (endX - startX) / 2;
       const cpY1 = startY;
       const cpX2 = startX + (endX - startX) / 2;
@@ -828,7 +1048,6 @@ function updateVisuals() {
     }
   });
   
-  // Update badges
   document.querySelectorAll('[id^="dsr-count-"]').forEach(el => {
     const id = parseInt(el.id.replace('dsr-count-', ''));
     const count = dsrCounts[id] || 0;
@@ -841,7 +1060,6 @@ function updateVisuals() {
   });
 }
 
-// Redraw lines on window resize or scroll inside lists
 window.addEventListener('resize', () => {
   if (!document.getElementById('wire-modal').classList.contains('hidden')) {
     updateVisuals();
@@ -853,7 +1071,6 @@ document.getElementById('dsr-list').addEventListener('scroll', updateVisuals);
 async function saveWireAssignments() {
   const date = document.getElementById('wire-date').value;
   
-  // Pivot connections into: { dsr_id: { sr_ids: [sr_id, ...], delivery_date: '...' } }
   const assignments = {};
   Object.keys(connections).forEach(sId => {
     const dId = connections[sId];
@@ -886,26 +1103,7 @@ async function saveWireAssignments() {
 
 // Initialization
 document.addEventListener('DOMContentLoaded', loadSchedules);
-</script>
-<div id="return-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-    <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-      <h3 class="font-bold text-gray-800 text-lg flex items-center gap-2"><i class="fa-solid fa-rotate-left text-gray-500"></i> Process Returns</h3>
-      <button onclick="window.closeReturnModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
-    </div>
-    <div class="p-6 overflow-y-auto">
-      <input type="hidden" id="return-schedule-id">
-      <div id="return-modal-content"></div>
-    </div>
-    <div class="p-5 border-t border-gray-100 flex justify-end gap-3 bg-white">
-      <button onclick="window.closeReturnModal()" class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
-      <button onclick="window.submitReturn()" class="px-5 py-2 rounded-lg bg-gray-800 text-white font-medium hover:bg-gray-900 transition flex items-center gap-2">
-        <i class="fa-solid fa-check"></i> Confirm Returns
-      </button>
-    </div>
-  </div>
-</div>
-<script>
+
 window.openReturnModal = async function(scheduleId, dsrId, date) {
   try {
     document.getElementById('return-schedule-id').value = scheduleId;
@@ -916,34 +1114,36 @@ window.openReturnModal = async function(scheduleId, dsrId, date) {
     const res = await fetch(`<?= url("manager/api/dispatch/van-stock/") ?>${dsrId}?date=${date}`);
     const data = await res.json();
     if(data.success) {
-      let html = `<p class="mb-4 text-sm text-gray-600">The following quantities are currently in the van stock for this DSR on ${date}. Confirm to process as returns.</p>`;
+      let html = `<p class="mb-4 text-xs text-gray-600">The following quantities are currently in the van stock for this DSR on ${date}. Confirm to process as returns.</p>`;
       if(data.stock.length === 0) {
-         html += `<div class="bg-amber-50 text-amber-800 p-3 rounded text-sm"><i class="fa-solid fa-info-circle mr-1"></i> No van stock found to return.</div>`;
+         html += `<div class="bg-amber-50 text-amber-800 p-3 rounded-xl text-xs font-semibold border border-amber-200"><i class="fa-solid fa-info-circle mr-1"></i> No van stock found to return.</div>`;
       } else {
-         html += `<table class="w-full text-left border-collapse">
+         html += `<div class="excel-container shadow-sm"><table class="excel-table">
             <thead>
-              <tr class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider">
-                <th class="p-2 border-b">Product</th>
-                <th class="p-2 border-b text-right w-24">Return Qty</th>
+              <tr>
+                <th class="excel-row-num">#</th>
+                <th>Product</th>
+                <th class="text-right w-28">Return Qty</th>
               </tr>
             </thead>
             <tbody>`;
-         data.stock.forEach(item => {
+         data.stock.forEach((item, itemIdx) => {
            html += `<tr>
-             <td class="p-2 border-b text-sm font-medium text-gray-800">${item.product_name}</td>
-             <td class="p-2 border-b text-right">
-               <input type="number" min="0" max="${item.qty}" class="return-qty-input w-full text-right border-gray-300 rounded text-sm py-1" data-pid="${item.product_id}" value="${item.qty}">
+             <td class="excel-row-num">${itemIdx + 1}</td>
+             <td class="font-bold text-gray-800 text-xs">${item.product_name}</td>
+             <td class="text-right">
+               <input type="number" min="0" max="${item.qty}" class="return-qty-input w-full text-right border border-gray-300 rounded text-xs py-1 px-2 font-bold text-gray-800 outline-none focus:border-blue-500" data-pid="${item.product_id}" value="${item.qty}">
              </td>
            </tr>`;
          });
-         html += `</tbody></table>`;
+         html += `</tbody></table></div>`;
       }
       content.innerHTML = html;
     } else {
-      content.innerHTML = `<div class="text-red-500 p-4">${data.message || 'Error loading stock'}</div>`;
+      content.innerHTML = `<div class="text-rose-500 p-4 text-xs font-bold">${data.message || 'Error loading stock'}</div>`;
     }
   } catch(e) {
-    document.getElementById('return-modal-content').innerHTML = '<div class="text-red-500 p-4">Network error loading van stock.</div>';
+    document.getElementById('return-modal-content').innerHTML = '<div class="text-rose-500 p-4 text-xs font-bold">Network error loading van stock.</div>';
   }
 };
 

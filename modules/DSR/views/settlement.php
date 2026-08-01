@@ -17,37 +17,100 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 ?>
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
-  .font-siliguri {
-    font-family: 'Hind Siliguri', 'Inter', sans-serif;
-  }
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+.font-siliguri {
+  font-family: 'Hind Siliguri', 'Inter', sans-serif;
+}
+
+.excel-table input[type="number"]::-webkit-inner-spin-button,
+.excel-table input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.excel-table input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.qty-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  user-select: none;
+  touch-action: manipulation;
+  transition: all 0.1s ease;
+}
+.qty-btn:active {
+  transform: scale(0.9);
+}
+
+.denom-row-active {
+  background-color: #f0fdf4 !important;
+  border-left: 3px solid #10b981 !important;
+}
+
+.progress-bar-fill {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 </style>
 
-<div class="p-3 sm:p-5 space-y-4 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none">
+<div class="p-3 sm:p-4 space-y-3 pb-24 max-w-4xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none">
 
-  <!-- 1. Premium Minimal Header Card -->
-  <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
-    <div class="flex items-center gap-3">
-      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-900 hover:text-white transition-all duration-200 flex items-center justify-center text-slate-600 shadow-2xs active:scale-95 print:hidden">
-        <i class="fa-solid fa-arrow-left text-xs sm:text-sm"></i>
-      </a>
-      <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight tracking-tight">হিসাব মিলাও</h1>
-        <p class="text-xs text-slate-400 font-medium leading-tight mt-1">সারাদিনের ক্যাশ ও মালের হিসাব জমা • <span class="font-mono text-slate-500 font-bold"><?= date('d M Y', strtotime($selectedDate)) ?></span></p>
+  <!-- EXCEL RIBBON & FORMULA HEADER -->
+  <div class="excel-container shadow-sm border border-slate-300 overflow-hidden">
+    
+    <!-- Excel Ribbon Header -->
+    <div class="excel-ribbon py-2 px-3 justify-between">
+      <div class="flex items-center gap-2">
+        <a href="<?= url('dsr/dashboard') ?>" class="w-7 h-7 rounded bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition text-xs">
+          <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div class="excel-ribbon-badge py-0.5 px-2.5 text-xs font-bold">
+          <i class="fa-solid fa-file-excel text-blue-200"></i>
+          <span>হিসাব মিলাও</span>
+        </div>
+      </div>
+
+      <!-- Date Selector -->
+      <form method="GET" action="<?= url('dsr/settlement') ?>" id="dateForm" class="flex items-center gap-2">
+        <input type="date" id="dateInput" name="date" value="<?= h($selectedDate) ?>" onchange="document.getElementById('dateForm').submit()" class="bg-white text-slate-900 font-mono text-xs font-bold px-2 py-0.5 rounded border border-white/40 outline-none cursor-pointer">
+      </form>
+    </div>
+
+    <!-- Excel Formula (fx) Bar -->
+    <div class="excel-formula-bar py-1.5 px-3 gap-2 text-xs bg-slate-50 border-b border-slate-300">
+      <span class="fx-symbol text-xs">fx</span>
+      <div class="excel-pill">
+        <span class="text-slate-500">লোড:</span>
+        <strong class="text-slate-900 font-mono">৳<?= number_format($dispatchedValue) ?></strong>
+      </div>
+      <div class="excel-pill">
+        <span class="text-slate-500">ফেরত:</span>
+        <strong class="text-rose-600 font-mono">৳<?= number_format($returnedValue) ?></strong>
+      </div>
+      <div class="excel-pill bg-blue-50 border-blue-200">
+        <span class="text-blue-700 font-bold">নিট জমা:</span>
+        <strong id="fxShouldPay" class="text-blue-800 font-mono font-bold">৳0</strong>
       </div>
     </div>
 
-      <!-- Date Picker Form (Icon Only) -->
-      <form method="GET" action="<?= url('dsr/settlement') ?>" id="dateForm" class="relative flex items-center">
-        <button type="button" onclick="const inp=document.getElementById('dateInput'); if(inp.showPicker){inp.showPicker()}else{inp.click()}" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition active:scale-95 shadow-2xs border border-slate-200/60" title="তারিখ পরিবর্তন করুন">
-          <i class="fa-regular fa-calendar-days text-sm"></i>
-        </button>
-        <input type="date" id="dateInput" name="date" value="<?= h($selectedDate) ?>" onchange="document.getElementById('dateForm').submit()" class="absolute opacity-0 pointer-events-none inset-0 w-full h-full">
-      </form>
+    <!-- Cash Progress Bar -->
+    <div class="bg-slate-100 px-3 py-1 border-t border-slate-200 flex items-center justify-between text-[11px]">
+      <div class="flex items-center gap-2 flex-1 max-w-xs">
+        <span class="font-bold text-slate-600 shrink-0">গণনা:</span>
+        <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+          <div id="cashProgressBar" class="bg-emerald-500 h-full progress-bar-fill w-0"></div>
+        </div>
+      </div>
+      <span id="cashProgressText" class="font-mono font-bold text-slate-700 ml-2">0%</span>
     </div>
   </div>
 
-  <form action="<?= url('dsr/settlement/submit') ?>" method="POST" id="settlementForm" class="space-y-4">
+  <form action="<?= url('dsr/settlement/submit') ?>" method="POST" id="settlementForm" class="space-y-3">
     <?= Helpers::csrfField() ?>
     <input type="hidden" name="dispatched_value" value="<?= $dispatchedValue ?>">
     <input type="hidden" name="returned_value" value="<?= $returnedValue ?>">
@@ -57,111 +120,153 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <input type="hidden" name="cash_breakdown" id="formCashBreakdown" value="{}">
     <input type="hidden" name="settlement_date" value="<?= htmlspecialchars($selectedDate) ?>">
 
-    <!-- Status Alerts -->
     <?php if ($isSubmitted): ?>
-      <div class="bg-blue-50/80 backdrop-blur-xs border border-blue-200 rounded-2xl p-4 flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-          <i class="fa-solid fa-lock text-sm"></i>
-        </div>
-        <div class="text-left">
-          <div class="text-xs font-bold text-blue-900">হিসাব ইতিমধ্যে জমা দেওয়া হয়েছে</div>
-          <div class="text-[11px] text-blue-700 mt-0.5">এই দিনের সেটেলমেন্ট ফাইনাল লক করা হয়েছে।</div>
-        </div>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-2.5 flex items-center gap-2 text-xs">
+        <i class="fa-solid fa-lock text-blue-600"></i>
+        <span class="font-bold text-blue-900">এই দিনের সেটেলমেন্ট লক করা হয়েছে।</span>
       </div>
     <?php endif; ?>
 
-    <!-- 3. Account Breakdown Card (Excel Table Style) -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left">
-      <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center text-xs">
-        <span class="font-bold text-slate-800">হিসাবের বিবরণ (Breakdown)</span>
-        <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">হিসাব</span>
+    <!-- 1. ACCOUNT BREAKDOWN TABLE -->
+    <div class="excel-container shadow-sm border border-slate-300">
+      <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-300 text-xs font-bold text-slate-800">
+        ১. হিসাব বিবরণী
       </div>
 
-      <div class="divide-y divide-slate-100 text-xs">
-        <div class="flex justify-between items-center p-3">
-          <span class="font-semibold text-slate-600">মোট লোড করা মালের মূল্য</span>
-          <span class="font-black text-slate-900 font-mono text-[13px]">৳ <?= number_format($dispatchedValue) ?></span>
-        </div>
-        <div class="flex justify-between items-center p-3 cursor-pointer hover:bg-slate-50/50 transition" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
-          <span class="font-semibold text-slate-600 flex items-center gap-1.5">ফেরত মালের মূল্য (-) <i class="fa-solid fa-circle-info text-[10px] text-slate-450"></i></span>
-          <div class="flex items-center gap-1.5 text-rose-600">
-            <span class="font-black font-mono text-[13px]">৳ <?= number_format($returnedValue) ?></span>
-            <i class="fa-solid fa-chevron-right text-[10px] opacity-65"></i>
-          </div>
-        </div>
-        <div class="flex justify-between items-center p-3">
-          <span class="font-semibold text-slate-600">ড্যামেজ পণ্য (-)</span>
-          <span class="font-black font-mono text-[13px] text-amber-600">৳ <?= number_format($savedDamage) ?></span>
-        </div>
-        <div class="flex justify-between items-center p-3">
-          <span class="font-semibold text-slate-600">সারাদিনের খরচ (-)</span>
-          <span class="font-black font-mono text-[13px] text-purple-600">৳ <?= number_format($savedExpense) ?></span>
-        </div>
-      </div>
-
-      <!-- Net Payable Highlight (Excel Sum Vibe) -->
-      <div class="bg-slate-50 border-t border-slate-200 p-3.5 flex justify-between items-center">
-        <div>
-          <span class="text-xs font-bold text-slate-600">ক্যাশারে জমা দেবার পরিমাণ (Net)</span>
-          <span class="text-[9px] text-slate-400 block font-normal">(নিট নগদ জমা টাকা)</span>
-        </div>
-        <span class="text-lg font-black text-slate-900 font-mono" id="displayShouldPay">৳ 0</span>
+      <div class="overflow-x-auto">
+        <table class="excel-table text-xs">
+          <thead>
+            <tr>
+              <th class="excel-row-num">#</th>
+              <th>বিবরণ</th>
+              <th class="text-right">টাকা (৳)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="excel-row-num">1</td>
+              <td class="font-bold text-slate-800">মোট লোড করা মাল</td>
+              <td class="excel-money text-slate-900">৳ <?= number_format($dispatchedValue) ?></td>
+            </tr>
+            <tr class="hover:bg-blue-50/50 cursor-pointer" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
+              <td class="excel-row-num">2</td>
+              <td class="font-bold text-slate-800 flex items-center gap-1.5">
+                <span>ফেরত মালের মূল্য (-)</span>
+                <span class="text-[10px] text-blue-600 font-bold bg-blue-50 px-1 py-0.2 rounded border border-blue-200">দেখুন</span>
+              </td>
+              <td class="excel-money text-rose-600 font-bold">
+                - ৳ <?= number_format($returnedValue) ?>
+              </td>
+            </tr>
+            <tr>
+              <td class="excel-row-num">3</td>
+              <td class="font-bold text-slate-800">ড্যামেজ পণ্য (-)</td>
+              <td class="excel-money text-amber-600 font-bold">৳ <?= number_format($savedDamage) ?></td>
+            </tr>
+            <tr>
+              <td class="excel-row-num">4</td>
+              <td class="font-bold text-slate-800">সারাদিনের খরচ (-)</td>
+              <td class="excel-money text-purple-600 font-bold">৳ <?= number_format($savedExpense) ?></td>
+            </tr>
+            <tr class="bg-blue-50/70 border-t-2 border-slate-300">
+              <td class="excel-row-num text-blue-700 font-black">∑</td>
+              <td class="font-black text-slate-900 text-xs">ক্যাশারে জমা (নিট)</td>
+              <td class="excel-money text-blue-700 text-sm font-black" id="displayShouldPay">৳ 0</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- 4. Cash Note Denominations Grid (Excel Grid Vibe) -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left">
-      <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 text-xs font-bold text-slate-800">
-        নোটের গণনা (Cash Counting)
+    <!-- 2. CASH NOTE COUNTING TABLE -->
+    <div class="excel-container shadow-sm border border-slate-300">
+      <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-300 flex justify-between items-center text-xs font-bold text-slate-800">
+        <span>২. নোট গণনাকারক</span>
+        
+        <?php if (!$isLocked): ?>
+        <div class="flex items-center gap-1">
+          <button type="button" onclick="autoFillCash()" class="px-2 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded transition active:scale-95">
+            <i class="fa-solid fa-wand-magic-sparkles text-emerald-600"></i> অটো ফিল
+          </button>
+          <button type="button" onclick="clearCash()" class="px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 bg-white hover:bg-slate-200 border border-slate-300 rounded transition active:scale-95">
+            ক্লিয়ার
+          </button>
+        </div>
+        <?php endif; ?>
       </div>
 
-      <div class="p-3 bg-slate-50/30">
-        <div class="grid grid-cols-2 gap-2">
-          <?php 
-            $denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
-            foreach ($denominations as $d): 
-              $qty = $cashBreakdown[$d] ?? '';
-          ?>
-          <div class="flex items-center gap-1.5 bg-white p-2 border border-slate-200 rounded-xl shadow-3xs">
-            <div class="w-12 font-black text-slate-600 text-xs font-mono text-center">৳ <?= $d ?></div>
-            <div class="text-slate-350 text-xs font-bold select-none">×</div>
-            <input type="number" min="0" class="w-full bg-slate-50/50 border border-slate-200/80 rounded-lg py-1 px-1.5 text-center font-black text-slate-900 outline-none focus:border-blue-500 text-xs font-mono denomination-input <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
-          </div>
-          <?php endforeach; ?>
-        </div>
+      <div class="overflow-x-auto">
+        <table class="excel-table text-xs">
+          <thead>
+            <tr>
+              <th class="excel-row-num">#</th>
+              <th>নোট</th>
+              <th class="text-center w-28 sm:w-36">সংখ্যা</th>
+              <th class="text-right">মোট (৳)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php 
+              $denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+              foreach ($denominations as $rowIdx => $d): 
+                $qty = $cashBreakdown[$d] ?? '';
+            ?>
+            <tr class="hover:bg-blue-50/40 transition-colors" id="denom-row-<?= $d ?>">
+              <td class="excel-row-num"><?= $rowIdx + 1 ?></td>
+              <td class="font-bold text-slate-800">
+                <span class="inline-block w-12 text-center font-mono font-black bg-emerald-50 text-emerald-700 py-0.5 px-1 rounded border border-emerald-200">৳ <?= $d ?></span>
+              </td>
+              <td class="p-1">
+                <div class="flex items-center justify-center gap-1 bg-white border border-slate-300 rounded p-0.5">
+                  <?php if (!$isLocked): ?>
+                  <button type="button" onclick="stepDenom(<?= $d ?>, -1)" class="qty-btn bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">-</button>
+                  <?php endif; ?>
+                  
+                  <input type="number" min="0" id="denom-input-<?= $d ?>" class="w-10 sm:w-14 bg-slate-50 border border-slate-200 rounded py-1 px-1 text-center font-mono font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 text-xs denomination-input <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
+                  
+                  <?php if (!$isLocked): ?>
+                  <button type="button" onclick="stepDenom(<?= $d ?>, 1)" class="qty-btn bg-blue-600 text-white hover:bg-blue-700 border border-blue-600">+</button>
+                  <?php endif; ?>
+                </div>
+              </td>
+              <td class="excel-money text-slate-900 font-bold" id="subtotal-<?= $d ?>">৳ 0</td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
       </div>
 
-      <!-- Summary rows inside grid card -->
-      <div class="divide-y divide-slate-100 border-t border-slate-200 text-xs">
-        <!-- Total counted cash -->
-        <div class="bg-slate-50 p-3.5 flex justify-between items-center">
-          <span class="font-bold text-slate-700">মোট গণনাকৃত ক্যাশ:</span>
-          <span class="text-base font-black text-slate-900 font-mono" id="displayCountedCash">৳ 0</span>
+      <!-- Aggregate Footer -->
+      <div class="bg-slate-50 border-t-2 border-slate-300 p-2.5 space-y-1.5 text-xs">
+        <div class="flex justify-between items-center">
+          <span class="font-bold text-slate-700">গণনাকৃত ক্যাশ:</span>
+          <span class="text-sm font-black text-slate-900 font-mono" id="displayCountedCash">৳ 0</span>
         </div>
 
-        <!-- Difference & Live Status -->
-        <div class="p-3.5 flex justify-between items-center">
-          <div class="flex items-center gap-1.5">
-            <span class="font-bold text-slate-600">কম / বেশি:</span>
-            <span class="font-mono font-black text-slate-950 text-sm" id="displayDifference">৳ 0</span>
+        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-700">পার্থক্য:</span>
+            <span class="font-mono font-black text-sm" id="displayDifference">৳ 0</span>
           </div>
-          <div id="statusBadge" class="px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-slate-100 text-slate-600 uppercase tracking-wide border border-slate-200">
+          <div id="statusBadge" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 text-slate-700 uppercase tracking-wider border border-slate-300">
             পেন্ডিং
           </div>
         </div>
       </div>
+
     </div>
 
-    <!-- 5. Optional Note -->
-    <div class="bg-white p-4 border border-slate-200 rounded-2xl shadow-3xs space-y-2 text-left">
-      <label class="text-xs font-bold text-slate-700">মন্তব্য বা নোট (অপশনাল)</label>
-      <textarea name="note" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 outline-none focus:border-blue-500 <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="ক্যাশ পার্থক্য বা কোনো মন্তব্য থাকলে লিখুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
+    <!-- 3. Optional Note -->
+    <div class="excel-container p-2.5 border border-slate-300 bg-white shadow-sm space-y-1 text-left">
+      <label class="text-xs font-bold text-slate-700 block">মন্তব্য (নোট)</label>
+      <textarea name="note" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 outline-none focus:border-blue-500 <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="কোনো মন্তব্য থাকলে লিখুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
     </div>
 
     <!-- Submit Button -->
     <?php if (!$isLocked): ?>
-      <button type="submit" class="w-full py-3.5 font-bold text-white bg-blue-600 border border-blue-700 hover:bg-blue-700 rounded-xl active:scale-95 transition-all shadow-sm text-xs font-siliguri">
-        হিসাব জমা দিন
+      <button type="submit" class="w-full py-3 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg active:scale-[0.99] transition shadow text-sm font-siliguri flex items-center justify-center gap-2">
+        <i class="fa-solid fa-check-circle"></i>
+        <span>হিসাব জমা দিন</span>
       </button>
     <?php endif; ?>
 
@@ -169,104 +274,146 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 
 </div>
 
-<!-- ===== Return Detail Modal (Excel Style) ===== -->
+<!-- ===== Return Detail Modal ===== -->
 <div id="returnModal" class="fixed inset-0 z-[100] hidden" aria-modal="true" role="dialog">
-  <!-- Backdrop -->
   <div class="absolute inset-0 bg-black/60 backdrop-blur-xs" onclick="closeReturnModal()"></div>
 
-  <!-- Sheet (Top Popup) -->
-  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-200" style="animation: slideDown .25s ease">
-    <!-- Header -->
-    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-150 bg-slate-50">
+  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-300" style="animation: slideDown .25s ease">
+    
+    <div class="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-100">
       <div class="text-left">
-        <h2 class="text-sm font-bold text-slate-900">ফেরত মালের বিস্তারিত</h2>
-        <p class="text-[10px] text-slate-400 font-semibold" id="returnModalDate"></p>
+        <h2 class="text-xs font-bold text-slate-900">ফেরত মালের বিবরণ</h2>
+        <p class="text-[10px] text-slate-500 font-mono" id="returnModalDate"></p>
       </div>
-      <button onclick="closeReturnModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition">
+      <button onclick="closeReturnModal()" class="w-6 h-6 rounded bg-white border border-slate-300 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition">
         <i class="fa-solid fa-xmark text-xs"></i>
       </button>
     </div>
 
-    <!-- Body -->
-    <div class="overflow-y-auto flex-1 p-4 space-y-4" id="returnModalBody">
+    <div class="overflow-y-auto flex-1 p-3 space-y-3" id="returnModalBody">
       <!-- filled by JS -->
     </div>
 
-    <!-- Footer Total -->
-    <div class="px-4 py-3 border-t border-slate-150 flex justify-between items-center bg-rose-50/80">
+    <div class="px-3 py-2 border-t border-slate-200 flex justify-between items-center bg-rose-50/80">
       <span class="text-xs font-bold text-rose-800">মোট ফেরত মূল্য:</span>
-      <span class="text-base font-black text-rose-700 font-mono" id="returnModalTotal">৳ 0</span>
+      <span class="text-sm font-black text-rose-700 font-mono" id="returnModalTotal">৳ 0</span>
     </div>
+
   </div>
 </div>
-
-<style>
-@keyframes slideDown {
-  from { transform: translateY(-20px); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
-}
-</style>
 
 <script>
 const dispatched = <?= (float)$dispatchedValue ?>;
 const returned = <?= (float)$returnedValue ?>;
+const damageVal = <?= (float)$savedDamage ?>;
+const expenseVal = <?= (float)$savedExpense ?>;
+
+function stepDenom(denom, step) {
+  const input = document.getElementById(`denom-input-${denom}`);
+  if (!input || input.readOnly) return;
+  let current = parseInt(input.value) || 0;
+  let nextVal = Math.max(0, current + step);
+  input.value = nextVal > 0 ? nextVal : '';
+  calculate();
+}
+
+function autoFillCash() {
+  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal);
+  if (shouldPay <= 0) return;
+  
+  document.querySelectorAll('.denomination-input').forEach(inp => inp.value = '');
+  
+  let remaining = shouldPay;
+  const denoms = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+  
+  denoms.forEach(d => {
+    if (remaining >= d) {
+      const count = Math.floor(remaining / d);
+      remaining %= d;
+      const inp = document.getElementById(`denom-input-${d}`);
+      if (inp) inp.value = count;
+    }
+  });
+  
+  calculate();
+}
+
+function clearCash() {
+  document.querySelectorAll('.denomination-input').forEach(inp => inp.value = '');
+  calculate();
+}
 
 function calculate() {
-    const damage = parseFloat(document.getElementById('inputDamage')?.value || <?= (float)$savedDamage ?>) || 0;
-    const expense = parseFloat(document.getElementById('inputExpense')?.value || <?= (float)$savedExpense ?>) || 0;
+    const shouldPay = dispatched - returned - damageVal - expenseVal;
+    const roundedShouldPay = Math.round(shouldPay);
     
-    // Should Pay
-    const shouldPay = dispatched - returned - damage - expense;
-    document.getElementById('displayShouldPay').innerText = '৳ ' + Math.round(shouldPay).toLocaleString('en-US');
+    document.getElementById('displayShouldPay').innerText = '৳ ' + roundedShouldPay.toLocaleString('en-US');
+    document.getElementById('fxShouldPay').innerText = '৳ ' + roundedShouldPay.toLocaleString('en-US');
     document.getElementById('formShouldPay').value = shouldPay.toFixed(2);
 
-    // Cash Count
     let countedCash = 0;
     const cashBreakdown = {};
+
     document.querySelectorAll('.denomination-input').forEach(input => {
         const val = parseFloat(input.getAttribute('data-val'));
         const qty = parseInt(input.value) || 0;
-        if(qty > 0) {
-            countedCash += (val * qty);
+        const subtotal = val * qty;
+        const row = document.getElementById(`denom-row-${val}`);
+        
+        const subCell = document.getElementById(`subtotal-${val}`);
+        if (subCell) {
+          subCell.innerText = '৳ ' + subtotal.toLocaleString('en-US');
+        }
+
+        if (qty > 0) {
+            countedCash += subtotal;
             cashBreakdown[val] = qty;
+            if (row) row.classList.add('denom-row-active');
+        } else {
+            if (row) row.classList.remove('denom-row-active');
         }
     });
 
-    document.getElementById('displayCountedCash').innerText = '৳ ' + Math.round(countedCash).toLocaleString('en-US');
+    const roundedCounted = Math.round(countedCash);
+    document.getElementById('displayCountedCash').innerText = '৳ ' + roundedCounted.toLocaleString('en-US');
     document.getElementById('formCountedCash').value = countedCash.toFixed(2);
     document.getElementById('formCashBreakdown').value = JSON.stringify(cashBreakdown);
 
-    // Difference
+    let pct = roundedShouldPay > 0 ? Math.min(100, Math.round((roundedCounted / roundedShouldPay) * 100)) : 0;
+    const pBar = document.getElementById('cashProgressBar');
+    const pTxt = document.getElementById('cashProgressText');
+    if (pBar) pBar.style.width = pct + '%';
+    if (pTxt) pTxt.innerText = pct + '%';
+
     const difference = countedCash - shouldPay;
     const diffDisplay = document.getElementById('displayDifference');
-    diffDisplay.innerText = (difference > 0 ? '+' : '') + '৳ ' + Math.round(difference).toLocaleString('en-US');
+    const roundedDiff = Math.round(difference);
+    
+    diffDisplay.innerText = (difference > 0 ? '+' : '') + '৳ ' + roundedDiff.toLocaleString('en-US');
     document.getElementById('formDifference').value = difference.toFixed(2);
 
-    // Status Badge
     const badge = document.getElementById('statusBadge');
     if (shouldPay === 0 && countedCash === 0) {
-        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-slate-100 text-slate-600 uppercase tracking-wide border border-slate-200';
+        badge.className = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 text-slate-700 uppercase tracking-wider border border-slate-300';
         badge.innerText = 'পেন্ডিং';
-        diffDisplay.className = 'font-mono font-black ml-1 text-sm text-slate-900';
+        diffDisplay.className = 'font-mono font-black text-sm text-slate-900';
     } else if (Math.abs(difference) < 0.01) {
-        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-emerald-100 text-emerald-800 uppercase tracking-wide border border-emerald-200';
-        badge.innerText = 'হিসাব মিলছে';
-        diffDisplay.className = 'font-mono font-black ml-1 text-sm text-emerald-600';
+        badge.className = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500 text-white uppercase tracking-wider border border-emerald-600 shadow-sm animate-pulse';
+        badge.innerText = 'হিসাব মিলছে ✓';
+        diffDisplay.className = 'font-mono font-black text-sm text-emerald-600';
     } else if (difference < 0) {
-        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-rose-100 text-rose-800 uppercase tracking-wide border border-rose-200';
+        badge.className = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-100 text-rose-800 uppercase tracking-wider border border-rose-200';
         badge.innerText = 'কম (শর্ট)';
-        diffDisplay.className = 'font-mono font-black ml-1 text-sm text-rose-600';
+        diffDisplay.className = 'font-mono font-black text-sm text-rose-600';
     } else {
-        badge.className = 'px-2.5 py-0.5 text-[9px] font-bold rounded-lg bg-blue-100 text-blue-800 uppercase tracking-wide border border-blue-200';
+        badge.className = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider border border-blue-200';
         badge.innerText = 'বেশি ক্যাশ';
-        diffDisplay.className = 'font-mono font-black ml-1 text-sm text-blue-600';
+        diffDisplay.className = 'font-mono font-black text-sm text-blue-600';
     }
 }
 
-// Initial calculation
 calculate();
 
-// ---- Return Detail Modal ----
 const selectedDate = '<?= $selectedDate ?>';
 
 function openReturnModal() {
@@ -280,15 +427,15 @@ function openReturnModal() {
     document.body.style.overflow = 'hidden';
 
     body.innerHTML = `
-      <div class="flex justify-center py-8">
-        <div class="w-7 h-7 border-2 border-rose-500 border-t-transparent animate-spin"></div>
+      <div class="flex justify-center py-6">
+        <div class="w-5 h-5 border-2 border-rose-500 border-t-transparent animate-spin rounded-full"></div>
       </div>`;
 
     fetch(`<?= url('dsr/api/settlement/returns') ?>?date=${selectedDate}`)
         .then(r => r.json())
         .then(data => {
             if (!data.success || !data.items || !data.items.length) {
-                body.innerHTML = '<p class="text-center text-slate-400 text-xs py-10 font-siliguri">এই তারিখে কোনো ফেরত মাল নেই।</p>';
+                body.innerHTML = '<p class="text-center text-slate-400 text-xs py-6 font-siliguri">এই তারিখে কোনো ফেরত মাল নেই।</p>';
                 total.textContent = '৳ 0';
                 return;
             }
@@ -296,36 +443,38 @@ function openReturnModal() {
             let grandTotal = 0;
             let rows = '';
 
-            data.items.forEach(item => {
+            data.items.forEach((item, idx) => {
                 const t = parseFloat(item.total);
                 grandTotal += t;
                 rows += `
-                  <tr class="border-b border-slate-100 last:border-0 font-siliguri">
-                    <td class="py-2.5 pr-2 text-xs text-slate-800 font-semibold text-left">${item.product_name}</td>
-                    <td class="py-2.5 text-center text-xs font-mono text-slate-600">${parseFloat(item.qty)}</td>
-                    <td class="py-2.5 text-right text-xs font-mono text-slate-600">৳ ${Math.round(parseFloat(item.price)).toLocaleString('en-US')}</td>
-                    <td class="py-2.5 text-right text-xs font-mono font-bold text-rose-600">৳ ${Math.round(t).toLocaleString('en-US')}</td>
+                  <tr class="font-siliguri">
+                    <td class="excel-row-num">${idx + 1}</td>
+                    <td class="font-bold text-slate-800 text-xs text-left">${item.product_name}</td>
+                    <td class="text-center font-mono text-xs text-slate-700">${parseFloat(item.qty)}</td>
+                    <td class="excel-money text-slate-600 font-normal">৳ ${Math.round(parseFloat(item.price)).toLocaleString('en-US')}</td>
+                    <td class="excel-money text-rose-600 font-bold">৳ ${Math.round(t).toLocaleString('en-US')}</td>
                   </tr>`;
             });
 
             body.innerHTML = `
-              <div class="overflow-hidden border border-slate-200 rounded-xl">
-                <table class="w-full">
+              <div class="excel-container shadow-2xs border border-slate-300">
+                <table class="excel-table text-xs">
                   <thead>
-                    <tr class="bg-slate-50 border-b border-slate-200">
-                      <th class="text-left py-2 px-3 text-[10px] text-slate-500 font-bold uppercase font-siliguri">পণ্য</th>
-                      <th class="text-center py-2 text-[10px] text-slate-500 font-bold uppercase font-siliguri">পরিমাণ</th>
-                      <th class="text-right py-2 text-[10px] text-slate-500 font-bold uppercase font-siliguri">মূল্য</th>
-                      <th class="text-right py-2 px-3 text-[10px] text-slate-500 font-bold uppercase font-siliguri">মোট</th>
+                    <tr>
+                      <th class="excel-row-num">#</th>
+                      <th>পণ্য</th>
+                      <th class="text-center">পরিমাণ</th>
+                      <th class="text-right">মূল্য</th>
+                      <th class="text-right">মোট</th>
                     </tr>
                   </thead>
-                  <tbody class="px-3 text-xs">${rows}</tbody>
+                  <tbody>${rows}</tbody>
                 </table>
               </div>`;
 
             total.textContent = '৳ ' + Math.round(grandTotal).toLocaleString('en-US');
         })
-        .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-8 font-siliguri">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
+        .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-6 font-siliguri">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
 }
 
 function closeReturnModal() {
