@@ -9,10 +9,13 @@ class AuthMiddleware
     public static function handle(): void
     {
         if (!Auth::check()) {
-            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            $trueUri = $_SERVER['HTTP_X_REQUEST_URI'] ?? $_SERVER['REQUEST_URI'] ?? '';
             $basePath = parse_url(BASE_URL, PHP_URL_PATH) ?? '';
-            $path = str_replace($basePath, '', $uri);
+            $path = str_replace($basePath, '', $trueUri);
             $path = trim(parse_url($path, PHP_URL_PATH), '/');
+            if (str_starts_with($path, 'public/')) {
+                $path = substr($path, 7);
+            }
 
             $loginUrl = '/login';
             if (str_starts_with($path, 'admin')) {
