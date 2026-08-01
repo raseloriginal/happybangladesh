@@ -111,17 +111,7 @@ class ManagerController extends Controller
                         }
                     }
                 } elseif (!empty($p['image_url'])) {
-                    $url = trim($p['image_url']);
-                    if (filter_var($url, FILTER_VALIDATE_URL)) {
-                        $imgData = @file_get_contents($url);
-                        if ($imgData !== false) {
-                            $filename = 'prod_' . uniqid() . '.jpg';
-                            $fullPath = $uploadDir . $filename;
-                            if (file_put_contents($fullPath, $imgData)) {
-                                $imagePath = 'assets/uploads/' . $filename;
-                            }
-                        }
-                    }
+                    $imagePath = $this->saveProductImageFromUrlOrData($p['image_url'], $uploadDir);
                 }
                 
                 $piecesPerBox = (int)($p['pieces_per_box'] ?: 1);
@@ -1249,7 +1239,7 @@ class ManagerController extends Controller
 
     private function convertToWebp(string $source, string $destination): bool
     {
-        $info = getimagesize($source);
+        $info = @getimagesize($source);
         if ($info === false) return false;
 
         $mime = $info['mime'];
@@ -1257,10 +1247,10 @@ class ManagerController extends Controller
 
         switch ($mime) {
             case 'image/jpeg':
-                $image = imagecreatefromjpeg($source);
+                $image = @imagecreatefromjpeg($source);
                 break;
             case 'image/png':
-                $image = imagecreatefrompng($source);
+                $image = @imagecreatefrompng($source);
                 if ($image) {
                     imagepalettetotruecolor($image);
                     imagealphablending($image, true);
@@ -1268,21 +1258,171 @@ class ManagerController extends Controller
                 }
                 break;
             case 'image/gif':
-                $image = imagecreatefromgif($source);
+                $image = @imagecreatefromgif($source);
                 break;
             case 'image/webp':
-                // It's already WebP, just move it
-                return move_uploaded_file($source, $destination);
+                if (is_uploaded_file($source)) {
+                    return move_uploaded_file($source, $destination);
+                }
+                return @copy($source, $destination);
             default:
-                // Unsupported type, fallback to move
-                return move_uploaded_file($source, $destination);
+                if (is_uploaded_file($source)) {
+                    return move_uploaded_file($source, $destination);
+                }
+                return @copy($source, $destination);
         }
 
         if ($image) {
-            // Convert to webp and save
-            $result = imagewebp($image, $destination, 80);
+            $result = @imagewebp($image, $destination, 80);
             imagedestroy($image);
             return $result;
+        }
+
+        if (is_uploaded_file($source)) {
+            return move_uploaded_file($source, $destination);
+        }
+        return @copy($source, $destination);
+    }
+
+    /**
+     * Download or decode product image from URL, data URL, or local path and save to assets/uploads/
+     */
+    private function saveProductImageFromUrlOrData(string $rawUrl, string $uploadDir): ?string
+    {
+        $rawUrl = trim($rawUrl);
+        if (empty($rawUrl)) return null;
+
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0755, true);
+        }
+
+        // 1. Data URL (Base64)
+        if (preg_match('/^data:image\/(\w+);base64,(.+)$/is', $rawUrl, $matches)) {
+            $imgType = strtolower($matches[1]);
+            $base64Data = $matches[2];
+            $decoded = base64_decode($base64Data);
+            if ($decoded !== false && strlen($decoded) > 0) {
+                $tempFile = sys_get_temp_dir() . '/img_data_' . uniqid() . '.' . $imgType;
+                file_put_contents($tempFile, $decoded);
+                
+                $filename = 'prod_' . uniqid() . '.webp';
+                if ($this->convertToWebp($tempFile, $uploadDir . $filename)) {
+                    @unlink($tempFile);
+                    return 'assets/uploads/' . $filename;
+                } else {
+                    $ext = ($imgType === 'jpeg' ? 'jpg' : $imgType);
+                    $filename = 'prod_' . uniqid() . '.' . ($ext ?: 'jpg');
+                    if (@copy($tempFile, $uploadDir . $filename)) {
+                        @unlink($tempFile);
+                        return 'assets/uploads/' . $filename;
+                    }
+                    @unlink($tempFile);
+                }
+            }
+            return null;
+        }
+
+        // 2. Check if local relative/absolute path or file already in assets/uploads/
+        $parsedPath = parse_url($rawUrl, PHP_URL_PATH) ?? '';
+        $cleanPath = ltrim($parsedPath, '/');
+        if (!empty($cleanPath)) {
+            if (file_exists(PUB_PATH . '/' . $cleanPath) && is_file(PUB_PATH . '/' . $cleanPath)) {
+                return $cleanPath;
+            }
+            $baseName = basename($cleanPath);
+            if (file_exists($uploadDir . $baseName) && is_file($uploadDir . $baseName)) {
+                return 'assets/uploads/' . $baseName;
+            }
+        }
+
+        // 3. HTTP / HTTPS URL download
+        $url = str_replace(' ', '%20', $rawUrl);
+        if (!preg_match('/^https?:\/\//i', $url)) {
+            if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}/i', $url)) {
+                $url = 'http://' . $url;
+            } else {
+                return null;
+            }
+        }
+
+        $imgData = $this->fetchUrlContent($url);
+        if ($imgData !== false && strlen($imgData) > 0) {
+            $tempFile = sys_get_temp_dir() . '/dl_img_' . uniqid();
+            file_put_contents($tempFile, $imgData);
+            
+            $imgInfo = @getimagesize($tempFile);
+            if ($imgInfo !== false) {
+                $filename = 'prod_' . uniqid() . '.webp';
+                if ($this->convertToWebp($tempFile, $uploadDir . $filename)) {
+                    @unlink($tempFile);
+                    return 'assets/uploads/' . $filename;
+                } else {
+                    $mime = $imgInfo['mime'] ?? 'image/jpeg';
+                    $extMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+                    $ext = $extMap[$mime] ?? 'jpg';
+                    $filename = 'prod_' . uniqid() . '.' . $ext;
+                    if (@copy($tempFile, $uploadDir . $filename)) {
+                        @unlink($tempFile);
+                        return 'assets/uploads/' . $filename;
+                    }
+                }
+            }
+            @unlink($tempFile);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch URL content using cURL with fallback to stream context
+     */
+    private function fetchUrlContent(string $url)
+    {
+        if (function_exists('curl_init')) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_TIMEOUT => 25,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                    'Accept-Language: en-US,en;q=0.9',
+                ]
+            ]);
+            $data = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($data !== false && $httpCode >= 200 && $httpCode < 300) {
+                return $data;
+            }
+        }
+
+        if (ini_get('allow_url_fopen')) {
+            $opts = [
+                'http' => [
+                    'method' => 'GET',
+                    'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n" .
+                                "Accept: image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8\r\n",
+                    'timeout' => 25,
+                    'follow_location' => 1
+                ],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
+                ]
+            ];
+            $context = stream_context_create($opts);
+            $data = @file_get_contents($url, false, $context);
+            if ($data !== false) {
+                return $data;
+            }
         }
 
         return false;

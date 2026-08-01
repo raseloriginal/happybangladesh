@@ -474,13 +474,19 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
         const name = tr.querySelector('.bulk-name').value;
         textEl.innerHTML = `Saving <strong>${name}</strong>...<br><span class="text-xs text-gray-400">Downloading image & saving data</span>`;
         
+        let imgUrlVal = tr.querySelector('.bulk-image-url') ? tr.querySelector('.bulk-image-url').value.trim() : '';
+        const previewEl = tr.querySelector('.bulk-img-preview');
+        if (!imgUrlVal && previewEl && previewEl.src && !previewEl.classList.contains('hidden') && !previewEl.src.endsWith('/')) {
+            imgUrlVal = previewEl.src;
+        }
+
         const item = {
             category_id: tr.querySelector('.bulk-cat').value,
             name: name,
             box_type: tr.querySelector('.bulk-boxtype').value,
             pieces_per_box: tr.querySelector('.bulk-pcsbox').value,
             dealer_percentage: tr.querySelector('.bulk-dealerpct').value,
-            image_url: tr.querySelector('.bulk-image-url').value,
+            image_url: imgUrlVal,
             price_piece: tr.querySelector('.bulk-price-piece').value
         };
 
@@ -489,11 +495,20 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
         formData.append('company_id', company_id);
         formData.append('items', JSON.stringify([item])); 
 
-        // Attach image if uploaded manually
+        // Attach image if uploaded manually or if blob URL
         const fileInput = tr.querySelector('.bulk-img-input');
         if (fileInput && fileInput.files[0]) {
             formData.append('row_indices[]', 0); // index 0 since items array has 1 element
             formData.append('images[0]', fileInput.files[0]);
+        } else if (imgUrlVal.startsWith('blob:')) {
+            try {
+                const blobRes = await fetch(imgUrlVal);
+                const blobData = await blobRes.blob();
+                formData.append('row_indices[]', 0);
+                formData.append('images[0]', blobData, 'product_image.jpg');
+            } catch(e) {
+                console.error("Failed to fetch blob image:", e);
+            }
         }
 
         try {
