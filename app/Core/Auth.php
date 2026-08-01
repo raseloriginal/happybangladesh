@@ -389,25 +389,28 @@ class Auth
     // ── Helper: get clean URL path ───────────────────────────
     private static function getCleanPath(): string
     {
-        $uri = $_SERVER['REQUEST_URI'] ?? '';
-        $basePath = parse_url(BASE_URL, PHP_URL_PATH) ?? '';
-        $path = str_replace($basePath, '', $uri);
-        $path = trim(parse_url($path, PHP_URL_PATH), '/');
+        $trueUri = $_SERVER['HTTP_X_REQUEST_URI'] ?? $_SERVER['REQUEST_URI'] ?? '/';
+        $urlPath = parse_url($trueUri, PHP_URL_PATH) ?? '/';
 
-        // Strip "public" if it's at the start of the path
-        if (str_starts_with($path, 'public/')) {
-            $path = substr($path, 7);
-        } elseif ($path === 'public') {
-            $path = '';
+        $basePath = parse_url(BASE_URL, PHP_URL_PATH);
+        if (!empty($basePath) && $basePath !== '/' && strpos($urlPath, $basePath) === 0) {
+            $urlPath = substr($urlPath, strlen($basePath));
         }
 
-        // Strip "index.php" if it's at the start of the path
-        if (str_starts_with($path, 'index.php/')) {
-            $path = substr($path, 10);
-        } elseif ($path === 'index.php') {
-            $path = '';
+        $url = '/' . ltrim($urlPath, '/');
+        if (strpos($url, '/public/') === 0) {
+            $url = substr($url, 7);
+        }
+        if ($url === '/public') {
+            $url = '/';
+        }
+        if (strpos($url, '/index.php/') === 0) {
+            $url = substr($url, 10);
+        }
+        if ($url === '/index.php') {
+            $url = '/';
         }
 
-        return trim($path, '/');
+        return trim($url, '/');
     }
 }

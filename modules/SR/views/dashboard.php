@@ -1,96 +1,40 @@
 <?php $pageTitle = 'ড্যাশবোর্ড'; ?>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
-.font-siliguri {
-  font-family: 'Hind Siliguri', 'Inter', sans-serif;
-}
+  @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+  .font-siliguri {
+    font-family: 'Hind Siliguri', 'Inter', sans-serif;
+  }
 </style>
 
-<div class="p-3 sm:p-5 space-y-4 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800">
+<div class="p-3 sm:p-5 space-y-5 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800">
 
-  <!-- 1. Top Header Profile & Status Bar -->
-  <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-5 sm:py-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between gap-3">
+  <!-- 1. Top Header Profile Bar -->
+  <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-5 sm:py-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between gap-3 transition-all">
     <div class="flex items-center gap-3">
       <div class="relative shrink-0 select-none">
-        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center font-black text-blue-700 text-sm sm:text-base shadow-inner">
+        <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center font-black text-slate-700 text-sm sm:text-base shadow-inner">
           <?= Helpers::initials(Auth::name()) ?>
         </div>
-        <span class="w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full absolute bottom-0 right-0 shadow-2xs"></span>
+        <span class="w-3 h-3 bg-emerald-500 border-2 border-white rounded-full absolute bottom-0 right-0 shadow-xs"></span>
       </div>
       <div>
-        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-700 uppercase tracking-wide border border-emerald-100">
+        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-[9px] font-black text-emerald-700 uppercase tracking-wide border border-emerald-100">
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           ফিল্ড একটিভ
         </div>
-        <h2 class="text-base sm:text-lg font-black text-slate-900 leading-tight mt-0.5"><?= h(Auth::name()) ?></h2>
-        <div class="text-[11px] text-slate-400 font-medium"><i class="fa-regular fa-calendar mr-1"></i><?= date('d M, Y') ?></div>
+        <h2 class="text-base sm:text-lg font-black text-slate-900 leading-tight mt-1"><?= h(Auth::name()) ?></h2>
       </div>
     </div>
 
     <!-- SR Logout Button -->
-    <a href="<?= url('sr/logout') ?>" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold shadow-2xs hover:bg-rose-100 transition active:scale-95" title="লগআউট করুন">
+    <a href="<?= url('sr/logout') ?>" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold shadow-3xs hover:bg-rose-100 transition duration-150 active:scale-95" title="লগআউট করুন">
       <i class="fa-solid fa-right-from-bracket text-xs"></i>
-      <span class="hidden sm:inline">লগআউট</span>
+      <span>লগআউট</span>
     </a>
   </div>
 
-  <!-- 2. Quick Action Launcher Bar -->
-  <div class="grid grid-cols-3 gap-2 sm:gap-3">
-    <a href="<?= url('sr/sales') ?>" class="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-2xl shadow-md flex flex-col items-center justify-center text-center transition active:scale-95 group">
-      <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg mb-1 group-hover:scale-110 transition">
-        <i class="fa-solid fa-cart-plus"></i>
-      </div>
-      <span class="text-xs font-bold leading-tight">নতুন অর্ডার</span>
-    </a>
-
-    <a href="<?= url('sr/sales') ?>" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-2xl shadow-md flex flex-col items-center justify-center text-center transition active:scale-95 group">
-      <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg mb-1 group-hover:scale-110 transition">
-        <i class="fa-solid fa-map-location-dot"></i>
-      </div>
-      <span class="text-xs font-bold leading-tight">রুট ম্যাপ</span>
-    </a>
-
-    <a href="<?= url('sr/orders') ?>" class="bg-slate-800 hover:bg-slate-900 text-white p-3 rounded-2xl shadow-md flex flex-col items-center justify-center text-center transition active:scale-95 group">
-      <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg mb-1 group-hover:scale-110 transition">
-        <i class="fa-solid fa-file-invoice"></i>
-      </div>
-      <span class="text-xs font-bold leading-tight">আজকের অর্ডার</span>
-    </a>
-  </div>
-
-  <!-- 3. Excel Formula Summary Ribbon (fx) -->
-  <div class="excel-container shadow-sm border border-slate-300">
-    <div class="excel-ribbon py-2 px-3 justify-between">
-      <div class="excel-ribbon-badge py-0.5 px-2 text-xs font-bold">
-        <i class="fa-solid fa-file-excel text-blue-200"></i>
-        <span>সেলস সমারি স্প্রেডশীট</span>
-      </div>
-      <span class="text-[11px] text-blue-100 font-mono">LIVE METRICS</span>
-    </div>
-
-    <div class="excel-formula-bar py-2 px-3 gap-2 text-xs bg-slate-50 border-b border-slate-300 flex-wrap">
-      <span class="fx-symbol text-xs">fx</span>
-      <div class="excel-pill">
-        <span class="text-slate-500">আজকের সেলস:</span>
-        <strong class="text-blue-700 font-mono">৳<?= number_format($stats['today_sales']) ?></strong>
-      </div>
-      <div class="excel-pill">
-        <span class="text-slate-500">আজকের ভিজিট:</span>
-        <strong class="text-emerald-700 font-mono"><?= $stats['visited_today'] ?> / <?= $stats['total_retailers'] ?></strong>
-      </div>
-      <div class="excel-pill">
-        <span class="text-slate-500">পেন্ডিং অর্ডার:</span>
-        <strong class="text-amber-700 font-mono"><?= $stats['pending_orders'] ?></strong>
-      </div>
-      <div class="excel-pill">
-        <span class="text-slate-500">চলতি মাস সেলস:</span>
-        <strong class="text-purple-700 font-mono">৳<?= number_format($stats['this_month_sales']) ?></strong>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4. Monthly Target & Delivery Metrics Grid (Excel Table) -->
+  <!-- 2. Target & Delivery Metrics Grid Cards (Excel Style) -->
   <?php
     $target = $stats['target_amount'] > 0 ? $stats['target_amount'] : 0;
     $sales = $stats['this_month_sales'];
@@ -98,138 +42,117 @@
     $targetPct = $target > 0 ? min(100, round(($sales / $target) * 100)) : 0;
     $deliveryPct = $target > 0 ? min(100, round(($delivery / $target) * 100)) : ($sales > 0 ? min(100, round(($delivery / $sales) * 100)) : 0);
   ?>
-  <div class="excel-container shadow-sm border border-slate-300">
-    <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-300 text-xs font-bold text-slate-800 flex justify-between items-center">
-      <span>মাসিক লক্ষ্যমাত্রা ও ডেলিভারি পারফরম্যান্স</span>
-      <span class="text-[10px] text-slate-500 font-mono">TARGET SHEET</span>
-    </div>
-
-    <div class="overflow-x-auto">
-      <table class="excel-table text-xs">
-        <thead>
-          <tr>
-            <th class="excel-row-num">#</th>
-            <th>মেট্রিক বিবরণ</th>
-            <th class="text-right">পরিমাণ (৳)</th>
-            <th class="text-center w-36 sm:w-44">অর্জিত শতাংশ</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="excel-row-num">1</td>
-            <td class="font-bold text-slate-800 flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
-              মাসিক টার্গেট সেলস
-            </td>
-            <td class="excel-money text-slate-900 font-bold">৳ <?= number_format($target) ?></td>
-            <td class="p-2 text-center">
-              <div class="flex flex-col items-center gap-1">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                  <?= $targetPct ?>% অর্জিত
-                </span>
-                <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                  <div class="bg-blue-600 h-full rounded-full" style="width: <?= $targetPct ?>%"></div>
-                </div>
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm font-mono text-xs">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider select-none">
+          <th class="p-3 border-r border-slate-200 font-sans">মেট্রিক বিবরণ</th>
+          <th class="p-3 text-right border-r border-slate-200 font-sans">পরিমাণ</th>
+          <th class="p-3 text-center font-sans">অগ্রগতি</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 text-slate-800">
+        <tr class="hover:bg-slate-50/50 transition">
+          <td class="p-3 font-sans font-semibold border-r border-slate-200 text-slate-700 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 shadow-2xs"></span>
+            মাসিক লক্ষ্যমাত্রা
+          </td>
+          <td class="p-3 text-right font-black border-r border-slate-200 text-slate-900 text-sm">
+            ৳<?= number_format($target) ?>
+          </td>
+          <td class="p-3 text-center font-sans">
+            <div class="flex flex-col items-center gap-1">
+              <span class="inline-block text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-100">
+                <?= $targetPct ?>% অর্জিত
+              </span>
+              <div class="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full" style="width: <?= $targetPct ?>%"></div>
               </div>
-            </td>
-          </tr>
-          <tr>
-            <td class="excel-row-num">2</td>
-            <td class="font-bold text-slate-800 flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
-              ডেলিভারি সম্পন্ন (Delivered)
-            </td>
-            <td class="excel-money text-emerald-700 font-bold">৳ <?= number_format($delivery) ?></td>
-            <td class="p-2 text-center">
-              <div class="flex flex-col items-center gap-1">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <?= $deliveryPct ?>% ডেলিভার্ড
-                </span>
-                <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                  <div class="bg-emerald-600 h-full rounded-full" style="width: <?= $deliveryPct ?>%"></div>
-                </div>
+            </div>
+          </td>
+        </tr>
+        <tr class="hover:bg-slate-50/50 transition">
+          <td class="p-3 font-sans font-semibold border-r border-slate-200 text-slate-700 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-2xs"></span>
+            ডেলিভারি সম্পন্ন
+          </td>
+          <td class="p-3 text-right font-black border-r border-slate-200 text-slate-900 text-sm">
+            ৳<?= number_format($delivery) ?>
+          </td>
+          <td class="p-3 text-center font-sans">
+            <div class="flex flex-col items-center gap-1">
+              <span class="inline-block text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                <?= $deliveryPct ?>% ডেলিভার্ড
+              </span>
+              <div class="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-emerald-500 rounded-full" style="width: <?= $deliveryPct ?>%"></div>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
-  <!-- 5. Recent Orders Excel Table Grid -->
-  <div class="excel-container shadow-sm border border-slate-300">
-    <div class="bg-slate-100 px-3 py-2 border-b border-slate-300 flex justify-between items-center text-xs font-bold text-slate-800">
-      <span class="flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left text-blue-600"></i> সাম্প্রতিক অর্ডারসমূহ</span>
-      <a href="<?= url('sr/orders') ?>" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
-        সকল অর্ডার <i class="fa-solid fa-arrow-right text-[10px]"></i>
-      </a>
-    </div>
-
-    <div class="overflow-x-auto">
-      <table class="excel-table text-xs">
+  <!-- 3. Sales Menu (Excel Style Table) -->
+  <div class="space-y-2">
+    <div class="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase px-1">সেলস মেনু</div>
+    
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm font-sans text-xs">
+      <table class="w-full text-left border-collapse">
         <thead>
-          <tr>
-            <th class="excel-row-num">#</th>
-            <th>অর্ডার নং</th>
-            <th>দোকান / ডিলার</th>
-            <th class="text-right">মূল্য (৳)</th>
-            <th class="text-center">স্ট্যাটাস</th>
+          <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider select-none">
+            <th class="p-3 border-r border-slate-200">মেনু আইটেম</th>
+            <th class="p-3 text-center">অ্যাকশন</th>
           </tr>
         </thead>
-        <tbody>
-          <?php if (empty($recentOrders)): ?>
-          <tr>
-            <td colspan="5" class="p-6 text-center text-slate-400">কোনো সাম্প্রতিক অর্ডার নেই।</td>
-          </tr>
-          <?php else: ?>
-          <?php foreach (array_slice($recentOrders, 0, 5) as $idx => $ord): ?>
-          <tr class="hover:bg-blue-50/40 transition cursor-pointer" onclick="window.location.href='<?= url('sr/orders') ?>'">
-            <td class="excel-row-num"><?= $idx + 1 ?></td>
-            <td class="font-mono font-bold text-slate-900">#<?= htmlspecialchars($ord['order_no'] ?? $ord['id']) ?></td>
-            <td class="font-bold text-slate-800"><?= htmlspecialchars($ord['dealer_name'] ?? 'General Store') ?></td>
-            <td class="excel-money text-blue-700">৳ <?= number_format($ord['total_amount'], 2) ?></td>
-            <td class="text-center">
-              <?php 
-                $st = $ord['status'] ?? 'pending';
-                $badgeClass = $st === 'confirmed' || $st === 'delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($st === 'cancelled' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200');
-              ?>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border <?= $badgeClass ?> uppercase">
-                <?= strtoupper($st) ?>
+        <tbody class="divide-y divide-slate-200 text-slate-700">
+          <!-- Item 1: Shop List -->
+          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="window.location.href='<?= url('sr/retailers') ?>'">
+            <td class="p-3 border-r border-slate-200 font-bold text-slate-800 flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
+                <i class="fa-solid fa-store"></i>
+              </div>
+              <span>দোকান তালিকা</span>
+            </td>
+            <td class="p-3 text-center">
+              <span class="inline-block text-[10px] px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition duration-200 font-sans">
+                প্রবেশ করুন
               </span>
             </td>
           </tr>
-          <?php endforeach; ?>
-          <?php endif; ?>
+
+          <!-- Item 2: Order History -->
+          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="window.location.href='<?= url('sr/orders') ?>'">
+            <td class="p-3 border-r border-slate-200 font-bold text-slate-800 flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
+                <i class="fa-solid fa-file-invoice"></i>
+              </div>
+              <span>অর্ডার ইতিহাস</span>
+            </td>
+            <td class="p-3 text-center">
+              <span class="inline-block text-[10px] px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold border border-amber-100 group-hover:bg-amber-500 group-hover:text-white transition duration-200 font-sans">
+                প্রবেশ করুন
+              </span>
+            </td>
+          </tr>
+
+          <!-- Item 3: Transactions -->
+          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="window.location.href='<?= url('sr/transactions') ?>'">
+            <td class="p-3 border-r border-slate-200 font-bold text-slate-800 flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
+                <i class="fa-solid fa-money-bill-transfer"></i>
+              </div>
+              <span>সমারি</span>
+            </td>
+            <td class="p-3 text-center">
+              <span class="inline-block text-[10px] px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 font-bold border border-purple-100 group-hover:bg-purple-600 group-hover:text-white transition duration-200 font-sans">
+                প্রবেশ করুন
+              </span>
+            </td>
+          </tr>
         </tbody>
       </table>
-    </div>
-  </div>
-
-  <!-- 6. Sales Menu Grid -->
-  <div class="space-y-1.5">
-    <div class="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase px-1">সেলস মেনু</div>
-    
-    <div class="grid grid-cols-3 gap-2 sm:gap-3">
-      <a href="<?= url('sr/retailers') ?>" class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs hover:border-blue-300 transition flex flex-col items-center text-center group active:scale-95">
-        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs mb-1 group-hover:scale-110 transition">
-          <i class="fa-solid fa-store"></i>
-        </div>
-        <span class="text-xs font-bold text-slate-800">দোকান তালিকা</span>
-      </a>
-
-      <a href="<?= url('sr/orders') ?>" class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs hover:border-amber-300 transition flex flex-col items-center text-center group active:scale-95">
-        <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs mb-1 group-hover:scale-110 transition">
-          <i class="fa-solid fa-file-invoice"></i>
-        </div>
-        <span class="text-xs font-bold text-slate-800">অর্ডার ইতিহাস</span>
-      </a>
-
-      <a href="<?= url('sr/transactions') ?>" class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs hover:border-purple-300 transition flex flex-col items-center text-center group active:scale-95">
-        <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs mb-1 group-hover:scale-110 transition">
-          <i class="fa-solid fa-chart-pie"></i>
-        </div>
-        <span class="text-xs font-bold text-slate-800">সেলস সামারি</span>
-      </a>
     </div>
   </div>
 
