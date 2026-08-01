@@ -64,6 +64,7 @@
 .sr-app-main.has-no-nav {
   padding-bottom: 0;
 }
+
 .sr-app-main.has-no-nav .sr-map-page {
   bottom: 0;
 }
@@ -1460,15 +1461,18 @@
     right: 12px;
     gap: 8px;
   }
+
   .sr-map-searchbar-new {
     height: 48px;
     padding: 0 12px;
     gap: 8px;
   }
+
   .sr-map-filter-btn {
     width: 48px;
     height: 48px;
   }
+
   .sr-search-suggestions {
     top: 56px;
     left: 56px;
@@ -1708,7 +1712,7 @@
   color: #64748b;
   border-color: #e2e8f0;
 }
-}
+
 
 .sr-retailer-card-meta-item {
   display: flex;
@@ -3001,4 +3005,4 @@
 .sr-no-img-box-v2.cart-placeholder i {
   font-size: 1.1rem;
   margin-bottom: 0;
-}
+}
