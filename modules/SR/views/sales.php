@@ -146,6 +146,8 @@ let allRetailersData = [];
 let fullMapMarker   = null;
 let myCircle        = null;
 let isSubmitting    = false;
+let omsInstance     = null; // OverlappingMarkerSpiderfier instance
+let svgOverlay      = null; // SVG layer for connector lines
 
 // ── Colour palette for product cards ──────────────────────────
 const gradients = [
@@ -213,13 +215,13 @@ window.addEventListener('beforeunload', function (e) {
 });
 
 function initMainMap() {
-  // Mobile Internet Optimization: Use HTML5 Canvas renderer for 60fps performance on mobile devices
   mainMap = L.map('srMap', { 
     zoomControl: false, 
     attributionControl: false,
-    preferCanvas: true, // Render Leaflet markers on Canvas for mobile RAM optimization
+    preferCanvas: false,      // Must be false — SVG connector lines need DOM markers
     fadeAnimation: true,
-    markerZoomAnimation: true
+    zoomAnimation: true,      // Enable Leaflet's built-in smooth zoom animation
+    markerZoomAnimation: true // Markers follow zoom animation (hardware-accelerated)
   }).setView([myLat, myLng], 18);
 
   // Fast HTTPS Google Tile Layer with buffer caching and idle updates to save mobile data
@@ -234,12 +236,159 @@ function initMainMap() {
 
   L.control.zoom({ position: 'bottomleft' }).addTo(mainMap);
   
+  // Init SVG overlay for connector lines
+  initSvgOverlay();
+  
   // Show initial cached/default location and load pins immediately
   placeMyLocationMarker();
   loadRetailersOnMap();
   
+  // ── Smooth Zoom Transition ─────────────────────────────────
+  // Redraw SVG lines continuously while panning
+  mainMap.on('move', redrawConnectorLines);
+
+  // On zoom START: inject CSS transition into label marker elements
+  // so when computeSpiderPositions() calls setLatLng() → Leaflet updates
+  // element.style.transform → browser animates it smoothly
+  mainMap.on('zoomstart', () => {
+    retailerMarkers.forEach(m => {
+      const el = m.labelMarker && m.labelMarker.getElement();
+      if (el) el.style.transition = 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)';
+    });
+    // Fade SVG lines during zoom so they don't look broken mid-animation
+    if (svgOverlay) {
+      svgOverlay.style.transition = 'opacity 0.22s ease';
+      svgOverlay.style.opacity    = '0.15';
+    }
+  });
+
+  // Keep redrawing lines during Leaflet's built-in zoom animation frames
+  mainMap.on('zoom', redrawConnectorLines);
+
+  // On zoom END: recompute spider positions (CSS transition makes it smooth),
+  // then restore SVG and clean up transitions
+  mainMap.on('zoomend', () => {
+    computeSpiderPositions();  // setLatLng calls animate via CSS transition
+    // Restore SVG opacity
+    if (svgOverlay) {
+      svgOverlay.style.opacity = '1';
+    }
+    // Remove transitions after animation finishes (~400ms)
+    setTimeout(() => {
+      retailerMarkers.forEach(m => {
+        const el = m.labelMarker && m.labelMarker.getElement();
+        if (el) el.style.transition = '';
+      });
+      if (svgOverlay) svgOverlay.style.transition = '';
+    }, 420);
+  });
+
   // Refine location in background
   detectLocation(false);
+}
+
+// ── SVG Overlay for Connector Lines ──────────────────────────
+function initSvgOverlay() {
+  const mapContainer = document.getElementById('srMap');
+  svgOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svgOverlay.id = 'sr-connector-svg';
+  svgOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:499;overflow:visible;';
+  mapContainer.style.position = 'relative';
+  mapContainer.appendChild(svgOverlay);
+}
+
+// ── Spiderfier: Spread overlapping labels to non-overlapping positions ──
+const OVERLAP_RADIUS_PX = 35; // px — markers within this distance are grouped
+const SPREAD_RADIUS_PX  = 88; // px — spread radius for label fan-out
+
+function computeSpiderPositions() {
+  if (!mainMap || retailerMarkers.length === 0) return;
+
+  // Step 1: Reset all label markers to their real GPS position
+  retailerMarkers.forEach(m => {
+    m.labelMarker.setLatLng([m.ret.lat, m.ret.lng]);
+    m._pixelOffset = { x: 0, y: 0 };
+  });
+
+  // Step 2: Get current pixel positions of each real location
+  const points = retailerMarkers.map(m => ({
+    idx: retailerMarkers.indexOf(m),
+    realPx: mainMap.latLngToContainerPoint([m.ret.lat, m.ret.lng])
+  }));
+
+  // Step 3: Group overlapping markers via BFS
+  const visited = new Set();
+  const groups  = [];
+  for (let i = 0; i < points.length; i++) {
+    if (visited.has(i)) continue;
+    const group = [i];
+    visited.add(i);
+    for (let j = i + 1; j < points.length; j++) {
+      if (visited.has(j)) continue;
+      const dx = points[i].realPx.x - points[j].realPx.x;
+      const dy = points[i].realPx.y - points[j].realPx.y;
+      if (Math.sqrt(dx * dx + dy * dy) < OVERLAP_RADIUS_PX) {
+        group.push(j);
+        visited.add(j);
+      }
+    }
+    if (group.length > 1) groups.push(group);
+  }
+
+  // Step 4: Fan each group radially
+  groups.forEach(group => {
+    const cx = points[group[0]].realPx.x;
+    const cy = points[group[0]].realPx.y;
+    const n  = group.length;
+    // Adaptive radius: more markers = wider spread
+    const r  = SPREAD_RADIUS_PX + (n > 4 ? (n - 4) * 18 : 0);
+    const angleStep  = (2 * Math.PI) / n;
+    const startAngle = -Math.PI / 2; // start from top
+
+    group.forEach((idx, i) => {
+      const angle    = startAngle + i * angleStep;
+      const offsetX  = Math.cos(angle) * r;
+      const offsetY  = Math.sin(angle) * r;
+      const newPx    = { x: cx + offsetX, y: cy + offsetY };
+      const newLatLng = mainMap.containerPointToLatLng([newPx.x, newPx.y]);
+
+      retailerMarkers[idx].labelMarker.setLatLng(newLatLng);
+      retailerMarkers[idx]._pixelOffset = { x: offsetX, y: offsetY };
+    });
+  });
+
+  redrawConnectorLines();
+}
+
+function redrawConnectorLines() {
+  if (!svgOverlay) return;
+  svgOverlay.innerHTML = '';
+
+  retailerMarkers.forEach(m => {
+    const off = m._pixelOffset;
+    if (!off || (Math.abs(off.x) < 4 && Math.abs(off.y) < 4)) return;
+
+    const realPx  = mainMap.latLngToContainerPoint([m.ret.lat, m.ret.lng]);
+    const labelPx = mainMap.latLngToContainerPoint(m.labelMarker.getLatLng());
+    const color   = getMarkerColor(m.ret);
+
+    // ── Quadratic bezier connector ──
+    const cpx = realPx.x + (labelPx.x - realPx.x) * 0.5;
+    const cpy = Math.min(realPx.y, labelPx.y) - 14;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${realPx.x},${realPx.y} Q${cpx},${cpy} ${labelPx.x},${labelPx.y}`);
+    path.setAttribute('fill',         'none');
+    path.setAttribute('stroke',       color);
+    path.setAttribute('stroke-width', '1.2');
+    path.setAttribute('opacity',      '0.55');
+    svgOverlay.appendChild(path);
+  });
+}
+
+function getMarkerColor(ret) {
+  if (cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0) return '#eab308';
+  if (ret.has_order_today) return '#10b981';
+  return '#2563eb';
 }
 
 // ── Skeleton Loader for Retailers Carousel ───────────────────
@@ -368,9 +517,18 @@ function loadRetailersOnMap() {
     });
 }
 
-function processRetailerData(data) {
-  retailerMarkers.forEach(m => mainMap.removeLayer(m.marker));
+function clearAllRetailerMarkers() {
+  retailerMarkers.forEach(m => {
+    if (m.dotMarker)   mainMap.removeLayer(m.dotMarker);
+    if (m.labelMarker) mainMap.removeLayer(m.labelMarker);
+  });
   retailerMarkers = [];
+  if (svgOverlay) svgOverlay.innerHTML = '';
+}
+
+function processRetailerData(data) {
+  clearAllRetailerMarkers();
+
   const retailers = data.retailers || [];
   allRetailersData = retailers;
   
@@ -384,6 +542,10 @@ function processRetailerData(data) {
   });
   
   nearbyRetailers.forEach(ret => addRetailerPin(ret));
+  
+  // After all pins placed, compute spider positions
+  setTimeout(() => computeSpiderPositions(), 50);
+  
   renderRetailerCards(nearbyRetailers);
 
   // Auto open retailer from query parameter
@@ -410,8 +572,7 @@ function showDemoPins() {
     { id: 2, name: 'Rahim Shop',  phone: '01711000002', lat: myLat - 0.0003, lng: myLng + 0.0005, dist: 67, address: 'Block C, Section 10, Mirpur, Dhaka' },
     { id: 3, name: 'Karim Bhai', phone: '01711000003', lat: myLat + 0.0006, lng: myLng - 0.0004, dist: 83, address: 'Sector 3, Uttara, Dhaka' },
   ];
-  retailerMarkers.forEach(m => mainMap.removeLayer(m.marker));
-  retailerMarkers = [];
+  clearAllRetailerMarkers();
   allRetailersData = demos;
   
   if (typeof initOrUpdateFuse === 'function') {
@@ -420,32 +581,54 @@ function showDemoPins() {
   
   const nearbyDemos = demos.filter(ret => ret.dist <= 100);
   nearbyDemos.forEach(ret => addRetailerPin(ret));
+  setTimeout(() => computeSpiderPositions(), 50);
   renderRetailerCards(nearbyDemos);
 }
 
 function updateAllPins() {
   const currentRetailers = retailerMarkers.map(m => m.ret);
-  // Re-render pins so they get the .has-cart class if needed
-  retailerMarkers.forEach(m => mainMap.removeLayer(m.marker));
-  retailerMarkers = [];
+  clearAllRetailerMarkers();
   currentRetailers.forEach(ret => addRetailerPin(ret));
+  setTimeout(() => computeSpiderPositions(), 80);
   renderRetailerCards(currentRetailers);
 }
 
 function addRetailerPin(ret) {
-  const hasCart = cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
-  const markerClass = hasCart ? 'has-cart' : (ret.has_order_today ? 'already-ordered' : '');
-  const icon = L.divIcon({
+  const hasCart     = cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
+  const statusClass = hasCart ? 'has-cart' : (ret.has_order_today ? 'already-ordered' : '');
+
+  // ── 1. Tiny dot at EXACT GPS location (non-interactive) ──────
+  const dotIcon = L.divIcon({
     className: '',
-    html: `<div class="sr-retailer-marker ${markerClass}"><i class="fa-solid fa-store"></i>${escHtml(ret.name)}</div>`,
-    iconSize: [0, 0],
+    html: `<div class="sr-pin-dot ${statusClass}"></div>`,
+    iconSize:   [12, 12],
+    iconAnchor: [6, 6]
+  });
+  const dotMarker = L.marker([ret.lat, ret.lng], {
+    icon:         dotIcon,
+    interactive:  false,
+    zIndexOffset: 100
+  }).addTo(mainMap);
+
+  // ── 2. Label bubble (repositioned by spider logic) ────────────
+  const labelIcon = L.divIcon({
+    className: '',
+    html: `<div class="sr-retailer-marker ${statusClass}">
+      <div class="sr-marker-icon-wrap">
+        <i class="fa-solid fa-store"></i>
+      </div>
+      <span class="sr-marker-name">${escHtml(ret.name)}</span>
+    </div>`,
+    iconSize:   [0, 0],
     iconAnchor: [0, 0]
   });
-  const marker = L.marker([ret.lat, ret.lng], { icon }).addTo(mainMap);
-  marker.on('click', () => {
-    triggerRetailerAction(ret);
-  });
-  retailerMarkers.push({ marker, ret });
+  const labelMarker = L.marker([ret.lat, ret.lng], {
+    icon:         labelIcon,
+    zIndexOffset: 200
+  }).addTo(mainMap);
+  labelMarker.on('click', () => triggerRetailerAction(ret));
+
+  retailerMarkers.push({ dotMarker, labelMarker, ret, _pixelOffset: { x: 0, y: 0 } });
 }
 
 function triggerRetailerAction(ret) {
@@ -863,75 +1046,182 @@ function handleSuggestionSelect(ret) {
   filter: grayscale(1) invert(0.08) contrast(1.15) brightness(0.96) saturate(0.85) !important;
 }
 
-/* ── Advanced Level Retailer Marker Design ── */
-.sr-retailer-marker {
-  font-family: 'Hind Siliguri', sans-serif !important;
-  font-size: 0.8rem !important;
-  font-weight: 700 !important;
-  padding: 6px 12px !important;
-  border-radius: 20px !important;
-  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.15) !important;
-  border: 1.5px solid #2563eb !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
+/* ── Smooth Zoom: GPU-accelerate all map markers ── */
+/* Leaflet positions markers via transform; will-change hints GPU */
+#srMap .leaflet-marker-icon {
+  will-change: transform;
 }
-.sr-retailer-marker i {
-  color: #2563eb !important;
-  margin-right: 4px;
+/* Leaflet's zoom pane — enable hardware-accelerated transitions */
+#srMap .leaflet-zoom-animated {
+  -webkit-transition: -webkit-transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94) !important;
+          transition:         transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94) !important;
 }
-.sr-retailer-marker::after {
-  border-top-color: #2563eb !important;
-}
-.sr-retailer-marker:hover {
-  background: #2563eb !important;
-  color: #ffffff !important;
-  border-color: #2563eb !important;
-}
-.sr-retailer-marker:hover i {
-  color: #ffffff !important;
+/* During zoom, our label markers animate via JS-injected transition (see zoomstart).
+   Reset transition after zoom to avoid pan lag */
+#srMap .leaflet-marker-icon.leaflet-zoom-hide {
+  transition: none !important;
 }
 
-/* Active Cart Marker (Yellow Highlight) */
+/* ══════════════════════════════════════════════
+   PREMIUM MAP MARKER SYSTEM
+   ══════════════════════════════════════════════ */
+
+/* ── Pin Dot at EXACT GPS location ── */
+.sr-pin-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.22), 0 2px 8px rgba(37,99,235,0.45);
+  animation: srPinPulse 2.4s ease-in-out infinite;
+}
+@keyframes srPinPulse {
+  0%,100% { box-shadow: 0 0 0 3px rgba(37,99,235,0.22), 0 2px 8px rgba(37,99,235,0.4); }
+  50%      { box-shadow: 0 0 0 7px rgba(37,99,235,0.06), 0 2px 8px rgba(37,99,235,0.4); }
+}
+.sr-pin-dot.has-cart {
+  background: #eab308;
+  box-shadow: 0 0 0 3px rgba(234,179,8,0.22), 0 2px 8px rgba(234,179,8,0.45);
+  animation: srPinPulseCart 2.4s ease-in-out infinite;
+}
+@keyframes srPinPulseCart {
+  0%,100% { box-shadow: 0 0 0 3px rgba(234,179,8,0.22), 0 2px 8px rgba(234,179,8,0.4); }
+  50%      { box-shadow: 0 0 0 7px rgba(234,179,8,0.06), 0 2px 8px rgba(234,179,8,0.4); }
+}
+.sr-pin-dot.already-ordered {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.22), 0 2px 8px rgba(16,185,129,0.45);
+  animation: srPinPulseGreen 2.4s ease-in-out infinite;
+}
+@keyframes srPinPulseGreen {
+  0%,100% { box-shadow: 0 0 0 3px rgba(16,185,129,0.22), 0 2px 8px rgba(16,185,129,0.4); }
+  50%      { box-shadow: 0 0 0 7px rgba(16,185,129,0.06), 0 2px 8px rgba(16,185,129,0.4); }
+}
+
+/* ── Premium Label Bubble ── */
+.sr-retailer-marker {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  background: rgba(255,255,255,0.97) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-radius: 14px !important;
+  padding: 5px 11px 5px 5px !important;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 6px 20px rgba(15,23,42,0.10),
+    0 0 0 1px rgba(37,99,235,0.12) !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  font-family: 'Hind Siliguri', sans-serif !important;
+  /* Center label on its Leaflet anchor point */
+  transform: translate(-50%, -50%) !important;
+  transition: transform 0.18s cubic-bezier(.34,1.56,.64,1),
+              box-shadow 0.18s ease !important;
+  max-width: 175px !important;
+  overflow: hidden !important;
+}
+
+/* Icon circle inside label */
+.sr-marker-icon-wrap {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 9px !important;
+  background: #eff6ff !important;
+  color: #2563eb !important;
+  font-size: 0.72rem !important;
+  flex-shrink: 0 !important;
+  margin-right: 7px !important;
+  transition: background 0.18s, color 0.18s !important;
+}
+
+/* Shop name text */
+.sr-marker-name {
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.01em !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 120px !important;
+}
+
+/* Hover state */
+.sr-retailer-marker:hover {
+  transform: translate(-50%, -50%) scale(1.07) !important;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.08),
+    0 10px 30px rgba(37,99,235,0.22),
+    0 0 0 1.5px rgba(37,99,235,0.4) !important;
+}
+.sr-retailer-marker:hover .sr-marker-icon-wrap {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+.sr-retailer-marker:hover .sr-marker-name {
+  color: #1e40af !important;
+}
+
+/* Cart status (Yellow) */
 .sr-retailer-marker.has-cart {
-  background: #fffbeb !important;
-  border-color: #eab308 !important;
-  color: #713f12 !important;
-  box-shadow: 0 4px 20px rgba(234, 179, 8, 0.25) !important;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 6px 20px rgba(234,179,8,0.15),
+    0 0 0 1px rgba(234,179,8,0.25) !important;
 }
-.sr-retailer-marker.has-cart i {
-  color: #eab308 !important;
-}
-.sr-retailer-marker.has-cart::after {
-  border-top-color: #eab308 !important;
+.sr-retailer-marker.has-cart .sr-marker-icon-wrap {
+  background: #fef9c3 !important;
+  color: #ca8a04 !important;
 }
 .sr-retailer-marker.has-cart:hover {
-  background: #eab308 !important;
-  color: #ffffff !important;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.08),
+    0 10px 30px rgba(234,179,8,0.28),
+    0 0 0 1.5px rgba(234,179,8,0.5) !important;
 }
-.sr-retailer-marker.has-cart:hover i {
-  color: #ffffff !important;
+.sr-retailer-marker.has-cart:hover .sr-marker-icon-wrap {
+  background: #eab308 !important;
+  color: #fff !important;
 }
 
-/* Visited Marker (Green Highlight) */
+/* Visited status (Green) */
 .sr-retailer-marker.already-ordered {
-  background: #f0fdf4 !important;
-  border-color: #10b981 !important;
-  color: #14532d !important;
-  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25) !important;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 6px 20px rgba(16,185,129,0.15),
+    0 0 0 1px rgba(16,185,129,0.25) !important;
 }
-.sr-retailer-marker.already-ordered i {
-  color: #10b981 !important;
-}
-.sr-retailer-marker.already-ordered::after {
-  border-top-color: #10b981 !important;
+.sr-retailer-marker.already-ordered .sr-marker-icon-wrap {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
 }
 .sr-retailer-marker.already-ordered:hover {
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.08),
+    0 10px 30px rgba(16,185,129,0.28),
+    0 0 0 1.5px rgba(16,185,129,0.5) !important;
+}
+.sr-retailer-marker.already-ordered:hover .sr-marker-icon-wrap {
   background: #10b981 !important;
-  color: #ffffff !important;
+  color: #fff !important;
 }
-.sr-retailer-marker.already-ordered:hover i {
-  color: #ffffff !important;
+
+/* SVG connector layer — sits inside map container */
+#sr-connector-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 498;
+  overflow: visible;
 }
+
 
 /* ── Advanced Level Retailer Card Design ── */
 .sr-retailer-card-new {
@@ -1050,6 +1340,4 @@ function handleSuggestionSelect(ret) {
   border-color: #cbd5e1 !important;
 }
 </style>
-  border-color: #cbd5e1 !important;
-}
-</style>
+

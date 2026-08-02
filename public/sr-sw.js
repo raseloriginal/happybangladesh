@@ -17,8 +17,8 @@
 'use strict';
 
 const CACHE_VERSION = 'v2';
-const SHELL_CACHE   = `sr-shell-${CACHE_VERSION}`;
-const PAGES_CACHE   = `sr-pages-${CACHE_VERSION}`;
+const SHELL_CACHE = `sr-shell-${CACHE_VERSION}`;
+const PAGES_CACHE = `sr-pages-${CACHE_VERSION}`;
 
 // ── Derive base URL from the SW script's own location ────────
 // SW lives at: http(s)://host/[subfolder]/sr-sw.js
