@@ -1,49 +1,64 @@
 <?php $pageTitle = 'Lots'; ?>
 <div class="page-header">
-  <div><h1 class="page-title">Product Lots</h1><div class="breadcrumb">Manager &rsaquo; Lots</div></div>
-  <button onclick="openModal('add-modal')" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add Lot</button>
+  <div>
+    <h1 class="page-title">Product Lots</h1>
+    <div class="breadcrumb">Manager &rsaquo; Lots</div>
+  </div>
+  <button onclick="openNewLotModal()" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add Lot</button>
 </div>
 
 <div class="card">
   <div class="card-header">
-    <h2 class="card-title">All Lots (<?= count($items) ?>)</h2>
-    <input type="text" placeholder="Search lots…" data-table-search="lots-table" class="form-input w-48 text-sm py-1.5">
+    <h2 class="card-title">All Lots (<?= count($batches ?? []) ?>)</h2>
+    <input type="text" placeholder="Search lots…" data-table-search="lots-table" class="form-input w-52 text-sm py-1.5">
   </div>
   <div class="overflow-x-auto">
-    <table class="data-table whitespace-nowrap" id="lots-table">
-      <thead>
-        <tr><th>#</th><th>Lot Date</th><th>Product</th><th>Pieces</th><th>Buying Price</th><th>Total</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        <?php foreach ($items as $i => $l):
-          $expired = !empty($l['expiry_date']) && strtotime($l['expiry_date']) < time();
-          $expiring = !$expired && !empty($l['expiry_date']) && strtotime($l['expiry_date']) < strtotime('+30 days');
-        ?>
+    <table class="data-table w-full text-left" id="lots-table">
+      <thead class="bg-gray-50 text-gray-600 text-xs uppercase font-semibold border-b border-gray-200">
         <tr>
-          <td class="text-gray-400 text-xs"><?= $i+1 ?></td>
-          <td class="font-mono font-semibold"><?= Helpers::date($l['lot_date'] ?? $l['created_at']) ?></td>
-          <td>
-            <?= h($l['product_name']) ?>
-            <?php if ($expired): ?>
-              <span class="badge bg-red-100 text-red-700 text-[10px] ml-1">EXPIRED</span>
-            <?php elseif ($expiring): ?>
-              <span class="badge bg-amber-100 text-amber-700 text-[10px] ml-1">EXPIRES SOON</span>
-            <?php endif; ?>
+          <th class="py-3 px-4">COMPANY</th>
+          <th class="py-3 px-4">DATE</th>
+          <th class="py-3 px-4">ITEMS</th>
+          <th class="py-3 px-4 text-right">AMOUNT</th>
+          <th class="py-3 px-4 text-center w-36">ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        <?php foreach (($batches ?? []) as $b): ?>
+        <tr class="hover:bg-gray-50/80 transition-colors">
+          <td class="py-3.5 px-4 font-semibold text-gray-900"><?= h($b['company_name']) ?></td>
+          <td class="py-3.5 px-4 text-gray-600 font-mono text-sm"><?= h($b['lot_date']) ?></td>
+          <td class="py-3.5 px-4">
+            <span class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-700 bg-gray-50">
+              <?= $b['items_count'] ?> items
+            </span>
           </td>
-          <td><span class="font-semibold"><?= Helpers::number($l['qty_pieces']) ?></span></td>
-          <td>৳<?= Helpers::number($l['buying_price'], 2) ?></td>
-          <?php 
-            $ppb = max(1, (float)($l['pieces_per_box'] ?? 1));
-            $rowTotal = ($l['qty_pieces'] / $ppb) * $l['buying_price'];
-          ?>
-          <td class="font-semibold">৳<?= Helpers::number($rowTotal, 2) ?></td>
-          <td>
-            <button onclick='editLot(<?= json_encode($l) ?>)' class="btn btn-secondary btn-sm"><i class="fa-solid fa-pen"></i></button>
-            <button onclick="deleteLot(<?= $l['id'] ?>)" class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i></button>
+          <td class="py-3.5 px-4 text-right font-bold text-gray-900 text-base">
+            <?= number_format($b['total_amount'], 2, '.', '') ?>
+          </td>
+          <td class="py-3.5 px-4">
+            <div class="flex items-center justify-center gap-1.5">
+              <!-- View Invoice Button -->
+              <button type="button" onclick='viewBatchInvoice(<?= json_encode($b, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' class="w-8 h-8 rounded bg-[#334155] hover:bg-slate-800 text-white flex items-center justify-center transition-colors shadow-xs" title="View Invoice">
+                <i class="fa-solid fa-eye text-xs"></i>
+              </button>
+              <!-- Edit Batch Button -->
+              <button type="button" onclick='editBatchLots(<?= json_encode($b, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' class="w-8 h-8 rounded bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-colors shadow-xs" title="Edit Lot Batch">
+                <i class="fa-solid fa-pen text-xs"></i>
+              </button>
+              <!-- Delete Batch Button -->
+              <button type="button" onclick="deleteBatchLots(<?= (int)$b['company_id'] ?>, '<?= h($b['lot_date']) ?>', '<?= addslashes(h($b['company_name'])) ?>')" class="w-8 h-8 rounded bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors shadow-xs" title="Delete Lot Batch">
+                <i class="fa-solid fa-trash text-xs"></i>
+              </button>
+            </div>
           </td>
         </tr>
         <?php endforeach; ?>
-        <?php if (empty($items)): ?><tr><td colspan="7" class="text-center py-8 text-gray-400">No lots found.</td></tr><?php endif; ?>
+        <?php if (empty($batches)): ?>
+        <tr>
+          <td colspan="5" class="text-center py-10 text-gray-400">No lots found.</td>
+        </tr>
+        <?php endif; ?>
       </tbody>
     </table>
   </div>
@@ -51,13 +66,88 @@
 
 <input type="hidden" id="csrf" value="<?= Helpers::csrfToken() ?>">
 
-<!-- Bulk Add Modal -->
+<!-- Invoice Details Modal -->
+<div id="invoice-modal" class="modal-overlay hidden">
+  <div class="modal-box p-0 overflow-hidden bg-white shadow-2xl rounded-xl" style="max-width: 680px; width: 95%;">
+    <!-- Dark Modal Header Bar -->
+    <div class="bg-[#334155] px-6 py-3.5 flex justify-between items-center text-white">
+      <h3 class="text-base font-bold text-white tracking-wide">Invoice Details</h3>
+      <button type="button" onclick="closeModal('invoice-modal')" class="text-gray-300 hover:text-white transition-colors text-2xl leading-none">
+        &times;
+      </button>
+    </div>
+
+    <!-- Printable Invoice Card -->
+    <div id="invoice-printable" class="p-6 md:p-8 bg-white">
+      <!-- Brand Logo & Header -->
+      <div class="text-center mb-3">
+        <img src="<?= asset('images/logo.png') ?>" alt="Logo" class="h-14 mx-auto mb-2 object-contain" onerror="this.outerHTML='<div class=&quot;text-3xl font-black text-gray-900 tracking-tight text-center mb-1&quot;>H</div>'">
+        <div class="text-center text-[11px] md:text-xs text-gray-600 leading-relaxed font-normal">
+          <p>Holding No: 01, Office No: 158-01, Charghat Bazar, Rajshahi, Bangladesh</p>
+          <p>Licence No: 00158-01 &nbsp;|&nbsp; Licence ID: 05-021-00158-01</p>
+          <p>Hotline: 01300-888811 &nbsp;|&nbsp; 01880-264444</p>
+        </div>
+      </div>
+
+      <div class="border-t border-gray-200 my-4"></div>
+
+      <!-- Invoice Reference -->
+      <div class="text-center mb-5">
+        <span class="text-xs md:text-sm font-semibold text-gray-600">Invoice: <span id="inv-lot-number" class="font-mono text-gray-900">#LOT130</span></span>
+      </div>
+
+      <!-- FROM & DATE Info Boxes -->
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="border border-gray-200 rounded-md p-3 bg-gray-50/40">
+          <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">FROM:</div>
+          <div class="text-sm md:text-base font-bold text-gray-900" id="inv-from-company">ডেকো ফুডস B</div>
+        </div>
+        <div class="border border-gray-200 rounded-md p-3 bg-gray-50/40">
+          <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">DATE:</div>
+          <div class="text-sm md:text-base font-bold text-gray-900 font-mono" id="inv-lot-date">2026-07-21</div>
+        </div>
+      </div>
+
+      <!-- Products Table -->
+      <div class="mb-4 overflow-x-auto">
+        <table class="w-full text-left text-xs md:text-sm border-collapse">
+          <thead>
+            <tr class="border-t-2 border-indigo-600 border-b border-gray-200 text-gray-800 font-bold uppercase text-[11px] md:text-xs bg-white">
+              <th class="py-2.5 px-2 text-left">ITEM</th>
+              <th class="py-2.5 px-2 text-center w-20">QTY</th>
+              <th class="py-2.5 px-2 text-right w-24">PRICE</th>
+              <th class="py-2.5 px-2 text-right w-28">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody id="inv-items-body" class="divide-y divide-gray-100 text-gray-800">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Grand Total Row -->
+      <div class="flex justify-between items-center py-3 border-t border-b-2 border-gray-300 font-bold text-gray-900 text-base md:text-lg mb-2">
+        <span>Total Amount:</span>
+        <span id="inv-grand-total" class="font-mono">0.00</span>
+      </div>
+    </div>
+
+    <!-- Modal Footer / Print Action -->
+    <div class="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex justify-end">
+      <button type="button" onclick="printInvoiceModal()" class="btn bg-[#334155] hover:bg-slate-800 text-white text-sm font-semibold px-5 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all">
+        <i class="fa-solid fa-print"></i> Print Invoice
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Add/Edit Modal -->
 <div id="add-modal" class="modal-overlay hidden">
     <div class="modal-box p-6" style="max-width: 1024px;">
         <div class="flex justify-between items-center mb-5">
             <div>
-                <h3 class="text-2xl font-bold text-gray-900">Add New Lot</h3>
-                <p class="text-gray-500 text-sm">Record a new product batch received from company</p>
+                <h3 class="text-2xl font-bold text-gray-900" id="modal-add-title">Add New Lot</h3>
+                <p class="text-gray-500 text-sm" id="modal-add-subtitle">Record a new product batch received from company</p>
             </div>
             <button type="button" onclick="closeModal('add-modal')" class="btn btn-secondary bg-white border border-gray-300">
                 <i class="fas fa-arrow-left mr-2"></i> Back to Lots
@@ -70,7 +160,7 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Company *</label>
                     <select id="bulk-company" class="form-input text-sm w-full" onchange="updateProductDropdowns()" required>
                         <option value="">Select Company</option>
-                        <?php foreach ($companies as $comp): ?>
+                        <?php foreach (($companies ?? []) as $comp): ?>
                             <option value="<?= $comp['id'] ?>"><?= h($comp['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -121,53 +211,8 @@
                     <div class="text-3xl font-bold text-blue-600" id="grand-total">৳0.00</div>
                 </div>
                 <div>
-                    <button type="submit" class="btn btn-primary bg-indigo-600 hover:bg-indigo-700 border-none px-8 py-3 rounded-lg font-bold text-white shadow-sm">Save Lot</button>
+                    <button type="submit" id="btn-save-lot" class="btn btn-primary bg-indigo-600 hover:bg-indigo-700 border-none px-8 py-3 rounded-lg font-bold text-white shadow-sm">Save Lot</button>
                 </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Edit Lot Modal -->
-<div id="edit-modal" class="modal-overlay hidden">
-    <div class="modal-box p-6" style="max-width: 600px;">
-        <div class="flex justify-between items-center mb-5">
-            <h3 class="text-xl font-bold text-gray-900">Edit Lot</h3>
-            <button type="button" onclick="closeModal('edit-modal')" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-
-        <form id="edit-form">
-            <input type="hidden" id="edit-id">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="col-span-2">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Product *</label>
-                    <select id="edit-product" class="form-input text-sm w-full" required>
-                        <?php foreach ($products as $p): ?>
-                            <option value="<?= $p['id'] ?>"><?= h($p['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Qty (Pieces) *</label>
-                    <input type="number" id="edit-pieces" class="form-input text-sm w-full" required min="0">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Buying Price (৳) *</label>
-                    <input type="number" step="0.01" id="edit-buying-price" class="form-input text-sm w-full" required min="0">
-                </div>
-                <!-- qty_boxes is hidden/ignored as inventory relies on qty_pieces -->
-                <input type="hidden" id="edit-boxes" value="0">
-                <div class="col-span-2">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Expiry Date</label>
-                    <input type="date" id="edit-exp-date" class="form-input text-sm w-full">
-                </div>
-            </div>
-            
-            <div class="flex justify-end gap-3 pt-4 border-t mt-4">
-                <button type="button" onclick="closeModal('edit-modal')" class="btn btn-secondary">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
             </div>
         </form>
     </div>
@@ -201,10 +246,166 @@ function openModal(id) { document.getElementById(id).classList.remove('hidden');
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 const csrf = document.getElementById('csrf').value;
 
-const productsList = <?= json_encode($products) ?>;
+const productsList = <?= json_encode($products ?? []) ?>;
 
 let activeProductSelectButton = null;
+let isBatchEdit = false;
+let originalBatchInfo = null;
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ══════════════════════════════════════════════════════════
+//  Invoice Modal Logic
+// ══════════════════════════════════════════════════════════
+function viewBatchInvoice(batch) {
+    if (!batch) return;
+    
+    const lotNum = batch.min_lot_id ? batch.min_lot_id : (batch.company_id + '' + (batch.lot_date ? batch.lot_date.replace(/-/g, '') : ''));
+    document.getElementById('inv-lot-number').textContent = `#LOT${lotNum}`;
+    document.getElementById('inv-from-company').textContent = batch.company_name || 'N/A';
+    document.getElementById('inv-lot-date').textContent = batch.lot_date || 'N/A';
+    
+    const tbody = document.getElementById('inv-items-body');
+    tbody.innerHTML = '';
+    
+    let totalAmt = 0;
+    (batch.items || []).forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-50/50";
+        
+        const qty = parseInt(item.qty_pieces) || 0;
+        const ppb = Math.max(1, parseFloat(item.pieces_per_box) || 1);
+        const buyingPrice = parseFloat(item.buying_price) || 0;
+        
+        // Unit price per piece = buying_price / pieces_per_box
+        const unitPrice = buyingPrice / ppb;
+        const rowTotal = (qty / ppb) * buyingPrice;
+        totalAmt += rowTotal;
+        
+        tr.innerHTML = `
+            <td class="py-2.5 px-2 font-medium text-gray-800">${escapeHtml(item.product_name)}</td>
+            <td class="py-2.5 px-2 text-center font-semibold text-gray-900">${qty}</td>
+            <td class="py-2.5 px-2 text-right text-gray-700">${unitPrice.toFixed(2)}</td>
+            <td class="py-2.5 px-2 text-right font-semibold text-gray-900">${rowTotal.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    document.getElementById('inv-grand-total').textContent = totalAmt.toFixed(2);
+    openModal('invoice-modal');
+}
+
+function printInvoiceModal() {
+    const printContent = document.getElementById('invoice-printable').innerHTML;
+    const printWindow = window.open('', '', 'width=800,height=900');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Invoice - ${document.getElementById('inv-lot-number').textContent}</title>
+            <meta charset="utf-8">
+            <script src="https://cdn.tailwindcss.com"><\/script>
+            <style>
+                @page { size: auto; margin: 12mm; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #111827; background: #fff; }
+                table { border-collapse: collapse; width: 100%; }
+            </style>
+        </head>
+        <body class="p-6">
+            ${printContent}
+            <script>
+                window.onload = function() {
+                    window.focus();
+                    window.print();
+                    setTimeout(function() { window.close(); }, 500);
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+// ══════════════════════════════════════════════════════════
+//  Batch Edit & Delete Logic
+// ══════════════════════════════════════════════════════════
+function openNewLotModal() {
+    isBatchEdit = false;
+    originalBatchInfo = null;
+    document.getElementById('modal-add-title').textContent = 'Add New Lot';
+    document.getElementById('modal-add-subtitle').textContent = 'Record a new product batch received from company';
+    document.getElementById('btn-save-lot').textContent = 'Save Lot';
+    document.getElementById('bulk-company').value = '';
+    document.getElementById('bulk-lot-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('bulk-rows').innerHTML = '';
+    addBulkRow();
+    calculateTotals();
+    openModal('add-modal');
+}
+
+function editBatchLots(batch) {
+    if (!batch) return;
+    isBatchEdit = true;
+    originalBatchInfo = {
+        company_id: batch.company_id,
+        lot_date: batch.lot_date
+    };
+    
+    document.getElementById('modal-add-title').textContent = 'Edit Lot Batch';
+    document.getElementById('modal-add-subtitle').textContent = `Editing batch for ${batch.company_name} on ${batch.lot_date}`;
+    document.getElementById('btn-save-lot').textContent = 'Update Lot Batch';
+    
+    document.getElementById('bulk-company').value = batch.company_id || '';
+    document.getElementById('bulk-lot-date').value = batch.lot_date || '';
+    
+    const tbody = document.getElementById('bulk-rows');
+    tbody.innerHTML = '';
+    
+    if (batch.items && batch.items.length > 0) {
+        batch.items.forEach(item => {
+            addBulkRow({
+                productId: item.product_id,
+                qty: item.qty_pieces,
+                expiry: item.expiry_date || '',
+                price: item.buying_price
+            });
+        });
+    } else {
+        addBulkRow();
+    }
+    
+    calculateTotals();
+    openModal('add-modal');
+}
+
+async function deleteBatchLots(companyId, lotDate, companyName) {
+    if (!confirm(`Are you sure you want to delete all lots for "${companyName}" on ${lotDate}? This will also revert the warehouse inventory.`)) {
+        return;
+    }
+    
+    try {
+        const res = await fetch('<?= url('manager/api/lots/delete-batch') ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+            body: JSON.stringify({ csrf_token: csrf, company_id: companyId, lot_date: lotDate })
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert(data.message || 'Error deleting lot batch');
+        }
+    } catch (err) {
+        alert('Request failed: ' + (err.message || err));
+    }
+}
+
+// ══════════════════════════════════════════════════════════
+//  Product Selector Modal Logic (Prevents duplicates)
+// ══════════════════════════════════════════════════════════
 function openProductSelector(btn) {
     activeProductSelectButton = btn;
     renderModalProducts();
@@ -679,7 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addBulkRow();
 });
 
-// Add Bulk Lots
+// Add / Update Lots Form Submit
 document.getElementById('bulk-add-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const rows = document.querySelectorAll('#bulk-rows tr');
@@ -718,64 +919,28 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
     if(!valid) return alert('Please fill in all required fields.');
     if(hasDuplicate) return alert('Duplicate products detected in the lot list. Each product can only be added once.');
 
-    const btn = this.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    const btn = document.getElementById('btn-save-lot');
+    const originalBtnText = btn.textContent;
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     
-    try {
-        const res = await fetch('<?= url('manager/api/lots/store') ?>', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-            body: JSON.stringify({ csrf_token: csrf, lot_date, company_id, lots })
-        });
-        let data;
-        try {
-            data = await res.json();
-        } catch(e) {
-            const rawText = await res.text().catch(() => '');
-            alert('Server error (' + res.status + '): ' + (rawText || res.statusText || 'Invalid response from server'));
-            btn.disabled = false; btn.innerText = 'Save Lot';
-            return;
-        }
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert(data.message || 'Error saving lots');
-            btn.disabled = false; btn.innerText = 'Save Lot';
-        }
-    } catch(err) {
-        alert('Request failed: ' + (err.message || err));
-        btn.disabled = false; btn.innerText = 'Save Lot';
-    }
-});
-
-// Edit Lot
-function editLot(lot) {
-    document.getElementById('edit-id').value = lot.id;
-    document.getElementById('edit-product').value = lot.product_id;
-    document.getElementById('edit-exp-date').value = lot.expiry_date || '';
-    document.getElementById('edit-boxes').value = lot.qty_boxes || 0;
-    document.getElementById('edit-pieces').value = lot.qty_pieces || 0;
-    document.getElementById('edit-buying-price').value = lot.buying_price || 0;
-    openModal('edit-modal');
-}
-
-document.getElementById('edit-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const btn = this.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    const endpoint = (isBatchEdit && originalBatchInfo)
+        ? '<?= url('manager/api/lots/update-batch') ?>'
+        : '<?= url('manager/api/lots/store') ?>';
     
     const payload = {
         csrf_token: csrf,
-        id: document.getElementById('edit-id').value,
-        product_id: document.getElementById('edit-product').value,
-        expiry_date: document.getElementById('edit-exp-date').value,
-        qty_boxes: document.getElementById('edit-boxes').value,
-        qty_pieces: document.getElementById('edit-pieces').value,
-        buying_price: document.getElementById('edit-buying-price').value
+        lot_date: lot_date,
+        company_id: company_id,
+        lots: lots
     };
 
+    if (isBatchEdit && originalBatchInfo) {
+        payload.original_company_id = originalBatchInfo.company_id;
+        payload.original_lot_date   = originalBatchInfo.lot_date;
+    }
+
     try {
-        const res = await fetch('<?= url('manager/api/lots/update') ?>', {
+        const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify(payload)
@@ -786,42 +951,18 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
         } catch(e) {
             const rawText = await res.text().catch(() => '');
             alert('Server error (' + res.status + '): ' + (rawText || res.statusText || 'Invalid response from server'));
-            btn.disabled = false; btn.innerText = 'Save Changes';
+            btn.disabled = false; btn.textContent = originalBtnText;
             return;
         }
         if (data.success) {
             window.location.reload();
         } else {
-            alert(data.message || 'Error updating lot');
-            btn.disabled = false; btn.innerText = 'Save Changes';
+            alert(data.message || 'Error saving lots');
+            btn.disabled = false; btn.textContent = originalBtnText;
         }
     } catch(err) {
         alert('Request failed: ' + (err.message || err));
-        btn.disabled = false; btn.innerText = 'Save Changes';
+        btn.disabled = false; btn.textContent = originalBtnText;
     }
 });
-
-// Delete Lot
-async function deleteLot(id) {
-    if(!confirm('Are you sure you want to delete this lot?')) return;
-    try {
-        const res = await fetch('<?= url('manager/api/lots/delete') ?>', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-            body: JSON.stringify({ csrf_token: csrf, id: id })
-        });
-        let data;
-        try {
-            data = await res.json();
-        } catch(e) {
-            const rawText = await res.text().catch(() => '');
-            alert('Server error (' + res.status + '): ' + (rawText || res.statusText || 'Invalid response from server'));
-            return;
-        }
-        if(data.success) window.location.reload();
-        else alert(data.message || 'Error deleting lot');
-    } catch(err) {
-        alert('Request failed: ' + (err.message || err));
-    }
-}
 </script>
