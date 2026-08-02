@@ -372,7 +372,17 @@ class SRController extends Controller
 
         $totalPages = ceil($totalRetailers / $limit);
 
-        $this->renderApp('retailers', compact('retailers', 'search', 'page', 'totalPages', 'totalRetailers'));
+        // Fetch all retailers for client-side search via Fuse.js
+        $allQ = $this->db->prepare("
+            SELECT r.*,
+                   (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today
+            FROM retailers r
+            ORDER BY r.name ASC
+        ");
+        $allQ->execute([$srId]);
+        $allRetailers = $allQ->fetchAll();
+
+        $this->renderApp('retailers', compact('retailers', 'search', 'page', 'totalPages', 'totalRetailers', 'allRetailers'));
     }
 
     // ── Profile ───────────────────────────────────────────────

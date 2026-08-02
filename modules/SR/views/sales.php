@@ -177,6 +177,20 @@ function normalizeBanglish(text) {
   return res;
 }
 
+let globalFuse = null;
+function initOrUpdateFuse() {
+  if (!allRetailersData) return;
+  const retailers = allRetailersData.map(r => {
+    if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
+    return r;
+  });
+  globalFuse = new Fuse(retailers, {
+    keys: ['name', 'normalized_name', 'phone'],
+    threshold: 0.4,
+    ignoreLocation: true
+  });
+}
+
 // ══════════════════════════════════════════════════════════════
 // MAIN MAP INIT
 // ══════════════════════════════════════════════════════════════
@@ -360,6 +374,10 @@ function processRetailerData(data) {
   const retailers = data.retailers || [];
   allRetailersData = retailers;
   
+  if (typeof initOrUpdateFuse === 'function') {
+    initOrUpdateFuse();
+  }
+  
   const nearbyRetailers = retailers.filter(ret => {
     const dist = ret.dist !== undefined ? ret.dist : calculateDistance(myLat, myLng, ret.lat, ret.lng);
     return dist <= 100;
@@ -395,6 +413,10 @@ function showDemoPins() {
   retailerMarkers.forEach(m => mainMap.removeLayer(m.marker));
   retailerMarkers = [];
   allRetailersData = demos;
+  
+  if (typeof initOrUpdateFuse === 'function') {
+    initOrUpdateFuse();
+  }
   
   const nearbyDemos = demos.filter(ret => ret.dist <= 100);
   nearbyDemos.forEach(ret => addRetailerPin(ret));
@@ -682,20 +704,6 @@ function initEventListeners() {
   const searchSpinner = document.getElementById('mapSearchSpinner');
   const suggestionsBox = document.getElementById('searchSuggestions');
   let searchTimeout = null;
-  let globalFuse = null;
-
-  function initOrUpdateFuse() {
-    if (!allRetailersData) return;
-    const retailers = allRetailersData.map(r => {
-      if (!r.normalized_name) r.normalized_name = normalizeBanglish(r.name);
-      return r;
-    });
-    globalFuse = new Fuse(retailers, {
-      keys: ['name', 'normalized_name', 'phone'],
-      threshold: 0.4,
-      ignoreLocation: true
-    });
-  }
 
   if (searchInput && suggestionsBox) {
     searchInput.addEventListener('input', () => {
@@ -719,18 +727,25 @@ function initEventListeners() {
         // 1. Try Fuse.js local search first
         let localMatches = [];
         if (globalFuse) {
-            localMatches = globalFuse.search(normalizedQ).map(res => res.item).slice(0, 15);
+            localMatches = globalFuse.search(normalizedQ).map(res => res.item);
         }
 
+        // Sort local matches by distance (nearest first)
+        localMatches.forEach(ret => {
+          if (ret.dist === undefined) {
+            ret.dist = calculateDistance(myLat, myLng, parseFloat(ret.lat || 0), parseFloat(ret.lng || 0));
+          }
+        });
+        localMatches.sort((a, b) => a.dist - b.dist);
+
         const renderMatches = (matches) => {
-          if (searchSpinner) searchSpinner.classList.remove('show');
           if (matches.length > 0) {
             suggestionsBox.innerHTML = matches.map(ret => {
-              const addressStr = ret.address || `Dhaka City Area, Retailer ID #${ret.id}`;
+              const hasAddress = ret.address && ret.address.trim() !== '';
               return `
                 <div class="sr-suggestion-item" onclick="handleSuggestionSelect(${JSON.stringify(ret).replace(/"/g, '&quot;')})">
                   <span class="sr-suggestion-title"><i class="fa-solid fa-store" style="color:#2563eb; margin-right:6px; font-size:0.8rem;"></i>${escHtml(ret.name)}</span>
-                  <span class="sr-suggestion-desc">${escHtml(addressStr)}</span>
+                  ${hasAddress ? `<span class="sr-suggestion-desc">${escHtml(ret.address)}</span>` : ''}
                 </div>
               `;
             }).join('');
@@ -740,27 +755,42 @@ function initEventListeners() {
           suggestionsBox.classList.add('open');
         };
 
-        if (localMatches.length > 0) {
-          // Fast local fuzzy match
-          renderMatches(localMatches);
-        } else {
-          // 2. Fallback to server search if not found locally
-          fetch(`${BASE_URL}/sr/api/retailers/search?q=${encodeURIComponent(q)}`)
-            .then(res => res.json())
-            .then(data => {
-              if (data.success) {
-                renderMatches(data.results);
-              } else {
-                renderMatches([]);
-              }
-            })
-            .catch(() => {
-              if (searchSpinner) searchSpinner.classList.remove('show');
+        // Render local matches immediately to keep it fast
+        renderMatches(localMatches.slice(0, 15));
+
+        // 2. Concurrently fetch complete results from server and merge them
+        fetch(`${BASE_URL}/sr/api/retailers/search?q=${encodeURIComponent(q)}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.results) {
+              const merged = [...localMatches];
+              data.results.forEach(serverRet => {
+                if (!merged.some(r => r.id === serverRet.id)) {
+                  merged.push(serverRet);
+                }
+              });
+
+              // Rank merged results based on nearest retailer first
+              merged.forEach(ret => {
+                if (ret.dist === undefined) {
+                  ret.dist = calculateDistance(myLat, myLng, parseFloat(ret.lat || 0), parseFloat(ret.lng || 0));
+                }
+              });
+              merged.sort((a, b) => a.dist - b.dist);
+
+              renderMatches(merged.slice(0, 15));
+            }
+          })
+          .catch(() => {
+            if (localMatches.length === 0) {
               suggestionsBox.innerHTML = `<div style="padding: 12px; color: #ef4444; font-size: 0.82rem; text-align: center;">Search failed</div>`;
               suggestionsBox.classList.add('open');
-            });
-        }
-      }, 150);
+            }
+          })
+          .finally(() => {
+            if (searchSpinner) searchSpinner.classList.remove('show');
+          });
+      }, 200);
     });
 
     searchInput.addEventListener('keypress', e => {

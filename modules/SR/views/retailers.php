@@ -56,16 +56,14 @@ $truncateName = function($name) {
 
   <!-- Search Box Card -->
   <div class="bg-white p-3 rounded-2xl border border-slate-200/50 shadow-3xs print:hidden">
-    <form method="GET" action="<?= url('sr/retailers') ?>" class="flex gap-2">
+    <form id="retailerSearchForm" method="GET" action="<?= url('sr/retailers') ?>" class="flex gap-2">
       <div class="relative flex-1">
         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" name="search" value="<?= h($search) ?>" placeholder="দোকানের নাম, ঠিকানা বা মোবাইল নাম্বার..." 
+        <input type="text" id="retailerSearchInput" name="search" value="<?= h($search) ?>" placeholder="দোকানের নাম, ঠিকানা বা মোবাইল নাম্বার..." 
           class="w-full bg-slate-50 border border-slate-200/60 rounded-xl pl-9 pr-8 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition" autocomplete="off">
-        <?php if ($search !== ''): ?>
-          <a href="<?= url('sr/retailers') ?>" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
-            <i class="fa-solid fa-circle-xmark"></i>
-          </a>
-        <?php endif; ?>
+        <a href="<?= url('sr/retailers') ?>" id="clearSearchBtn" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs <?= $search !== '' ? '' : 'hidden' ?>">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </a>
       </div>
       <button type="submit" class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl active:scale-95 transition">
         খুঁজুন
@@ -185,6 +183,7 @@ $truncateName = function($name) {
 
 <?php include __DIR__ . '/partials/_shop_v2.php'; ?>
 
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js" defer></script>
 <script>
 const BASE_URL = '<?= BASE_URL ?>';
 const ALL_PRODUCTS_URL = `${BASE_URL}/sr/api/products`;
@@ -261,4 +260,180 @@ function toggleRetailerName(element, fullName, shortName) {
     element.innerText = shortName;
   }
 }
+
+// ── Client-side fuzzy search with Fuse.js ──────────────────────
+const allRetailers = <?= isset($allRetailers) ? json_encode($allRetailers) : '[]' ?>;
+
+function normalizeBanglish(text) {
+  if (!text) return '';
+  text = text.toLowerCase();
+  const b2e = {
+    'অ': 'o', 'আ': 'a', 'ই': 'i', 'ঈ': 'i', 'উ': 'u', 'ঊ': 'u', 'ঋ': 'ri', 'এ': 'e', 'ঐ': 'oi', 'ও': 'o', 'ঔ': 'ou',
+    'ক': 'k', 'খ': 'kh', 'গ': 'g', 'ঘ': 'gh', 'ঙ': 'ng', 'চ': 'ch', 'ছ': 'ch', 'জ': 'j', 'ঝ': 'jh', 'ঞ': 'n',
+    'ট': 't', 'ঠ': 'th', 'ড': 'd', 'ঢ': 'dh', 'ণ': 'n', 'ত': 't', 'থ': 'th', 'দ': 'd', 'ধ': 'dh', 'ন': 'n',
+    'প': 'p', 'ফ': 'f', 'ব': 'b', 'ভ': 'v', 'ম': 'm', 'য': 'j', 'র': 'r', 'ল': 'l', 'শ': 'sh', 'ষ': 'sh', 'স': 's',
+    'হ': 'h', 'ড়': 'r', 'ঢ়': 'rh', 'য়': 'y', 'ৎ': 't', 'ং': 'ng', 'ঃ': 'h', 'ঁ': 'n',
+    'া': 'a', 'ি': 'i', 'ী': 'i', 'ু': 'u', 'ূ': 'u', 'ৃ': 'ri', 'ে': 'e', 'ৈ': 'oi', 'ো': 'o', 'ৌ': 'ou', '্': ''
+  };
+  let res = '';
+  for (let i = 0; i < text.length; i++) {
+    res += b2e[text[i]] !== undefined ? b2e[text[i]] : text[i];
+  }
+  return res;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const originalTableHTML = document.getElementById('tableBody') ? document.getElementById('tableBody').innerHTML : '';
+  const paginationContainer = document.querySelector('.flex.items-center.justify-center.gap-2.pt-2.print\\:hidden');
+  const searchInput = document.getElementById('retailerSearchInput');
+  const searchForm = document.getElementById('retailerSearchForm');
+  const clearSearchBtn = document.getElementById('clearSearchBtn');
+  
+  let fuse = null;
+  let hasSearchedClientSide = false;
+
+  function initRetailersFuse() {
+    allRetailers.forEach(r => {
+      r.normalized_name = normalizeBanglish(r.name);
+    });
+    fuse = new Fuse(allRetailers, {
+      keys: ['name', 'normalized_name', 'phone'],
+      threshold: 0.4,
+      ignoreLocation: true
+    });
+  }
+
+  function truncateNameJs(name) {
+    const words = name.trim().split(/\s+/);
+    if (words.length > 2) {
+      const truncated = words.slice(0, 2).join(' ') + '..';
+      return { is_truncated: true, short: truncated, full: name };
+    }
+    return { is_truncated: false, short: name, full: name };
+  }
+
+  function renderSearchResults(results) {
+    const tableBody = document.getElementById('tableBody');
+    if (!tableBody) return;
+    if (paginationContainer) paginationContainer.style.display = 'none';
+    
+    if (results.length === 0) {
+      tableBody.innerHTML = `
+        <tr id="emptyRow">
+          <td colspan="3" class="p-12 text-center text-slate-400 bg-white">
+            <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center text-xl mx-auto mb-2"><i class="fa-solid fa-store"></i></div>
+            <span class="text-xs font-medium">কোনো দোকান পাওয়া যায়নি।</span>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tableBody.innerHTML = results.map(res => {
+      const r = res.item;
+      const firstChar = r.name.charAt(0);
+      const nameInfo = truncateNameJs(r.name);
+      
+      let nameHtml = '';
+      if (nameInfo.is_truncated) {
+        nameHtml = `
+          <div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug cursor-pointer select-none break-words"
+               onclick="toggleRetailerName(this, '${escHtml(nameInfo.full).replace(/'/g, "\\'")}', '${escHtml(nameInfo.short).replace(/'/g, "\\'")}')">
+            ${escHtml(nameInfo.short)}
+          </div>
+        `;
+      } else {
+        nameHtml = `
+          <div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug break-words">
+            ${escHtml(r.name)}
+          </div>
+        `;
+      }
+
+      const avatarHtml = r.has_order_today > 0
+        ? `<div class="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-emerald-600 text-xs shrink-0 select-none font-siliguri" title="অর্ডার সম্পন্ন">
+             <i class="fa-solid fa-check text-[10px]"></i>
+           </div>`
+        : `<div class="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center font-bold text-blue-600 text-xs shrink-0 select-none font-siliguri" title="পেন্ডিং">
+             ${escHtml(firstChar)}
+           </div>`;
+
+      const buttonHtml = r.has_order_today > 0
+        ? `<button type="button" onclick="openShop(${r.id}, '${escHtml(r.name).replace(/'/g, "\\'")}', '${escHtml(r.address || '').replace(/'/g, "\\'")}', true)" 
+             class="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 transition-all flex items-center justify-center shadow-3xs active:scale-95 mx-auto" 
+             title="অর্ডার সম্পন্ন (সম্পাদনা করতে ক্লিক করুন)">
+             <i class="fa-solid fa-circle-check text-sm"></i>
+           </button>`
+        : `<button type="button" onclick="openShop(${r.id}, '${escHtml(r.name).replace(/'/g, "\\'")}', '${escHtml(r.address || '').replace(/'/g, "\\'")}', false)" 
+             class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center shadow-3xs active:scale-95 mx-auto" 
+             title="অর্ডার শুরু">
+             <i class="fa-solid fa-cart-plus text-xs"></i>
+           </button>`;
+
+      return `
+        <tr class="retailer-row hover:bg-slate-50/40 transition-colors">
+          <td class="p-2 border-r border-slate-100 align-middle bg-white overflow-hidden">
+            <div class="flex items-center gap-2 min-w-0">
+              ${avatarHtml}
+              <div class="min-w-0 flex-1">
+                ${nameHtml}
+              </div>
+            </div>
+          </td>
+          <td class="p-2 text-center border-r border-slate-100 align-middle bg-white text-slate-600 text-[10px] sm:text-xs font-mono truncate">
+            ${escHtml(r.phone || 'N/A')}
+          </td>
+          <td class="p-2 text-center align-middle bg-white">
+            ${buttonHtml}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function restoreOriginalTable() {
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) tableBody.innerHTML = originalTableHTML;
+    if (paginationContainer) paginationContainer.style.display = 'flex';
+    if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
+    hasSearchedClientSide = false;
+  }
+
+  if (searchForm) {
+    searchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim();
+      if (!q) {
+        restoreOriginalTable();
+        return;
+      }
+      
+      if (clearSearchBtn) clearSearchBtn.classList.remove('hidden');
+      hasSearchedClientSide = true;
+
+      if (!fuse) {
+        initRetailersFuse();
+      }
+
+      const normalizedQ = normalizeBanglish(q.toLowerCase());
+      const results = fuse.search(normalizedQ);
+      renderSearchResults(results);
+    });
+  }
+
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', (e) => {
+      if (hasSearchedClientSide) {
+        e.preventDefault();
+        searchInput.value = '';
+        restoreOriginalTable();
+      }
+    });
+  }
+});
 </script>
