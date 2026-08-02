@@ -287,46 +287,51 @@ function initMainMap() {
   detectLocation(false);
 }
 
-// ── SVG Overlay for Connector Lines ──────────────────────────
+// ── SVG Overlay ── inserted before the Leaflet map-pane in DOM so it sits
+// ABOVE tiles but below Leaflet's marker layer (Leaflet's pane creates a
+// higher stacking context because it appears later in the DOM).
 function initSvgOverlay() {
   const mapContainer = document.getElementById('srMap');
   svgOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svgOverlay.id = 'sr-connector-svg';
-  svgOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:499;overflow:visible;';
-  mapContainer.style.position = 'relative';
-  mapContainer.appendChild(svgOverlay);
+  svgOverlay.style.cssText =
+    'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;';
+  // Insert as FIRST child — the later-added .leaflet-map-pane creates its own
+  // stacking context and will render ON TOP of our SVG regardless of z-index.
+  mapContainer.insertBefore(svgOverlay, mapContainer.firstChild);
 }
 
-// ── Spiderfier: Spread overlapping labels to non-overlapping positions ──
-const OVERLAP_RADIUS_PX = 35; // px — markers within this distance are grouped
-const SPREAD_RADIUS_PX  = 88; // px — spread radius for label fan-out
+// ── Layout constants ───────────────────────────────────────────
+const OVERLAP_RADIUS_PX    = 30;   // group pins this close
+const SPREAD_RADIUS_PX     = 100;  // initial radial spread
+const MIN_LABEL_LABEL_DIST = 100;  // min centre-to-centre between labels
+const MIN_LABEL_PIN_DIST   = 32;   // min distance from label centre to any pin
 
 function computeSpiderPositions() {
   if (!mainMap || retailerMarkers.length === 0) return;
 
-  // Step 1: Reset all label markers to their real GPS position
+  // Step 1: Reset labels to their real GPS pin
   retailerMarkers.forEach(m => {
     m.labelMarker.setLatLng([m.ret.lat, m.ret.lng]);
     m._pixelOffset = { x: 0, y: 0 };
   });
 
-  // Step 2: Get current pixel positions of each real location
-  const points = retailerMarkers.map(m => ({
-    idx: retailerMarkers.indexOf(m),
-    realPx: mainMap.latLngToContainerPoint([m.ret.lat, m.ret.lng])
-  }));
+  // Step 2: Pixel position of each real pin
+  const pinPx = retailerMarkers.map(m =>
+    mainMap.latLngToContainerPoint([m.ret.lat, m.ret.lng])
+  );
 
-  // Step 3: Group overlapping markers via BFS
+  // Step 3: BFS grouping — pins within OVERLAP_RADIUS_PX of each other
   const visited = new Set();
   const groups  = [];
-  for (let i = 0; i < points.length; i++) {
+  for (let i = 0; i < pinPx.length; i++) {
     if (visited.has(i)) continue;
     const group = [i];
     visited.add(i);
-    for (let j = i + 1; j < points.length; j++) {
+    for (let j = i + 1; j < pinPx.length; j++) {
       if (visited.has(j)) continue;
-      const dx = points[i].realPx.x - points[j].realPx.x;
-      const dy = points[i].realPx.y - points[j].realPx.y;
+      const dx = pinPx[i].x - pinPx[j].x;
+      const dy = pinPx[i].y - pinPx[j].y;
       if (Math.sqrt(dx * dx + dy * dy) < OVERLAP_RADIUS_PX) {
         group.push(j);
         visited.add(j);
@@ -335,27 +340,81 @@ function computeSpiderPositions() {
     if (group.length > 1) groups.push(group);
   }
 
-  // Step 4: Fan each group radially
+  // Step 4: Radially fan out labels for each group
   groups.forEach(group => {
-    const cx = points[group[0]].realPx.x;
-    const cy = points[group[0]].realPx.y;
     const n  = group.length;
-    // Adaptive radius: more markers = wider spread
-    const r  = SPREAD_RADIUS_PX + (n > 4 ? (n - 4) * 18 : 0);
-    const angleStep  = (2 * Math.PI) / n;
+    // Use centroid of the group as the spread origin
+    let cx = 0, cy = 0;
+    group.forEach(idx => { cx += pinPx[idx].x; cy += pinPx[idx].y; });
+    cx /= n; cy /= n;
+
+    const r         = SPREAD_RADIUS_PX + (n > 4 ? (n - 4) * 22 : 0);
+    const angleStep = (2 * Math.PI) / n;
     const startAngle = -Math.PI / 2; // start from top
 
     group.forEach((idx, i) => {
-      const angle    = startAngle + i * angleStep;
-      const offsetX  = Math.cos(angle) * r;
-      const offsetY  = Math.sin(angle) * r;
-      const newPx    = { x: cx + offsetX, y: cy + offsetY };
-      const newLatLng = mainMap.containerPointToLatLng([newPx.x, newPx.y]);
-
-      retailerMarkers[idx].labelMarker.setLatLng(newLatLng);
-      retailerMarkers[idx]._pixelOffset = { x: offsetX, y: offsetY };
+      const angle   = startAngle + i * angleStep;
+      const lx      = cx + Math.cos(angle) * r;
+      const ly      = cy + Math.sin(angle) * r;
+      retailerMarkers[idx].labelMarker.setLatLng(
+        mainMap.containerPointToLatLng([lx, ly])
+      );
+      retailerMarkers[idx]._pixelOffset = {
+        x: lx - pinPx[idx].x,
+        y: ly - pinPx[idx].y
+      };
     });
   });
+
+  // Step 5: Combined force-directed repulsion (label-label + label-pin)
+  // Runs up to 8 iterations to settle all conflicts
+  for (let iter = 0; iter < 8; iter++) {
+    let anyConflict = false;
+
+    for (let i = 0; i < retailerMarkers.length; i++) {
+      const li = mainMap.latLngToContainerPoint(retailerMarkers[i].labelMarker.getLatLng());
+
+      // ── Label vs every OTHER label ──
+      for (let j = i + 1; j < retailerMarkers.length; j++) {
+        const lj = mainMap.latLngToContainerPoint(retailerMarkers[j].labelMarker.getLatLng());
+        const dx = li.x - lj.x, dy = li.y - lj.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MIN_LABEL_LABEL_DIST && dist > 0.5) {
+          anyConflict = true;
+          const push = (MIN_LABEL_LABEL_DIST - dist) * 0.55;
+          const nx = dx / dist, ny = dy / dist;
+          li.x += nx * push; li.y += ny * push;
+          lj.x -= nx * push; lj.y -= ny * push;
+          retailerMarkers[i].labelMarker.setLatLng(mainMap.containerPointToLatLng([li.x, li.y]));
+          retailerMarkers[j].labelMarker.setLatLng(mainMap.containerPointToLatLng([lj.x, lj.y]));
+        }
+      }
+
+      // ── Label vs every pin dot (including its own pin's neighbours) ──
+      for (let k = 0; k < retailerMarkers.length; k++) {
+        const pk = pinPx[k];
+        const dx = li.x - pk.x, dy = li.y - pk.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MIN_LABEL_PIN_DIST && dist > 0.5) {
+          anyConflict = true;
+          const push = (MIN_LABEL_PIN_DIST - dist);
+          const nx = dx / dist, ny = dy / dist;
+          li.x += nx * push; li.y += ny * push;
+          retailerMarkers[i].labelMarker.setLatLng(mainMap.containerPointToLatLng([li.x, li.y]));
+        }
+      }
+
+      // Update offset record (used for connector line visibility decision)
+      const pi = pinPx[i];
+      const finalLi = mainMap.latLngToContainerPoint(retailerMarkers[i].labelMarker.getLatLng());
+      retailerMarkers[i]._pixelOffset = {
+        x: finalLi.x - pi.x,
+        y: finalLi.y - pi.y
+      };
+    }
+
+    if (!anyConflict) break;
+  }
 
   redrawConnectorLines();
 }
@@ -364,23 +423,39 @@ function redrawConnectorLines() {
   if (!svgOverlay) return;
   svgOverlay.innerHTML = '';
 
+  // containerPoint = screen pixels relative to map container — always correct
   retailerMarkers.forEach(m => {
     const off = m._pixelOffset;
-    if (!off || (Math.abs(off.x) < 4 && Math.abs(off.y) < 4)) return;
+    if (!off || (Math.abs(off.x) < 5 && Math.abs(off.y) < 5)) return;
 
-    const realPx  = mainMap.latLngToContainerPoint([m.ret.lat, m.ret.lng]);
-    const labelPx = mainMap.latLngToContainerPoint(m.labelMarker.getLatLng());
+    const realPt  = mainMap.latLngToContainerPoint([m.ret.lat, m.ret.lng]);
+    const labelPt = mainMap.latLngToContainerPoint(m.labelMarker.getLatLng());
     const color   = getMarkerColor(m.ret);
 
-    // ── Quadratic bezier connector ──
-    const cpx = realPx.x + (labelPx.x - realPx.x) * 0.5;
-    const cpy = Math.min(realPx.y, labelPx.y) - 14;
+    const dx   = labelPt.x - realPt.x;
+    const dy   = labelPt.y - realPt.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 22) return;
+
+    // Line starts at pin dot edge, stops at label bubble edge (not centers)
+    const PIN_EDGE   = 7;
+    const LABEL_EDGE = 17;
+    const x1 = realPt.x  + dx * (PIN_EDGE / dist);
+    const y1 = realPt.y  + dy * (PIN_EDGE / dist);
+    const x2 = realPt.x  + dx * ((dist - LABEL_EDGE) / dist);
+    const y2 = realPt.y  + dy * ((dist - LABEL_EDGE) / dist);
+
+    // Bezier arc — curves gently upward
+    const cpx = (x1 + x2) / 2;
+    const cpy = Math.min(y1, y2) - Math.max(8, dist * 0.10);
+
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', `M${realPx.x},${realPx.y} Q${cpx},${cpy} ${labelPx.x},${labelPx.y}`);
-    path.setAttribute('fill',         'none');
-    path.setAttribute('stroke',       color);
-    path.setAttribute('stroke-width', '1.2');
-    path.setAttribute('opacity',      '0.55');
+    path.setAttribute('d',              `M${x1},${y1} Q${cpx},${cpy} ${x2},${y2}`);
+    path.setAttribute('fill',           'none');
+    path.setAttribute('stroke',         color);
+    path.setAttribute('stroke-width',   '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('opacity',        '0.6');
     svgOverlay.appendChild(path);
   });
 }
@@ -390,6 +465,7 @@ function getMarkerColor(ret) {
   if (ret.has_order_today) return '#10b981';
   return '#2563eb';
 }
+
 
 // ── Skeleton Loader for Retailers Carousel ───────────────────
 function renderRetailerSkeletons() {
@@ -462,13 +538,19 @@ function placeMyLocationMarker() {
   if (window._myMarker) mainMap.removeLayer(window._myMarker);
   if (myCircle) mainMap.removeLayer(myCircle);
 
+  // Red location pin with pulsing ring
   const icon = L.divIcon({
     className: '',
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 8px rgba(37,99,235,.5);"></div>`,
+    html: `<div style="
+      width:18px;height:18px;border-radius:50%;
+      background:#ef4444;
+      border:3px solid #fff;
+      box-shadow:0 0 0 4px rgba(239,68,68,0.25), 0 2px 8px rgba(239,68,68,0.5);
+    "></div>`,
     iconSize: [18, 18], iconAnchor: [9, 9]
   });
   window._myMarker = L.marker([myLat, myLng], { icon }).addTo(mainMap);
-  
+
   myCircle = L.circle([myLat, myLng], {
     radius: 100,
     className: 'sr-radius-circle'
