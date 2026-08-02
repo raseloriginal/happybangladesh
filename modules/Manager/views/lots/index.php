@@ -224,13 +224,32 @@ function renderModalProducts() {
     
     const companyId = document.getElementById('bulk-company').value;
     
-    const filtered = productsList.filter(p => !companyId || p.company_id == companyId);
+    // Collect all product IDs already selected in other rows to prevent duplicate products in lot
+    const activeRow = activeProductSelectButton ? activeProductSelectButton.closest('tr') : null;
+    const selectedProductIds = new Set();
+    document.querySelectorAll('#bulk-rows tr').forEach(row => {
+        if (activeRow && row === activeRow) return;
+        const input = row.querySelector('.row-product');
+        if (input && input.value) {
+            selectedProductIds.add(String(input.value));
+        }
+    });
+
+    const filtered = productsList.filter(p => {
+        if (companyId && p.company_id != companyId) return false;
+        if (selectedProductIds.has(String(p.id))) return false;
+        return true;
+    });
     
     if (filtered.length === 0) {
+        const hasCompanyProducts = productsList.some(p => !companyId || p.company_id == companyId);
+        const emptyMsg = hasCompanyProducts && selectedProductIds.size > 0
+            ? 'All available products for this company have already been added to the lot.'
+            : 'No products found for this company.';
         grid.innerHTML = `
             <div class="col-span-full py-8 text-center text-gray-400">
                 <i class="fas fa-box-open text-3xl mb-2"></i>
-                <p>No products found for this company.</p>
+                <p>${emptyMsg}</p>
             </div>
         `;
         return;
@@ -671,6 +690,9 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
 
     const lots = [];
     let valid = true;
+    const seenProductIds = new Set();
+    let hasDuplicate = false;
+
     rows.forEach(row => {
         const productId = row.querySelector('.row-product').value;
         const qty = row.querySelector('.row-qty').value;
@@ -678,6 +700,12 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
         const price = row.querySelector('.row-price').value;
         
         if(!productId) valid = false;
+        if(productId) {
+            if(seenProductIds.has(productId)) {
+                hasDuplicate = true;
+            }
+            seenProductIds.add(productId);
+        }
         
         lots.push({
             product_id: productId,
@@ -688,6 +716,7 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
     });
 
     if(!valid) return alert('Please fill in all required fields.');
+    if(hasDuplicate) return alert('Duplicate products detected in the lot list. Each product can only be added once.');
 
     const btn = this.querySelector('button[type="submit"]');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
