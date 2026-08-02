@@ -244,8 +244,8 @@
           </tr>
           <tr>
             <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 font-sans">মোট মূল্য</td>
-            <td class="p-2.5 text-slate-800 font-black font-mono">
-              <span id="productSheetBasePrice">—</span>
+            <td class="p-2.5 text-slate-800 font-black font-mono cursor-pointer" onclick="document.getElementById('productSheetBasePriceInput').focus()">
+              Tk <input type="number" id="productSheetBasePriceInput" value="0" min="0" step="any" oninput="calcFromTotal()" style="border:none; background:none; font-weight:900; width:80px; outline:none; padding:0; font-family:monospace;" class="text-slate-800">
             </td>
           </tr>
         </tbody>
@@ -258,12 +258,12 @@
     </div>
     
     <!-- Big Middle counter showing Total Value -->
-    <div class="sr-prod-total-counter-box-v2">
-      <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(-10)">−</button>
+    <div class="sr-prod-total-counter-box-v2" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('totalDisplayInput').focus()" style="cursor:text;">
+      <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(-1)">−</button>
       <div class="sr-prod-total-cnt-value-v2">
         Tk <input type="number" id="totalDisplayInput" value="0" min="0" step="1" oninput="calcTotal()" style="border:none; background:none; font-weight:700; width:100px; text-align:center; color:#0f172a; outline:none;">
       </div>
-      <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(10)">+</button>
+      <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(1)">+</button>
     </div>
     
     <!-- Box & Piece counters -->
@@ -271,7 +271,7 @@
       <!-- Box counter -->
       <div class="sr-prod-qty-counter-v2" id="boxCounterGroup">
         <div class="sr-prod-qty-counter-label-v2 font-sans">বক্স</div>
-        <div class="sr-prod-qty-counter-row-v2">
+        <div class="sr-prod-qty-counter-row-v2" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('qtyCartons').focus()" style="cursor:text;">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('cartons',-1)">−</button>
           <input type="number" id="qtyCartons" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('cartons',1)">+</button>
@@ -280,7 +280,7 @@
       <!-- Piece counter -->
       <div class="sr-prod-qty-counter-v2" id="pieceCounterGroup">
         <div class="sr-prod-qty-counter-label-v2 font-sans">পিস</div>
-        <div class="sr-prod-qty-counter-row-v2">
+        <div class="sr-prod-qty-counter-row-v2" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('qtyPieces').focus()" style="cursor:text;">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('pieces',-1)">−</button>
           <input type="number" id="qtyPieces" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('pieces',1)">+</button>
@@ -792,7 +792,8 @@ function openProductSheet(idx) {
 
   // Carton base price estimation (or piece price if isPcs)
   const defaultDisplayPrice = isPcs ? baseProductPrice : (baseProductPrice * ppb);
-  document.getElementById('productSheetBasePrice').textContent = `Tk 0`;
+  const basePriceInput = document.getElementById('productSheetBasePriceInput');
+  if (basePriceInput) basePriceInput.value = '0';
   
   // Set the big input default to the display price
   document.getElementById('totalDisplayInput').value = defaultDisplayPrice.toFixed(0);
@@ -875,13 +876,43 @@ function calcTotal() {
   document.getElementById('unitPrice').value = currentPiecePrice;
   
   // update মোট মূল্য
-  document.getElementById('productSheetBasePrice').textContent = `Tk ${Math.round(actualTotal)}`;
+  const basePriceInput = document.getElementById('productSheetBasePriceInput');
+  if (basePriceInput && document.activeElement !== basePriceInput) {
+    basePriceInput.value = Math.round(actualTotal);
+  }
   
   const btnText = document.getElementById('addToCartBtnText');
   if (btnText) {
     btnText.textContent = `Tk ${Math.round(actualTotal)} • কার্টে যোগ করুন`;
   }
   updateOcDisplay(totalPcs, actualTotal);
+}
+
+function calcFromTotal() {
+  const p = currentProduct;
+  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || 12);
+  const isPcs = isPcsProduct(p);
+
+  const cartons = isPcs ? 0 : (parseInt(document.getElementById('qtyCartons').value) || 0);
+  const pieces  = parseInt(document.getElementById('qtyPieces').value)  || 0;
+  
+  const pcsPerCarton = isPcs ? 1 : (ppb > 0 ? ppb : 1);
+  const totalPcs = cartons * pcsPerCarton + pieces;
+
+  if (totalPcs > 0) {
+    const newTotal = parseFloat(document.getElementById('productSheetBasePriceInput').value) || 0;
+    const currentPiecePrice = newTotal / totalPcs;
+    const currentBoxPrice = isPcs ? currentPiecePrice : (currentPiecePrice * pcsPerCarton);
+    
+    document.getElementById('totalDisplayInput').value = currentBoxPrice.toFixed(0);
+    document.getElementById('unitPrice').value = currentPiecePrice;
+    
+    const btnText = document.getElementById('addToCartBtnText');
+    if (btnText) {
+      btnText.textContent = `Tk ${Math.round(newTotal)} • কার্টে যোগ করুন`;
+    }
+    updateOcDisplay(totalPcs, newTotal);
+  }
 }
 
 function addToCart() {
