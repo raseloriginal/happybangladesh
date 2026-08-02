@@ -295,13 +295,56 @@
         maximumAge: 0
       };
 
+      // ── Location push to server ─────────────────────────────
+      const PUSH_URL      = '<?= BASE_URL ?>/sr/api/location/push';
+      const PUSH_INTERVAL = 60000; // 60 seconds
+      let lastPushTime    = 0;
+      let lastPushedLat   = null;
+      let lastPushedLng   = null;
+
+      function reverseGeocode(lat, lng, callback) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+          .then(r => r.json())
+          .then(d => callback(d.display_name || null))
+          .catch(() => callback(null));
+      }
+
+      function pushLocationToServer(lat, lng, accuracy) {
+        const now = Date.now();
+        if (now - lastPushTime < PUSH_INTERVAL) return; // throttle
+
+        lastPushTime  = now;
+        lastPushedLat = lat;
+        lastPushedLng = lng;
+
+        function doPost(address) {
+          fetch(PUSH_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lng, address, accuracy })
+          }).catch(() => {}); // silent — background push
+        }
+
+        // Try to get address, fall back to null if it times out
+        const geocodeTimeout = setTimeout(() => doPost(null), 3000);
+        reverseGeocode(lat, lng, addr => {
+          clearTimeout(geocodeTimeout);
+          doPost(addr);
+        });
+      }
+      // ────────────────────────────────────────────────────────
+
       function updateLocationCache(pos) {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+        const lat      = pos.coords.latitude;
+        const lng      = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy;
         
         // Save to cache for instant preloading
         localStorage.setItem('sr_last_lat', lat);
         localStorage.setItem('sr_last_lng', lng);
+
+        // Push to server every 60 seconds
+        pushLocationToServer(lat, lng, accuracy);
         
         // If the Sales map is currently open on this page, update coordinates dynamically
         if (typeof mainMap !== 'undefined' && mainMap && typeof placeMyLocationMarker === 'function') {

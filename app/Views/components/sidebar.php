@@ -24,6 +24,7 @@ $menus = [
         ['icon' => 'fa-file-import',  'label' => 'Import Retailers', 'url' => '/admin/retailers/import'],
         ['icon' => 'fa-database',     'label' => 'Database Sync', 'url' => '/admin/database-sync'],
         ['icon' => 'fa-shield-halved','label' => 'Sessions',      'url' => '/admin/sessions'],
+        ['icon' => 'fa-location-dot', 'label' => 'SR Tracking',   'url' => '/admin/sr-tracking'],
     ],
     'manager' => [
         ['section' => 'OVERVIEW'],

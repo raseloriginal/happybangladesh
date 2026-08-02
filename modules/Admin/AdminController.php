@@ -1173,6 +1173,91 @@ class AdminController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════
+    //  SR Tracking
+    // ══════════════════════════════════════════════════════════
+    public function srTracking(): void
+    {
+        $srList = $this->db->query("
+            SELECT u.id, u.name
+            FROM users u
+            JOIN roles r ON r.id = u.role_id
+            WHERE r.slug = 'sr' AND u.status = 1
+            ORDER BY u.name ASC
+        ")->fetchAll();
+
+        $pageTitle = 'SR Tracking';
+        $this->render('sr_tracking', compact('srList', 'pageTitle'), 'main');
+    }
+
+    /** GET /admin/api/sr-tracking/live
+     *  Returns the latest location for every active SR.
+     *  is_online = true if last ping is within 5 minutes.
+     */
+    public function apiSrTrackingLive(): void
+    {
+        $srs = $this->db->query("
+            SELECT u.id, u.name,
+                   sl.lat, sl.lng, sl.address, sl.recorded_at,
+                   TIMESTAMPDIFF(SECOND, sl.recorded_at, NOW()) AS seconds_ago
+            FROM users u
+            JOIN roles r ON r.id = u.role_id AND r.slug = 'sr'
+            LEFT JOIN sr_locations sl ON sl.id = (
+                SELECT id FROM sr_locations
+                WHERE sr_id = u.id
+                ORDER BY recorded_at DESC LIMIT 1
+            )
+            WHERE u.status = 1
+            ORDER BY u.name ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $result = [];
+        foreach ($srs as $sr) {
+            $result[] = [
+                'id'          => (int)$sr['id'],
+                'name'        => $sr['name'],
+                'lat'         => $sr['lat'] !== null ? (float)$sr['lat'] : null,
+                'lng'         => $sr['lng'] !== null ? (float)$sr['lng'] : null,
+                'address'     => $sr['address'],
+                'recorded_at' => $sr['recorded_at'],
+                'is_online'   => ($sr['seconds_ago'] !== null && (int)$sr['seconds_ago'] <= 300),
+            ];
+        }
+
+        $this->json(['success' => true, 'srs' => $result]);
+    }
+
+    /** GET /admin/api/sr-tracking/history?sr_id=&date=&time_from=&time_to=
+     *  Returns all location points for a specific SR on a given day.
+     */
+    public function apiSrTrackingHistory(): void
+    {
+        $srId     = (int)$this->get('sr_id', 0);
+        $date     = $this->get('date', date('Y-m-d'));
+        $timeFrom = $this->get('time_from', '00:00');
+        $timeTo   = $this->get('time_to', '23:59');
+
+        if (!$srId) {
+            $this->json(['success' => false, 'message' => 'sr_id required']);
+            return;
+        }
+
+        $from = $date . ' ' . $timeFrom . ':00';
+        $to   = $date . ' ' . $timeTo   . ':59';
+
+        $stmt = $this->db->prepare("
+            SELECT id, lat, lng, address, accuracy, recorded_at
+            FROM sr_locations
+            WHERE sr_id = ?
+              AND recorded_at BETWEEN ? AND ?
+            ORDER BY recorded_at ASC
+        ");
+        $stmt->execute([$srId, $from, $to]);
+        $points = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->json(['success' => true, 'points' => $points]);
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  Session Management
     // ══════════════════════════════════════════════════════════
     public function sessions(): void
