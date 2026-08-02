@@ -1050,3 +1050,6 @@ function handleSuggestionSelect(ret) {
   border-color: #cbd5e1 !important;
 }
 </style>
+  border-color: #cbd5e1 !important;
+}
+</style>
