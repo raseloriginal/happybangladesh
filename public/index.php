@@ -165,6 +165,11 @@ $router->get( '/admin/api/orders',            ['AdminController', 'apiOrders']);
 $router->get( '/admin/sessions',              ['AdminController', 'sessions']);
 $router->post('/admin/sessions/logout/{id}',  ['AdminController', 'sessionForceLogout']);
 
+// SR Tracking
+$router->get( '/admin/sr-tracking',                   ['AdminController', 'srTracking']);
+$router->get( '/admin/api/sr-tracking/live',          ['AdminController', 'apiSrTrackingLive']);
+$router->get( '/admin/api/sr-tracking/history',       ['AdminController', 'apiSrTrackingHistory']);
+
 
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
@@ -225,6 +230,7 @@ $router->get( '/sr/api/retailers/search',     ['SRController', 'apiSearchRetaile
 $router->post('/sr/api/retailers/store',      ['SRController', 'apiStoreRetailer']);
 $router->get( '/sr/api/products',             ['SRController', 'apiProducts']);
 $router->get( '/sr/api/today-order',          ['SRController', 'apiGetTodayOrder']);
+$router->post('/sr/api/location/push',        ['SRController', 'apiPushLocation']);
 
 // ── DSR routes ────────────────────────────────────────────────
 $router->get( '/dsr/dashboard',               ['DSRController', 'dashboard']);

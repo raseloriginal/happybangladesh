@@ -1043,4 +1043,40 @@ class SRController extends Controller
 
         $this->renderApp('transactions', compact('transactions', 'date', 'companies', 'subtotal'));
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Location Tracking — SR pushes its GPS location
+    // ══════════════════════════════════════════════════════════
+
+    /** POST /sr/api/location/push
+     *  Body JSON or form-data: { lat, lng, address?, accuracy? }
+     *  Records the SR's current GPS position in sr_locations.
+     */
+    public function apiPushLocation(): void
+    {
+        $srId = Auth::id();
+        if (!$srId) {
+            $this->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            return;
+        }
+
+        // Accept both JSON body and form-data
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $lat      = isset($body['lat'])      ? (float)$body['lat']      : (isset($_POST['lat'])      ? (float)$_POST['lat']      : null);
+        $lng      = isset($body['lng'])      ? (float)$body['lng']      : (isset($_POST['lng'])      ? (float)$_POST['lng']      : null);
+        $address  = isset($body['address'])  ? trim($body['address'])   : (isset($_POST['address'])  ? trim($_POST['address'])   : null);
+        $accuracy = isset($body['accuracy']) ? (float)$body['accuracy'] : (isset($_POST['accuracy']) ? (float)$_POST['accuracy'] : null);
+
+        if ($lat === null || $lng === null || abs($lat) > 90 || abs($lng) > 180) {
+            $this->json(['success' => false, 'message' => 'Invalid coordinates'], 422);
+            return;
+        }
+
+        $this->db->prepare("
+            INSERT INTO sr_locations (sr_id, lat, lng, address, accuracy, recorded_at)
+            VALUES (?, ?, ?, ?, ?, NOW())
+        ")->execute([$srId, $lat, $lng, $address ?: null, $accuracy ?: null]);
+
+        $this->json(['success' => true, 'message' => 'Location recorded']);
+    }
 }
