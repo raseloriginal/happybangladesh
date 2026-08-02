@@ -1,5 +1,12 @@
 <?php $pageTitle = 'ম্যাপ'; ?>
 
+<style>
+  html, body, .sr-app-shell, .sr-app-main {
+    height: 100% !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+  }
+</style>
 
 <!-- ── Fullscreen Map Page ──────────────────────────────────── -->
 <div class="sr-map-page" style="font-family: 'Hind Siliguri', sans-serif;">
@@ -197,6 +204,8 @@ function initOrUpdateFuse() {
 // MAIN MAP INIT
 // ══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.classList.add('sr-map-active');
+  document.body.classList.add('sr-map-active');
   // Delay map and event initialization to unblock First Contentful Paint (FCP)
   setTimeout(() => {
     initMainMap();

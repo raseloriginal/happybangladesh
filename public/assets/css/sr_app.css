@@ -505,11 +505,46 @@
    SALES / MAP PAGE
 ══════════════════════════════════════════════════════════════ */
 
+html:has(.sr-map-page),
+body:has(.sr-map-page),
+html.sr-map-active,
+body.sr-map-active {
+  overflow: hidden !important;
+  height: 100% !important;
+  height: 100dvh !important;
+  position: fixed !important;
+  width: 100% !important;
+}
+
+.sr-app-shell:has(.sr-map-page),
+.sr-app-shell.sr-map-shell {
+  height: 100% !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+  min-height: 100dvh !important;
+}
+
+.sr-app-main.has-no-nav:has(.sr-map-page),
+.sr-app-main.has-no-nav.sr-map-main {
+  height: 100% !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
+
 .sr-map-page {
-  position: fixed;
-  inset: 0;
-  bottom: var(--sr-nav-h);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
   z-index: 1;
+  overflow: hidden;
+}
+
+.sr-app-main:not(.has-no-nav) .sr-map-page {
+  bottom: var(--sr-nav-h);
 }
 
 #srMap {
