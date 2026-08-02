@@ -331,11 +331,44 @@ class ManagerController extends Controller
     // ══════════════════════════════════════════════════════════
     public function lots(): void
     {
-        $items = $this->db->query("
-            SELECT l.*, p.name AS product_name, p.pieces_per_box
-            FROM lots l JOIN products p ON p.id = l.product_id
-            ORDER BY l.created_at DESC
+        $rawLots = $this->db->query("
+            SELECT l.*, p.name AS product_name, p.pieces_per_box, p.box_type, p.sku, p.company_id, c.name AS company_name
+            FROM lots l 
+            JOIN products p ON p.id = l.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
+            ORDER BY COALESCE(l.lot_date, DATE(l.created_at)) DESC, l.id DESC
         ")->fetchAll();
+
+        $batches = [];
+        foreach ($rawLots as $lot) {
+            $lotDate = !empty($lot['lot_date']) ? $lot['lot_date'] : date('Y-m-d', strtotime($lot['created_at']));
+            $compId  = $lot['company_id'] ?? 0;
+            $compKey = $compId . '_' . $lotDate;
+
+            if (!isset($batches[$compKey])) {
+                $batches[$compKey] = [
+                    'company_id'   => $compId,
+                    'company_name' => $lot['company_name'] ?: 'Unknown Company',
+                    'lot_date'     => $lotDate,
+                    'min_lot_id'   => $lot['id'],
+                    'items_count'  => 0,
+                    'total_amount' => 0,
+                    'items'        => []
+                ];
+            }
+            $ppb = max(1, (float)($lot['pieces_per_box'] ?? 1));
+            $unitPrice = (float)$lot['buying_price'] / $ppb;
+            $rowTotal  = ((float)$lot['qty_pieces'] / $ppb) * (float)$lot['buying_price'];
+            
+            $lot['unit_price'] = $unitPrice;
+            $lot['row_total']  = $rowTotal;
+            
+            $batches[$compKey]['items_count']++;
+            $batches[$compKey]['total_amount'] += $rowTotal;
+            $batches[$compKey]['items'][] = $lot;
+        }
+        $batches = array_values($batches);
+
         $products = $this->db->query("
             SELECT p.id, p.name, p.sku, p.company_id, p.image, p.pieces_per_box, p.box_type,
                    COALESCE(SUM(i.qty_boxes), 0) AS stock_boxes,
@@ -347,7 +380,7 @@ class ManagerController extends Controller
             ORDER BY p.name
         ")->fetchAll();
         $companies = $this->db->query("SELECT id, name FROM companies WHERE status=1 ORDER BY name")->fetchAll();
-        $this->render('lots/index', compact('items', 'products', 'companies'));
+        $this->render('lots/index', compact('batches', 'products', 'companies'));
     }
 
     public function apiLotStore(): void
@@ -496,21 +529,146 @@ class ManagerController extends Controller
         $this->db->beginTransaction();
         try {
             // Get lot data before deleting
-            $lot = $this->db->prepare("SELECT product_id, qty_boxes FROM lots WHERE id=?");
+            $lot = $this->db->prepare("SELECT product_id, qty_pieces FROM lots WHERE id=?");
             $lot->execute([$input['id']]);
             $lotData = $lot->fetch();
 
             if ($lotData) {
                 // Reduce inventory, cap at 0
                 $this->db->prepare(
-                    "UPDATE inventory SET qty_boxes = GREATEST(0, qty_boxes - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
-                )->execute([$lotData['qty_boxes'], $lotData['product_id'], $wid, $input['id']]);
+                    "UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
+                )->execute([$lotData['qty_pieces'], $lotData['product_id'], $wid, $input['id']]);
             }
 
             $this->db->prepare("DELETE FROM lots WHERE id=?")->execute([$input['id']]);
 
             $this->db->commit();
             echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiLotBatchDelete(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verifyCsrf();
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
+        if (empty($input['company_id']) || empty($input['lot_date'])) {
+            echo json_encode(['success' => false, 'message' => 'Missing company or date']); exit;
+        }
+
+        $company_id = (int)$input['company_id'];
+        $lot_date   = $input['lot_date'];
+        $wid        = Auth::warehouseId() ?: ($this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn() ?: 1);
+
+        $this->db->beginTransaction();
+        try {
+            $lots = $this->db->prepare("
+                SELECT l.id, l.product_id, l.qty_pieces 
+                FROM lots l
+                JOIN products p ON p.id = l.product_id
+                WHERE p.company_id = ? AND (l.lot_date = ? OR (l.lot_date IS NULL AND DATE(l.created_at) = ?))
+            ");
+            $lots->execute([$company_id, $lot_date, $lot_date]);
+            $lotRows = $lots->fetchAll();
+
+            foreach ($lotRows as $lRow) {
+                $this->db->prepare(
+                    "UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
+                )->execute([$lRow['qty_pieces'], $lRow['product_id'], $wid, $lRow['id']]);
+
+                $this->db->prepare("DELETE FROM lots WHERE id=?")->execute([$lRow['id']]);
+            }
+
+            $this->db->commit();
+            echo json_encode(['success' => true, 'message' => 'Batch lots deleted successfully']);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiLotBatchUpdate(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verifyCsrf();
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
+        if (!$input || empty($input['lots'])) {
+            echo json_encode(['success' => false, 'message' => 'No lots provided']); exit;
+        }
+
+        $orig_company_id = !empty($input['original_company_id']) ? (int)$input['original_company_id'] : (int)($input['company_id'] ?? 0);
+        $orig_lot_date   = !empty($input['original_lot_date']) ? $input['original_lot_date'] : ($input['lot_date'] ?? date('Y-m-d'));
+        
+        $new_company_id  = (int)($input['company_id'] ?? $orig_company_id);
+        $new_lot_date    = !empty($input['lot_date']) ? $input['lot_date'] : $orig_lot_date;
+
+        $wid = Auth::warehouseId() ?: ($this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn() ?: 1);
+
+        $this->db->beginTransaction();
+        try {
+            // 1. Fetch all old lots in this batch to revert inventory
+            $oldLots = $this->db->prepare("
+                SELECT l.id, l.product_id, l.qty_pieces 
+                FROM lots l
+                JOIN products p ON p.id = l.product_id
+                WHERE p.company_id = ? AND (l.lot_date = ? OR (l.lot_date IS NULL AND DATE(l.created_at) = ?))
+            ");
+            $oldLots->execute([$orig_company_id, $orig_lot_date, $orig_lot_date]);
+            $oldRows = $oldLots->fetchAll();
+
+            foreach ($oldRows as $o) {
+                $this->db->prepare(
+                    "UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
+                )->execute([$o['qty_pieces'], $o['product_id'], $wid, $o['id']]);
+
+                $this->db->prepare("DELETE FROM lots WHERE id=?")->execute([$o['id']]);
+            }
+
+            // 2. Insert new lots
+            $lotStmt = $this->db->prepare(
+                "INSERT INTO lots (product_id, lot_date, expiry_date, qty_boxes, buying_price, lot_number, qty_pieces) VALUES (?,?,?,0,?,NULL,?)"
+            );
+
+            foreach ($input['lots'] as $lot) {
+                $product_id   = (int)($lot['product_id'] ?? 0);
+                $qty_pieces   = (int)($lot['qty_pieces'] ?? 0);
+                $buying_price = (float)($lot['buying_price'] ?? 0);
+                $expiry_date  = $lot['expiry_date'] ?: null;
+
+                if (!$product_id || !$qty_pieces) continue;
+
+                $lotStmt->execute([$product_id, $new_lot_date, $expiry_date, $buying_price, $qty_pieces]);
+                $lot_id = $this->db->lastInsertId();
+
+                $this->db->prepare(
+                    "INSERT INTO inventory (warehouse_id, product_id, lot_id, qty_boxes, qty_pieces)
+                     VALUES (?,?,?,0,?)
+                     ON DUPLICATE KEY UPDATE qty_pieces = qty_pieces + VALUES(qty_pieces)"
+                )->execute([$wid, $product_id, $lot_id, $qty_pieces]);
+
+                // Update product buying_price and selling price
+                $prod = $this->db->prepare("SELECT pieces_per_box, dealer_percentage FROM products WHERE id=?");
+                $prod->execute([$product_id]);
+                $p = $prod->fetch();
+
+                if ($p) {
+                    $ppb = max(1, (float)$p['pieces_per_box']);
+                    $dp  = (float)$p['dealer_percentage'];
+                    $selling_price = round($buying_price * (1 + $dp / 100) / $ppb, 2);
+
+                    $this->db->prepare(
+                        "UPDATE products SET buying_price=?, price=? WHERE id=?"
+                    )->execute([$buying_price, $selling_price, $product_id]);
+                }
+            }
+
+            $this->db->commit();
+            echo json_encode(['success' => true, 'message' => 'Lot batch updated successfully']);
         } catch (\Exception $e) {
             $this->db->rollBack();
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);

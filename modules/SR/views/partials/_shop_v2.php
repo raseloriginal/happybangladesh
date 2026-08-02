@@ -661,8 +661,23 @@ function filterProductsTable() {
 
 function renderProductsGrid() {
   const grid = document.getElementById('productsGrid');
-  if (!ALL_PRODUCTS.length) {
-    grid.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;">No products available.</div>`;
+  if (!ALL_PRODUCTS || !ALL_PRODUCTS.length) {
+    grid.innerHTML = `
+      <table class="w-full text-left border-collapse font-sans text-xs">
+        <tbody class="divide-y divide-slate-100">
+          ${[1,2,3,4,5].map(() => `
+            <tr class="sr-skeleton-table-row">
+              <td class="p-3 flex items-center gap-2.5">
+                <div class="sr-skeleton-circle" style="width:32px; height:32px; flex-shrink:0;"></div>
+                <div class="sr-skeleton-line" style="width:65%; height:12px;"></div>
+              </td>
+              <td class="p-3 text-center"><div class="sr-skeleton-line" style="width:35px; height:16px; margin:0 auto; border-radius:4px;"></div></td>
+              <td class="p-3 text-center"><div class="sr-skeleton-line" style="width:50px; height:22px; margin:0 auto; border-radius:6px;"></div></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
     return;
   }
 
@@ -945,6 +960,9 @@ function confirmRetailerCart() {
   confirmBtn.disabled = true;
   confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Placing Order...';
 
+  // Show frosted glass loading overlay
+  SRLoader.showOverlay('আপনার অর্ডার সম্পন্ন করা হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন...');
+
   const formData = new FormData(form);
 
   fetch(`${BASE_URL}/sr/orders/store`, {
@@ -956,6 +974,7 @@ function confirmRetailerCart() {
     isSubmitting = false;
     confirmBtn.disabled = false;
     confirmBtn.innerHTML = originalBtnHtml;
+    SRLoader.hideOverlay();
 
     if (d.success) {
       // 1. Populating the success screen before clearing the cart
@@ -1027,6 +1046,7 @@ function confirmRetailerCart() {
     isSubmitting = false;
     confirmBtn.disabled = false;
     confirmBtn.innerHTML = originalBtnHtml;
+    SRLoader.hideOverlay();
     showMiniToast('❌ Network error', true);
     console.error(err);
   });

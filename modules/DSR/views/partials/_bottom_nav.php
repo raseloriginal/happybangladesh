@@ -9,7 +9,7 @@ $isDelivery   = str_contains($uri, '/dsr/delivery');
 $isStock      = str_contains($uri, '/dsr/van-stock');
 $isSettlement = str_contains($uri, '/dsr/settlement');
 $isExpenses   = str_contains($uri, '/dsr/expenses');
-
+ 
 $dsr_can_settle = true;
 if (class_exists('Database') && class_exists('Auth') && Auth::check()) {
     $db = Database::getInstance();

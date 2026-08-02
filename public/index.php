@@ -186,6 +186,8 @@ $router->get( '/manager/lots',                ['ManagerController', 'lots']);
 $router->post('/manager/api/lots/store',      ['ManagerController', 'apiLotStore']);
 $router->post('/manager/api/lots/update',     ['ManagerController', 'apiLotUpdate']);
 $router->post('/manager/api/lots/delete',     ['ManagerController', 'apiLotDelete']);
+$router->post('/manager/api/lots/delete-batch',['ManagerController', 'apiLotBatchDelete']);
+$router->post('/manager/api/lots/update-batch',['ManagerController', 'apiLotBatchUpdate']);
 
 // Other manager pages
 $router->get( '/manager/inventory',           ['ManagerController', 'inventory']);
@@ -213,6 +215,7 @@ $router->get( '/sr/transactions',             ['SRController', 'transactions']);
 $router->get( '/sr/orders',                   ['SRController', 'orders']);
 $router->get( '/sr/orders/place',             ['SRController', 'placeOrder']);
 $router->post('/sr/orders/store',             ['SRController', 'storeOrder']);
+$router->post('/sr/orders/update',            ['SRController', 'updateOrder']);
 $router->get( '/sr/sales',                    ['SRController', 'sales']);
 $router->get( '/sr/retailers',                ['SRController', 'retailers']);
 $router->get( '/sr/profile',                  ['SRController', 'profile']);

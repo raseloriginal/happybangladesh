@@ -37,7 +37,7 @@ $totalOrderedVal = 0;
         <button type="button" onclick="const inp=document.getElementById('dateInput'); if(inp.showPicker){inp.showPicker()}else{inp.click()}" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition active:scale-95 shadow-2xs border border-slate-200/60" title="তারিখ পরিবর্তন করুন">
           <i class="fa-regular fa-calendar-days text-sm"></i>
         </button>
-        <input type="date" id="dateInput" name="date" value="<?= h($date) ?>" onchange="document.getElementById('dateForm').submit()" class="absolute opacity-0 pointer-events-none inset-0 w-full h-full">
+        <input type="date" id="dateInput" name="date" value="<?= h($date) ?>" onchange="SRLoader.start(); document.getElementById('dateForm').submit()" class="absolute opacity-0 pointer-events-none inset-0 w-full h-full">
       </form>
 
       <button onclick="window.print()" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition active:scale-95 shadow-sm" title="প্রিন্ট রিপোর্ট">

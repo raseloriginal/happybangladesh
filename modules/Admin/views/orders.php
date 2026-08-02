@@ -872,3 +872,6 @@
       .replace(/'/g, '&#039;');
   }
 </script>
+      .replace(/'/g, '&#039;');
+  }
+</script>
