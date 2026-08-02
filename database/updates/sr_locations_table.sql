@@ -3,8 +3,6 @@
 --  Run this file to add GPS tracking support
 -- ============================================================
 
-USE `happybangladesh_dms`;
-
 -- ── SR Locations (live + history) ────────────────────────────
 CREATE TABLE IF NOT EXISTS `sr_locations` (
     `id`         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
