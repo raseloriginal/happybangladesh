@@ -85,6 +85,7 @@ class SRController extends Controller
 
         $q = $this->db->prepare("
             SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
+                   p.buying_price, p.dealer_percentage,
                    COALESCE(SUM(i.qty_boxes * p.pieces_per_box + i.qty_pieces), 0) AS stock
             FROM products p
             LEFT JOIN companies c ON c.id=p.company_id

@@ -243,9 +243,16 @@
             </td>
           </tr>
           <tr>
+            <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 font-sans">প্রতি পিস মূল্য</td>
+            <td class="p-2.5 text-slate-800 font-bold font-mono text-xs" id="productSheetPerPiecePriceWrap">
+              Tk <span id="productSheetPerPiecePriceVal">0.00</span>
+              <span id="productSheetPerPiecePriceFormula" class="text-[10px] text-slate-500 font-sans ml-1"></span>
+            </td>
+          </tr>
+          <tr>
             <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 font-sans">মোট মূল্য</td>
             <td class="p-2.5 text-slate-800 font-black font-mono cursor-pointer" onclick="document.getElementById('productSheetBasePriceInput').focus()">
-              Tk <input type="number" id="productSheetBasePriceInput" value="0" min="0" step="any" oninput="calcFromTotal()" style="border:none; background:none; font-weight:900; width:80px; outline:none; padding:0; font-family:monospace;" class="text-slate-800">
+              Tk <input type="number" id="productSheetBasePriceInput" value="0.00" min="0" step="any" oninput="calcFromTotal()" style="border:none; background:none; font-weight:900; width:80px; outline:none; padding:0; font-family:monospace;" class="text-slate-800">
             </td>
           </tr>
         </tbody>
@@ -261,7 +268,7 @@
     <div class="sr-prod-total-counter-box-v2" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('totalDisplayInput').focus()" style="cursor:text;">
       <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(-1)">−</button>
       <div class="sr-prod-total-cnt-value-v2">
-        Tk <input type="number" id="totalDisplayInput" value="0" min="0" step="1" oninput="calcTotal()" style="border:none; background:none; font-weight:700; width:100px; text-align:center; color:#0f172a; outline:none;">
+        Tk <input type="number" id="totalDisplayInput" value="0.00" min="0" step="0.01" oninput="calcTotal()" style="border:none; background:none; font-weight:700; width:110px; text-align:center; color:#0f172a; outline:none;">
       </div>
       <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(1)">+</button>
     </div>
@@ -783,20 +790,35 @@ function openProductSheet(idx) {
     if (grid) grid.style.gridTemplateColumns = '1fr 1fr';
   }
   
-  // Pre-fill quantities from cart if item already exists
-  const cart = cartsByRetailer[currentRetailer.id] || [];
-  const existing = cart.find(c => c.id === p.id);
+  // Calculate standard selling price per piece based on buying_price & dealer_percentage
+  const buyingPrice = parseFloat(p.buying_price || 0);
+  const dealerPct = parseFloat(p.dealer_percentage || 0);
   
-  const baseProductPrice = parseFloat(p.selling_price || p.price || 0);
+  let baseProductPrice = parseFloat(p.selling_price || p.price || 0);
+  if (buyingPrice > 0) {
+    // selling price per piece = (buying_price_per_box * (1 + dealer_percentage/100)) / ppb
+    baseProductPrice = (buyingPrice * (1 + dealerPct / 100)) / (isPcs ? 1 : ppb);
+  }
+  
   document.getElementById('baseUnitPrice').value = baseProductPrice;
+
+  // Display initial per piece price in info table
+  const perPieceValEl = document.getElementById('productSheetPerPiecePriceVal');
+  const perPieceFormulaEl = document.getElementById('productSheetPerPiecePriceFormula');
+  if (perPieceValEl) perPieceValEl.textContent = baseProductPrice.toFixed(2);
+  if (perPieceFormulaEl && buyingPrice > 0) {
+    perPieceFormulaEl.textContent = `(Buy: ৳${buyingPrice.toFixed(2)} + ${dealerPct}%)`;
+  } else if (perPieceFormulaEl) {
+    perPieceFormulaEl.textContent = '';
+  }
 
   // Carton base price estimation (or piece price if isPcs)
   const defaultDisplayPrice = isPcs ? baseProductPrice : (baseProductPrice * ppb);
   const basePriceInput = document.getElementById('productSheetBasePriceInput');
-  if (basePriceInput) basePriceInput.value = '0';
+  if (basePriceInput) basePriceInput.value = '0.00';
   
   // Set the big input default to the display price
-  document.getElementById('totalDisplayInput').value = defaultDisplayPrice.toFixed(0);
+  document.getElementById('totalDisplayInput').value = defaultDisplayPrice.toFixed(2);
 
   const imgWrap = document.getElementById('productSheetImgWrap');
   if (p && p.image) {
@@ -809,6 +831,10 @@ function openProductSheet(idx) {
   let pieces = 0;
   let currentPiecePrice = baseProductPrice;
   
+  // Pre-fill quantities from cart if item already exists
+  const cart = cartsByRetailer[currentRetailer.id] || [];
+  const existing = cart.find(c => c.id === p.id);
+  
   if (existing) {
     if (isPcs) {
       cartons = 0;
@@ -818,7 +844,7 @@ function openProductSheet(idx) {
       pieces = existing.qty % ppb;
     }
     currentPiecePrice = existing.price;
-    document.getElementById('totalDisplayInput').value = (currentPiecePrice * (isPcs ? 1 : ppb)).toFixed(0);
+    document.getElementById('totalDisplayInput').value = (currentPiecePrice * (isPcs ? 1 : ppb)).toFixed(2);
   }
 
   document.getElementById('qtyCartons').value = cartons;
@@ -839,7 +865,7 @@ function changeQty(type, delta) {
 function changeTotalAmount(amount) {
   const input = document.getElementById('totalDisplayInput');
   let currentBoxPrice = parseFloat(input.value) || 0;
-  input.value = Math.max(0, currentBoxPrice + amount).toFixed(0);
+  input.value = Math.max(0, currentBoxPrice + amount).toFixed(2);
   calcTotal();
 }
 
@@ -849,11 +875,11 @@ function updateOcDisplay(totalPcs, actualTotal) {
   const oc = actualTotal - expectedTotal;
   
   const badge = document.getElementById('productSheetOcBadge');
-  if (Math.round(oc) === 0 || totalPcs === 0) {
+  if (Math.abs(oc) < 0.001 || totalPcs === 0) {
     badge.style.display = 'none';
   } else {
     badge.style.display = 'inline-block';
-    badge.textContent = `Tk ${oc > 0 ? '+' : ''}${Math.round(oc)}`;
+    badge.textContent = `Tk ${oc > 0 ? '+' : ''}${oc.toFixed(2)}`;
     badge.className = `sr-prod-override-badge-v2 ${oc < 0 ? 'neg' : 'pos'}`;
   }
 }
@@ -875,10 +901,16 @@ function calcTotal() {
   
   document.getElementById('unitPrice').value = currentPiecePrice;
   
+  // Update Per Piece Price value dynamically in table
+  const perPieceValEl = document.getElementById('productSheetPerPiecePriceVal');
+  if (perPieceValEl) {
+    perPieceValEl.textContent = currentPiecePrice.toFixed(2);
+  }
+  
   // update মোট মূল্য
   const basePriceInput = document.getElementById('productSheetBasePriceInput');
   if (basePriceInput && document.activeElement !== basePriceInput) {
-    basePriceInput.value = Math.round(actualTotal);
+    basePriceInput.value = actualTotal.toFixed(2);
   }
   
   const btnText = document.getElementById('addToCartBtnText');
