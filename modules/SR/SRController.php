@@ -959,7 +959,8 @@ class SRController extends Controller
         $qOrders = $this->db->prepare("
             SELECT p.id as product_id, p.name as product_name, c.name as company_name, 
                    COALESCE(p.pieces_per_box, 1) as pieces_per_box,
-                   MAX(oi.unit_price) as ordered_price, SUM(oi.quantity) as ordered_qty
+                   MAX(oi.unit_price) as ordered_price, SUM(oi.quantity) as ordered_qty,
+                   SUM(oi.unit_price * oi.quantity) as ordered_val_exact
             FROM order_items oi
             JOIN orders o ON o.id = oi.order_id
             JOIN products p ON p.id = oi.product_id
@@ -1026,7 +1027,7 @@ class SRController extends Controller
                 'pieces_per_box' => (int)($row['pieces_per_box'] ?: 1),
                 'ordered_price'  => $orderedPrice,
                 'ordered_qty'    => $orderedQty,
-                'ordered_val'    => $orderedQty * $orderedPrice,
+                'ordered_val'    => (float)($row['ordered_val_exact'] ?? ($orderedQty * $orderedPrice)),
                 'dispatched_qty' => $dispatchedQty,
                 'dispatched_val' => $dispatchedVal,
                 'sell_qty'       => $sellQty,
