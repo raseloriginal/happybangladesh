@@ -1095,6 +1095,20 @@ function renderDsrList(dsrs) {
   container.innerHTML = '';
   dsrElements = {};
   
+  const wireDateVal = document.getElementById('wire-date')?.value || '';
+  let defaultDeliveryDate = wireDateVal;
+  if (wireDateVal) {
+    const parts = wireDateVal.split('-');
+    if (parts.length === 3) {
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      d.setDate(d.getDate() + 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      defaultDeliveryDate = `${yyyy}-${mm}-${dd}`;
+    }
+  }
+  
   dsrs.forEach(dsr => {
     const div = document.createElement('div');
     div.className = 'connector-card bg-white p-4 rounded-xl border border-gray-200 flex items-center shadow-sm relative pl-8';
@@ -1112,7 +1126,7 @@ function renderDsrList(dsrs) {
       <div class="ml-auto pointer-events-auto flex flex-col items-end gap-1">
          <div class="flex items-center gap-1">
              <label class="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Delivery:</label>
-             <input type="date" id="dsr-date-${dsr.id}" class="form-input text-xs px-1 py-0.5 border-gray-300 rounded shadow-sm w-[110px]" value="${document.getElementById('wire-date').value}">
+             <input type="date" id="dsr-date-${dsr.id}" class="form-input text-xs px-1 py-0.5 border-gray-300 rounded shadow-sm w-[110px]" value="${defaultDeliveryDate}">
          </div>
          <span id="dsr-count-${dsr.id}" class="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">0 SRs</span>
       </div>
