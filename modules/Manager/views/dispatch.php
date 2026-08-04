@@ -316,17 +316,27 @@ let schedules = [];
 let allDsrs = [];
 
 async function fetchDsrs() {
-  const res = await fetch('<?= url("manager/api/dispatch/new-popup-data") ?>');
-  const data = await res.json();
-  allDsrs = data.dsrs || [];
+  try {
+    const res = await fetch('<?= url("manager/api/dispatch/new-popup-data") ?>');
+    const data = await res.json();
+    allDsrs = data.dsrs || [];
+  } catch (e) {
+    console.error('Failed to fetch DSRs', e);
+    allDsrs = [];
+  }
 }
 
 async function loadSchedules() {
   if (allDsrs.length === 0) {
     await fetchDsrs();
   }
-  const res = await fetch('<?= url("manager/api/dispatch/data") ?>');
-  schedules = await res.json();
+  try {
+    const res = await fetch('<?= url("manager/api/dispatch/data") ?>');
+    schedules = await res.json();
+  } catch (e) {
+    console.error('Failed to load schedules', e);
+    schedules = [];
+  }
   renderSchedules();
 }
 
@@ -1026,11 +1036,16 @@ function closeWireModal() {
 
 async function loadWireData() {
   const date = document.getElementById('wire-date').value;
-  const res = await fetch(`<?= url("manager/api/dispatch/new-popup-data") ?>?date=${date}`);
-  const data = await res.json();
-  
-  renderSrList(data.srs);
-  renderDsrList(data.dsrs);
+  try {
+    const res = await fetch(`<?= url("manager/api/dispatch/new-popup-data") ?>?date=${date}`);
+    const data = await res.json();
+    renderSrList(data.srs || []);
+    renderDsrList(data.dsrs || []);
+  } catch (e) {
+    console.error('Failed to load popup data', e);
+    renderSrList([]);
+    renderDsrList([]);
+  }
   clearWires();
 }
 
