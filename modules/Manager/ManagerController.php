@@ -936,21 +936,102 @@ class ManagerController extends Controller
 
         $this->db->beginTransaction();
         try {
-            // Update schedule delivery date
-            $stmt = $this->db->prepare("UPDATE dispatch_schedules SET delivery_date = ? WHERE id = ?");
-            $stmt->execute([$newDeliveryDate, $scheduleId]);
-
-            // Update associated dispatches date if matching old delivery date
-            $stmtDisp = $this->db->prepare("UPDATE dispatches SET dispatch_date = ? WHERE dsr_id = ? AND dispatch_date = ?");
+            // Only move pending or in_transit dispatches to the new date
+            $stmtDisp = $this->db->prepare("UPDATE dispatches SET dispatch_date = ? WHERE dsr_id = ? AND dispatch_date = ? AND status IN ('pending', 'in_transit')");
             $stmtDisp->execute([$newDeliveryDate, $dsrId, $oldDeliveryDate]);
 
-            // Update associated returns date if matching old delivery date
-            $stmtRet = $this->db->prepare("UPDATE returns SET return_date = ? WHERE dsr_id = ? AND return_date = ?");
-            $stmtRet->execute([$newDeliveryDate, $dsrId, $oldDeliveryDate]);
+            // Check if a schedule already exists for the new date
+            $checkSch = $this->db->prepare("SELECT id FROM dispatch_schedules WHERE dsr_id = ? AND (delivery_date = ? OR (delivery_date IS NULL AND dispatch_date = ?))");
+            $checkSch->execute([$dsrId, $newDeliveryDate, $newDeliveryDate]);
+            $newSchId = $checkSch->fetchColumn();
+            
+            if (!$newSchId) {
+                // Create new schedule for the new date
+                $this->db->prepare("INSERT INTO dispatch_schedules (dsr_id, dispatch_date, delivery_date, status) VALUES (?, ?, ?, 'organized')")
+                         ->execute([$dsrId, $dispatchDate, $newDeliveryDate]);
+                $newSchId = $this->db->lastInsertId();
+            }
 
-            // Update associated settlements date if matching old delivery date
-            $stmtSett = $this->db->prepare("UPDATE settlements SET date = ? WHERE dsr_id = ? AND date = ?");
-            $stmtSett->execute([$newDeliveryDate, $dsrId, $oldDeliveryDate]);
+            // Ensure SRs are attached to the new schedule so order value calculates correctly
+            $this->db->prepare("
+                INSERT IGNORE INTO dispatch_schedule_srs (schedule_id, sr_id)
+                SELECT ?, sr_id FROM dispatch_schedule_srs WHERE schedule_id = ?
+            ")->execute([$newSchId, $scheduleId]);
+
+            // Check if there are any dispatches left on the old date
+            $left = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id = ? AND dispatch_date = ?");
+            $left->execute([$dsrId, $oldDeliveryDate]);
+            if ($left->fetchColumn() == 0) {
+                // No dispatches left on old date, safe to remove old schedule
+                $this->db->prepare("DELETE FROM dispatch_schedules WHERE id = ?")->execute([$scheduleId]);
+            } else {
+                // If there are dispatches left on the old date, we leave the old schedule intact.
+                // We also update its status if needed, but 'dispatched' or whatever it is should remain.
+            }
+
+            // We do NOT move returns or settlements! They belong to the date they were made.
+            
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiDispatchDelete(string $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $schedule = $this->db->prepare("SELECT * FROM dispatch_schedules WHERE id = ?");
+        $schedule->execute([$id]);
+        $sch = $schedule->fetch();
+
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found']);
+            exit;
+        }
+
+        if (!in_array($sch['status'], ['assigned', 'organized'])) {
+            echo json_encode(['success' => false, 'message' => 'Cannot delete a schedule that is already dispatched or returned.']);
+            exit;
+        }
+
+        $dsrId = $sch['dsr_id'];
+        $date = $sch['dispatch_date'];
+        $deliv_date = $sch['delivery_date'] ?: $date;
+
+        $this->db->beginTransaction();
+        try {
+            // Revert orders status to 'confirmed' so they can be dispatched again
+            $dispatches = $this->db->prepare("SELECT order_id FROM dispatches WHERE dsr_id = ? AND dispatch_date = ? AND order_id IS NOT NULL");
+            $dispatches->execute([$dsrId, $deliv_date]);
+            $orderIds = $dispatches->fetchAll(\PDO::FETCH_COLUMN);
+
+            if (!empty($orderIds)) {
+                $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+                $this->db->prepare("UPDATE orders SET status = 'confirmed' WHERE id IN ($placeholders)")->execute($orderIds);
+            }
+
+            // Delete dispatch_items
+            $this->db->prepare("
+                DELETE di FROM dispatch_items di
+                JOIN dispatches d ON d.id = di.dispatch_id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            ")->execute([$dsrId, $deliv_date]);
+
+            // Delete dispatches
+            $this->db->prepare("DELETE FROM dispatches WHERE dsr_id = ? AND dispatch_date = ?")->execute([$dsrId, $deliv_date]);
+
+            // Delete extras
+            $this->db->prepare("DELETE FROM dispatch_extras WHERE schedule_id = ?")->execute([$id]);
+
+            // Delete schedule srs
+            $this->db->prepare("DELETE FROM dispatch_schedule_srs WHERE schedule_id = ?")->execute([$id]);
+
+            // Delete schedule
+            $this->db->prepare("DELETE FROM dispatch_schedules WHERE id = ?")->execute([$id]);
 
             $this->db->commit();
             echo json_encode(['success' => true]);
