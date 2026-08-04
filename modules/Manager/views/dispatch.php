@@ -380,9 +380,7 @@ function renderSchedules() {
         <div class="text-xs font-bold text-gray-800">Order: ${sch.dispatch_date}</div>
         <div class="text-[11px] text-gray-500 font-medium mt-0.5 flex items-center gap-1">
           <span>Deliv: ${sch.delivery_date || sch.dispatch_date}</span>
-          <button onclick="openEditDeliveryDateModal(${sch.id}, '${sch.delivery_date || sch.dispatch_date}')" class="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change Delivery Date">
-            <i class="fa-solid fa-pen text-[10px]"></i>
-          </button>
+          ${sch.status !== 'returned' ? `<button onclick="openEditDeliveryDateModal(${sch.id}, '${sch.delivery_date || sch.dispatch_date}')" class="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change Delivery Date"><i class="fa-solid fa-pen text-[10px]"></i></button>` : ''}
         </div>
       </td>
       <td>

@@ -921,7 +921,7 @@ class ManagerController extends Controller
             exit;
         }
 
-        $sch = $this->db->prepare("SELECT dsr_id, dispatch_date, delivery_date FROM dispatch_schedules WHERE id = ?");
+        $sch = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE id = ?");
         $sch->execute([$scheduleId]);
         $schData = $sch->fetch();
 
@@ -930,51 +930,19 @@ class ManagerController extends Controller
             exit;
         }
 
-        $dsrId = $schData['dsr_id'];
-        $dispatchDate = $schData['dispatch_date'];
-        $oldDeliveryDate = $schData['delivery_date'] ?: $dispatchDate;
+        // Returned schedules cannot have their date changed
+        if ($schData['status'] === 'returned') {
+            echo json_encode(['success' => false, 'message' => 'Returned dispatch এর delivery date পরিবর্তন করা যাবে না।']);
+            exit;
+        }
 
-        $this->db->beginTransaction();
         try {
-            // Only move pending or in_transit dispatches to the new date
-            $stmtDisp = $this->db->prepare("UPDATE dispatches SET dispatch_date = ? WHERE dsr_id = ? AND dispatch_date = ? AND status IN ('pending', 'in_transit')");
-            $stmtDisp->execute([$newDeliveryDate, $dsrId, $oldDeliveryDate]);
+            // Simply update only the delivery_date column. Nothing else.
+            $this->db->prepare("UPDATE dispatch_schedules SET delivery_date = ? WHERE id = ?")
+                     ->execute([$newDeliveryDate, $scheduleId]);
 
-            // Check if a schedule already exists for the new date
-            $checkSch = $this->db->prepare("SELECT id FROM dispatch_schedules WHERE dsr_id = ? AND (delivery_date = ? OR (delivery_date IS NULL AND dispatch_date = ?))");
-            $checkSch->execute([$dsrId, $newDeliveryDate, $newDeliveryDate]);
-            $newSchId = $checkSch->fetchColumn();
-            
-            if (!$newSchId) {
-                // Create new schedule for the new date
-                $this->db->prepare("INSERT INTO dispatch_schedules (dsr_id, dispatch_date, delivery_date, status) VALUES (?, ?, ?, 'organized')")
-                         ->execute([$dsrId, $dispatchDate, $newDeliveryDate]);
-                $newSchId = $this->db->lastInsertId();
-            }
-
-            // Ensure SRs are attached to the new schedule so order value calculates correctly
-            $this->db->prepare("
-                INSERT IGNORE INTO dispatch_schedule_srs (schedule_id, sr_id)
-                SELECT ?, sr_id FROM dispatch_schedule_srs WHERE schedule_id = ?
-            ")->execute([$newSchId, $scheduleId]);
-
-            // Check if there are any dispatches left on the old date
-            $left = $this->db->prepare("SELECT COUNT(*) FROM dispatches WHERE dsr_id = ? AND dispatch_date = ?");
-            $left->execute([$dsrId, $oldDeliveryDate]);
-            if ($left->fetchColumn() == 0) {
-                // No dispatches left on old date, safe to remove old schedule
-                $this->db->prepare("DELETE FROM dispatch_schedules WHERE id = ?")->execute([$scheduleId]);
-            } else {
-                // If there are dispatches left on the old date, we leave the old schedule intact.
-                // We also update its status if needed, but 'dispatched' or whatever it is should remain.
-            }
-
-            // We do NOT move returns or settlements! They belong to the date they were made.
-            
-            $this->db->commit();
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
-            $this->db->rollBack();
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         exit;
@@ -1739,11 +1707,6 @@ class ManagerController extends Controller
         header('Content-Type: application/json; charset=utf-8');
         $input = json_decode(file_get_contents('php://input'), true);
         $products = $input['products'] ?? [];
-        
-        if (empty($products)) {
-            echo json_encode(['success' => false, 'message' => 'No products provided']);
-            exit;
-        }
 
         $sch = $this->db->query("SELECT dsr_id, dispatch_date, delivery_date FROM dispatch_schedules WHERE id = " . (int)$scheduleId)->fetch();
         if (!$sch) {
@@ -1760,35 +1723,38 @@ class ManagerController extends Controller
 
         $this->db->beginTransaction();
         try {
-            $this->db->prepare("INSERT INTO returns (dsr_id, return_date, status) VALUES (?, ?, 'pending')")
-                     ->execute([$dsrId, $deliv_date]);
-            $returnId = $this->db->lastInsertId();
+            if (!empty($products)) {
+                $this->db->prepare("INSERT INTO returns (dsr_id, return_date, status) VALUES (?, ?, 'pending')")
+                         ->execute([$dsrId, $deliv_date]);
+                $returnId = $this->db->lastInsertId();
 
-            foreach ($products as $p) {
-                $pid = (int)$p['id'];
-                $qty = (int)$p['qty'];
-                
-                $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, quantity - ?) WHERE dsr_id = ? AND product_id = ?")
-                         ->execute([$qty, $dsrId, $pid]);
-                         
-                $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason) VALUES (?, ?, ?, 'good')")
-                         ->execute([$returnId, $pid, $qty]);
-                         
-                // Restore to warehouse inventory
-                $exists = $this->db->prepare("SELECT id FROM inventory WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL");
-                $exists->execute([$pid, $wId]);
-                if ($exists->fetch()) {
-                    $this->db->prepare("UPDATE inventory SET qty_pieces = qty_pieces + ? WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL")
-                             ->execute([$qty, $pid, $wId]);
-                } else {
-                    $this->db->prepare("INSERT INTO inventory (warehouse_id, product_id, qty_boxes, qty_pieces, lot_id) VALUES (?, ?, 0, ?, NULL)")
-                             ->execute([$wId, $pid, $qty]);
+                foreach ($products as $p) {
+                    $pid = (int)$p['id'];
+                    $qty = (int)$p['qty'];
+                    if ($qty <= 0) continue;
+                    
+                    $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, quantity - ?) WHERE dsr_id = ? AND product_id = ?")
+                             ->execute([$qty, $dsrId, $pid]);
+                             
+                    $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason) VALUES (?, ?, ?, 'good')")
+                             ->execute([$returnId, $pid, $qty]);
+                             
+                    // Restore to warehouse inventory
+                    $exists = $this->db->prepare("SELECT id FROM inventory WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL");
+                    $exists->execute([$pid, $wId]);
+                    if ($exists->fetch()) {
+                        $this->db->prepare("UPDATE inventory SET qty_pieces = qty_pieces + ? WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL")
+                                 ->execute([$qty, $pid, $wId]);
+                    } else {
+                        $this->db->prepare("INSERT INTO inventory (warehouse_id, product_id, qty_boxes, qty_pieces, lot_id) VALUES (?, ?, 0, ?, NULL)")
+                                 ->execute([$wId, $pid, $qty]);
+                    }
                 }
             }
 
             $this->db->prepare("UPDATE dispatch_schedules SET status = 'returned' WHERE id = ?")->execute([$scheduleId]);
             
-            $this->db->prepare("UPDATE dispatches SET status='returned', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status='in_transit'")
+            $this->db->prepare("UPDATE dispatches SET status='returned', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status IN ('pending', 'in_transit')")
                      ->execute([$dsrId, $deliv_date]);
 
             $this->db->commit();

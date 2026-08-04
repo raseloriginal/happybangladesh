@@ -673,6 +673,19 @@ class DSRController extends Controller
         $dsrId = Auth::id();
         $selectedDate = $_GET['date'] ?? date('Y-m-d');
 
+        // Check dispatch schedule status for this date (must all be returned)
+        $qSch = $this->db->prepare("
+            SELECT COUNT(*) as total_schedules,
+                   SUM(CASE WHEN status = 'returned' THEN 1 ELSE 0 END) as returned_schedules
+            FROM dispatch_schedules
+            WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?))
+        ");
+        $qSch->execute([$dsrId, $selectedDate, $selectedDate]);
+        $schRow = $qSch->fetch();
+        $totSch = (int)($schRow['total_schedules'] ?? 0);
+        $retSch = (int)($schRow['returned_schedules'] ?? 0);
+        $scheduleStatus = ($totSch > 0 && $totSch === $retSch) ? 'returned' : 'pending';
+
         // Calculate Dispatched Value and Spot Return Value (from deliveries)
         $q = $this->db->prepare("
             SELECT 
@@ -724,7 +737,7 @@ class DSRController extends Controller
         $check->execute([$dsrId, $selectedDate]);
         $existingSettlement = $check->fetch() ?: null;
 
-        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'selectedDate', 'existingSettlement'), 'dsr_app');
+        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'selectedDate', 'existingSettlement', 'scheduleStatus'), 'dsr_app');
     }
 
     public function settlementSubmit(): void
@@ -732,6 +745,33 @@ class DSRController extends Controller
         $this->verifyCsrf();
         $dsrId = Auth::id();
         $date = $this->post('settlement_date', date('Y-m-d'));
+
+        // Validate that settlement is not already submitted
+        $check = $this->db->prepare("SELECT id FROM settlements WHERE dsr_id=? AND date=?");
+        $check->execute([$dsrId, $date]);
+        if ($check->fetch()) {
+            $this->flash('error', 'এই দিনের সেটেলমেন্ট ইতিমধ্যেই জমা দেওয়া হয়েছে।');
+            $this->redirect('dsr/settlement?date=' . $date);
+            return;
+        }
+
+        // Validate that dispatch schedule is returned
+        $qSch = $this->db->prepare("
+            SELECT COUNT(*) as total_schedules,
+                   SUM(CASE WHEN status = 'returned' THEN 1 ELSE 0 END) as returned_schedules
+            FROM dispatch_schedules
+            WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?))
+        ");
+        $qSch->execute([$dsrId, $date, $date]);
+        $schRow = $qSch->fetch();
+        $totSch = (int)($schRow['total_schedules'] ?? 0);
+        $retSch = (int)($schRow['returned_schedules'] ?? 0);
+
+        if ($totSch === 0 || $totSch !== $retSch) {
+            $this->flash('error', 'ম্যানেজার কর্তৃক ডেলিভারি স্ট্যাটাস Returned হওয়ার পর সেটেলমেন্ট জমা দিতে পারবেন।');
+            $this->redirect('dsr/settlement?date=' . $date);
+            return;
+        }
         
         $dispatched = (float) $this->post('dispatched_value', 0);
         $returned = (float) $this->post('returned_value', 0);

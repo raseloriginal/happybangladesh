@@ -9,14 +9,6 @@ $isDelivery   = str_contains($uri, '/dsr/delivery');
 $isStock      = str_contains($uri, '/dsr/van-stock');
 $isSettlement = str_contains($uri, '/dsr/settlement');
 $isExpenses   = str_contains($uri, '/dsr/expenses');
- 
-$dsr_can_settle = true;
-if (class_exists('Database') && class_exists('Auth') && Auth::check()) {
-    $db = Database::getInstance();
-    $q = $db->prepare("SELECT COUNT(*) FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=CURDATE() OR (delivery_date IS NULL AND dispatch_date=CURDATE())) AND status != 'returned'");
-    $q->execute([Auth::id()]);
-    $dsr_can_settle = ($q->fetchColumn() == 0);
-}
 ?>
 
 <!-- ── Excel-Style Bottom Sheet Tabs Nav for DSR Panel ───────────────────────── -->
@@ -44,19 +36,11 @@ if (class_exists('Database') && class_exists('Auth') && Auth::check()) {
   </a>
 
   <!-- Tab 4: Settlement -->
-  <?php if ($dsr_can_settle): ?>
   <a href="<?= url('dsr/settlement') ?>" 
      class="flex-1 flex flex-col items-center justify-center gap-1 border-r border-slate-200 transition-all pt-1 pb-1 <?= $isSettlement ? 'bg-white border-t-[3.5px] border-blue-600 text-blue-600 font-extrabold shadow-2xs' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-t-[3.5px] border-transparent' ?>">
     <i class="fa-solid fa-file-invoice-dollar text-lg <?= $isSettlement ? 'scale-110' : '' ?> transition duration-200"></i>
     <span class="text-[12px] tracking-tight font-bold">হিসাব</span>
   </a>
-  <?php else: ?>
-  <div onclick="alert('ডেলিভারি স্ট্যাটাস রিটার্ন হওয়ার পর হিসাব মিলাতে পারবেন।')" 
-       class="flex-1 flex flex-col items-center justify-center gap-1 border-r border-slate-200 transition-all pt-1 pb-1 bg-slate-50 text-slate-400 opacity-60 cursor-pointer border-t-[3.5px] border-transparent">
-    <i class="fa-solid fa-file-invoice-dollar text-lg"></i>
-    <span class="text-[12px] tracking-tight font-bold">হিসাব</span>
-  </div>
-  <?php endif; ?>
 
   <!-- Tab 5: Expenses -->
   <a href="<?= url('dsr/expenses') ?>" 
