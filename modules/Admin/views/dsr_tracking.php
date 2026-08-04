@@ -163,10 +163,10 @@ $dsrList = $dsrList ?? [];
 <!-- ── Tab Switcher ───────────────────────────────────────────── -->
 <div class="bg-slate-100 rounded-xl p-1 inline-flex gap-1 mb-5">
   <button id="tab-live-btn" class="track-tab-btn active" onclick="switchTab('live')">
-    <i class="fa-solid fa-circle text-emerald-500 text-[9px] animate-pulse"></i> SR Live Location
+    <i class="fa-solid fa-circle text-emerald-500 text-[9px] animate-pulse"></i> DSR Live Location
   </button>
   <button id="tab-hist-btn" class="track-tab-btn" onclick="switchTab('history')">
-    <i class="fa-solid fa-clock-rotate-left text-[13px]"></i> SR Location History
+    <i class="fa-solid fa-clock-rotate-left text-[13px]"></i> DSR Location History
   </button>
 </div>
 
@@ -232,8 +232,8 @@ $dsrList = $dsrList ?? [];
     <div class="filter-bar">
       <select id="histDsrFilter">
         <option value="">— Select DSR —</option>
-        <?php foreach ($dsrList as $sr): ?>
-        <option value="<?= $sr['id'] ?>"><?= h($sr['name']) ?></option>
+        <?php foreach ($dsrList as $dsr): ?>
+        <option value="<?= $dsr['id'] ?>"><?= h($dsr['name']) ?></option>
         <?php endforeach; ?>
       </select>
       <input type="date" id="histDateFilter" value="<?= date('Y-m-d') ?>">
@@ -620,12 +620,12 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 function loadHistory() {
-  const srId   = document.getElementById('histDsrFilter').value;
+  const dsrId  = document.getElementById('histDsrFilter').value;
   const date   = document.getElementById('histDateFilter').value;
   const tFrom  = document.getElementById('histTimeFrom').value;
   const tTo    = document.getElementById('histTimeTo').value;
 
-  if (!srId) { alert('Please select an SR first.'); return; }
+  if (!dsrId) { alert('Please select a DSR first.'); return; }
   if (!date) { alert('Please select a date.'); return; }
 
   stopRouteAnimation();
@@ -633,7 +633,7 @@ function loadHistory() {
   info.classList.remove('hidden');
   document.getElementById('histMapStatus').innerHTML = 'Loading route…';
 
-  const params = new URLSearchParams({ dsr_id: srId, date, time_from: tFrom, time_to: tTo });
+  const params = new URLSearchParams({ dsr_id: dsrId, date, time_from: tFrom, time_to: tTo });
   fetch(API_HISTORY + '?' + params.toString())
     .then(r => r.json())
     .then(data => {
