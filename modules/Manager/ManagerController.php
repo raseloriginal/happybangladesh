@@ -774,7 +774,7 @@ class ManagerController extends Controller
                         SELECT SUM(CAST(SUBSTRING_INDEX(r.reason, 'Amount: ', -1) AS DECIMAL(14,2)))
                         FROM returns r
                         LEFT JOIN return_items ri ON ri.return_id = r.id
-                        WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND r.reason LIKE 'Damage%' AND ri.id IS NULL
+                        WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND r.reason LIKE '%Amount:%' AND ri.id IS NULL
                     ), 0)
             ")->fetchColumn();
             
@@ -806,8 +806,9 @@ class ManagerController extends Controller
         
         $srs = $this->db->prepare("
             SELECT u.id, u.name, u.avatar, COUNT(o.id) as order_count,
-                   CASE WHEN soc.id IS NOT NULL THEN 1 ELSE 0 END AS is_cutoff,
-                   soc.cutoff_at, soc.is_auto
+                   MAX(CASE WHEN soc.id IS NOT NULL THEN 1 ELSE 0 END) AS is_cutoff,
+                   MAX(soc.cutoff_at) AS cutoff_at,
+                   MAX(soc.is_auto) AS is_auto
             FROM users u 
             JOIN roles r ON r.id = u.role_id 
             JOIN orders o ON o.sr_id = u.id AND DATE(o.created_at) = ?
@@ -820,7 +821,7 @@ class ManagerController extends Controller
                 JOIN dispatch_schedules ds ON ds.id = dss.schedule_id 
                 WHERE ds.dispatch_date = ?
             )
-            GROUP BY u.id
+            GROUP BY u.id, u.name, u.avatar
         ");
         $srs->execute([$date, $date, $date]);
         $srsList = $srs->fetchAll();
@@ -841,9 +842,9 @@ class ManagerController extends Controller
 
         $rows = $this->db->prepare("
             SELECT u.id, u.name,
-                   CASE WHEN soc.id IS NOT NULL THEN 1 ELSE 0 END AS is_cutoff,
-                   soc.cutoff_at,
-                   soc.is_auto,
+                   MAX(CASE WHEN soc.id IS NOT NULL THEN 1 ELSE 0 END) AS is_cutoff,
+                   MAX(soc.cutoff_at) AS cutoff_at,
+                   MAX(soc.is_auto) AS is_auto,
                    COUNT(o.id) as order_count,
                    COALESCE(SUM(o.total_amount), 0) as order_value
             FROM users u
@@ -853,7 +854,7 @@ class ManagerController extends Controller
                 AND soc.cutoff_date = ?
                 AND soc.undone_by IS NULL
             WHERE r.slug = 'sr' AND u.status = 1
-            GROUP BY u.id
+            GROUP BY u.id, u.name
             ORDER BY u.name
         ");
         $rows->execute([$date, $date]);
