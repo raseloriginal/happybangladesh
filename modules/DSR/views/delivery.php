@@ -101,7 +101,9 @@ $hasDeliveries = !empty($retailers);
       <!-- Retailer Info -->
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
-          <img id="bsRetailerAvatar" src="" class="w-12 h-12 rounded-full object-cover border border-gray-100 shadow-sm" onerror="this.src='https://i.pravatar.cc/100?img=12'">
+          <div class="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0 shadow-sm">
+            <i class="fa-solid fa-store text-base"></i>
+          </div>
           <div>
             <h2 class="text-base font-black text-gray-800 leading-tight" id="bsRetailerName">Retailer Name</h2>
             <p class="text-xs text-gray-400 font-bold mt-0.5" id="bsRetailerSub">Address details</p>
@@ -1115,10 +1117,9 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
     currentRetailerObj = retailer;
     currentOrderIndex = defaultIndex;
     
-    // Set Name & Subtitle & Avatar
+    // Set Name & Subtitle
     document.getElementById('bsRetailerName').innerText = retailer.retailer_name || retailer.dealer_name || retailer.name;
     document.getElementById('bsRetailerSub').innerText = retailer.retailer_name ? retailer.dealer_name : 'Retailer';
-    document.getElementById('bsRetailerAvatar').src = 'https://i.pravatar.cc/100?img=' + ((parseInt(retailer.dealer_id) % 70) + 1);
     
     // Update damage button icon & styling based on whether damage is recorded for this retailer
     updateDamageBtnState(retailer.has_damage);
@@ -1162,6 +1163,11 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
             } else {
                 order.products.forEach((p, idx) => {
                     const ppb = parseInt(p.pieces_per_box) || 1;
+                    const boxTypeStr = (p.box_type || '').toString().trim().toLowerCase();
+                    const pcsKeywords = ['pcs', 'pc', 'piece', 'pieces', 'পিস', 'পিছ'];
+                    const isPcs = pcsKeywords.includes(boxTypeStr) || (ppb <= 1);
+                    const boxLabel = (p.box_type && p.box_type.trim()) ? p.box_type.trim() : 'Box';
+
                     const qty = parseInt(p.quantity); // pieces dispatched on van
 
                     let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
@@ -1169,10 +1175,28 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                     const initialBoxes = Math.floor(initialDeliveredQty / ppb);
                     const initialPcs = initialDeliveredQty % ppb;
 
+                    const boxInputHtml = isPcs ? `
+                        <input type="hidden" value="0" class="delivery-input-box"
+                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}">
+                    ` : `
+                        <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
+                            <input type="number" min="0" value="${initialBoxes}"
+                                class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-box text-sm"
+                                data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+                                oninput="calcProgress(this, '${orderIdx}-${idx}')">
+                            <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">${boxLabel}</div>
+                        </div>
+                    `;
+
                     orderHtml += `
-                    <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
-                        <div class="flex items-center gap-4 mb-3">
-                            <div class="w-16 h-16 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 p-1">
+                    <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" style="position: relative;" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
+                        <!-- Top Right Van Stock Badge -->
+                        <div style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                            ${vanStockMap[p.product_id] ? `<span class="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Van: ${vanStockMap[p.product_id]}pcs</span>` : `<span class="text-[11px] font-black text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg">Van: 0pcs</span>`}
+                        </div>
+
+                        <div class="flex items-center gap-3 mb-3" style="padding-right: 75px;">
+                            <div class="w-14 h-14 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 p-1 border border-gray-100">
                                 ${(() => {
                                     if (!p.image) return '<i class="fa-solid fa-box text-gray-300 text-2xl"></i>';
                                     const src = (p.image.startsWith('http://') || p.image.startsWith('https://')) ? p.image : '<?= BASE_URL ?>/' + p.image.replace(/^\/+/, '');
@@ -1184,24 +1208,16 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                                 <div class="flex items-center gap-2 mt-1 flex-wrap">
                                     <div class="text-xs font-black text-pink-500" id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</div>
                                     <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
-                                    ${vanStockMap[p.product_id] ? `<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">Van: ${vanStockMap[p.product_id]}pcs</span>` : `<span class="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-md">Van: 0</span>`}
                                 </div>
                             </div>
                         </div>
 
                         <!-- Delivery Input Box & Pcs -->
                         <div class="flex gap-3 mt-3">
-                            <!-- Box Input -->
-                            <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
-                                <input type="number" min="0" value="${initialBoxes}"
-                                    class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-box text-sm"
-                                    data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
-                                    oninput="calcProgress(this, '${orderIdx}-${idx}')">
-                                <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">Box</div>
-                            </div>
+                            ${boxInputHtml}
                             <!-- Pcs Input -->
                             <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
-                                <input type="number" min="0" value="${initialPcs}"
+                                <input type="number" min="0" value="${isPcs ? initialDeliveredQty : initialPcs}"
                                     class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-pcs text-sm"
                                     data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                     oninput="calcProgress(this, '${orderIdx}-${idx}')">

@@ -489,8 +489,9 @@ function renderRetailerCart() {
       ? `<img src="${BASE_URL}/${escHtml(prod.image)}" class="w-7 h-7 rounded-lg object-contain bg-slate-50 border border-slate-200 shrink-0" alt="" loading="lazy" onerror="handleProductImageError(this)">`
       : `<div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-regular fa-image text-[9px]"></i></div>`;
       
-    const ocHtml = c.oc !== 0 && c.oc !== undefined 
-      ? `<span class="inline-block text-[9px] font-extrabold px-1 py-0.2 rounded ${c.oc < 0 ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}">${c.oc > 0 ? '+' : ''}${Math.round(c.oc)} O/C</span>` 
+    const roundedOc = Math.round(c.oc || 0);
+    const ocHtml = Math.abs(roundedOc) >= 1 
+      ? `<span class="inline-block text-[9px] font-extrabold px-1 py-0.2 rounded ${roundedOc < 0 ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}">${roundedOc > 0 ? '+' : ''}${roundedOc} O/C</span>` 
       : '';
         
     tableHtml += `
@@ -503,9 +504,8 @@ function renderRetailerCart() {
           </div>
         </td>
         <td class="p-2 text-center border-r border-slate-200 font-mono text-[10px] text-slate-600">
-          <div class="flex flex-col gap-0.5 items-center">
-            <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${boxes.toString().padStart(2, '0')} B</span>
-            <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${pcs.toString().padStart(2, '0')} P</span>
+          <div class="flex justify-center items-center">
+            <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200/50 font-bold text-xs">${c.qty.toString().padStart(2, '0')} P</span>
           </div>
         </td>
         <td class="p-2 text-right font-bold border-r border-slate-200 text-slate-950 font-mono text-[11px]">
@@ -531,11 +531,12 @@ function renderRetailerCart() {
   document.getElementById('retCartGrandTotal').textContent = 'Tk ' + Math.round(totalVal);
   
   const totalOc = cart.reduce((sum, item) => sum + (item.oc || 0), 0);
+  const roundedTotalOc = Math.round(totalOc);
   const retCartOcVal = document.getElementById('retCartOcVal');
-  if (totalOc !== 0) {
+  if (Math.abs(roundedTotalOc) >= 1) {
     retCartOcVal.style.display = 'block';
-    retCartOcVal.textContent = `O/C ${totalOc > 0 ? '+' : ''}${Math.round(totalOc)}`;
-    retCartOcVal.className = `sr-cart-summary-oc-v2 ${totalOc < 0 ? 'neg' : 'pos'}`;
+    retCartOcVal.textContent = `O/C ${roundedTotalOc > 0 ? '+' : ''}${roundedTotalOc}`;
+    retCartOcVal.className = `sr-cart-summary-oc-v2 ${roundedTotalOc < 0 ? 'neg' : 'pos'}`;
   } else {
     retCartOcVal.style.display = 'none';
   }
@@ -800,6 +801,9 @@ function openProductSheet(idx) {
     baseProductPrice = (buyingPrice * (1 + dealerPct / 100)) / (isPcs ? 1 : ppb);
   }
   
+  // রাউন্ডিং এর কারণে O/C যেন না বাড়ে, তাই Base Price-কে ২ দশমিক পর্যন্ত রাউন্ড করে নিচ্ছি
+  baseProductPrice = Math.round(baseProductPrice * 100) / 100;
+  
   document.getElementById('baseUnitPrice').value = baseProductPrice;
 
   // Display initial per piece price in info table
@@ -936,8 +940,14 @@ function calcFromTotal() {
     const currentPiecePrice = newTotal / totalPcs;
     const currentBoxPrice = isPcs ? currentPiecePrice : (currentPiecePrice * pcsPerCarton);
     
-    document.getElementById('totalDisplayInput').value = currentBoxPrice.toFixed(0);
+    document.getElementById('totalDisplayInput').value = currentBoxPrice.toFixed(2);
     document.getElementById('unitPrice').value = currentPiecePrice;
+    
+    // Update Per Piece Price value dynamically in table (including decimal places)
+    const perPieceValEl = document.getElementById('productSheetPerPiecePriceVal');
+    if (perPieceValEl) {
+      perPieceValEl.textContent = currentPiecePrice.toFixed(2);
+    }
     
     const btnText = document.getElementById('addToCartBtnText');
     if (btnText) {
@@ -1060,9 +1070,8 @@ function confirmRetailerCart() {
           <td class="p-2.5 border-r border-slate-200 text-center font-mono font-bold text-slate-500">${idx + 1}</td>
           <td class="p-2.5 border-r border-slate-200 font-semibold text-slate-800">${escHtml(item.name)}</td>
           <td class="p-2.5 text-center font-mono text-[10px] text-slate-600">
-            <div class="flex gap-1 justify-center">
-              <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${boxes.toString().padStart(2, '0')} B</span>
-              <span class="bg-slate-100 px-1 py-0.2 rounded border border-slate-200/50 font-bold">${pcs.toString().padStart(2, '0')} P</span>
+            <div class="flex justify-center items-center">
+              <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200/50 font-bold text-xs">${item.qty.toString().padStart(2, '0')} P</span>
             </div>
           </td>
         </tr>`;

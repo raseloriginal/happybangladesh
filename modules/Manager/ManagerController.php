@@ -909,6 +909,58 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiDispatchUpdateDeliveryDate(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input = json_decode(file_get_contents('php://input'), true);
+        $scheduleId = (int)($input['schedule_id'] ?? 0);
+        $newDeliveryDate = trim($input['delivery_date'] ?? '');
+
+        if (!$scheduleId || !$newDeliveryDate) {
+            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+            exit;
+        }
+
+        $sch = $this->db->prepare("SELECT dsr_id, dispatch_date, delivery_date FROM dispatch_schedules WHERE id = ?");
+        $sch->execute([$scheduleId]);
+        $schData = $sch->fetch();
+
+        if (!$schData) {
+            echo json_encode(['success' => false, 'message' => 'Dispatch schedule not found']);
+            exit;
+        }
+
+        $dsrId = $schData['dsr_id'];
+        $dispatchDate = $schData['dispatch_date'];
+        $oldDeliveryDate = $schData['delivery_date'] ?: $dispatchDate;
+
+        $this->db->beginTransaction();
+        try {
+            // Update schedule delivery date
+            $stmt = $this->db->prepare("UPDATE dispatch_schedules SET delivery_date = ? WHERE id = ?");
+            $stmt->execute([$newDeliveryDate, $scheduleId]);
+
+            // Update associated dispatches date if matching old delivery date
+            $stmtDisp = $this->db->prepare("UPDATE dispatches SET dispatch_date = ? WHERE dsr_id = ? AND dispatch_date = ?");
+            $stmtDisp->execute([$newDeliveryDate, $dsrId, $oldDeliveryDate]);
+
+            // Update associated returns date if matching old delivery date
+            $stmtRet = $this->db->prepare("UPDATE returns SET return_date = ? WHERE dsr_id = ? AND return_date = ?");
+            $stmtRet->execute([$newDeliveryDate, $dsrId, $oldDeliveryDate]);
+
+            // Update associated settlements date if matching old delivery date
+            $stmtSett = $this->db->prepare("UPDATE settlements SET date = ? WHERE dsr_id = ? AND date = ?");
+            $stmtSett->execute([$newDeliveryDate, $dsrId, $oldDeliveryDate]);
+
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function apiDispatchSrDetails(string $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -1029,7 +1081,7 @@ class ManagerController extends Controller
             }
 
             $products = $this->db->query("
-                SELECT p.id as product_id, p.name, p.image, p.pieces_per_box,
+                SELECT p.id as product_id, p.name, p.image, p.pieces_per_box, p.box_type,
                        SUM(oi.quantity)          as total_ordered_qty,
                        IFNULL(MAX(de.qty_boxes),  0) as extra_boxes,
                        IFNULL(MAX(de.qty_pieces), 0) as extra_pieces
@@ -1039,7 +1091,7 @@ class ManagerController extends Controller
                 JOIN products p   ON p.id = oi.product_id
                 LEFT JOIN dispatch_extras de ON de.schedule_id = dss.schedule_id AND de.product_id = p.id
                 WHERE dss.schedule_id = " . (int)$id . "
-                GROUP BY p.id, p.name, p.image, p.pieces_per_box
+                GROUP BY p.id, p.name, p.image, p.pieces_per_box, p.box_type
             ")->fetchAll();
 
             echo json_encode($products);
@@ -1246,7 +1298,7 @@ class ManagerController extends Controller
                     $invLotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
                     $invParams = [$item['total_qty'], $item['product_id'], $item['warehouse_id']];
                     if ($item['lot_id'] !== null) $invParams[] = $item['lot_id'];
-                    $this->db->prepare("UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id $invLotCondition")
+                    $this->db->prepare("UPDATE inventory SET qty_pieces = GREATEST(0, CAST(qty_pieces AS SIGNED) - CAST(? AS SIGNED)) WHERE product_id=? AND warehouse_id=? AND lot_id $invLotCondition")
                              ->execute($invParams);
                 }
 
