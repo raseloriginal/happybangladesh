@@ -170,6 +170,11 @@ $router->get( '/admin/sr-tracking',                   ['AdminController', 'srTra
 $router->get( '/admin/api/sr-tracking/live',          ['AdminController', 'apiSrTrackingLive']);
 $router->get( '/admin/api/sr-tracking/history',       ['AdminController', 'apiSrTrackingHistory']);
 
+// DSR Tracking
+$router->get( '/admin/dsr-tracking',                  ['AdminController', 'dsrTracking']);
+$router->get( '/admin/api/dsr-tracking/live',         ['AdminController', 'apiDsrTrackingLive']);
+$router->get( '/admin/api/dsr-tracking/history',      ['AdminController', 'apiDsrTrackingHistory']);
+
 
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
@@ -216,6 +221,10 @@ $router->post('/manager/attendance/store',    ['ManagerController', 'attendanceS
 $router->get( '/manager/readysale',           ['ManagerController', 'readysale']);
 $router->post('/manager/readysale/store',     ['ManagerController', 'readysaleStore']);
 
+// Order Cutoff
+$router->get( '/manager/api/sr-cutoff-status',              ['ManagerController', 'apiSrCutoffStatus']);
+$router->post('/manager/api/order-cutoff/undo/{srId}',      ['ManagerController', 'apiUndoOrderCutoff']);
+
 // ── SR routes ─────────────────────────────────────────────────
 $router->get( '/sr/dashboard',                ['SRController', 'dashboard']);
 $router->get( '/sr/transactions',             ['SRController', 'transactions']);
@@ -233,6 +242,7 @@ $router->post('/sr/api/retailers/store',      ['SRController', 'apiStoreRetailer
 $router->get( '/sr/api/products',             ['SRController', 'apiProducts']);
 $router->get( '/sr/api/today-order',          ['SRController', 'apiGetTodayOrder']);
 $router->post('/sr/api/location/push',        ['SRController', 'apiPushLocation']);
+$router->post('/sr/api/order-cutoff',         ['SRController', 'apiSetOrderCutoff']);
 
 // ── DSR routes ────────────────────────────────────────────────
 $router->get( '/dsr/dashboard',               ['DSRController', 'dashboard']);
@@ -251,7 +261,8 @@ $router->get( '/dsr/api/settlement/returns',  ['DSRController', 'apiSettlementRe
 $router->get( '/dsr/profile',                 ['DSRController', 'profile']);
 $router->post('/dsr/api/retailers/store',     ['DSRController', 'apiStoreRetailer']);
 $router->post('/dsr/damage/store',            ['DSRController', 'damageStore']);
-$router->get('/dsr/api/companies-products',    ['DSRController', 'apiCompanyProducts']);
+$router->get( '/dsr/api/companies-products',   ['DSRController', 'apiCompanyProducts']);
+$router->post('/dsr/api/location/push',       ['DSRController', 'apiPushLocation']);
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);

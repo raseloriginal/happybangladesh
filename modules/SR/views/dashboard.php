@@ -156,4 +156,148 @@
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════
+       4. ORDER CUTOFF CARD
+  ═══════════════════════════════════════════════════════ -->
+  <div class="space-y-2">
+    <div class="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase px-1">আজকের অর্ডার</div>
+
+    <?php if ($orderCutoff): ?>
+      <!-- LOCKED STATE -->
+      <div class="rounded-2xl border border-gray-200 shadow-sm p-4" style="background-color: #f0fdf4; border-color: #bbf7d0;">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center shadow-md shrink-0" style="background-color: #10b981;">
+            <i class="fa-solid fa-lock text-white text-lg"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-black text-sm" style="color: #065f46;">আজকের অর্ডার কাটা শেষ ✅</div>
+            <div class="text-[11px] font-semibold mt-0.5" style="color: #047857;">
+              <?php if (!empty($cutoffInfo['is_auto'])): ?>
+                রাত ১২টায় স্বয়ংক্রিয়ভাবে বন্ধ হয়েছে
+              <?php else: ?>
+                <?= date('h:i A', strtotime($cutoffInfo['cutoff_at'] ?? 'now')) ?> তে শেষ করা হয়েছে
+              <?php endif; ?>
+            </div>
+          </div>
+          <div class="shrink-0">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black rounded-lg" style="background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0;">
+              <i class="fa-solid fa-shield-check text-[9px]"></i>
+              লক
+            </span>
+          </div>
+        </div>
+        <div class="mt-3 pt-3 text-[11px] font-semibold flex items-center gap-1.5" style="border-top: 1px solid #bbf7d0; color: #047857;">
+          <i class="fa-solid fa-circle-info" style="color: #10b981;"></i>
+          রাত ১২টার পরে নতুন অর্ডার নেওয়া যাবে।
+        </div>
+      </div>
+    <?php else: ?>
+      <!-- ACTIVE STATE — can cut off -->
+      <div class="rounded-2xl border shadow-sm p-4" style="background-color: #fffbeb; border-color: #fde68a;">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center shadow-md shrink-0" style="background-color: #f59e0b;">
+            <i class="fa-solid fa-flag-checkered text-white text-lg"></i>
+          </div>
+          <div class="flex-1">
+            <div class="font-black text-sm" style="color: #92400e;">অর্ডার কাটা চলছে</div>
+            <div class="text-[11px] font-semibold mt-0.5" style="color: #b45309;">আজকের অর্ডার নেওয়া শেষ হলে নিচের বাটনটি চাপুন</div>
+          </div>
+        </div>
+        <button id="cutoffBtn" onclick="openCutoffConfirmModal()"
+          class="w-full py-3 rounded-xl text-white font-black text-sm shadow-md active:scale-[0.98] transition flex items-center justify-center gap-2"
+          style="background-color: #f43f5e;">
+          <i class="fa-solid fa-hand-fist"></i>
+          আজকের মতো অর্ডার কাটা শেষ
+        </button>
+        <div class="mt-2 text-[10px] font-semibold text-center flex items-center justify-center gap-1" style="color: #b45309;">
+          <i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i>
+          এই বাটন চাপলে আর নতুন অর্ডার নেওয়া যাবে না
+        </div>
+      </div>
+    <?php endif; ?>
+  </div>
+
 </div>
+
+<!-- ══════════════════════════════════════════════════════
+     ORDER CUTOFF CONFIRM MODAL
+═══════════════════════════════════════════════════════ -->
+<div id="cutoffConfirmModal" class="fixed inset-0 z-[500] hidden items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div id="cutoffConfirmContent" class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-95 opacity-0 transition-all duration-200">
+    <div class="text-center">
+      <div class="w-20 h-20 bg-gradient-to-br from-rose-100 to-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fa-solid fa-flag-checkered text-3xl text-rose-500"></i>
+      </div>
+      <h3 class="text-xl font-black text-slate-800 mb-1 font-siliguri">নিশ্চিত করুন</h3>
+      <p class="text-sm text-slate-500 mb-1 font-siliguri">আজকের অর্ডার কাটা কি শেষ করতে চান?</p>
+      <p class="text-xs text-rose-500 font-bold mb-6 font-siliguri">
+        <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+        এরপর রাত ১২টার আগে আর নতুন অর্ডার নেওয়া যাবে না।
+      </p>
+      <!-- Buttons -->
+      <div class="flex gap-3">
+        <button onclick="closeCutoffConfirmModal()"
+          class="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl active:bg-slate-200 transition font-siliguri">
+          বাতিল
+        </button>
+        <button id="cutoffConfirmOkBtn" onclick="submitOrderCutoff()"
+          class="flex-1 py-3 text-white font-black rounded-xl active:scale-[0.98] shadow-md transition font-siliguri"
+          style="background-color: #f43f5e;">
+          হ্যাঁ, শেষ করুন
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openCutoffConfirmModal() {
+  const modal = document.getElementById('cutoffConfirmModal');
+  const content = document.getElementById('cutoffConfirmContent');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  setTimeout(() => {
+    content.classList.remove('scale-95', 'opacity-0');
+    content.classList.add('scale-100', 'opacity-100');
+  }, 10);
+}
+
+function closeCutoffConfirmModal() {
+  const modal = document.getElementById('cutoffConfirmModal');
+  const content = document.getElementById('cutoffConfirmContent');
+  content.classList.remove('scale-100', 'opacity-100');
+  content.classList.add('scale-95', 'opacity-0');
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }, 200);
+}
+
+async function submitOrderCutoff() {
+  const btn = document.getElementById('cutoffConfirmOkBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> সেভ হচ্ছে...';
+
+  try {
+    const res = await fetch('<?= url('sr/api/order-cutoff') ?>', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: ''
+    });
+    const data = await res.json();
+
+    if (data.success || data.already) {
+      closeCutoffConfirmModal();
+      setTimeout(() => window.location.reload(), 300);
+    } else {
+      alert(data.message || 'একটি ত্রুটি হয়েছে।');
+      btn.disabled = false;
+      btn.innerHTML = 'হ্যাঁ, শেষ করুন';
+    }
+  } catch (err) {
+    alert('নেটওয়ার্ক ত্রুটি। আবার চেষ্টা করুন।');
+    btn.disabled = false;
+    btn.innerHTML = 'হ্যাঁ, শেষ করুন';
+  }
+}
+</script>

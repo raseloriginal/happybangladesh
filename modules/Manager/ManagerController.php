@@ -805,10 +805,15 @@ class ManagerController extends Controller
         ")->fetchAll();
         
         $srs = $this->db->prepare("
-            SELECT u.id, u.name, u.avatar, COUNT(o.id) as order_count
+            SELECT u.id, u.name, u.avatar, COUNT(o.id) as order_count,
+                   CASE WHEN soc.id IS NOT NULL THEN 1 ELSE 0 END AS is_cutoff,
+                   soc.cutoff_at, soc.is_auto
             FROM users u 
             JOIN roles r ON r.id = u.role_id 
             JOIN orders o ON o.sr_id = u.id AND DATE(o.created_at) = ?
+            LEFT JOIN sr_order_cutoffs soc ON soc.sr_id = u.id 
+                AND soc.cutoff_date = ? 
+                AND soc.undone_by IS NULL
             WHERE r.slug = 'sr' AND u.status = 1
             AND u.id NOT IN (
                 SELECT sr_id FROM dispatch_schedule_srs dss 
@@ -817,12 +822,71 @@ class ManagerController extends Controller
             )
             GROUP BY u.id
         ");
-        $srs->execute([$date, $date]);
+        $srs->execute([$date, $date, $date]);
         $srsList = $srs->fetchAll();
         
         echo json_encode(['dsrs' => $dsrs, 'srs' => $srsList]);
         exit;
     }
+
+    // ── SR Cutoff Status API (for manager overview) ────────────
+    /**
+     * GET /manager/api/sr-cutoff-status?date=Y-m-d
+     * Returns today's cutoff status for all active SRs
+     */
+    public function apiSrCutoffStatus(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $date = $_GET['date'] ?? date('Y-m-d');
+
+        $rows = $this->db->prepare("
+            SELECT u.id, u.name,
+                   CASE WHEN soc.id IS NOT NULL THEN 1 ELSE 0 END AS is_cutoff,
+                   soc.cutoff_at,
+                   soc.is_auto,
+                   COUNT(o.id) as order_count,
+                   COALESCE(SUM(o.total_amount), 0) as order_value
+            FROM users u
+            JOIN roles r ON r.id = u.role_id
+            LEFT JOIN orders o ON o.sr_id = u.id AND DATE(o.created_at) = ?
+            LEFT JOIN sr_order_cutoffs soc ON soc.sr_id = u.id
+                AND soc.cutoff_date = ?
+                AND soc.undone_by IS NULL
+            WHERE r.slug = 'sr' AND u.status = 1
+            GROUP BY u.id
+            ORDER BY u.name
+        ");
+        $rows->execute([$date, $date]);
+        echo json_encode($rows->fetchAll());
+        exit;
+    }
+
+    // ── Manager Undo Order Cutoff ────────────────────────────
+    /**
+     * POST /manager/api/order-cutoff/undo/{srId}
+     * Manager only — undo an SR's order cutoff for today
+     */
+    public function apiUndoOrderCutoff(string $srId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $managerId = Auth::id();
+        $today = date('Y-m-d');
+
+        $stmt = $this->db->prepare("
+            UPDATE sr_order_cutoffs
+            SET undone_by = ?, undone_at = NOW()
+            WHERE sr_id = ? AND cutoff_date = ? AND undone_by IS NULL
+        ");
+        $stmt->execute([$managerId, (int)$srId, $today]);
+
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(['success' => true, 'message' => 'SR-এর অর্ডার কাটা রেস্টোর করা হয়েছে।']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'কোনো সক্্রিয় কাটা পাওয়া যায়নি।']);
+        }
+        exit;
+    }
+
 
     public function apiDispatchAssign(): void
     {
@@ -1071,6 +1135,14 @@ class ManagerController extends Controller
         ")->fetchAll();
         
         foreach ($srs as &$sr) {
+            // Add cutoff status for today (dispatch_date)
+            $cutoffStmt = $this->db->prepare("
+                SELECT id FROM sr_order_cutoffs 
+                WHERE sr_id = ? AND cutoff_date = ? AND undone_by IS NULL
+            ");
+            $cutoffStmt->execute([$sr['id'], $schedule['dispatch_date']]);
+            $sr['is_cutoff'] = $cutoffStmt->fetchColumn() ? 1 : 0;
+
             $sr['products'] = $this->db->query("
                 SELECT p.name,
                        SUM(oi.quantity) as ordered_qty,
