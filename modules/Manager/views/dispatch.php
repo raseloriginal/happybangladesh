@@ -483,6 +483,7 @@ async function toggleSrRow(schId) {
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>SR Name</th>
+        <th class="text-center">Order Status</th>
         <th class="text-right">Orders Value</th>
         <th class="text-right">Dispatch Items</th>
         <th class="text-right">Return Items</th>
@@ -498,10 +499,25 @@ async function toggleSrRow(schId) {
     const returnItemsVal = parseFloat(sr.return_items_value || 0);
     const damageVal = parseFloat(sr.damage_value || 0);
     const saleVal = parseFloat(sr.sale_value || 0);
+    const isCutoff = parseInt(sr.is_cutoff || 0);
+
+    const cutoffBadge = isCutoff
+      ? `<div class="flex flex-col items-center gap-1">
+           <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-black border border-emerald-200">
+             <i class="fa-solid fa-lock text-[9px]"></i> কাটা শেষ
+           </span>
+           <button onclick="undoOrderCutoff(${sr.id}, this)" class="text-[9px] text-rose-500 hover:text-rose-700 font-bold underline">
+             Undo (Manager)
+           </button>
+         </div>`
+      : `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-600 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">
+           <i class="fa-solid fa-flag-checkered text-[9px]"></i> চলছে
+         </span>`;
 
     html += `<tr>
       <td class="excel-row-num">${srIdx + 1}</td>
       <td class="font-bold text-gray-800 text-xs">${sr.name}</td>
+      <td class="text-center">${cutoffBadge}</td>
       <td class="excel-money">
         ৳ ${ordersVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
         ${(()=>{ 
@@ -533,7 +549,7 @@ async function toggleSrRow(schId) {
         </button>
       </td>
     </tr>
-    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
+    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-white"><td colspan="9" class="p-0 border-b border-gray-300">
       <div id="prod-container-${schId}-${sr.id}" class="p-2"></div>
     </td></tr>`;
     
@@ -543,6 +559,41 @@ async function toggleSrRow(schId) {
   
   html += `</tbody></table></div>`;
   container.innerHTML = html;
+}
+
+
+// ── Manager Undo Order Cutoff ─────────────────────────────────
+async function undoOrderCutoff(srId, btnEl) {
+  if (!confirm('এই SR-এর অর্ডার কাটা undo করবেন? SR আবার নতুন অর্ডার নিতে পারবে।')) return;
+  
+  btnEl.disabled = true;
+  btnEl.textContent = 'হচ্ছে...';
+  
+  try {
+    const res = await fetch(`<?= url('manager/api/order-cutoff/undo/') ?>${srId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      // Replace undo button parent with "চলছে" badge
+      const cell = btnEl.closest('td');
+      if (cell) {
+        cell.innerHTML = `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-600 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">
+          <i class="fa-solid fa-flag-checkered text-[9px]"></i> চলছে
+        </span>`;
+      }
+    } else {
+      alert(data.message || 'Undo ব্যর্থ হয়েছে।');
+      btnEl.disabled = false;
+      btnEl.textContent = 'Undo (Manager)';
+    }
+  } catch (err) {
+    alert('নেটওয়ার্ক ত্রুটি।');
+    btnEl.disabled = false;
+    btnEl.textContent = 'Undo (Manager)';
+  }
 }
 
 function toggleProductRow(schId, srId) {
@@ -998,15 +1049,23 @@ function renderSrList(srs) {
     div.className = 'connector-card bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between shadow-sm relative';
     div.id = `sr-card-${sr.id}`;
     div.innerHTML = `
-      <div class="flex items-center gap-3 pointer-events-none">
-        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">${sr.name.charAt(0)}</div>
-        <div>
-          <div class="font-bold text-gray-800">${sr.name}</div>
+      <div class="flex items-center gap-3 pointer-events-none flex-1 min-w-0">
+        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0">${sr.name.charAt(0)}</div>
+        <div class="min-w-0">
+          <div class="font-bold text-gray-800 truncate">${sr.name}</div>
           <div class="text-xs text-gray-500">ID: #${sr.id}</div>
         </div>
       </div>
-      <div class="pointer-events-none">
+      <div class="pointer-events-none flex flex-col items-end gap-1 shrink-0">
         <span class="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-lg font-bold">${sr.order_count} Orders</span>
+        ${sr.is_cutoff == 1
+          ? `<span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded font-black border border-emerald-200">
+               <i class="fa-solid fa-lock text-[9px]"></i> কাটা শেষ
+             </span>`
+          : `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-600 text-[10px] px-1.5 py-0.5 rounded font-bold border border-amber-200">
+               <i class="fa-solid fa-flag-checkered text-[9px]"></i> চলছে
+             </span>`
+        }
       </div>
       <div class="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-1/2 w-4 h-4 rounded-full bg-gray-300 border-4 border-white dot" id="sr-dot-${sr.id}"></div>
     `;

@@ -1258,6 +1258,91 @@ class AdminController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════
+    //  DSR Tracking
+    // ══════════════════════════════════════════════════════════
+    public function dsrTracking(): void
+    {
+        $dsrList = $this->db->query("
+            SELECT u.id, u.name
+            FROM users u
+            JOIN roles r ON r.id = u.role_id
+            WHERE r.slug = 'dsr' AND u.status = 1
+            ORDER BY u.name ASC
+        ")->fetchAll();
+
+        $pageTitle = 'DSR Tracking';
+        $this->render('dsr_tracking', compact('dsrList', 'pageTitle'), 'main');
+    }
+
+    /** GET /admin/api/dsr-tracking/live
+     *  Returns the latest location for every active DSR.
+     *  is_online = true if last ping is within 5 minutes.
+     */
+    public function apiDsrTrackingLive(): void
+    {
+        $dsrs = $this->db->query("
+            SELECT u.id, u.name,
+                   dl.lat, dl.lng, dl.address, dl.recorded_at,
+                   TIMESTAMPDIFF(SECOND, dl.recorded_at, NOW()) AS seconds_ago
+            FROM users u
+            JOIN roles r ON r.id = u.role_id AND r.slug = 'dsr'
+            LEFT JOIN dsr_locations dl ON dl.id = (
+                SELECT id FROM dsr_locations
+                WHERE dsr_id = u.id
+                ORDER BY recorded_at DESC LIMIT 1
+            )
+            WHERE u.status = 1
+            ORDER BY u.name ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $result = [];
+        foreach ($dsrs as $dsr) {
+            $result[] = [
+                'id'          => (int)$dsr['id'],
+                'name'        => $dsr['name'],
+                'lat'         => $dsr['lat'] !== null ? (float)$dsr['lat'] : null,
+                'lng'         => $dsr['lng'] !== null ? (float)$dsr['lng'] : null,
+                'address'     => $dsr['address'],
+                'recorded_at' => $dsr['recorded_at'],
+                'is_online'   => ($dsr['seconds_ago'] !== null && (int)$dsr['seconds_ago'] <= 300),
+            ];
+        }
+
+        $this->json(['success' => true, 'dsrs' => $result]);
+    }
+
+    /** GET /admin/api/dsr-tracking/history?dsr_id=&date=&time_from=&time_to=
+     *  Returns all location points for a specific DSR on a given day.
+     */
+    public function apiDsrTrackingHistory(): void
+    {
+        $dsrId    = (int)$this->get('dsr_id', 0);
+        $date     = $this->get('date', date('Y-m-d'));
+        $timeFrom = $this->get('time_from', '00:00');
+        $timeTo   = $this->get('time_to', '23:59');
+
+        if (!$dsrId) {
+            $this->json(['success' => false, 'message' => 'dsr_id required']);
+            return;
+        }
+
+        $from = $date . ' ' . $timeFrom . ':00';
+        $to   = $date . ' ' . $timeTo   . ':59';
+
+        $stmt = $this->db->prepare("
+            SELECT id, lat, lng, address, accuracy, recorded_at
+            FROM dsr_locations
+            WHERE dsr_id = ?
+              AND recorded_at BETWEEN ? AND ?
+            ORDER BY recorded_at ASC
+        ");
+        $stmt->execute([$dsrId, $from, $to]);
+        $points = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->json(['success' => true, 'points' => $points]);
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  Session Management
     // ══════════════════════════════════════════════════════════
     public function sessions(): void

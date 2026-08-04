@@ -48,6 +48,33 @@ class SRController extends Controller
                 // Ignore if add column fails
             }
         }
+
+        // Ensure sr_order_cutoffs table exists
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS sr_order_cutoffs (
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                sr_id        INT NOT NULL,
+                cutoff_date  DATE NOT NULL,
+                cutoff_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                is_auto      TINYINT(1) NOT NULL DEFAULT 0,
+                undone_by    INT DEFAULT NULL,
+                undone_at    DATETIME DEFAULT NULL,
+                UNIQUE KEY uq_sr_date (sr_id, cutoff_date),
+                INDEX idx_cutoff_date (cutoff_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
+    // ── Check if today's order cutoff is active for SR ────────
+    private function isCutoffActive(int $srId): bool
+    {
+        // Explicit button cutoff (not undone)
+        $stmt = $this->db->prepare("
+            SELECT id FROM sr_order_cutoffs
+            WHERE sr_id = ? AND cutoff_date = CURDATE() AND undone_by IS NULL
+        ");
+        $stmt->execute([$srId]);
+        return (bool)$stmt->fetchColumn();
     }
 
     // ── Render with SR mobile layout ──────────────────────────
@@ -194,7 +221,19 @@ class SRController extends Controller
             $chartValues[] = $val;
         }
 
-        $this->renderApp('dashboard', compact('stats', 'recentOrders', 'chartLabels', 'chartValues'));
+        // Order cutoff status for today
+        $orderCutoff = $this->isCutoffActive($srId);
+        $cutoffInfo  = null;
+        if ($orderCutoff) {
+            $qCo = $this->db->prepare("
+                SELECT cutoff_at, is_auto FROM sr_order_cutoffs
+                WHERE sr_id = ? AND cutoff_date = CURDATE() AND undone_by IS NULL
+            ");
+            $qCo->execute([$srId]);
+            $cutoffInfo = $qCo->fetch(PDO::FETCH_ASSOC);
+        }
+
+        $this->renderApp('dashboard', compact('stats', 'recentOrders', 'chartLabels', 'chartValues', 'orderCutoff', 'cutoffInfo'));
     }
 
     // ── Orders ────────────────────────────────────────────────
@@ -618,6 +657,16 @@ class SRController extends Controller
     // ── Store Order ───────────────────────────────────────────
     public function storeOrder(): void
     {
+        // ── Order Cutoff Guard ────────────────────────────────────
+        if ($this->isCutoffActive(Auth::id())) {
+            if ($this->post('ajax')) {
+                $this->json(['success' => false, 'message' => 'আজকের অর্ডার কাটা শেষ হয়ে গেছে। রাত ১২টার পরে নতুন অর্ডার নেওয়া যাবে।']);
+            }
+            $this->flash('error', 'আজকের অর্ডার কাটা শেষ হয়ে গেছে।');
+            $this->redirect('sr/orders');
+            return;
+        }
+
         $dealerId = $this->post('dealer_id') ?: null;
         $retailerId = $this->post('retailer_id') ?: null;
 
@@ -806,6 +855,51 @@ class SRController extends Controller
             }
             $this->json(['success' => false, 'message' => 'অর্ডার আপডেট করতে ত্রুটি হয়েছে: ' . $e->getMessage()]);
         }
+    }
+
+    // ── Set Order Cutoff ─────────────────────────────────────
+    /**
+     * POST /sr/api/order-cutoff
+     * SR এর বাটন থেকে call হয় — আজকের order কাটা শেষ বাতান দায়
+     */
+    public function apiSetOrderCutoff(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $srId = Auth::id();
+        $today = date('Y-m-d');
+
+        // Already cut off?
+        if ($this->isCutoffActive($srId)) {
+            echo json_encode([
+                'success' => false,
+                'already' => true,
+                'message' => 'আজকের অর্ডার কাটা আগেই শেষ করা হয়েছে।'
+            ]);
+            exit;
+        }
+
+        try {
+            // INSERT with ON DUPLICATE KEY UPDATE (in case row exists but was undone)
+            $stmt = $this->db->prepare("
+                INSERT INTO sr_order_cutoffs (sr_id, cutoff_date, cutoff_at, is_auto, undone_by, undone_at)
+                VALUES (?, ?, NOW(), 0, NULL, NULL)
+                ON DUPLICATE KEY UPDATE
+                    cutoff_at = NOW(),
+                    is_auto   = 0,
+                    undone_by = NULL,
+                    undone_at = NULL
+            ");
+            $stmt->execute([$srId, $today]);
+
+            echo json_encode([
+                'success'    => true,
+                'cutoff_at'  => date('d M Y, h:i A'),
+                'message'    => 'আজকের অর্ডার কাটা শেষ হয়েছে। রাত ১২টার আগে আর নতুন অর্ডার নেওয়া যাবে না।'
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
     }
 
     public function reports(): void

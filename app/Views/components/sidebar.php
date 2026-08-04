@@ -25,6 +25,7 @@ $menus = [
         ['icon' => 'fa-database',     'label' => 'Database Sync', 'url' => '/admin/database-sync'],
         ['icon' => 'fa-shield-halved','label' => 'Sessions',      'url' => '/admin/sessions'],
         ['icon' => 'fa-location-dot', 'label' => 'SR Tracking',   'url' => '/admin/sr-tracking'],
+        ['icon' => 'fa-route',        'label' => 'DSR Tracking',  'url' => '/admin/dsr-tracking'],
     ],
     'manager' => [
         ['section' => 'OVERVIEW'],
