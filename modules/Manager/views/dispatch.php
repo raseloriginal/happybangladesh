@@ -229,7 +229,7 @@
               <th class="excel-row-num">#</th>
               <th>Product</th>
               <th>Ordered Qty</th>
-              <th>Dispatch Qty (Box | Pcs)</th>
+              <th>Dispatch Qty</th>
               <th class="text-center">Change (কম / বেশি)</th>
               <th class="text-center">Organized?</th>
             </tr>
@@ -264,6 +264,24 @@
     <div class="flex gap-3">
       <button onclick="closeEditDsrModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
       <button onclick="saveDsrChange()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Save Change</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- 3.5. EDIT DELIVERY DATE MODAL              -->
+<!-- ========================================== -->
+<div id="edit-delivery-date-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-calendar-days text-blue-500 mr-2"></i> Change Delivery Date</h3>
+    <input type="hidden" id="edit-delivery-date-schedule-id">
+    <div class="mb-5">
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select New Delivery Date</label>
+      <input type="date" id="edit-delivery-date-input" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-gray-700">
+    </div>
+    <div class="flex gap-3">
+      <button onclick="closeEditDeliveryDateModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+      <button onclick="saveDeliveryDateChange()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Save Date</button>
     </div>
   </div>
 </div>
@@ -360,7 +378,12 @@ function renderSchedules() {
       <td class="excel-row-num">${idx + 1}</td>
       <td class="whitespace-nowrap">
         <div class="text-xs font-bold text-gray-800">Order: ${sch.dispatch_date}</div>
-        <div class="text-[11px] text-gray-500 font-medium mt-0.5">Deliv: ${sch.delivery_date || sch.dispatch_date}</div>
+        <div class="text-[11px] text-gray-500 font-medium mt-0.5 flex items-center gap-1">
+          <span>Deliv: ${sch.delivery_date || sch.dispatch_date}</span>
+          <button onclick="openEditDeliveryDateModal(${sch.id}, '${sch.delivery_date || sch.dispatch_date}')" class="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change Delivery Date">
+            <i class="fa-solid fa-pen text-[10px]"></i>
+          </button>
+        </div>
       </td>
       <td>
         <div class="flex items-center justify-between gap-2 w-full">
@@ -640,6 +663,47 @@ async function saveDsrChange() {
   }
 }
 
+function openEditDeliveryDateModal(scheduleId, currentDate) {
+  document.getElementById('edit-delivery-date-schedule-id').value = scheduleId;
+  document.getElementById('edit-delivery-date-input').value = currentDate;
+  document.getElementById('edit-delivery-date-modal').classList.remove('hidden');
+}
+
+function closeEditDeliveryDateModal() {
+  document.getElementById('edit-delivery-date-modal').classList.add('hidden');
+}
+
+async function saveDeliveryDateChange() {
+  const scheduleId = document.getElementById('edit-delivery-date-schedule-id').value;
+  const deliveryDate = document.getElementById('edit-delivery-date-input').value;
+  
+  if (!scheduleId || !deliveryDate) {
+    alert('Please select a valid date.');
+    return;
+  }
+  
+  try {
+    const res = await fetch('<?= url("manager/api/dispatch/update-delivery-date") ?>', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ schedule_id: scheduleId, delivery_date: deliveryDate })
+    });
+    
+    const result = await res.json();
+    if (result.success) {
+      closeEditDeliveryDateModal();
+      loadSchedules();
+    } else {
+      alert(result.message || 'Failed to update delivery date');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('An error occurred while updating delivery date');
+  }
+}
+
 // ============================================================================
 // EXPORT & PRINT HELPERS
 // ============================================================================
@@ -701,10 +765,18 @@ async function openOrganizeModal(schId) {
       const img = p.image ? `<img src="<?= BASE_URL ?>/${p.image}" class="w-8 h-8 rounded object-cover border border-gray-200">` : `<div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center"><i class="fa-solid fa-box text-gray-300"></i></div>`;
       
       const ppb = Math.max(1, parseInt(p.pieces_per_box) || 1);
+      const boxTypeStr = (p.box_type || '').toString().trim().toLowerCase();
+      const pcsKeywords = ['pcs', 'pc', 'piece', 'pieces', 'পিস', 'পিছ'];
+      const isPcs = pcsKeywords.includes(boxTypeStr) || (ppb <= 1);
+      const boxLabel = p.box_type && p.box_type.trim() ? p.box_type.trim() : 'Box';
+
       const origPcs = parseInt(p.total_ordered_qty) || 0;
       const origBoxes = Math.floor(origPcs / ppb);
       const origRemPcs = origPcs % ppb;
-      const origStr = `${origBoxes} box | ${origRemPcs} pcs`;
+
+      const origStr = isPcs 
+        ? `${origPcs} pcs` 
+        : `${origBoxes} ${boxLabel} | ${origRemPcs} pcs`;
 
       // Pre-fill editable inputs with existing dispatch quantity if extra/diff exists
       const extraPcs = (parseInt(p.extra_boxes || 0) * ppb) + parseInt(p.extra_pieces || 0);
@@ -712,15 +784,36 @@ async function openOrganizeModal(schId) {
       const initDispatchBoxes = Math.floor(initDispatchPcs / ppb);
       const initDispatchRemPcs = initDispatchPcs % ppb;
 
+      const subtitleText = isPcs ? `1 Pcs` : `${ppb} Pcs / ${boxLabel}`;
+
+      const inputControlsHtml = isPcs ? `
+        <div class="flex items-center gap-2">
+          <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm">
+            <input type="hidden" value="0" class="org-dispatch-box">
+            <input type="number" min="0" value="${initDispatchPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-16 text-xs py-1 px-2 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
+            <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-gray-200 font-semibold">Pcs</span>
+          </div>
+        </div>
+      ` : `
+        <div class="flex items-center gap-2">
+          <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm">
+            <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-14 text-xs py-1 px-2 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
+            <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-r border-gray-200 font-semibold">${boxLabel}</span>
+            <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-14 text-xs py-1 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
+            <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-gray-200 font-semibold">Pcs</span>
+          </div>
+        </div>
+      `;
+
       tbody.innerHTML += `
-        <tr class="hover:bg-blue-50/50" data-pid="${p.product_id}" data-orig-pcs="${origPcs}" data-ppb="${ppb}">
+        <tr class="hover:bg-blue-50/50" data-pid="${p.product_id}" data-orig-pcs="${origPcs}" data-ppb="${ppb}" data-ispcs="${isPcs}" data-boxlabel="${boxLabel}">
           <td class="excel-row-num">${pIdx + 1}</td>
           <td class="p-3">
             <div class="flex items-center gap-3">
               ${img}
               <div>
                 <div class="font-bold text-gray-800 text-xs">${p.name}</div>
-                <div class="text-[11px] text-gray-400 font-medium">${ppb} Pcs / Box</div>
+                <div class="text-[11px] text-gray-400 font-medium">${subtitleText}</div>
               </div>
             </div>
           </td>
@@ -729,14 +822,7 @@ async function openOrganizeModal(schId) {
             <div class="text-[11px] text-gray-400 mt-0.5">Total: ${origPcs} pcs</div>
           </td>
           <td class="p-3">
-            <div class="flex items-center gap-2">
-              <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm">
-                <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-14 text-xs py-1 px-2 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
-                <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-r border-gray-200 font-semibold">Box</span>
-                <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-14 text-xs py-1 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
-                <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-gray-200 font-semibold">Pcs</span>
-              </div>
-            </div>
+            ${inputControlsHtml}
           </td>
           <td class="p-3 text-center whitespace-nowrap">
             <div class="org-diff-badge flex items-center justify-center"></div>
@@ -750,7 +836,7 @@ async function openOrganizeModal(schId) {
 
     // Trigger difference updates for initial state
     document.querySelectorAll('#organize-tbody tr').forEach(tr => {
-      const input = tr.querySelector('.org-dispatch-box');
+      const input = tr.querySelector('.org-dispatch-pcs') || tr.querySelector('.org-dispatch-box');
       if (input) updateOrgDiff(input);
     });
   }
@@ -762,9 +848,11 @@ function updateOrgDiff(elem) {
   const tr = elem.closest('tr');
   const origPcs = parseInt(tr.getAttribute('data-orig-pcs')) || 0;
   const ppb = parseInt(tr.getAttribute('data-ppb')) || 1;
+  const isPcs = tr.getAttribute('data-ispcs') === 'true';
+  const boxLabel = tr.getAttribute('data-boxlabel') || 'Box';
   
-  const boxVal = parseInt(tr.querySelector('.org-dispatch-box').value) || 0;
-  const pcsVal = parseInt(tr.querySelector('.org-dispatch-pcs').value) || 0;
+  const boxVal = parseInt(tr.querySelector('.org-dispatch-box')?.value || 0);
+  const pcsVal = parseInt(tr.querySelector('.org-dispatch-pcs')?.value || 0);
   
   const newTotalPcs = (boxVal * ppb) + pcsVal;
   const diffPcs = newTotalPcs - origPcs;
@@ -776,13 +864,18 @@ function updateOrgDiff(elem) {
   }
   
   const absDiff = Math.abs(diffPcs);
-  const diffBox = Math.floor(absDiff / ppb);
-  const diffRemPcs = absDiff % ppb;
-  
-  let parts = [];
-  if (diffBox > 0) parts.push(`${diffBox} box`);
-  if (diffRemPcs > 0 || parts.length === 0) parts.push(`${diffRemPcs} pcs`);
-  const textStr = parts.join(' ');
+  let textStr = '';
+  if (isPcs) {
+    textStr = `${absDiff} pcs`;
+  } else {
+    const diffBox = Math.floor(absDiff / ppb);
+    const diffRemPcs = absDiff % ppb;
+    
+    let parts = [];
+    if (diffBox > 0) parts.push(`${diffBox} ${boxLabel}`);
+    if (diffRemPcs > 0 || parts.length === 0) parts.push(`${diffRemPcs} pcs`);
+    textStr = parts.join(' ');
+  }
   
   if (diffPcs > 0) {
     badgeContainer.innerHTML = `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-semibold border border-emerald-200"><i class="fa-solid fa-arrow-up text-[10px]"></i> +${textStr} বেশি</span>`;

@@ -254,14 +254,12 @@ class DSRController extends Controller
         }
 
         // 2. SALE (Delivered orders)
-        // Orders created on that date by ANY SR, but dispatched by this DSR on that date.
-        // Or simply `delivered_quantity` in dispatch_items? Actually order_items is better.
-        // Let's use dispatch_items.delivered_quantity which is updated when DSR confirms delivery.
+        // Orders dispatched by this DSR for this dispatch_date where status is delivered or partial
         $saleQ = $this->db->prepare("
             SELECT di.product_id, SUM(di.delivered_quantity) as qty
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND DATE(d.updated_at) = ? AND d.status IN ('delivered', 'partial')
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
             GROUP BY di.product_id
         ");
         $saleQ->execute([$dsrId, $date]);
@@ -307,7 +305,7 @@ class DSRController extends Controller
             SELECT di.product_id, SUM(di.delivered_quantity) as qty
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND DATE(d.updated_at) = ? AND d.status IN ('delivered', 'partial')
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
             GROUP BY di.product_id
         ");
         $saleMapQ->execute([$dsrId, $date]);
@@ -443,7 +441,7 @@ class DSRController extends Controller
             $inClause = implode(',', array_map('intval', $dispatchIds));
             $iq = $this->db->query("
                 SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
-                       p.name, p.image, p.pieces_per_box, 
+                       p.name, p.image, p.pieces_per_box, p.box_type,
                        p.price as base_price,
                        COALESCE(oi.unit_price, p.price) as price
                 FROM dispatch_items di
