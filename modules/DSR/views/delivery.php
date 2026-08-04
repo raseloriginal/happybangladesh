@@ -16,8 +16,7 @@ $hasDeliveries = !empty($retailers);
     
     <!-- Empty State Date Picker -->
     <div class="absolute top-10 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-50 border border-gray-200 px-4 py-2 rounded-full shadow-sm z-30">
-        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Date</span>
-        <div class="bg-transparent border-none text-brand text-sm font-black outline-none px-1 py-0.5"><?= date('d M, Y') ?></div>
+        <input type="date" value="<?= $selectedDate ?? date('Y-m-d') ?>" class="bg-transparent border-none text-brand text-sm font-black outline-none cursor-pointer" onchange="window.location.href='<?= url('dsr/delivery') ?>?date='+this.value">
     </div>
 
     <div class="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-6 mt-12">
@@ -58,7 +57,7 @@ $hasDeliveries = !empty($retailers);
       <div class="flex-1">
         <div class="text-white text-xs font-semibold opacity-80 flex items-center gap-2">
             Deliveries for: 
-            <span class="bg-white/20 border-b border-white text-white text-xs px-1 py-0.5 rounded"><?= date('d M, Y') ?></span>
+            <input type="date" value="<?= $selectedDate ?? date('Y-m-d') ?>" class="bg-white/20 border-b border-white text-white text-xs outline-none px-1 py-0.5 rounded" onchange="window.location.href='<?= url('dsr/delivery') ?>?date='+this.value">
         </div>
         <div class="text-white text-lg font-black leading-tight"><?= count($retailers) ?> Retailer<?= count($retailers) !== 1 ? 's' : '' ?> on Van</div>
       </div>

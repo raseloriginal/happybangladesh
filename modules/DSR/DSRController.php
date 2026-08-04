@@ -408,7 +408,7 @@ class DSRController extends Controller
     public function delivery(): void
     {
         $dsrId = Auth::id();
-        $selectedDate = date('Y-m-d');
+        $selectedDate = $_GET['date'] ?? date('Y-m-d');
 
         // Fetch only dispatches that are physically on the van (in_transit, partial) or delivered today
         $q = $this->db->prepare("
