@@ -425,6 +425,7 @@ function renderSchedules() {
       <td class="text-center no-print">
         <div class="flex items-center justify-center gap-2">
           ${actionBtn}
+          ${(sch.status === 'assigned' || sch.status === 'organized') ? `<button onclick="deleteSchedule(${sch.id})" class="text-rose-700 hover:bg-rose-100 px-2 py-1 rounded text-xs border border-rose-300 transition" title="Delete permanently"><i class="fa-solid fa-trash"></i></button>` : ''}
           <button onclick="toggleSrRow(${sch.id})" class="w-7 h-7 rounded hover:bg-slate-200 text-gray-600 flex items-center justify-center transition-colors border border-gray-200">
             <i class="fa-solid fa-chevron-down text-xs transform transition-transform" id="icon-sch-${sch.id}"></i>
           </button>
@@ -610,6 +611,20 @@ async function updateStatus(id, status) {
     loadSchedules();
   } else {
     alert("Error updating status");
+  }
+}
+
+async function deleteSchedule(id) {
+  if(!confirm("Are you sure you want to permanently delete this dispatch schedule and all its related organized data? This action cannot be undone.")) return;
+  const res = await fetch(`<?= url("manager/api/dispatch/delete/") ?>${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const data = await res.json();
+  if (data.success) {
+    loadSchedules();
+  } else {
+    alert("Error deleting: " + data.message);
   }
 }
 
