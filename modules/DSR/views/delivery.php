@@ -1204,15 +1204,22 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                             </div>
                             <div class="flex-1 min-w-0">
                                 <div class="text-sm font-black text-gray-800 line-clamp-2 leading-snug">${p.name}</div>
+                                <div class="text-[11px] font-bold text-gray-500 mt-0.5">Ord Val: <span class="text-gray-800 font-extrabold">৳${(qty * parseFloat(p.price || 0)).toFixed(0)}</span></div>
                                 <div class="flex items-center gap-2 mt-1 flex-wrap">
-                                    <div class="text-xs font-black text-pink-500" id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</div>
+                                    <div class="text-xs font-black text-pink-500"><span class="text-[10px] text-gray-400 font-bold uppercase">Delivered:</span> <span id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</span></div>
                                     <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- Ordered Pcs Reference -->
+                        <div class="flex items-center justify-between text-xs font-bold text-gray-500 mt-2 mb-1 px-1">
+                            <span>Ordered: <strong class="text-blue-600 font-black">${qty} Pcs</strong></span>
+                            ${!isPcs ? `<span class="text-gray-400 font-medium">(${Math.floor(qty / ppb)} ${boxLabel} ${qty % ppb} Pcs)</span>` : ''}
+                        </div>
+
                         <!-- Delivery Input Box & Pcs -->
-                        <div class="flex gap-3 mt-3">
+                        <div class="flex gap-3 mt-1">
                             ${boxInputHtml}
                             <!-- Pcs Input -->
                             <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">

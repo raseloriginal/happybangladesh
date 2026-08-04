@@ -11,8 +11,10 @@ if ($isSubmitted) {
     $returnedValue = $existingSettlement['total_returned'];
 }
 
+$scheduleStatus = $scheduleStatus ?? 'pending';
+$isReturned = ($scheduleStatus === 'returned');
 $isNoDispatch = ($dispatchedValue <= 0);
-$isLocked = $isSubmitted || $isNoDispatch;
+$isLocked = $isSubmitted || !$isReturned || $isNoDispatch;
 $readonlyAttr = $isLocked ? 'readonly' : '';
 ?>
 
@@ -124,6 +126,11 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-2.5 flex items-center gap-2 text-xs">
         <i class="fa-solid fa-lock text-blue-600"></i>
         <span class="font-bold text-blue-900">এই দিনের সেটেলমেন্ট লক করা হয়েছে।</span>
+      </div>
+    <?php elseif (!$isReturned): ?>
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-center gap-2 text-xs">
+        <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
+        <span class="font-bold text-amber-900">ম্যানেজার কর্তৃক ডেলিভারি স্ট্যাটাস 'Returned' হওয়ার পর হিসাব মিলানো ও জমা দেওয়া যাবে।</span>
       </div>
     <?php endif; ?>
 
