@@ -493,7 +493,6 @@ async function toggleSrRow(schId) {
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>SR Name</th>
-        <th class="text-center">Order Status</th>
         <th class="text-right">Orders Value</th>
         <th class="text-right">Dispatch Items</th>
         <th class="text-right">Return Items</th>
@@ -509,25 +508,10 @@ async function toggleSrRow(schId) {
     const returnItemsVal = parseFloat(sr.return_items_value || 0);
     const damageVal = parseFloat(sr.damage_value || 0);
     const saleVal = parseFloat(sr.sale_value || 0);
-    const isCutoff = parseInt(sr.is_cutoff || 0);
-
-    const cutoffBadge = isCutoff
-      ? `<div class="flex flex-col items-center gap-1">
-           <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-black border border-emerald-200">
-             <i class="fa-solid fa-lock text-[9px]"></i> কাটা শেষ
-           </span>
-           <button onclick="undoOrderCutoff(${sr.id}, this)" class="text-[9px] text-rose-500 hover:text-rose-700 font-bold underline">
-             Undo (Manager)
-           </button>
-         </div>`
-      : `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-600 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">
-           <i class="fa-solid fa-flag-checkered text-[9px]"></i> চলছে
-         </span>`;
 
     html += `<tr>
       <td class="excel-row-num">${srIdx + 1}</td>
       <td class="font-bold text-gray-800 text-xs">${sr.name}</td>
-      <td class="text-center">${cutoffBadge}</td>
       <td class="excel-money">
         ৳ ${ordersVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
         ${(()=>{ 
@@ -559,7 +543,7 @@ async function toggleSrRow(schId) {
         </button>
       </td>
     </tr>
-    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-white"><td colspan="9" class="p-0 border-b border-gray-300">
+    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
       <div id="prod-container-${schId}-${sr.id}" class="p-2"></div>
     </td></tr>`;
     
