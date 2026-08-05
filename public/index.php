@@ -263,6 +263,8 @@ $router->post('/dsr/api/retailers/store',     ['DSRController', 'apiStoreRetaile
 $router->post('/dsr/damage/store',            ['DSRController', 'damageStore']);
 $router->get( '/dsr/api/companies-products',   ['DSRController', 'apiCompanyProducts']);
 $router->post('/dsr/api/location/push',       ['DSRController', 'apiPushLocation']);
+$router->get( '/dsr/api/van-stock',           ['DSRController', 'apiVanStock']);
+$router->post('/dsr/ready-sale/store',         ['DSRController', 'readySaleStore']);
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);

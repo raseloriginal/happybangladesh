@@ -33,10 +33,13 @@ $hasDeliveries = !empty($retailers);
         No deliveries are loaded on your van today.<br>
         Please wait for your manager to complete the dispatch.
       </p>
-      <a href="<?= url('dsr/van-stock') ?>" class="inline-flex items-center gap-2 px-6 py-3 bg-brand text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 active:scale-95 transition">
+      <a href="<?= url('dsr/van-stock') ?>" class="inline-flex items-center gap-2 px-6 py-3 bg-brand text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 active:scale-95 transition mb-3">
         <i class="fa-solid fa-boxes-stacked"></i> Go to Inventory
       </a>
     <?php endif; ?>
+    <button onclick="openReadySaleModal()" class="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-amber-500/30 active:scale-95 transition">
+      <i class="fa-solid fa-bolt"></i> Ready Sale by DSR
+    </button>
     <a href="<?= url('dsr/dashboard') ?>" class="mt-3 text-sm text-gray-400 font-medium">← Back to Dashboard</a>
   </div>
   <?php endif; ?>
@@ -50,21 +53,24 @@ $hasDeliveries = !empty($retailers);
 
   <!-- Top Overlay -->
   <div class="absolute top-0 left-0 w-full z-10 px-4 pt-10 pb-2 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
-    <div class="flex items-center gap-3 pointer-events-auto">
-      <a href="<?= url('dsr/dashboard') ?>" class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md">
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md">
         <i class="fa-solid fa-arrow-left"></i>
       </a>
-      <div class="flex-1">
-        <div class="text-white text-xs font-semibold opacity-80 flex items-center gap-2">
+      <div class="flex-1 min-w-0">
+        <div class="text-white text-[11px] font-semibold opacity-80 flex items-center gap-1.5 truncate">
             Deliveries for: 
-            <input type="date" value="<?= $selectedDate ?? date('Y-m-d') ?>" class="bg-white/20 border-b border-white text-white text-xs outline-none px-1 py-0.5 rounded" onchange="window.location.href='<?= url('dsr/delivery') ?>?date='+this.value">
+            <input type="date" value="<?= $selectedDate ?? date('Y-m-d') ?>" class="bg-white/20 border-b border-white text-white text-[11px] outline-none px-1 py-0.5 rounded" onchange="window.location.href='<?= url('dsr/delivery') ?>?date='+this.value">
         </div>
-        <div class="text-white text-lg font-black leading-tight"><?= count($retailers) ?> Retailer<?= count($retailers) !== 1 ? 's' : '' ?> on Van</div>
+        <div class="text-white text-base font-black leading-tight truncate"><?= count($retailers) ?> Retailer<?= count($retailers) !== 1 ? 's' : '' ?> on Van</div>
       </div>
-      <button onclick="openRetailerListModal()" class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md active:scale-95 transition" style="margin-right: -4px;">
+      <button onclick="openReadySaleModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 active:scale-95 transition">
+        <i class="fa-solid fa-bolt text-amber-100"></i> Ready Sale
+      </button>
+      <button onclick="openRetailerListModal()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md active:scale-95 transition">
         <i class="fa-solid fa-list-ul"></i>
       </button>
-      <button onclick="locateMe()" class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-md active:scale-95 transition">
+      <button onclick="locateMe()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-md active:scale-95 transition">
         <i class="fa-solid fa-location-crosshairs"></i>
       </button>
     </div>
@@ -490,8 +496,6 @@ $hasDeliveries = !empty($retailers);
       </div>
     </div>
   </div>
-
-</div><!-- /page root -->
 
 <script>
 // ── Data from PHP ────────────────────────────────────────────
@@ -2148,9 +2152,685 @@ function handleRetailerListClick(idx) {
 <?php endif; // $hasDeliveries ?>
 </script>
 
+<!-- ══════════════════════════════════════════════════════
+     READY SALE MODALS & NEARBY MAP (ALWAYS AVAILABLE)
+═══════════════════════════════════════════════════════ -->
+
+<!-- Ready Sale Modal -->
+<div id="readySaleModal" class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm hidden" style="z-index: 99980 !important;">
+  <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+    
+    <!-- Modal Header -->
+    <div class="bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-3.5 flex items-center justify-between text-white shadow-sm">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg shadow-inner">
+          <i class="fa-solid fa-bolt text-amber-100"></i>
+        </div>
+        <div>
+          <h3 class="font-black text-base leading-tight">Ready Sale by DSR</h3>
+          <p class="text-[11px] text-amber-100 font-medium">ভ্যান স্টক থেকে অন-দ্য-স্পট সরাসরি বিক্রি</p>
+        </div>
+      </div>
+      <button onclick="closeReadySaleModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition active:scale-95">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-gray-800">
+      
+      <!-- Hidden Date & CSRF -->
+      <input type="hidden" id="rs_csrf_token" value="<?= Helpers::csrfToken() ?>">
+      <input type="hidden" id="rs_date" value="<?= $selectedDate ?? date('Y-m-d') ?>">
+
+      <!-- Retailer Selector -->
+      <div>
+        <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+          <i class="fa-solid fa-store text-amber-500 mr-1"></i> রিটেলার নির্বাচন করুন <span class="text-red-500">*</span>
+        </label>
+        <div class="flex gap-1.5 flex-wrap sm:flex-nowrap">
+          <select id="rs_retailer_id" class="flex-1 min-w-[150px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:border-amber-500 transition">
+            <option value="">-- রিটেলার পছন্দ করুন --</option>
+            <?php foreach ($allRetailers ?? [] as $ret): ?>
+              <option value="<?= $ret['id'] ?>" data-lat="<?= $ret['lat'] ?? '' ?>" data-lng="<?= $ret['lng'] ?? '' ?>"><?= htmlspecialchars($ret['name']) ?> (<?= htmlspecialchars($ret['phone'] ?? 'No Phone') ?>)</option>
+            <?php endforeach; ?>
+          </select>
+          <button type="button" onclick="openNearbyRetailerMapModal(20)" class="px-2.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1 border border-blue-200 active:scale-95 transition whitespace-nowrap" title="20 মিটার ব্যাসার্ধের মধ্যে রিটেলার ম্যাপে দেখুন">
+            <i class="fa-solid fa-location-dot text-blue-600"></i> ২০মি: ম্যাপ
+          </button>
+          <button type="button" onclick="openQuickAddRetailerModal()" class="px-2.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-bold flex items-center gap-1 border border-amber-200 active:scale-95 transition whitespace-nowrap">
+            <i class="fa-solid fa-plus text-amber-600"></i> নতুন
+          </button>
+        </div>
+      </div>
+
+      <!-- Products Section -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-bold text-gray-600 uppercase tracking-wider">
+            <i class="fa-solid fa-boxes-stacked text-amber-500 mr-1"></i> ভ্যান স্টক থেকে পণ্য যোগ করুন
+          </label>
+          <button type="button" onclick="addReadySaleRow()" class="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 active:scale-95 transition">
+            <i class="fa-solid fa-plus"></i> আইটেম যুক্ত করুন
+          </button>
+        </div>
+
+        <div class="bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-3 max-h-[300px] overflow-y-auto" id="rs_products_container">
+          <!-- Dynamic product rows will be inserted here -->
+        </div>
+      </div>
+
+      <!-- Total & Live O/C Summary Card -->
+      <div class="bg-slate-900 text-white rounded-2xl p-4 shadow-lg space-y-2">
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-slate-300 font-medium">সর্বমোট টাকা (Total Value):</span>
+          <span class="font-black text-amber-400 text-base font-mono" id="rs_summary_total">৳0.00</span>
+        </div>
+        <div class="flex items-center justify-between text-sm border-t border-slate-700/60 pt-2">
+          <span class="text-slate-300 font-medium flex items-center gap-1">
+            ওভার কমিশন (Live O/C):
+            <i class="fa-solid fa-circle-info text-slate-400 text-xs" title="(Custom Unit Price - Base Price) × Quantity"></i>
+          </span>
+          <span class="font-black text-sm px-2 py-0.5 rounded font-mono bg-slate-800 text-slate-300" id="rs_summary_oc">৳0.00</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="bg-gray-50 border-t border-gray-100 px-5 py-3.5 flex items-center justify-end gap-3">
+      <button type="button" onclick="closeReadySaleModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-xs sm:text-sm transition">
+        বাতিল
+      </button>
+      <button type="button" id="rs_submit_btn" onclick="submitReadySale()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs sm:text-sm shadow-lg shadow-amber-500/30 flex items-center gap-2 active:scale-95 transition">
+        <i class="fa-solid fa-check"></i> সেভ করুন (Submit)
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Quick Add Retailer Modal -->
+<div id="quickAddRetailerModal" class="fixed inset-0 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden" style="z-index: 99990 !important;">
+  <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden p-5 space-y-4">
+    <div class="flex items-center justify-between border-b pb-2">
+      <h4 class="font-bold text-gray-800 text-base">দ্রুত নতুন রিটেলার যোগ করুন</h4>
+      <button type="button" onclick="closeQuickAddRetailerModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">রিটেলারের নাম <span class="text-red-500">*</span></label>
+        <input type="text" id="qr_name" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:border-amber-500" placeholder="দোকানের/মালিকের নাম">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">ফোন নাম্বার</label>
+        <input type="text" id="qr_phone" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:border-amber-500" placeholder="017xxxxxxxx">
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 pt-2">
+      <button type="button" onclick="closeQuickAddRetailerModal()" class="px-3.5 py-2 bg-gray-200 text-gray-700 text-xs font-bold rounded-xl">বাতিল</button>
+      <button type="button" id="qr_save_btn" onclick="submitQuickAddRetailer()" class="px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl shadow">সেভ করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nearby Retailer Map Modal (20m Radius) -->
+<div id="nearbyRetailerMapModal" class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm hidden" style="z-index: 99999 !important;">
+
+  <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col h-[85vh] max-h-[650px] overflow-hidden">
+    
+    <!-- Header -->
+    <div class="bg-slate-900 px-5 py-3.5 flex items-center justify-between text-white shadow-md">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm border border-blue-500/30">
+          <i class="fa-solid fa-location-crosshairs"></i>
+        </div>
+        <div>
+          <h4 class="font-black text-sm leading-tight text-white">কাছের রিটেলার ম্যাপ</h4>
+          <p class="text-[11px] text-slate-300 font-medium" id="nearbyRadiusLabel">আপনার অবস্থানের ২০ মিটার ব্যাসার্ধের মধ্যে</p>
+        </div>
+      </div>
+      <button onclick="closeNearbyRetailerMapModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Radius Control Bar -->
+    <div class="bg-slate-100 border-b border-gray-200 px-4 py-2 flex items-center justify-between gap-2 text-xs">
+      <span class="font-bold text-gray-600">দূরত্ব ফিল্টার:</span>
+      <div class="flex items-center gap-1">
+        <button type="button" onclick="setNearbyRadius(20)" id="radiusBtn20" class="px-2.5 py-1 rounded-lg font-bold transition bg-blue-600 text-white shadow-sm">২০মি:</button>
+        <button type="button" onclick="setNearbyRadius(50)" id="radiusBtn50" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-gray-700 border border-gray-200">৫০মি:</button>
+        <button type="button" onclick="setNearbyRadius(100)" id="radiusBtn100" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-gray-700 border border-gray-200">১০০মি:</button>
+        <button type="button" onclick="setNearbyRadius(999999)" id="radiusBtnAll" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-gray-700 border border-gray-200">সব</button>
+      </div>
+    </div>
+
+    <!-- Map Container -->
+    <div class="relative flex-1 bg-gray-200 min-h-[220px]">
+      <div id="nearbyMapCanvas" class="w-full h-full"></div>
+      <div id="nearbyMapLoader" class="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center text-gray-600 text-xs font-bold gap-2">
+        <i class="fa-solid fa-circle-notch fa-spin text-2xl text-blue-600"></i>
+        <span>আপনার বর্তমান লোকেশন পাওয়ার চেষ্টা চলছে...</span>
+      </div>
+    </div>
+
+    <!-- Retailer List Sheet at bottom of map modal -->
+    <div class="bg-white border-t border-gray-200 p-3 max-h-[200px] overflow-y-auto" id="nearbyRetailersList">
+      <!-- Dynamic list of nearby retailers -->
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Ready Sale by DSR Global Logic ───────────────────────────
+let vanStockProducts = [];
+
+async function openReadySaleModal() {
+    const modal = document.getElementById('readySaleModal');
+    const container = document.getElementById('rs_products_container');
+    container.innerHTML = '<div class="text-center py-6 text-gray-400 text-sm font-medium"><i class="fa-solid fa-spinner fa-spin mr-2"></i>ভ্যান স্টক থেকে প্রোডাক্ট লোড হচ্ছে...</div>';
+    
+    modal.classList.remove('hidden');
+
+    try {
+        const date = document.getElementById('rs_date').value || '<?= $selectedDate ?? date('Y-m-d') ?>';
+        const res = await fetch('<?= url('dsr/api/van-stock') ?>?date=' + date);
+        const data = await res.json();
+        
+        if (data.success && data.items) {
+            vanStockProducts = data.items;
+        } else {
+            vanStockProducts = [];
+        }
+
+        container.innerHTML = '';
+        if (vanStockProducts.length === 0) {
+            container.innerHTML = '<div class="text-center py-6 text-red-500 text-sm font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>আপনার ভ্যানে বর্তমানে কোনো অবশিষ্টাংশ প্রোডাক্ট নেই।</div>';
+        } else {
+            addReadySaleRow();
+        }
+        calculateRSTotals();
+    } catch (err) {
+        container.innerHTML = '<div class="text-center py-6 text-red-500 text-sm font-bold">ভ্যান স্টক লোড করতে ব্যর্থ হয়েছে।</div>';
+    }
+}
+
+function closeReadySaleModal() {
+    document.getElementById('readySaleModal').classList.add('hidden');
+}
+
+function addReadySaleRow() {
+    const container = document.getElementById('rs_products_container');
+    const rowId = 'rs_row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+    let productOptionsHtml = '<option value="">-- প্রোডাক্ট নির্বাচন করুন --</option>';
+    vanStockProducts.forEach(p => {
+        productOptionsHtml += `<option value="${p.product_id}" data-baseprice="${p.base_price}" data-avail="${p.available_qty}" data-ppb="${p.pieces_per_box}" data-name="${p.product_name}" data-lotid="${p.lot_id || ''}">${p.product_name} (Avail: ${p.available_qty} Pcs | Base: ৳${p.base_price})</option>`;
+    });
+
+    const rowHtml = `
+        <div id="${rowId}" class="rs-product-row bg-white border border-gray-200 rounded-xl p-3 shadow-sm space-y-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <select class="rs-prod-select flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:border-amber-500" onchange="onRSProductChange(this)">
+              ${productOptionsHtml}
+            </select>
+            <button type="button" onclick="removeRSRow('${rowId}')" class="w-7 h-7 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg flex items-center justify-center text-xs active:scale-95 transition">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            <div>
+              <span class="block text-[10px] font-bold text-gray-400 uppercase">পরিমাণ (Qty Pcs)</span>
+              <input type="number" min="1" value="1" class="rs-qty w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 font-bold text-gray-800 outline-none focus:border-amber-500" oninput="calculateRSTotals()">
+            </div>
+            <div>
+              <span class="block text-[10px] font-bold text-gray-400 uppercase">মূল দাম (Trade Price)</span>
+              <div class="rs-base-price-label pt-1 font-mono font-bold text-gray-600">৳0.00</div>
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <span class="block text-[10px] font-bold text-gray-400 uppercase">বিক্রি মূল্য (Unit Price)</span>
+              <input type="number" step="0.01" min="0" value="0.00" class="rs-unit-price w-full bg-amber-50 border border-amber-300 rounded-lg px-2 py-1 font-mono font-bold text-amber-800 outline-none focus:border-amber-500" oninput="calculateRSTotals()">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1 border-t border-gray-100 text-xs">
+            <span class="rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600 font-mono">O/C: ৳0.00</span>
+            <span class="font-bold text-gray-700">লাইন টোটাল: <span class="rs-line-total font-mono text-amber-600 font-black">৳0.00</span></span>
+          </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', rowHtml);
+}
+
+function removeRSRow(rowId) {
+    const el = document.getElementById(rowId);
+    if (el) el.remove();
+    calculateRSTotals();
+}
+
+function onRSProductChange(selectEl) {
+    const row = selectEl.closest('.rs-product-row');
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    
+    if (!selectedOpt || !selectedOpt.value) {
+        row.querySelector('.rs-base-price-label').innerText = '৳0.00';
+        row.querySelector('.rs-base-price-label').dataset.val = '0';
+        row.querySelector('.rs-unit-price').value = '0.00';
+        row.querySelector('.rs-qty').max = '';
+        calculateRSTotals();
+        return;
+    }
+
+    const basePrice = parseFloat(selectedOpt.dataset.baseprice || 0);
+    const availQty = parseInt(selectedOpt.dataset.avail || 0);
+
+    row.querySelector('.rs-base-price-label').innerText = '৳' + basePrice.toFixed(2);
+    row.querySelector('.rs-base-price-label').dataset.val = basePrice;
+    row.querySelector('.rs-unit-price').value = basePrice.toFixed(2);
+    row.querySelector('.rs-qty').max = availQty;
+    if (parseInt(row.querySelector('.rs-qty').value) > availQty) {
+        row.querySelector('.rs-qty').value = availQty;
+    }
+
+    calculateRSTotals();
+}
+
+function calculateRSTotals() {
+    const rows = document.querySelectorAll('.rs-product-row');
+    let grandTotal = 0;
+    let grandOC = 0;
+
+    rows.forEach(row => {
+        const select = row.querySelector('.rs-prod-select');
+        const selectedOpt = select ? select.options[select.selectedIndex] : null;
+        if (!selectedOpt || !selectedOpt.value) return;
+
+        const qtyInput = row.querySelector('.rs-qty');
+        const maxAvail = parseInt(selectedOpt.dataset.avail || 99999);
+        let qty = parseInt(qtyInput.value) || 0;
+        if (qty > maxAvail) {
+            qty = maxAvail;
+            qtyInput.value = qty;
+        }
+
+        const basePrice = parseFloat(selectedOpt.dataset.baseprice || 0);
+        const unitPrice = parseFloat(row.querySelector('.rs-unit-price').value) || 0;
+
+        const lineTotal = qty * unitPrice;
+        const lineOC = (unitPrice - basePrice) * qty;
+
+        grandTotal += lineTotal;
+        grandOC += lineOC;
+
+        row.querySelector('.rs-line-total').innerText = '৳' + lineTotal.toFixed(2);
+        
+        const ocBadge = row.querySelector('.rs-oc-badge');
+        const sign = lineOC > 0 ? '+' : '';
+        ocBadge.innerText = `O/C: ${sign}৳` + lineOC.toFixed(2);
+
+        if (lineOC > 0) {
+            ocBadge.className = 'rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-green-100 text-green-700 font-mono';
+        } else if (lineOC < 0) {
+            ocBadge.className = 'rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-red-100 text-red-700 font-mono';
+        } else {
+            ocBadge.className = 'rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600 font-mono';
+        }
+    });
+
+    document.getElementById('rs_summary_total').innerText = '৳' + grandTotal.toFixed(2);
+    
+    const ocSummaryEl = document.getElementById('rs_summary_oc');
+    const signSum = grandOC > 0 ? '+' : '';
+    ocSummaryEl.innerText = `O/C: ${signSum}৳` + grandOC.toFixed(2);
+
+    if (grandOC > 0) {
+        ocSummaryEl.className = 'font-black text-sm px-2 py-0.5 rounded font-mono bg-green-900/60 text-green-300 border border-green-700';
+    } else if (grandOC < 0) {
+        ocSummaryEl.className = 'font-black text-sm px-2 py-0.5 rounded font-mono bg-red-900/60 text-red-300 border border-red-700';
+    } else {
+        ocSummaryEl.className = 'font-black text-sm px-2 py-0.5 rounded font-mono bg-slate-800 text-slate-300';
+    }
+}
+
+async function submitReadySale() {
+    const retailerId = document.getElementById('rs_retailer_id').value;
+    if (!retailerId) {
+        showToast('⚠️ রিটেলার সিলেক্ট করুন!');
+        return;
+    }
+
+    const rows = document.querySelectorAll('.rs-product-row');
+    const items = [];
+
+    rows.forEach(row => {
+        const select = row.querySelector('.rs-prod-select');
+        const pid = select ? select.value : 0;
+        if (!pid) return;
+
+        const selectedOpt = select.options[select.selectedIndex];
+        const lotId = selectedOpt ? selectedOpt.dataset.lotid : null;
+        const qty = parseInt(row.querySelector('.rs-qty').value) || 0;
+        const unitPrice = parseFloat(row.querySelector('.rs-unit-price').value) || 0;
+
+        if (qty > 0 && unitPrice >= 0) {
+            items.push({
+                product_id: parseInt(pid),
+                lot_id: lotId ? parseInt(lotId) : null,
+                qty: qty,
+                unit_price: unitPrice
+            });
+        }
+    });
+
+    if (items.length === 0) {
+        showToast('⚠️ অন্তত একটি সঠিক প্রোডাক্ট সিলেক্ট করুন!');
+        return;
+    }
+
+    const submitBtn = document.getElementById('rs_submit_btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> প্রসেসিং হচ্ছে...';
+
+    try {
+        const csrfToken = document.getElementById('rs_csrf_token').value;
+        const date = document.getElementById('rs_date').value || '<?= $selectedDate ?? date('Y-m-d') ?>';
+
+        const formData = new URLSearchParams();
+        formData.append('csrf_token', csrfToken);
+        formData.append('date', date);
+        formData.append('retailer_id', retailerId);
+        formData.append('items', JSON.stringify(items));
+
+        const res = await fetch('<?= url('dsr/ready-sale/store') ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ ' + (data.message || 'রেডি সেল সফলভাবে সম্পন্ন হয়েছে!'));
+            closeReadySaleModal();
+            setTimeout(() => location.reload(), 900);
+        } else {
+            showToast('❌ ' + (data.message || 'রেডি সেল জমা দিতে ব্যর্থ হয়েছে!'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> সেভ করুন (Submit)';
+        }
+    } catch (err) {
+        showToast('❌ সার্ভিস কানেকশন সমস্যা।');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> সেভ করুন (Submit)';
+    }
+}
+
+// Quick Add Retailer Handlers
+function openQuickAddRetailerModal() {
+    document.getElementById('quickAddRetailerModal').classList.remove('hidden');
+    document.getElementById('qr_name').focus();
+}
+
+function closeQuickAddRetailerModal() {
+    document.getElementById('quickAddRetailerModal').classList.add('hidden');
+}
+
+async function submitQuickAddRetailer() {
+    const name = document.getElementById('qr_name').value.trim();
+    const phone = document.getElementById('qr_phone').value.trim();
+
+    if (!name) {
+        showToast('⚠️ রিটেলারের নাম দিন!');
+        return;
+    }
+
+    const saveBtn = document.getElementById('qr_save_btn');
+    saveBtn.disabled = true;
+    saveBtn.innerText = 'সেভ হচ্ছে...';
+
+    try {
+        const res = await fetch('<?= url('dsr/api/retailers/store') ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, phone: phone })
+        });
+        const data = await res.json();
+        if (data.success && data.id) {
+            showToast('✅ রিটেলার যুক্ত হয়েছে!');
+            const select = document.getElementById('rs_retailer_id');
+            const newOpt = document.createElement('option');
+            newOpt.value = data.id;
+            newOpt.text = name + (phone ? ` (${phone})` : '');
+            newOpt.selected = true;
+            select.appendChild(newOpt);
+            closeQuickAddRetailerModal();
+            document.getElementById('qr_name').value = '';
+            document.getElementById('qr_phone').value = '';
+        } else {
+            showToast('❌ ' + (data.message || 'রিটেলার যুক্ত করতে ব্যর্থ।'));
+        }
+    } catch (err) {
+        showToast('❌ সার্ভিস সমস্যা।');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerText = 'সেভ করুন';
+    }
+}
+
+// ── Nearby Retailer Map (20m Radius) ─────────────────────────
+const allRetailersList = <?= json_encode($allRetailers ?? []) ?>;
+let nearbyMap = null;
+let nearbyUserMarker = null;
+let nearbyCircle = null;
+let nearbyMarkers = [];
+let currentNearbyRadius = 20;
+let currentDsrLat = null;
+let currentDsrLng = null;
+
+function openNearbyRetailerMapModal(radius = 20) {
+    currentNearbyRadius = radius;
+    const modal = document.getElementById('nearbyRetailerMapModal');
+    const loader = document.getElementById('nearbyMapLoader');
+    loader.classList.remove('hidden');
+    modal.classList.remove('hidden');
+
+    updateRadiusButtonsUI(radius);
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                currentDsrLat = pos.coords.latitude;
+                currentDsrLng = pos.coords.longitude;
+                loader.classList.add('hidden');
+                initNearbyMap(currentDsrLat, currentDsrLng, currentNearbyRadius);
+            },
+            (err) => {
+                loader.classList.add('hidden');
+                currentDsrLat = 23.8103;
+                currentDsrLng = 90.4125;
+                if (allRetailersList.length > 0 && allRetailersList[0].lat && allRetailersList[0].lng) {
+                    currentDsrLat = parseFloat(allRetailersList[0].lat);
+                    currentDsrLng = parseFloat(allRetailersList[0].lng);
+                }
+                showToast('⚠️ আপনার লোকেশন অ্যাক্সেস করা যায়নি, ডিফল্ট লোকেশন ব্যবহার করা হচ্ছে।');
+                initNearbyMap(currentDsrLat, currentDsrLng, currentNearbyRadius);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    } else {
+        loader.classList.add('hidden');
+        showToast('⚠️ ব্রাউজারে Geolocation সাপোর্ট নেই।');
+    }
+}
+
+function closeNearbyRetailerMapModal() {
+    document.getElementById('nearbyRetailerMapModal').classList.add('hidden');
+}
+
+function updateRadiusButtonsUI(radius) {
+    const btns = { 20: 'radiusBtn20', 50: 'radiusBtn50', 100: 'radiusBtn100', 999999: 'radiusBtnAll' };
+    Object.keys(btns).forEach(r => {
+        const btn = document.getElementById(btns[r]);
+        if (btn) {
+            if (parseInt(r) === radius) {
+                btn.className = 'px-2.5 py-1 rounded-lg font-bold transition bg-blue-600 text-white shadow-sm';
+            } else {
+                btn.className = 'px-2.5 py-1 rounded-lg font-bold transition bg-white text-gray-700 border border-gray-200';
+            }
+        }
+    });
+
+    const label = document.getElementById('nearbyRadiusLabel');
+    if (label) {
+        if (radius >= 999999) {
+            label.innerText = 'সকল নিবন্ধিত রিটেলার';
+        } else {
+            label.innerText = `আপনার অবস্থানের ${radius} মিটার ব্যাসার্ধের মধ্যে`;
+        }
+    }
+}
+
+function setNearbyRadius(radius) {
+    currentNearbyRadius = radius;
+    updateRadiusButtonsUI(radius);
+    if (currentDsrLat && currentDsrLng) {
+        renderNearbyMapItems(currentDsrLat, currentDsrLng, currentNearbyRadius);
+    }
+}
+
+function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function initNearbyMap(userLat, userLng, radius) {
+    const canvas = document.getElementById('nearbyMapCanvas');
+    if (!canvas) return;
+
+    if (!nearbyMap) {
+        nearbyMap = L.map(canvas, { zoomControl: false }).setView([userLat, userLng], 19);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 21,
+            attribution: 'Happy Bangladesh'
+        }).addTo(nearbyMap);
+    } else {
+        nearbyMap.setView([userLat, userLng], 19);
+        setTimeout(() => nearbyMap.invalidateSize(), 200);
+    }
+
+    renderNearbyMapItems(userLat, userLng, radius);
+}
+
+function renderNearbyMapItems(userLat, userLng, radius) {
+    if (!nearbyMap) return;
+
+    nearbyMarkers.forEach(m => nearbyMap.removeLayer(m));
+    nearbyMarkers = [];
+    if (nearbyUserMarker) nearbyMap.removeLayer(nearbyUserMarker);
+    if (nearbyCircle) nearbyMap.removeLayer(nearbyCircle);
+
+    const userIcon = L.divIcon({
+        className: 'nearby-user-pin',
+        html: `<div class="w-6 h-6 bg-blue-600 border-2 border-white rounded-full shadow-lg flex items-center justify-center text-white text-xs animate-pulse"><i class="fa-solid fa-person-walking"></i></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+    nearbyUserMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(nearbyMap);
+
+    if (radius < 999999) {
+        nearbyCircle = L.circle([userLat, userLng], {
+            radius: radius,
+            color: '#2563eb',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.15,
+            weight: 2,
+            dashArray: '4, 4'
+        }).addTo(nearbyMap);
+    }
+
+    const nearbyList = [];
+    allRetailersList.forEach(r => {
+        const rLat = parseFloat(r.lat);
+        const rLng = parseFloat(r.lng);
+        if (isNaN(rLat) || isNaN(rLng) || rLat === 0 || rLng === 0) return;
+
+        const dist = getDistanceInMeters(userLat, userLng, rLat, rLng);
+        if (dist <= radius) {
+            nearbyList.push({ ...r, distMeters: dist });
+
+            const pinIcon = L.divIcon({
+                className: 'nearby-ret-pin',
+                html: `<div class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] px-2 py-1 rounded-full shadow-md border border-white whitespace-nowrap flex items-center gap-1 cursor-pointer"><i class="fa-solid fa-store"></i> ${r.name} (${Math.round(dist)}m)</div>`,
+                iconSize: [100, 24],
+                iconAnchor: [50, 12]
+            });
+            const m = L.marker([rLat, rLng], { icon: pinIcon }).addTo(nearbyMap);
+            m.on('click', () => selectNearbyRetailer(r.id));
+            nearbyMarkers.push(m);
+        }
+    });
+
+    nearbyList.sort((a, b) => a.distMeters - b.distMeters);
+
+    const listContainer = document.getElementById('nearbyRetailersList');
+    if (nearbyList.length === 0) {
+        listContainer.innerHTML = `
+            <div class="text-center py-4 text-gray-500 text-xs font-medium">
+                <i class="fa-solid fa-circle-info text-amber-500 mr-1"></i> 
+                ${radius < 999999 ? `${radius} মিটারের মধ্যে কোনো নিবন্ধিত রিটেলার পাওয়া যায়নি।` : 'কোনো রিটেলার পাওয়া যায়নি।'}
+                <button type="button" onclick="setNearbyRadius(50)" class="block mx-auto mt-2 text-blue-600 font-bold underline">৫০ মিটারে চেক করুন</button>
+            </div>
+        `;
+    } else {
+        let listHtml = `<div class="text-[11px] font-bold text-gray-500 mb-2 uppercase tracking-wider">পাওয়ার রিটেলারসমূহ (${nearbyList.length}):</div><div class="space-y-1.5">`;
+        nearbyList.forEach(r => {
+            listHtml += `
+                <div onclick="selectNearbyRetailer('${r.id}')" class="flex items-center justify-between p-2.5 bg-gray-50 hover:bg-amber-50 rounded-xl border border-gray-200 hover:border-amber-300 cursor-pointer transition">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs flex-shrink-0">
+                      <i class="fa-solid fa-store"></i>
+                    </div>
+                    <div class="truncate">
+                      <div class="text-xs font-bold text-gray-800 truncate">${r.name}</div>
+                      <div class="text-[10px] text-gray-500 truncate">${r.phone || 'No Phone'} ${r.address ? '• ' + r.address : ''}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">${Math.round(r.distMeters)}m দূরে</span>
+                    <i class="fa-solid fa-circle-check text-amber-500 text-sm"></i>
+                  </div>
+                </div>
+            `;
+        });
+        listHtml += `</div>`;
+        listContainer.innerHTML = listHtml;
+    }
+}
+
+function selectNearbyRetailer(retailerId) {
+    const select = document.getElementById('rs_retailer_id');
+    if (select) {
+        select.value = retailerId;
+    }
+    closeNearbyRetailerMapModal();
+    showToast('✅ রিটেলার সিলেক্ট করা হয়েছে!');
+}
+</script>
+
 <style>
 @keyframes fadeInUp {
     from { opacity: 0; transform: translate(-50%, 12px); }
     to   { opacity: 1; transform: translate(-50%, 0); }
 }
 </style>
+
