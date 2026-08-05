@@ -135,6 +135,7 @@
             <th class="text-right">Total Returned</th>
             <th class="text-right">Damage</th>
             <th class="text-right">Expense</th>
+            <th class="text-right">Delivery O/C</th>
             <th class="text-right">Should Pay</th>
             <th class="text-right">Counted Cash</th>
             <th class="text-right">Difference</th>
@@ -145,7 +146,7 @@
         <tbody>
           <?php if (empty($items)): ?>
           <tr>
-            <td colspan="12" class="p-12 text-center text-gray-400 bg-white font-medium">
+            <td colspan="13" class="p-12 text-center text-gray-400 bg-white font-medium">
               <i class="fa-solid fa-folder-open text-4xl text-gray-300 mb-3 block"></i>
               No DSR settlements submitted yet.
             </td>
@@ -176,6 +177,9 @@
             <td class="excel-money text-rose-600">- ৳ <?= number_format($s['total_returned'], 2) ?></td>
             <td class="excel-money text-amber-600">৳ <?= number_format($s['total_damage'], 2) ?></td>
             <td class="excel-money text-orange-600">৳ <?= number_format($s['total_expense'], 2) ?></td>
+            <td class="excel-money <?= $s['delivery_oc'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
+              <?= $s['delivery_oc'] >= 0 ? '+' : '' ?>৳ <?= number_format($s['delivery_oc'], 2) ?>
+            </td>
             <td class="excel-money text-gray-900 font-bold" id="should-pay-<?= $s['id'] ?>">৳ <?= number_format($s['should_pay'], 2) ?></td>
             <td class="excel-money text-blue-700 font-bold" id="counted-cash-<?= $s['id'] ?>">৳ <?= number_format($s['counted_cash'], 2) ?></td>
             <td class="excel-money <?= $diff < 0 ? 'text-rose-600' : ($diff > 0 ? 'text-emerald-600' : 'text-blue-600') ?>" id="diff-<?= $s['id'] ?>">
@@ -192,9 +196,8 @@
             </td>
           </tr>
 
-          <!-- Expandable Details Row -->
-          <tr id="details-<?= $s['id'] ?>" class="hidden bg-slate-100/70">
-            <td colspan="12" class="p-4 border-b border-gray-300">
+          <!-- Expa          <tr id="details-<?= $s['id'] ?>" class="hidden bg-slate-100/70">
+            <td colspan="13" class="p-4 border-b border-gray-300">
               <div class="excel-container p-5 bg-white shadow-sm border border-slate-300">
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -209,12 +212,12 @@
                       <span class="text-xs font-bold text-gray-600">Total Dispatched</span>
                       <span class="text-xs font-bold text-gray-900 font-mono">৳ <span id="orig-disp-<?= $s['id'] ?>"><?= number_format($s['total_dispatched'], 2, '.', '') ?></span></span>
                     </div>
-
+ 
                     <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border border-gray-200">
                       <span class="text-xs font-bold text-gray-600">Total Returned</span>
                       <span class="text-xs font-bold text-rose-600 font-mono">- ৳ <span id="orig-ret-<?= $s['id'] ?>"><?= number_format($s['total_returned'], 2, '.', '') ?></span></span>
                     </div>
-
+ 
                     <div class="flex justify-between items-center bg-amber-50/60 p-2.5 rounded-lg border border-amber-200">
                       <label class="text-xs font-bold text-amber-800">Total Damage</label>
                       <div class="relative w-36">
@@ -222,12 +225,20 @@
                         <input type="number" step="0.01" id="inp-dmg-<?= $s['id'] ?>" value="<?= number_format($s['total_damage'], 2, '.', '') ?>" class="w-full bg-white border border-amber-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-amber-800 outline-none focus:ring-1 focus:ring-amber-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
                       </div>
                     </div>
-
+ 
                     <div class="flex justify-between items-center bg-orange-50/60 p-2.5 rounded-lg border border-orange-200">
                       <label class="text-xs font-bold text-orange-800">Total Expense</label>
                       <div class="relative w-36">
                         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-orange-500 font-bold text-xs">৳</span>
                         <input type="number" step="0.01" id="inp-exp-<?= $s['id'] ?>" value="<?= number_format($s['total_expense'], 2, '.', '') ?>" class="w-full bg-white border border-orange-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-orange-800 outline-none focus:ring-1 focus:ring-orange-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
+                      </div>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-blue-50/60 p-2.5 rounded-lg border border-blue-200">
+                      <label class="text-xs font-bold text-blue-800">Delivery O/C (কমিশন/ওভার)</label>
+                      <div class="relative w-36">
+                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-500 font-bold text-xs">৳</span>
+                        <input type="number" step="0.01" id="inp-oc-<?= $s['id'] ?>" value="<?= number_format($s['delivery_oc'], 2, '.', '') ?>" class="w-full bg-white border border-blue-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-blue-800 outline-none focus:ring-1 focus:ring-blue-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
                       </div>
                     </div>
 
@@ -305,8 +316,9 @@ function recalc(id) {
     const ret = parseFloat(document.getElementById(`orig-ret-${id}`).innerText) || 0;
     const dmg = parseFloat(document.getElementById(`inp-dmg-${id}`).value) || 0;
     const exp = parseFloat(document.getElementById(`inp-exp-${id}`).value) || 0;
+    const oc = parseFloat(document.getElementById(`inp-oc-${id}`).value) || 0;
     
-    const shouldPay = disp - ret - dmg - exp;
+    const shouldPay = disp - ret - dmg - exp + oc;
     
     let countedCash = 0;
     document.querySelectorAll(`.denom-${id}`).forEach(inp => {
@@ -333,6 +345,7 @@ async function updateSettlement(id, status) {
 
     const dmg = parseFloat(document.getElementById(`inp-dmg-${id}`).value) || 0;
     const exp = parseFloat(document.getElementById(`inp-exp-${id}`).value) || 0;
+    const oc = parseFloat(document.getElementById(`inp-oc-${id}`).value) || 0;
     const mgrNote = document.getElementById(`mgr-note-${id}`).value;
 
     let cashBreakdown = {};
@@ -351,6 +364,7 @@ async function updateSettlement(id, status) {
         status: status,
         total_damage: dmg,
         total_expense: exp,
+        delivery_oc: oc,
         counted_cash: countedCash,
         cash_breakdown: JSON.stringify(cashBreakdown),
         manager_notes: mgrNote

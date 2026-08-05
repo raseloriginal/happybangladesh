@@ -3,6 +3,7 @@ $pageTitle = 'Daily Settlement';
 $isSubmitted = !empty($existingSettlement);
 $savedDamage = $isSubmitted ? $existingSettlement['total_damage'] : $totalDamage;
 $savedExpense = $isSubmitted ? $existingSettlement['total_expense'] : $totalExpense;
+$savedDeliveryOc = $isSubmitted ? $existingSettlement['delivery_oc'] : $deliveryOc;
 $cashBreakdown = $isSubmitted && !empty($existingSettlement['cash_breakdown']) ? json_decode($existingSettlement['cash_breakdown'], true) : [];
 $savedNote = $cashBreakdown['note'] ?? '';
 
@@ -116,6 +117,9 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <?= Helpers::csrfField() ?>
     <input type="hidden" name="dispatched_value" value="<?= $dispatchedValue ?>">
     <input type="hidden" name="returned_value" value="<?= $returnedValue ?>">
+    <input type="hidden" name="damage_amount" value="<?= $savedDamage ?>">
+    <input type="hidden" name="total_expense" value="<?= $savedExpense ?>">
+    <input type="hidden" name="delivery_oc" id="formDeliveryOc" value="<?= $savedDeliveryOc ?>">
     <input type="hidden" name="should_pay" id="formShouldPay" value="0">
     <input type="hidden" name="counted_cash" id="formCountedCash" value="0">
     <input type="hidden" name="difference" id="formDifference" value="0">
@@ -174,6 +178,13 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
               <td class="excel-row-num">4</td>
               <td class="font-bold text-slate-800">সারাদিনের খরচ (-)</td>
               <td class="excel-money text-purple-600 font-bold">৳ <?= number_format($savedExpense) ?></td>
+            </tr>
+            <tr>
+              <td class="excel-row-num">5</td>
+              <td class="font-bold text-slate-800">ডেলিভারি O/C (কমিশন/ওভার)</td>
+              <td class="excel-money <?= $savedDeliveryOc >= 0 ? 'text-emerald-600' : 'text-rose-600' ?> font-bold">
+                <?= $savedDeliveryOc >= 0 ? '+' : '' ?>৳ <?= number_format($savedDeliveryOc) ?>
+              </td>
             </tr>
             <tr class="bg-blue-50/70 border-t-2 border-slate-300">
               <td class="excel-row-num text-blue-700 font-black">∑</td>
@@ -314,6 +325,7 @@ const dispatched = <?= (float)$dispatchedValue ?>;
 const returned = <?= (float)$returnedValue ?>;
 const damageVal = <?= (float)$savedDamage ?>;
 const expenseVal = <?= (float)$savedExpense ?>;
+const deliveryOcVal = <?= (float)$savedDeliveryOc ?>;
 
 function stepDenom(denom, step) {
   const input = document.getElementById(`denom-input-${denom}`);
@@ -325,7 +337,7 @@ function stepDenom(denom, step) {
 }
 
 function autoFillCash() {
-  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal);
+  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal + deliveryOcVal);
   if (shouldPay <= 0) return;
   
   document.querySelectorAll('.denomination-input').forEach(inp => inp.value = '');
@@ -351,7 +363,7 @@ function clearCash() {
 }
 
 function calculate() {
-    const shouldPay = dispatched - returned - damageVal - expenseVal;
+    const shouldPay = dispatched - returned - damageVal - expenseVal + deliveryOcVal;
     const roundedShouldPay = Math.round(shouldPay);
     
     document.getElementById('displayShouldPay').innerText = '৳ ' + roundedShouldPay.toLocaleString('en-US');

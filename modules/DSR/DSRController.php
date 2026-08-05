@@ -19,6 +19,7 @@ class DSRController extends Controller
             $this->ensureDeliveredQuantityColumn();
             $this->ensureReturnRetailerColumn();
             $this->ensureReadySaleColumn();
+            $this->ensureDeliveryOcColumn();
             self::$schemaChecked = true;
         }
     }
@@ -79,6 +80,19 @@ class DSRController extends Controller
         } catch (PDOException $e) {
             try {
                 $this->db->exec("ALTER TABLE dispatches ADD COLUMN is_ready_sale TINYINT(1) NOT NULL DEFAULT 0 AFTER paid_amount");
+            } catch (PDOException $ex) {
+                // Ignore
+            }
+        }
+    }
+
+    private function ensureDeliveryOcColumn(): void
+    {
+        try {
+            $this->db->query("SELECT delivery_oc FROM settlements LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE settlements ADD COLUMN delivery_oc DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER total_expense");
             } catch (PDOException $ex) {
                 // Ignore
             }
@@ -757,12 +771,25 @@ class DSRController extends Controller
         $q4->execute([$dsrId, $selectedDate]);
         $totalExpense = (float) $q4->fetchColumn();
 
+        // Total Delivery O/C
+        $qOc = $this->db->prepare("
+            SELECT 
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)), 0) as delivery_oc
+            FROM dispatches d
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            JOIN products p ON p.id = di.product_id
+            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
+        ");
+        $qOc->execute([$dsrId, $selectedDate]);
+        $deliveryOc = (float)$qOc->fetchColumn();
+
         // Check if settlement already submitted for this date
         $check = $this->db->prepare("SELECT * FROM settlements WHERE dsr_id=? AND date=?");
         $check->execute([$dsrId, $selectedDate]);
         $existingSettlement = $check->fetch() ?: null;
 
-        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'selectedDate', 'existingSettlement', 'scheduleStatus'), 'dsr_app');
+        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'deliveryOc', 'selectedDate', 'existingSettlement', 'scheduleStatus'), 'dsr_app');
     }
 
     public function settlementSubmit(): void
@@ -802,6 +829,7 @@ class DSRController extends Controller
         $returned = (float) $this->post('returned_value', 0);
         $damage = (float) $this->post('damage_amount', 0);
         $expense = (float) $this->post('total_expense', 0);
+        $deliveryOc = (float) $this->post('delivery_oc', 0);
         $shouldPay = (float) $this->post('should_pay', 0);
         $countedCash = (float) $this->post('counted_cash', 0);
         $difference = (float) $this->post('difference', 0);
@@ -811,9 +839,9 @@ class DSRController extends Controller
         $cashBreakdownStr = json_encode($cashBreakdown);
 
         $this->db->prepare("
-            INSERT INTO settlements (dsr_id, date, total_dispatched, total_returned, total_damage, total_expense, should_pay, counted_cash, difference, cash_breakdown)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ")->execute([$dsrId, $date, $dispatched, $returned, $damage, $expense, $shouldPay, $countedCash, $difference, $cashBreakdownStr]);
+            INSERT INTO settlements (dsr_id, date, total_dispatched, total_returned, total_damage, total_expense, delivery_oc, should_pay, counted_cash, difference, cash_breakdown)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute([$dsrId, $date, $dispatched, $returned, $damage, $expense, $deliveryOc, $shouldPay, $countedCash, $difference, $cashBreakdownStr]);
 
         $this->flash('success', 'Settlement submitted for Manager approval.');
         $this->redirect('dsr/dashboard');

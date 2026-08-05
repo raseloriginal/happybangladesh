@@ -1466,6 +1466,7 @@ class ManagerController extends Controller
         $managerNotes = $input['manager_notes'] ?? null;
         $totalDamage = (float)($input['total_damage'] ?? 0);
         $totalExpense = (float)($input['total_expense'] ?? 0);
+        $deliveryOc = (float)($input['delivery_oc'] ?? 0);
         $countedCash = (float)($input['counted_cash'] ?? 0);
         $cashBreakdown = $input['cash_breakdown'] ?? '{}';
         
@@ -1478,13 +1479,13 @@ class ManagerController extends Controller
             exit;
         }
 
-        $shouldPay = $settlement['total_dispatched'] - $settlement['total_returned'] - $totalDamage - $totalExpense;
+        $shouldPay = $settlement['total_dispatched'] - $settlement['total_returned'] - $totalDamage - $totalExpense + $deliveryOc;
         $difference = $countedCash - $shouldPay;
 
         $this->db->beginTransaction();
         try {
-            $this->db->prepare("UPDATE settlements SET status=?, manager_notes=?, total_damage=?, total_expense=?, should_pay=?, counted_cash=?, difference=?, cash_breakdown=?, updated_at=NOW() WHERE id=?")
-                     ->execute([$status, $managerNotes, $totalDamage, $totalExpense, $shouldPay, $countedCash, $difference, $cashBreakdown, $id]);
+            $this->db->prepare("UPDATE settlements SET status=?, manager_notes=?, total_damage=?, total_expense=?, delivery_oc=?, should_pay=?, counted_cash=?, difference=?, cash_breakdown=?, updated_at=NOW() WHERE id=?")
+                     ->execute([$status, $managerNotes, $totalDamage, $totalExpense, $deliveryOc, $shouldPay, $countedCash, $difference, $cashBreakdown, $id]);
             
             $this->db->commit();
             echo json_encode(['success' => true]);
