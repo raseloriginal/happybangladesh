@@ -876,6 +876,35 @@ class DSRController extends Controller
         exit;
     }
 
+    public function apiSettlementOc(): void
+    {
+        $dsrId = Auth::id();
+        $date  = $_GET['date'] ?? date('Y-m-d');
+
+        $q = $this->db->prepare("
+            SELECT 
+                u.name AS sr_name,
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)), 0) as sr_oc
+            FROM dispatches d
+            JOIN orders o ON o.id = d.order_id
+            JOIN users u ON u.id = o.sr_id
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            JOIN products p ON p.id = di.product_id
+            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
+            GROUP BY o.sr_id, u.name
+        ");
+        $q->execute([$dsrId, $date]);
+        $items = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'items'   => $items,
+        ]);
+        exit;
+    }
+
     public function profile(): void
     {
         $user = $this->db->prepare("SELECT * FROM users WHERE id=?");

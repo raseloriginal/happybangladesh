@@ -179,9 +179,12 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
               <td class="font-bold text-slate-800">সারাদিনের খরচ (-)</td>
               <td class="excel-money text-purple-600 font-bold">৳ <?= number_format($savedExpense) ?></td>
             </tr>
-            <tr>
+            <tr class="hover:bg-blue-50/50 cursor-pointer" onclick="openOcModal()" title="বিস্তারিত দেখুন">
               <td class="excel-row-num">5</td>
-              <td class="font-bold text-slate-800">ডেলিভারি O/C (কমিশন/ওভার)</td>
+              <td class="font-bold text-slate-800 flex items-center gap-1.5">
+                <span>ডেলিভারি O/C (কমিশন/ওভার)</span>
+                <span class="text-[10px] text-blue-600 font-bold bg-blue-50 px-1 py-0.2 rounded border border-blue-200">দেখুন</span>
+              </td>
               <td class="excel-money <?= $savedDeliveryOc >= 0 ? 'text-emerald-600' : 'text-rose-600' ?> font-bold">
                 <?= $savedDeliveryOc >= 0 ? '+' : '' ?>৳ <?= number_format($savedDeliveryOc) ?>
               </td>
@@ -315,6 +318,34 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <div class="px-3 py-2 border-t border-slate-200 flex justify-between items-center bg-rose-50/80">
       <span class="text-xs font-bold text-rose-800">মোট ফেরত মূল্য:</span>
       <span class="text-sm font-black text-rose-700 font-mono" id="returnModalTotal">৳ 0</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== OC Detail Modal ===== -->
+<div id="ocModal" class="fixed inset-0 z-[100] hidden" aria-modal="true" role="dialog">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-xs" onclick="closeOcModal()"></div>
+
+  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-300" style="animation: slideDown .25s ease">
+    
+    <div class="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-100">
+      <div class="text-left">
+        <h2 class="text-xs font-bold text-slate-900">SR অনুযায়ী O/C বিবরণ</h2>
+        <p class="text-[10px] text-slate-500 font-mono" id="ocModalDate"></p>
+      </div>
+      <button onclick="closeOcModal()" class="w-6 h-6 rounded bg-white border border-slate-300 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+
+    <div class="overflow-y-auto flex-1 p-3 space-y-3" id="ocModalBody">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="px-3 py-2 border-t border-slate-200 flex justify-between items-center bg-blue-50/80">
+      <span class="text-xs font-bold text-blue-800">মোট O/C:</span>
+      <span class="text-sm font-black text-blue-700 font-mono" id="ocModalTotal">৳ 0</span>
     </div>
 
   </div>
@@ -501,5 +532,74 @@ function closeReturnModal() {
     document.body.style.overflow = '';
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReturnModal(); });
+function openOcModal() {
+    const modal = document.getElementById('ocModal');
+    const body  = document.getElementById('ocModalBody');
+    const total = document.getElementById('ocModalTotal');
+    const dateEl = document.getElementById('ocModalDate');
+
+    dateEl.textContent = '<?= date('d M Y', strtotime($selectedDate)) ?>';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    body.innerHTML = `
+      <div class="flex justify-center py-6">
+        <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent animate-spin rounded-full"></div>
+      </div>`;
+
+    fetch(`<?= url('dsr/api/settlement/oc') ?>?date=${selectedDate}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.items || !data.items.length) {
+                body.innerHTML = '<p class="text-center text-slate-400 text-xs py-6 font-siliguri">এই তারিখে কোনো O/C নেই।</p>';
+                total.textContent = '৳ 0';
+                return;
+            }
+
+            let grandTotal = 0;
+            let rows = '';
+
+            data.items.forEach((item, idx) => {
+                const t = parseFloat(item.sr_oc);
+                grandTotal += t;
+                rows += `
+                  <tr class="font-siliguri">
+                    <td class="excel-row-num">${idx + 1}</td>
+                    <td class="font-bold text-slate-800 text-xs text-left">${item.sr_name}</td>
+                    <td class="excel-money ${t >= 0 ? 'text-emerald-600' : 'text-rose-600'} font-bold">
+                      ${t >= 0 ? '+' : ''}৳ ${Math.round(t).toLocaleString('en-US')}
+                    </td>
+                  </tr>`;
+            });
+
+            body.innerHTML = `
+              <div class="excel-container shadow-2xs border border-slate-300">
+                <table class="excel-table text-xs">
+                  <thead>
+                    <tr>
+                      <th class="excel-row-num">#</th>
+                      <th>SR নাম</th>
+                      <th class="text-right">O/C মোট</th>
+                    </tr>
+                  </thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              </div>`;
+
+            total.textContent = (grandTotal >= 0 ? '+' : '') + '৳ ' + Math.round(grandTotal).toLocaleString('en-US');
+        })
+        .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-6 font-siliguri">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
+}
+
+function closeOcModal() {
+    document.getElementById('ocModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => { 
+    if (e.key === 'Escape') {
+        closeReturnModal();
+        closeOcModal();
+    }
+});
 </script>
