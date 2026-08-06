@@ -520,6 +520,12 @@ function selectProductForActiveRow(product) {
     if (qtyInput) {
         updatePiecesHelper(qtyInput);
     }
+    
+    const priceInput = row.querySelector('.row-price');
+    if (priceInput && product.buying_price !== undefined && product.buying_price !== null) {
+        priceInput.value = parseFloat(product.buying_price).toFixed(2);
+        calculateTotals();
+    }
 }
 
 function updatePiecesHelper(input) {

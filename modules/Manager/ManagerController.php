@@ -370,7 +370,7 @@ class ManagerController extends Controller
         $batches = array_values($batches);
 
         $products = $this->db->query("
-            SELECT p.id, p.name, p.sku, p.company_id, p.image, p.pieces_per_box, p.box_type,
+            SELECT p.id, p.name, p.sku, p.company_id, p.image, p.pieces_per_box, p.box_type, p.buying_price,
                    COALESCE(SUM(i.qty_boxes), 0) AS stock_boxes,
                    COALESCE(SUM(i.qty_pieces), 0) AS stock_pieces
             FROM products p
