@@ -26,6 +26,7 @@ $menus = [
         ['icon' => 'fa-shield-halved','label' => 'Sessions',      'url' => '/admin/sessions'],
         ['icon' => 'fa-location-dot', 'label' => 'SR Tracking',   'url' => '/admin/sr-tracking'],
         ['icon' => 'fa-route',        'label' => 'DSR Tracking',  'url' => '/admin/dsr-tracking'],
+        ['icon' => 'fa-draw-polygon', 'label' => 'Custom Areas',  'url' => '/admin/custom-areas'],
     ],
     'manager' => [
         ['section' => 'OVERVIEW'],

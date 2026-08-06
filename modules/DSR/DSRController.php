@@ -247,17 +247,19 @@ class DSRController extends Controller
         // We will build an aggregated structure in PHP.
 
         $productsData = [
-            'outside' => [],
-            'sale' => [],
-            'inside' => [],
-            'damage' => []
+            'outside'    => [],
+            'sale'       => [],
+            'ready_sale' => [],
+            'inside'     => [],
+            'damage'     => []
         ];
         
         $totals = [
-            'outside' => 0, 'outside_oc' => 0,
-            'sale'    => 0, 'sale_oc'    => 0,
-            'inside'  => 0, 'inside_oc'  => 0,
-            'damage'  => 0, 'damage_oc'  => 0
+            'outside'    => 0, 'outside_oc'    => 0,
+            'sale'       => 0, 'sale_oc'       => 0,
+            'ready_sale' => 0, 'ready_sale_oc' => 0,
+            'inside'     => 0, 'inside_oc'     => 0,
+            'damage'     => 0, 'damage_oc'     => 0
         ];
 
         // Helper to fetch basic product info + trade_price
@@ -305,7 +307,7 @@ class DSRController extends Controller
             }
         }
 
-        // 2. SALE (Delivered orders including delivered ready sales)
+        // 2. SALE (Delivered regular orders excluding ready sales)
         $saleQ = $this->db->prepare("
             SELECT di.product_id, 
                    SUM(COALESCE(di.delivered_quantity, 0)) as qty,
@@ -314,7 +316,7 @@ class DSRController extends Controller
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
             LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
             GROUP BY di.product_id
         ");
         $saleQ->execute([$dsrId, $date]);
@@ -343,18 +345,57 @@ class DSRController extends Controller
             }
         }
 
-        // 3. INSIDE = Outside - Sale (per product)
-        $allPids = array_unique(array_merge(array_keys($outsideDataMap), array_keys($saleDataMap)));
+        // 2b. READY SALE (Delivered ready sales on the spot)
+        $readySaleQ = $this->db->prepare("
+            SELECT di.product_id, 
+                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0)) as qty,
+                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)) as oc_val
+            FROM dispatches d
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            JOIN products p ON p.id = di.product_id
+            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND d.is_ready_sale = 1
+            GROUP BY di.product_id
+        ");
+        $readySaleQ->execute([$dsrId, $date]);
+        $readySaleDataMap = [];
+        foreach ($readySaleQ->fetchAll() as $row) {
+            $pid = (int)$row['product_id'];
+            $qty = (int)$row['qty'];
+            $ocVal = (float)($row['oc_val'] ?? 0);
+            $readySaleDataMap[$pid] = [
+                'qty' => $qty,
+                'oc_val' => $ocVal
+            ];
+            if (isset($productMap[$pid]) && $qty > 0) {
+                $p = $productMap[$pid];
+                $val = $qty * $p['price'];
+                $totals['ready_sale'] += $val;
+                $totals['ready_sale_oc'] += $ocVal;
+                $productsData['ready_sale'][] = [
+                    'name' => $p['name'],
+                    'qty' => $qty,
+                    'pcs_per_box' => (int)$p['pieces_per_box'],
+                    'trade_price' => $p['price'],
+                    'value' => $val,
+                    'oc_value' => $ocVal
+                ];
+            }
+        }
+
+        // 3. INSIDE = Outside - Regular Sale - Ready Sale (per product)
+        $allPids = array_unique(array_merge(array_keys($outsideDataMap), array_keys($saleDataMap), array_keys($readySaleDataMap)));
         foreach ($allPids as $pid) {
             if (!isset($productMap[$pid])) continue;
             $p         = $productMap[$pid];
-            $oData     = $outsideDataMap[$pid] ?? ['qty' => 0, 'oc_val' => 0];
-            $sData     = $saleDataMap[$pid]    ?? ['qty' => 0, 'oc_val' => 0];
-            $insideQty = $oData['qty'] - $sData['qty'];
+            $oData     = $outsideDataMap[$pid]    ?? ['qty' => 0, 'oc_val' => 0];
+            $sData     = $saleDataMap[$pid]       ?? ['qty' => 0, 'oc_val' => 0];
+            $rsData    = $readySaleDataMap[$pid]  ?? ['qty' => 0, 'oc_val' => 0];
+            $insideQty = $oData['qty'] - $sData['qty'] - $rsData['qty'];
             if ($insideQty <= 0) continue;
             
             $insideVal   = $insideQty * $p['price'];
-            $insideOcVal = max(0, $oData['oc_val'] - $sData['oc_val']);
+            $insideOcVal = max(0, $oData['oc_val'] - $sData['oc_val'] - $rsData['oc_val']);
             
             $totals['inside'] += $insideVal;
             $totals['inside_oc'] += $insideOcVal;
@@ -411,8 +452,8 @@ class DSRController extends Controller
             }
         }
 
-        // Ensure Inside base total matches Outside base - Sale base
-        $totals['inside'] = max(0, $totals['outside'] - $totals['sale']);
+        // Ensure Inside base total matches Outside base - Regular Sale base - Ready Sale base
+        $totals['inside'] = max(0, $totals['outside'] - $totals['sale'] - $totals['ready_sale']);
 
         $this->render('van_stock', [
             'products' => $productsData,

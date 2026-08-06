@@ -85,10 +85,9 @@
                                             <div class="text-xs text-gray-500"><?= htmlspecialchars($p['category_name'] ?? 'Uncategorized') ?></div>
                                         </td>
                                         <td class="py-4 px-6 text-center">
-                                             <?php $isLowStock = ($displayBoxes == 0 && $displayPieces < 10); ?>
+                                             <?php $isLowStock = ($totalPieces < 10); ?>
                                              <div class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium <?= $isLowStock ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' ?>">
-                                                 <div><?= $displayBoxes ?> Box</div>
-                                                 <div><?= $displayPieces ?> Pcs</div>
+                                                 <div><?= $totalPieces ?> Pcs</div>
                                              </div>
                                         </td>
                                         <td class="py-4 px-6 text-right">

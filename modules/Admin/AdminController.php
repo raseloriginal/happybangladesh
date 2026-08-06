@@ -1392,6 +1392,101 @@ class AdminController extends Controller
 
         $this->redirect('admin/sessions');
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Custom Areas Map Management
+    // ══════════════════════════════════════════════════════════
+    public function customAreas(): void
+    {
+        $srs = $this->db->query("SELECT u.id, u.name FROM users u JOIN roles r ON r.id=u.role_id WHERE r.slug='sr' AND u.status=1 ORDER BY u.name ASC")->fetchAll();
+        $dsrs = $this->db->query("SELECT u.id, u.name FROM users u JOIN roles r ON r.id=u.role_id WHERE r.slug='dsr' AND u.status=1 ORDER BY u.name ASC")->fetchAll();
+        $warehouses = $this->db->query("SELECT id, name FROM warehouses WHERE status=1 ORDER BY name ASC")->fetchAll();
+
+        $pageTitle = 'Custom Area Map Management';
+        $this->render('custom_areas', compact('srs', 'dsrs', 'warehouses', 'pageTitle'));
+    }
+
+    public function apiCustomAreas(): void
+    {
+        header('Content-Type: application/json');
+        $areas = $this->db->query("SELECT * FROM custom_areas WHERE status=1 ORDER BY created_at DESC")->fetchAll();
+        foreach ($areas as &$area) {
+            $area['coordinates'] = json_decode($area['coordinates']);
+        }
+        echo json_encode(['success' => true, 'data' => $areas]);
+        exit;
+    }
+
+    public function apiCustomAreaStore(): void
+    {
+        header('Content-Type: application/json');
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+        if (!$input) { $input = $_POST; }
+
+        $name          = trim($input['name'] ?? '');
+        $description   = trim($input['description'] ?? '');
+        $type          = trim($input['type'] ?? 'polygon');
+        $coordinates   = is_array($input['coordinates'] ?? null) ? json_encode($input['coordinates']) : ($input['coordinates'] ?? '');
+        $strokeColor   = trim($input['stroke_color'] ?? '#3b82f6');
+        $fillColor     = trim($input['fill_color'] ?? '#93c5fd');
+        $fillOpacity   = floatval($input['fill_opacity'] ?? 0.35);
+        $assignedType  = !empty($input['assigned_type']) ? trim($input['assigned_type']) : null;
+        $assignedId    = !empty($input['assigned_id']) ? (int)$input['assigned_id'] : null;
+
+        if (!$name || !$coordinates) {
+            echo json_encode(['success' => false, 'message' => 'Area name and valid geometry coordinates are required.']);
+            exit;
+        }
+
+        $stmt = $this->db->prepare("INSERT INTO custom_areas (name, description, type, coordinates, stroke_color, fill_color, fill_opacity, assigned_type, assigned_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $description, $type, $coordinates, $strokeColor, $fillColor, $fillOpacity, $assignedType, $assignedId]);
+        $id = $this->db->lastInsertId();
+
+        echo json_encode(['success' => true, 'id' => $id, 'message' => 'Custom area saved successfully.']);
+        exit;
+    }
+
+    public function apiCustomAreaUpdate(string $id): void
+    {
+        header('Content-Type: application/json');
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+        if (!$input) { $input = $_POST; }
+
+        $areaId = (int)$id;
+        $name          = trim($input['name'] ?? '');
+        $description   = trim($input['description'] ?? '');
+        $type          = trim($input['type'] ?? 'polygon');
+        $coordinates   = is_array($input['coordinates'] ?? null) ? json_encode($input['coordinates']) : ($input['coordinates'] ?? '');
+        $strokeColor   = trim($input['stroke_color'] ?? '#3b82f6');
+        $fillColor     = trim($input['fill_color'] ?? '#93c5fd');
+        $fillOpacity   = floatval($input['fill_opacity'] ?? 0.35);
+        $assignedType  = !empty($input['assigned_type']) ? trim($input['assigned_type']) : null;
+        $assignedId    = !empty($input['assigned_id']) ? (int)$input['assigned_id'] : null;
+
+        if (!$name || !$coordinates) {
+            echo json_encode(['success' => false, 'message' => 'Area name and valid geometry coordinates are required.']);
+            exit;
+        }
+
+        $stmt = $this->db->prepare("UPDATE custom_areas SET name=?, description=?, type=?, coordinates=?, stroke_color=?, fill_color=?, fill_opacity=?, assigned_type=?, assigned_id=? WHERE id=?");
+        $stmt->execute([$name, $description, $type, $coordinates, $strokeColor, $fillColor, $fillOpacity, $assignedType, $assignedId, $areaId]);
+
+        echo json_encode(['success' => true, 'message' => 'Custom area updated successfully.']);
+        exit;
+    }
+
+    public function apiCustomAreaDelete(string $id): void
+    {
+        header('Content-Type: application/json');
+        $areaId = (int)$id;
+        $stmt = $this->db->prepare("DELETE FROM custom_areas WHERE id=?");
+        $stmt->execute([$areaId]);
+
+        echo json_encode(['success' => true, 'message' => 'Custom area deleted successfully.']);
+        exit;
+    }
 }
 
 

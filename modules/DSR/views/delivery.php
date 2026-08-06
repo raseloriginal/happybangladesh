@@ -12,35 +12,64 @@ $hasDeliveries = !empty($retailers);
        EMPTY STATE — No dispatches loaded on van yet
   ═══════════════════════════════════════════════════════ -->
   <?php if (!$hasDeliveries): ?>
-  <div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white px-8 text-center">
+  <div class="fixed inset-0 z-20 flex flex-col items-center justify-between p-4 sm:p-6 bg-slate-50 text-center font-siliguri overflow-y-auto">
     
-    <!-- Empty State Date Picker -->
-    <div class="absolute top-10 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-50 border border-gray-200 px-4 py-2 rounded-full shadow-sm z-30">
-        <input type="date" value="<?= $selectedDate ?? date('Y-m-d') ?>" class="bg-transparent border-none text-brand text-sm font-black outline-none cursor-pointer" onchange="window.location.href='<?= url('dsr/delivery') ?>?date='+this.value">
+    <!-- Top Date Bar Selector -->
+    <div class="pt-2 pb-4">
+      <div class="inline-flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-full shadow-2xs">
+        <i class="fa-regular fa-calendar-days text-blue-600 text-sm"></i>
+        <input type="date" value="<?= $selectedDate ?? date('Y-m-d') ?>" class="bg-transparent border-none text-slate-900 text-xs sm:text-sm font-black font-mono outline-none cursor-pointer" onchange="window.location.href='<?= url('dsr/delivery') ?>?date='+this.value">
+      </div>
     </div>
 
-    <div class="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-6 mt-12">
-      <i class="fa-solid fa-truck text-4xl text-blue-300"></i>
+    <!-- Centered Card -->
+    <div class="w-full max-w-sm bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80 my-auto space-y-5">
+      <!-- Icon Container -->
+      <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-2xl mx-auto shadow-inner border border-blue-100">
+        <i class="fa-solid fa-truck-ramp-box"></i>
+      </div>
+
+      <!-- Text Header -->
+      <div class="space-y-1.5">
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">ভ্যান খালি রয়েছে (Van is Empty)</h2>
+        <?php if (isset($isCompleted) && $isCompleted): ?>
+          <p class="text-xs text-slate-500 leading-relaxed font-medium">
+            আজকের রুটে কোনো অর্ডার জমা নেই। আপনার কাছে মাল স্টক থাকলে রেডি সেল করতে পারেন।
+          </p>
+        <?php else: ?>
+          <p class="text-xs text-slate-500 leading-relaxed font-medium">
+            আজকের চালানে আপনার ভ্যানে কোনো পণ্য লোড করা হয়নি। ম্যানেজারের চালানের জন্য অপেক্ষা করুন।
+          </p>
+        <?php endif; ?>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-2.5 pt-1">
+        <?php if (!isset($isCompleted) || !$isCompleted): ?>
+          <a href="<?= url('dsr/van-stock') ?>" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-boxes-stacked"></i>
+            <span>Go to Inventory (ইনভেন্টরি)</span>
+          </a>
+        <?php endif; ?>
+
+        <button onclick="openReadySaleModal()" class="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-bolt"></i>
+          <span>Ready Sale by DSR (রেডি সেল)</span>
+        </button>
+      </div>
+
+      <!-- Back Link -->
+      <div class="pt-2">
+        <a href="<?= url('dsr/dashboard') ?>" class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 font-bold transition">
+          <i class="fa-solid fa-arrow-left text-[10px]"></i>
+          <span>Back to Dashboard</span>
+        </a>
+      </div>
     </div>
-    <h2 class="text-xl font-black text-gray-800 mb-2">Van is Empty</h2>
-    <?php if (isset($isCompleted) && $isCompleted): ?>
-      <p class="text-sm text-gray-500 leading-relaxed mb-6">
-        No retailer deliveries are assigned to your route today.<br>
-        You can proceed with Ready Sales if you have van stock.
-      </p>
-    <?php else: ?>
-      <p class="text-sm text-gray-500 leading-relaxed mb-6">
-        No deliveries are loaded on your van today.<br>
-        Please wait for your manager to complete the dispatch.
-      </p>
-      <a href="<?= url('dsr/van-stock') ?>" class="inline-flex items-center gap-2 px-6 py-3 bg-brand text-white font-bold rounded-2xl shadow-lg shadow-blue-500/30 active:scale-95 transition mb-3">
-        <i class="fa-solid fa-boxes-stacked"></i> Go to Inventory
-      </a>
-    <?php endif; ?>
-    <button onclick="openReadySaleModal()" class="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-amber-500/30 active:scale-95 transition">
-      <i class="fa-solid fa-bolt"></i> Ready Sale by DSR
-    </button>
-    <a href="<?= url('dsr/dashboard') ?>" class="mt-3 text-sm text-gray-400 font-medium">← Back to Dashboard</a>
+
+    <!-- Bottom Spacing for Nav Bar -->
+    <div class="pb-16"></div>
+
   </div>
   <?php endif; ?>
 
@@ -92,51 +121,59 @@ $hasDeliveries = !empty($retailers);
     <div class="bottom-sheet-handle"></div>
     <div class="bottom-sheet-content no-scrollbar">
 
-      <!-- Sheet Header -->
-      <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
-        <button onclick="closeBottomSheet()" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800">
-          <i class="fa-solid fa-chevron-left text-lg"></i>
+      <!-- Sheet Header Banner (Royal Blue Brand Theme) -->
+      <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-200 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700" style="margin: -16px -16px 12px -16px; padding: 12px 16px; border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <button onclick="closeBottomSheet()" class="w-8 h-8 flex items-center justify-center text-white/90 hover:text-white transition active:scale-90">
+          <i class="fa-solid fa-chevron-left text-base"></i>
         </button>
-        <span class="text-base font-black text-gray-800">Order Details</span>
-        <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-800">
-          <i class="fa-solid fa-list-ul text-lg"></i>
+        <span class="text-sm font-black text-white uppercase tracking-wider">অর্ডারের বিবরণ</span>
+        <button onclick="openRetailerListModal()" class="w-8 h-8 flex items-center justify-center text-white/90 hover:text-white transition active:scale-90">
+          <i class="fa-solid fa-list-ul text-base"></i>
         </button>
       </div>
 
-      <!-- Retailer Info -->
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0 shadow-sm">
-            <i class="fa-solid fa-store text-base"></i>
-          </div>
-          <div>
-            <h2 class="text-base font-black text-gray-800 leading-tight" id="bsRetailerName">Retailer Name</h2>
-            <p class="text-xs text-gray-400 font-bold mt-0.5" id="bsRetailerSub">Address details</p>
-          </div>
-        </div>
-        <!-- Action Buttons on Right -->
-        <div class="flex gap-2">
-          <a href="#" class="w-8 h-8 bg-green-50 text-green-500 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition">
-            <i class="fa-solid fa-circle-plus text-lg"></i>
-          </a>
-          <button onclick="openDamageModal()" id="damageBtn" class="w-8 h-8 bg-red-50 text-red-400 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition" title="Report Damage">
-            <i class="fa-solid fa-ban text-sm"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Stats / Summary -->
-      <div class="flex justify-between items-center mb-4">
-        <div class="text-sm font-bold text-gray-800 flex items-center gap-1">
-          অর্ডার সমূহ <span class="text-emerald-500 font-black text-base ml-1" id="bsTotalQty">50</span>
-          <span id="bsStatus" class="ml-2 px-2 py-0.5 rounded-md text-[10px] font-bold border border-current">Pending</span>
-        </div>
-        <div class="flex flex-col items-end gap-1">
-            <div class="text-[10px] text-gray-400 font-bold uppercase">Ordered: <span id="bsOrderTotal" class="text-gray-500 line-through">Tk 0.00</span></div>
-            <div class="border border-blue-400 text-blue-600 bg-blue-50/30 font-black px-3 py-1 rounded-full text-xs shadow-sm flex items-center gap-1">
-              <span>Payable:</span>
-              <span id="bsGettingTotal">৳0.00</span>
+      <!-- Retailer Card (Royal Blue Spreadsheet Style) -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm mb-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0 shadow-sm bg-gradient-to-tr from-blue-600 to-indigo-600">
+              <i class="fa-solid fa-store text-sm"></i>
             </div>
+            <div class="min-w-0">
+              <h2 class="text-sm font-black text-slate-900 leading-tight truncate" id="bsRetailerName">খুচরা বিক্রেতার নাম</h2>
+              <p class="text-[10px] text-slate-400 mt-0.5 truncate" id="bsRetailerSub">ঠিকানা বিবরণ</p>
+            </div>
+          </div>
+          <div class="flex gap-1.5 shrink-0">
+            <a href="#" class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm active:scale-95 transition text-blue-600 border border-blue-200 bg-blue-50">
+              <i class="fa-solid fa-plus text-sm"></i>
+            </a>
+            <button onclick="openDamageModal()" id="damageBtn" class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm active:scale-95 transition text-red-600 border border-red-200 bg-red-50" title="ক্ষতিগ্রস্ত পণ্য">
+              <i class="fa-solid fa-ban text-xs"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Summary (Royal Blue minimal grid cells) -->
+      <div class="grid grid-cols-3 border border-slate-200 rounded-xl bg-white text-[10px] font-bold text-slate-500 mb-3 overflow-hidden divide-x divide-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]">
+        <!-- Items -->
+        <div class="p-2 flex flex-col justify-between h-12 bg-white">
+          <div class="text-[9px] text-slate-400 uppercase tracking-wider">মোট পণ্য</div>
+          <div class="text-slate-800 font-black text-xs flex items-center gap-1.5 flex-wrap">
+            <span id="bsTotalQty">0</span>
+            <span id="bsStatus" class="px-1 py-0.5 rounded text-[8px] border font-bold" style="color: #2563eb; border-color: #93c5fd; background-color: #eff6ff;">অপেক্ষমান</span>
+          </div>
+        </div>
+        <!-- Ordered Value -->
+        <div class="p-2 flex flex-col justify-between h-12 bg-white">
+          <div class="text-[9px] text-slate-400 uppercase tracking-wider">অর্ডার মূল্য</div>
+          <div class="text-slate-400 line-through text-xs font-bold" id="bsOrderTotal">৳0</div>
+        </div>
+        <!-- Payable Value -->
+        <div class="p-2 flex flex-col justify-between h-12 bg-blue-50/50">
+          <div class="text-[9px] text-blue-700 uppercase tracking-wider">পরিশোধযোগ্য</div>
+          <div class="text-blue-700 font-black text-xs" id="bsGettingTotal">৳0</div>
         </div>
       </div>
 
@@ -167,9 +204,9 @@ $hasDeliveries = !empty($retailers);
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex gap-4 mt-4 pt-3 border-t border-gray-100" id="bsActionButtons">
-        <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
-        <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
+      <div class="flex gap-4 mt-4 pt-3 border-t border-gray-150" id="bsActionButtons">
+        <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">Cancel</button>
+        <button onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">Paid</button>
       </div>
 
     </div>
@@ -181,27 +218,37 @@ $hasDeliveries = !empty($retailers);
        CUSTOM MODALS
   ═══════════════════════════════════════════════════════ -->
 
-  <!-- Retailer List Modal -->
-  <div id="retailerListModal" class="fixed inset-0 z-[500] hidden flex flex-col bg-gray-100 transition-opacity">
+  <!-- Retailer List Modal (Modern Excel Grid Style) -->
+  <div id="retailerListModal" class="fixed inset-0 z-[500] hidden flex flex-col bg-slate-50 font-siliguri">
       <!-- Header -->
-      <div class="bg-white px-5 pt-10 pb-4 shadow-sm flex items-center gap-4 sticky top-0 z-10">
-          <button onclick="closeRetailerListModal()" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 active:scale-95 transition">
-              <i class="fa-solid fa-arrow-left"></i>
-          </button>
-          <div class="flex-1">
-              <h2 class="text-lg font-black text-gray-800">Retailers on Van</h2>
-              <div class="text-xs text-gray-500 font-semibold"><?= count($retailers) ?> Retailers</div>
+      <div class="bg-white px-4 py-3.5 sm:px-6 sm:py-4 shadow-sm border-b border-slate-200/80 flex items-center justify-between sticky top-0 z-10">
+          <div class="flex items-center gap-3">
+              <button type="button" onclick="closeRetailerListModal()" class="w-9 h-9 sm:w-10 sm:h-10 bg-slate-100 hover:bg-slate-900 hover:text-white rounded-xl flex items-center justify-center text-slate-700 active:scale-95 transition shadow-2xs cursor-pointer" title="ফিরে যান">
+                  <i class="fa-solid fa-arrow-left text-sm"></i>
+              </button>
+              <div>
+                  <h2 class="text-base sm:text-lg font-black text-slate-900 leading-tight">ভ্যানের খুচরা বিক্রেতা তালিকা</h2>
+                  <div class="text-xs text-slate-500 font-medium">মোট <?= count($retailers) ?> জন রিটেইলার অর্ডার</div>
+              </div>
           </div>
+
+          <button type="button" onclick="closeRetailerListModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition text-xs">
+              <i class="fa-solid fa-xmark"></i>
+          </button>
       </div>
-      <!-- Body -->
-      <div class="flex-1 overflow-y-auto px-4 py-4 grid grid-cols-2 gap-3 pb-20 content-start">
+
+      <!-- Body Grid (Modern Excel Card Grid) -->
+      <div class="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 pb-24 content-start">
           <?php foreach ($retailers as $idx => $r): 
               $hasDelivered = false;
               $hasPending = false;
               $hasPartial = false;
               $hasCancelled = false;
               $actionedCount = 0;
+              $totalVal = 0;
+
               foreach ($r['orders'] as $o) {
+                  $totalVal += (float)($o['total_amount'] ?? 0);
                   if ($o['status'] === 'in_transit') {
                       $hasPending = true;
                   } else {
@@ -215,39 +262,51 @@ $hasDeliveries = !empty($retailers);
               
               // Determine status badge
               if ($hasPending && $actionedCount > 0) {
-                  // Some actioned, some still pending => Incomplete (Black)
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-800 text-white"><i class="fa-solid fa-circle-exclamation mr-1"></i>Incomplete</span>';
+                  $statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-800 text-white border border-slate-700"><i class="fa-solid fa-circle-exclamation mr-1"></i>আংশিক বাকি</span>';
               } elseif ($hasPending) {
-                  // All pending
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700"><i class="fa-regular fa-clock mr-1"></i>Pending</span>';
+                  $statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200"><i class="fa-regular fa-clock mr-1"></i>অপেক্ষমাণ</span>';
               } elseif ($hasDelivered && !$hasPartial && !$hasCancelled) {
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-green-100 text-green-700"><i class="fa-solid fa-check mr-1"></i>Delivered</span>';
+                  $statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>ডেলিভারড</span>';
               } elseif ($hasCancelled && !$hasDelivered && !$hasPartial) {
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700"><i class="fa-solid fa-xmark mr-1"></i>Cancelled</span>';
+                  $statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-xmark mr-1"></i>বাতিল</span>';
               } elseif ($hasPartial && !$hasDelivered && !$hasCancelled) {
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-yellow-100 text-yellow-700"><i class="fa-solid fa-circle-half-stroke mr-1"></i>Partial</span>';
+                  $statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-circle-half-stroke mr-1"></i>পার্শিয়াল</span>';
               } else {
-                  // Mixed completed statuses
-                  $statusBadge = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700"><i class="fa-solid fa-shuffle mr-1"></i>Mixed</span>';
+                  $statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200"><i class="fa-solid fa-shuffle mr-1"></i>মিশ্রিত</span>';
               }
           ?>
-            <div class="bg-white rounded-2xl p-3 shadow-sm active:scale-[0.98] transition cursor-pointer border border-gray-100 flex flex-col h-full" onclick="handleRetailerListClick(<?= $idx ?>)">
-                <div class="mb-2">
-                    <?= $statusBadge ?>
-                </div>
-                <div class="text-sm font-black text-gray-800 leading-tight mb-1 line-clamp-2"><?= h($r['retailer_name'] ?? $r['dealer_name'] ?? 'Unknown Retailer') ?></div>
-                <div class="text-[10px] text-gray-400 line-clamp-2 mb-auto leading-tight"><i class="fa-solid fa-location-dot mr-1 text-gray-300"></i><?= h($r['address'] ?? 'No Address') ?></div>
+            <div class="bg-white rounded-2xl p-3.5 shadow-2xs hover:shadow-md active:scale-[0.99] transition cursor-pointer border border-slate-200/90 flex flex-col justify-between space-y-3 group" onclick="handleRetailerListClick(<?= $idx ?>)">
                 
-                <div class="flex justify-between items-end mt-2 pt-2 border-t border-gray-50">
-                    <?php if (count($r['orders']) > 1): ?>
-                        <div class="text-[9px] font-bold text-brand bg-blue-50 px-1.5 py-0.5 rounded"><?= count($r['orders']) ?> Orders</div>
-                    <?php else: ?>
-                        <div></div>
-                    <?php endif; ?>
-                    <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
-                        <i class="fa-solid fa-chevron-right text-gray-400 text-[10px]"></i>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black border border-blue-100">
+                      <i class="fa-solid fa-store"></i>
                     </div>
+                    <?= $statusBadge ?>
+                  </div>
+                  <span class="font-mono font-black text-xs text-slate-900 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                    ৳<?= number_format($totalVal) ?>
+                  </span>
                 </div>
+
+                <div>
+                  <div class="text-xs sm:text-sm font-black text-slate-900 leading-snug line-clamp-2 group-hover:text-blue-600 transition">
+                    <?= h($r['retailer_name'] ?? $r['dealer_name'] ?? 'Unknown Retailer') ?>
+                  </div>
+                  <div class="text-[10.5px] text-slate-400 font-medium line-clamp-1 mt-0.5">
+                    <i class="fa-solid fa-location-dot mr-1 text-slate-300"></i><?= h($r['address'] ?? 'No Address') ?>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                  <span class="font-bold text-slate-500">
+                    <?= count($r['orders']) ?> টি অর্ডার
+                  </span>
+                  <span class="w-7 h-7 rounded-xl bg-slate-100 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-slate-400 text-xs transition duration-200">
+                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                  </span>
+                </div>
+
             </div>
           <?php endforeach; ?>
       </div>
@@ -298,27 +357,67 @@ $hasDeliveries = !empty($retailers);
   </div>
 
   <!-- Paid Payment Modal -->
-  <div id="paidPaymentModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
-      <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="paidPaymentContent">
-          <div class="text-center">
-              <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-                  <i class="fa-solid fa-hand-holding-dollar"></i>
+  <div id="paidPaymentModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/60 transition-opacity">
+      <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200 overflow-hidden" id="paidPaymentContent">
+          <!-- Pop Header -->
+          <div class="px-5 py-3.5 text-white flex items-center justify-between" style="background-color: #1e73be;">
+              <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-money-bill-wave text-base"></i>
+                  <span class="text-xs font-black uppercase tracking-wider">পেমেন্ট নিশ্চিত করুন</span>
               </div>
-              <h3 class="text-lg font-black text-gray-800 mb-1">Receipt Amount</h3>
-              
-              <!-- Info block showing due status -->
-              <div id="paymentDueInfo" class="text-sm font-semibold text-gray-500 mb-4 h-5">
-                  Paid in Full
+              <button onclick="closePaidPaymentModal()" class="w-6 h-6 flex items-center justify-center text-white/80 hover:text-white transition active:scale-90">
+                  <i class="fa-solid fa-xmark text-base"></i>
+              </button>
+          </div>
+
+          <!-- Pop Body -->
+          <div class="p-5">
+              <!-- Retailer Info -->
+              <div class="mb-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <div class="text-[9px] text-gray-400 font-bold uppercase">খুচরা বিক্রেতা</div>
+                  <div class="text-xs font-black text-gray-805 mt-0.5" id="paidRetailerName">খুচরা বিক্রেতার নাম</div>
               </div>
-              
-              <div class="mb-6">
-                  <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider text-left mb-1.5">Amount Paid (৳)</label>
-                  <input type="number" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-2xl font-black text-gray-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition">
+
+              <!-- Payment Summary Table -->
+              <div class="border border-gray-200 rounded-xl overflow-hidden mb-3 bg-white text-xs">
+                  <div class="grid grid-cols-2 divide-x divide-gray-150 border-b border-gray-150 bg-gray-50/50 p-2 font-bold text-gray-500 text-[10px] uppercase tracking-wider">
+                      <div>বিবরণ</div>
+                      <div class="text-right">টাকা</div>
+                  </div>
+                  <div class="divide-y divide-gray-150">
+                      <div class="grid grid-cols-2 p-2.5">
+                          <div class="text-gray-500 font-bold">মোট পরিশোধযোগ্য</div>
+                          <div class="font-black text-gray-800 text-right" id="paidTotalPayable">৳০</div>
+                      </div>
+                      <div class="grid grid-cols-2 p-2.5">
+                          <div class="text-gray-500 font-bold">ইতিমধ্যে পরিশোধিত</div>
+                          <div class="font-black text-amber-600 text-right" id="paidAlreadyPaid">৳০</div>
+                      </div>
+                      <div class="grid grid-cols-2 p-2.5 bg-blue-50/10">
+                          <div class="text-[#1e73be] font-black">বাকি পাওনা</div>
+                          <div class="font-black text-[#1e73be] text-right" id="paidRemainingDue">৳০</div>
+                      </div>
+                  </div>
               </div>
-              
+
+              <!-- Input Amount -->
+              <div class="mb-4">
+                  <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">প্রাপ্ত টাকা লিখুন (৳)</label>
+                  <div class="relative flex items-center">
+                      <span class="absolute left-4 text-gray-400 font-bold text-lg">৳</span>
+                      <input type="number" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-lg font-black text-gray-800 outline-none focus:border-[#1e73be] focus:ring-4 focus:ring-blue-500/10 transition">
+                  </div>
+              </div>
+
+              <!-- Info status text -->
+              <div id="paymentDueInfo" class="text-xs font-bold text-center text-gray-500 mb-4 h-5">
+                  সম্পূর্ণ পরিশোধিত
+              </div>
+
+              <!-- Action Buttons -->
               <div class="flex gap-3">
-                  <button onclick="closePaidPaymentModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
-                  <button onclick="submitPaidPayment()" class="flex-1 py-3 bg-[#007aff] text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Submit</button>
+                  <button onclick="closePaidPaymentModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-lg active:bg-gray-200 transition text-sm">বাতিল</button>
+                  <button onclick="submitPaidPayment()" class="flex-1 py-2.5 text-white font-bold rounded-lg active:scale-[0.98] shadow-md shadow-blue-500/20 transition text-sm" style="background-color: #1e73be;">পেইড নিশ্চিত করুন</button>
               </div>
           </div>
       </div>
@@ -1116,19 +1215,31 @@ function locateMe() {
 let currentRetailerObj = null;
 let currentOrderIndex = 0;
 
+function changeQty(btn, amount, type, idx) {
+    const parent = btn.closest('.product-item');
+    if (!parent) return;
+    const input = parent.querySelector(type === 'box' ? '.delivery-input-box' : '.delivery-input-pcs');
+    if (!input || input.disabled) return;
+    let val = parseInt(input.value) || 0;
+    val = Math.max(0, val + amount);
+    input.value = val;
+    calcProgress(input, idx);
+}
+
 function openRetailerSheet(retailer, defaultIndex = 0) {
     currentRetailerObj = retailer;
     currentOrderIndex = defaultIndex;
     
     // Set Name & Subtitle
     document.getElementById('bsRetailerName').innerText = retailer.retailer_name || retailer.dealer_name || retailer.name;
-    document.getElementById('bsRetailerSub').innerText = retailer.retailer_name ? retailer.dealer_name : 'Retailer';
+    document.getElementById('bsRetailerSub').innerText = retailer.retailer_name ? retailer.dealer_name : 'খুচরা বিক্রেতা';
     
     // Update damage button icon & styling based on whether damage is recorded for this retailer
     updateDamageBtnState(retailer.has_damage);
 
     const tabsContainer = document.getElementById('bsCompanyTabs');
     tabsContainer.innerHTML = '';
+    tabsContainer.className = "flex gap-6 overflow-x-auto pb-0 no-scrollbar border-b border-gray-100 px-4 pt-2 mb-4";
     
     const list = document.getElementById('bsProductsList');
     list.innerHTML = '';
@@ -1139,17 +1250,17 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
             const isSelected = idx === 0;
             const count = order.products ? order.products.length : 0;
             const isCancelled = order.status === 'cancelled';
-            let borderClass = 'border-gray-200 bg-white text-gray-500';
+            let tabClass = 'text-gray-500 pb-2 border-b-2 border-transparent transition hover:text-gray-700';
             if (isCancelled) {
-                borderClass = isSelected ? 'border-red-600 bg-white text-red-600 font-bold' : 'border-red-200 bg-red-50/30 text-red-500';
+                tabClass = isSelected ? 'text-red-600 pb-2 border-b-2 border-red-600 font-extrabold' : 'text-red-400 pb-2 border-b-2 border-transparent transition hover:text-red-500';
             } else if (isSelected) {
-                borderClass = 'border-blue-600 bg-white text-blue-600 font-bold';
+                tabClass = 'text-[#217346] pb-2 border-b-2 border-[#217346] font-extrabold';
             }
             
             tabsContainer.insertAdjacentHTML('beforeend', `
                 <button onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
-                        class="whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border transition ${borderClass}">
-                    ${order.company_name} <span class="text-blue-500 ml-1 font-bold">${count}</span>
+                        class="whitespace-nowrap px-1 text-xs font-semibold ${tabClass}">
+                    ${order.company_name} <span class="text-gray-400 ml-1 text-[10px]">(${count})</span>
                 </button>
             `);
         });
@@ -1160,16 +1271,25 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
     // Render all orders
     if (retailer.orders && retailer.orders.length > 0) {
         retailer.orders.forEach((order, orderIdx) => {
-            let orderHtml = `<div id="order-group-${orderIdx}" class="order-group-container hidden space-y-3">`;
+            let orderHtml = `<div id="order-group-${orderIdx}" class="order-group-container hidden">`;
             if (!order.products || order.products.length === 0) {
-                orderHtml += `<div class="text-center py-4 text-sm text-gray-400"><i class="fa-solid fa-box-open mb-2 text-xl"></i><br>No products found for this order.</div>`;
+                orderHtml += `<div class="text-center py-6 text-sm text-gray-400 bg-gray-50 rounded-xl border border-gray-100"><i class="fa-solid fa-box-open mb-2 text-2xl text-gray-300"></i><br>এই অর্ডারে কোনো পণ্য পাওয়া যায়নি।</div>`;
             } else {
+                orderHtml += `
+                <div class="border border-gray-150 rounded-xl bg-white overflow-hidden max-h-[50vh] overflow-y-auto shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]">
+                    <!-- Clean Minimal Column Header -->
+                    <div class="flex items-center text-[9px] text-gray-400 font-extrabold bg-[#fcfcfc] border-b border-gray-150 uppercase tracking-wider select-none sticky top-0 z-10">
+                        <div class="flex-1 py-2 px-3">পণ্যের বিবরণ ও স্টক</div>
+                        <div class="w-[165px] py-2 text-center shrink-0 border-l border-gray-100">ডেলিভারি পরিমাণ</div>
+                    </div>
+                    <div class="divide-y divide-gray-100 bg-white">
+                `;
+                
                 order.products.forEach((p, idx) => {
                     const ppb = parseInt(p.pieces_per_box) || 1;
                     const boxTypeStr = (p.box_type || '').toString().trim().toLowerCase();
                     const pcsKeywords = ['pcs', 'pc', 'piece', 'pieces', 'পিস', 'পিছ'];
                     const isPcs = pcsKeywords.includes(boxTypeStr) || (ppb <= 1);
-                    const boxLabel = (p.box_type && p.box_type.trim()) ? p.box_type.trim() : 'Box';
 
                     const qty = parseInt(p.quantity); // pieces dispatched on van
 
@@ -1178,64 +1298,67 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                     const initialBoxes = Math.floor(initialDeliveredQty / ppb);
                     const initialPcs = initialDeliveredQty % ppb;
 
-                    const boxInputHtml = isPcs ? `
-                        <input type="hidden" value="0" class="delivery-input-box"
-                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}">
-                    ` : `
-                        <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
-                            <input type="number" min="0" value="${initialBoxes}"
-                                class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-box text-sm"
-                                data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
-                                oninput="calcProgress(this, '${orderIdx}-${idx}')">
-                            <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">${boxLabel}</div>
-                        </div>
-                    `;
+                    const vanStock = parseInt(vanStockMap[p.product_id]) || 0;
+                    const isStockOk = vanStock >= qty;
 
                     orderHtml += `
-                    <div class="bg-white rounded-3xl border border-gray-150 p-4 shadow-sm product-item" style="position: relative;" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
-                        <!-- Top Right Van Stock Badge -->
-                        <div style="position: absolute; top: 14px; right: 14px; z-index: 10;">
-                            ${vanStockMap[p.product_id] ? `<span class="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Van: ${vanStockMap[p.product_id]}pcs</span>` : `<span class="text-[11px] font-black text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg">Van: 0pcs</span>`}
+                    <div class="product-item flex items-stretch divide-x divide-gray-100 text-xs animate-fadeIn border-b border-gray-100 last:border-b-0" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
+                        <!-- Product & Stock Cell -->
+                        <div class="flex-1 p-3 flex flex-col justify-center min-w-0 bg-white">
+                            <div class="font-black text-gray-800 text-[11px] leading-snug break-words" title="${p.name}">${p.name}</div>
+                            
+                            <!-- Badges -->
+                            <div class="text-[9px] mt-2 flex flex-wrap gap-1.5 items-center">
+                                <span class="bg-gray-100 border border-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold">৳${parseFloat(p.price || 0).toFixed(0)}</span>
+                                <span class="${isStockOk ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-red-50 border border-red-100 text-red-700'} px-1.5 py-0.5 rounded font-bold">স্টক: ${vanStock}</span>
+                            </div>
+
+                            <!-- Totals & OC -->
+                            <div class="flex items-center gap-1.5 mt-2.5">
+                                <span class="text-pink-600 font-black text-[11px]" id="itemPrice-${orderIdx}-${idx}">৳${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</span>
+                                <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
+                            </div>
                         </div>
 
-                        <div class="flex items-center gap-3 mb-3" style="padding-right: 75px;">
-                            <div class="w-14 h-14 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0 p-1 border border-gray-100">
-                                ${(() => {
-                                    if (!p.image) return '<i class="fa-solid fa-box text-gray-300 text-2xl"></i>';
-                                    const src = (p.image.startsWith('http://') || p.image.startsWith('https://')) ? p.image : '<?= BASE_URL ?>/' + p.image.replace(/^\/+/, '');
-                                    return `<img src="${src}" class="w-full h-full object-contain rounded-xl" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span style="display:none" class="w-full h-full items-center justify-center"><i class="fa-solid fa-box text-gray-300 text-2xl"></i></span>`;
-                                })()}
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="text-sm font-black text-gray-800 line-clamp-2 leading-snug">${p.name}</div>
-                                <div class="text-[11px] font-bold text-gray-500 mt-0.5">Ord Val: <span class="text-gray-800 font-extrabold">৳${(qty * parseFloat(p.price || 0)).toFixed(0)}</span></div>
-                                <div class="flex items-center gap-2 mt-1 flex-wrap">
-                                    <div class="text-xs font-black text-pink-500"><span class="text-[10px] text-gray-400 font-bold uppercase">Delivered:</span> <span id="itemPrice-${orderIdx}-${idx}">Tk ${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</span></div>
-                                    <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
+                        <!-- Delivered Input Cell -->
+                        <div class="w-[165px] flex flex-col justify-center shrink-0 p-2 bg-white gap-2">
+                            ${isPcs ? `
+                                <input type="hidden" value="0" class="delivery-input-box"
+                                    data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}">
+                            ` : `
+                                <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
+                                    <span>বক্স</span>
+                                    <div class="flex items-center border border-gray-200 bg-white rounded-md overflow-hidden shadow-sm">
+                                        <button type="button" onclick="changeQty(this, -1, 'box', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center text-gray-600 font-black text-sm shrink-0 select-none border-r border-gray-200 transition-colors bg-transparent">-</button>
+                                        <input type="number" min="0" value="${initialBoxes}"
+                                            class="w-12 text-center font-black text-gray-800 outline-none bg-transparent delivery-input-box text-base"
+                                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+                                            oninput="calcProgress(this, '${orderIdx}-${idx}')">
+                                        <button type="button" onclick="changeQty(this, 1, 'box', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 flex items-center justify-center font-black text-sm shrink-0 select-none border-l border-[#217346] text-white active:scale-95 transition-all" style="background-color: #217346;">+</button>
+                                    </div>
+                                </div>
+                            `}
+                            
+                            <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
+                                <span>পিস</span>
+                                <div class="flex items-center border border-gray-200 bg-white rounded-md overflow-hidden shadow-sm">
+                                    <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center text-gray-600 font-black text-sm shrink-0 select-none border-r border-gray-200 transition-colors bg-transparent">-</button>
+                                    <input type="number" min="0" value="${isPcs ? initialDeliveredQty : initialPcs}"
+                                        class="w-12 text-center font-black text-gray-800 outline-none bg-transparent delivery-input-pcs text-base"
+                                        data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+                                        oninput="calcProgress(this, '${orderIdx}-${idx}')">
+                                    <button type="button" onclick="changeQty(this, 1, 'pcs', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 flex items-center justify-center font-black text-sm shrink-0 select-none border-l border-[#217346] text-white active:scale-95 transition-all" style="background-color: #217346;">+</button>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Ordered Pcs Reference -->
-                        <div class="flex items-center justify-between text-xs font-bold text-gray-500 mt-2 mb-1 px-1">
-                            <span>Ordered: <strong class="text-blue-600 font-black">${qty} Pcs</strong></span>
-                            ${!isPcs ? `<span class="text-gray-400 font-medium">(${Math.floor(qty / ppb)} ${boxLabel} ${qty % ppb} Pcs)</span>` : ''}
-                        </div>
-
-                        <!-- Delivery Input Box & Pcs -->
-                        <div class="flex gap-3 mt-1">
-                            ${boxInputHtml}
-                            <!-- Pcs Input -->
-                            <div class="flex items-center flex-1 border border-gray-250 rounded-xl overflow-hidden focus-within:border-blue-500 transition-colors">
-                                <input type="number" min="0" value="${isPcs ? initialDeliveredQty : initialPcs}"
-                                    class="w-full text-center font-bold text-gray-700 py-2 outline-none delivery-input-pcs text-sm"
-                                    data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
-                                    oninput="calcProgress(this, '${orderIdx}-${idx}')">
-                                <div class="bg-gray-100 text-gray-500 text-xs font-bold px-3 py-2.5 border-l border-gray-250 select-none">Pcs</div>
-                            </div>
-                        </div>
-                    </div>`;
+                    </div>
+                    `;
                 });
+                
+                orderHtml += `
+                    </div>
+                </div>
+                `;
             }
             orderHtml += `</div>`;
             list.insertAdjacentHTML('beforeend', orderHtml);
@@ -1269,15 +1392,15 @@ function selectCompanyOrder(orderIndex) {
             const isCancelled = ord.status === 'cancelled';
             if (idx === orderIndex) {
                 if (isCancelled) {
-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-red-600 bg-white text-red-600 font-bold';
+                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-bold bg-white text-red-655 border-t-2 border-t-red-600 border-x border-x-gray-300 rounded-t-md relative z-10 -mb-[1px]';
                 } else {
-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-blue-600 bg-white text-blue-600 font-bold';
+                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-bold bg-white text-[#217346] border-t-2 border-t-[#217346] border-x border-x-gray-300 rounded-t-md relative z-10 -mb-[1px]';
                 }
             } else {
                 if (isCancelled) {
-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-red-200 bg-red-50/30 text-red-500';
+                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-semibold bg-[#f3f2f1] text-red-500 border-b border-b-gray-300 border-x border-x-gray-200 rounded-t-md opacity-80';
                 } else {
-                    btn.className = 'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white text-gray-500 active:bg-gray-50';
+                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-semibold bg-[#f3f2f1] text-gray-600 border-b border-b-gray-300 border-x border-x-gray-200 rounded-t-md hover:bg-gray-100';
                 }
             }
         });
@@ -1289,11 +1412,11 @@ function selectCompanyOrder(orderIndex) {
     const totalQty = order.products ? order.products.reduce((acc, p) => acc + parseInt(p.quantity), 0) : 0;
     document.getElementById('bsTotalQty').innerText = totalQty;
 
-    const statusLabel = { 'in_transit': 'Pending Delivery', 'delivered': 'Delivered', 'partial': 'Partial/Due', 'cancelled': 'Cancelled' };
+    const statusLabel = { 'in_transit': 'অপেক্ষমান', 'delivered': 'পরিশোধিত', 'partial': 'আংশিক/বাকি', 'cancelled': 'বাতিল' };
     const statusColor = { 'in_transit': '#3b82f6', 'delivered': '#16a34a', 'partial': '#f97316', 'cancelled': '#dc2626' };
     const bsStatus = document.getElementById('bsStatus');
     if (bsStatus) {
-        bsStatus.innerText = statusLabel[order.status] || 'Pending';
+        bsStatus.innerText = statusLabel[order.status] || 'অপেক্ষমান';
         bsStatus.style.color = statusColor[order.status] || '#3b82f6';
     }
 
@@ -1339,18 +1462,18 @@ function selectCompanyOrder(orderIndex) {
     const actionContainer = document.getElementById('bsActionButtons');
     if (actionContainer) {
         if (order.status === 'cancelled') {
-            actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-3 rounded-full font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-rotate-left"></i> Redo</button>`;
+            actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-2.5 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-rotate-left"></i> আবার চেষ্টা করুন</button>`;
         } else if (order.status === 'delivered') {
             actionContainer.innerHTML = '';
         } else if (order.status === 'partial') {
             actionContainer.innerHTML = `
-                <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
-                <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
+                <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
+                <button onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
             `;
         } else {
             actionContainer.innerHTML = `
-                <button onclick="markDelivery('cancelled')" class="flex-1 py-3 rounded-full font-bold bg-[#ff3b30] text-white active:scale-[0.98] transition text-sm shadow-md">Cancel</button>
-                <button onclick="markDelivery('delivered')" class="flex-1 py-3 rounded-full font-bold bg-[#007aff] text-white active:scale-[0.98] transition text-sm shadow-md">Paid</button>
+                <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
+                <button onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
             `;
         }
     }
@@ -1402,7 +1525,7 @@ function calcProgress(el, idx) {
             const oc = (unitPrice - basePrice) * totalDelivered;
             if (Math.round(oc) !== 0 && totalDelivered > 0) {
                 itemOcEl.className = `text-[10px] font-bold px-1.5 py-0.5 rounded-md ${oc > 0 ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`;
-                itemOcEl.innerText = `${oc > 0 ? '+' : ''}${Math.round(oc)} O/C`;
+                itemOcEl.innerText = `${oc > 0 ? '+' : ''}${Math.round(oc)}`;
                 itemOcEl.classList.remove('hidden');
             } else {
                 itemOcEl.classList.add('hidden');
@@ -1515,14 +1638,22 @@ function openPaidPaymentModal() {
     }
     const remainingDue = totalPayable - existingPaid;
     
+    // Populate new structural info elements
+    if (document.getElementById('paidRetailerName') && currentRetailerObj) {
+        document.getElementById('paidRetailerName').innerText = currentRetailerObj.retailer_name || currentRetailerObj.dealer_name || currentRetailerObj.name;
+        document.getElementById('paidTotalPayable').innerText = '৳' + totalPayable.toFixed(0);
+        document.getElementById('paidAlreadyPaid').innerText = '৳' + existingPaid.toFixed(0);
+        document.getElementById('paidRemainingDue').innerText = '৳' + remainingDue.toFixed(0);
+    }
+    
     document.getElementById('paidPaymentInput').value = remainingDue.toFixed(0);
     
     if (existingPaid > 0) {
-        document.getElementById('paymentDueInfo').innerHTML = `Already Paid: ৳${existingPaid.toFixed(0)} | Remaining: ৳${remainingDue.toFixed(0)}`;
-        document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-amber-600 mb-4 h-5';
+        document.getElementById('paymentDueInfo').innerHTML = `ইতিমধ্যে পরিশোধিত: ৳${existingPaid.toFixed(0)} | বাকি পাওনা: ৳${remainingDue.toFixed(0)}`;
+        document.getElementById('paymentDueInfo').className = 'text-xs font-bold text-amber-600 mb-4 h-5';
     } else {
-        document.getElementById('paymentDueInfo').innerText = 'Paid in Full';
-        document.getElementById('paymentDueInfo').className = 'text-sm font-semibold text-green-500 mb-4 h-5';
+        document.getElementById('paymentDueInfo').innerText = 'সম্পূর্ণ পরিশোধিত';
+        document.getElementById('paymentDueInfo').className = 'text-xs font-bold text-green-500 mb-4 h-5';
     }
     
     document.getElementById('paidPaymentModal').classList.remove('hidden');
@@ -1556,16 +1687,20 @@ function onPaidPaymentInput(el) {
     
     const due = maxPayable - entered;
     
+    if (document.getElementById('paidRemainingDue')) {
+        document.getElementById('paidRemainingDue').innerText = '৳' + due.toFixed(0);
+    }
+    
     const info = document.getElementById('paymentDueInfo');
     if (Math.round(due) > 0) {
-        info.innerText = `Due: ৳${Math.round(due)} (Will set as Partial)`;
-        info.className = 'text-sm font-bold text-red-500 mb-4 h-5';
+        info.innerText = `বাকি পাওনা: ৳${Math.round(due)} (আংশিক পরিশোধ হবে)`;
+        info.className = 'text-xs font-bold text-red-500 mb-4 h-5';
     } else if (Math.round(due) < 0) {
-        info.innerText = `Overpaid by: ৳${Math.abs(Math.round(due))} (Please adjust)`;
-        info.className = 'text-sm font-bold text-orange-500 mb-4 h-5';
+        info.innerText = `অতিরিক্ত পরিশোধ: ৳${Math.abs(Math.round(due))} (সমন্বয় করুন)`;
+        info.className = 'text-xs font-bold text-orange-500 mb-4 h-5';
     } else {
-        info.innerText = 'Paid in Full';
-        info.className = 'text-sm font-semibold text-green-500 mb-4 h-5';
+        info.innerText = 'সম্পূর্ণ পরিশোধিত';
+        info.className = 'text-xs font-bold text-green-500 mb-4 h-5';
     }
 }
 
@@ -2126,27 +2261,31 @@ function showToast(msg) {
 }
 function openRetailerListModal() {
     const modal = document.getElementById('retailerListModal');
-    modal.classList.remove('hidden');
-    // Animate opacity if needed, but since it's full screen, just show it
+    if (modal) modal.classList.remove('hidden');
 }
 
 function closeRetailerListModal() {
-    document.getElementById('retailerListModal').classList.add('hidden');
+    const modal = document.getElementById('retailerListModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 function handleRetailerListClick(idx) {
     closeRetailerListModal();
+    if (typeof orderedRetailers === 'undefined' || !orderedRetailers[idx]) return;
     const ret = orderedRetailers[idx];
-    if (!ret) return;
     
     let shouldWarn = true;
-    ret.orders.forEach(o => {
-        if (o.status !== 'delivered' && o.status !== 'cancelled') {
-            shouldWarn = false;
-        }
-    });
+    if (ret.orders && Array.isArray(ret.orders)) {
+        ret.orders.forEach(o => {
+            if (o.status !== 'delivered' && o.status !== 'cancelled') {
+                shouldWarn = false;
+            }
+        });
+    }
     
-    handleRetailerClick(ret, shouldWarn);
+    if (typeof handleRetailerClick === 'function') {
+        handleRetailerClick(ret, shouldWarn);
+    }
 }
 
 <?php endif; // $hasDeliveries ?>
@@ -2156,94 +2295,131 @@ function handleRetailerListClick(idx) {
      READY SALE MODALS & NEARBY MAP (ALWAYS AVAILABLE)
 ═══════════════════════════════════════════════════════ -->
 
-<!-- Ready Sale Modal -->
-<div id="readySaleModal" class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm hidden" style="z-index: 99980 !important;">
-  <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+<!-- Ready Sale Modal (Excel Grid Style - Blue Brand Theme) -->
+<div id="readySaleModal" class="fixed inset-0 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-md hidden transition-all duration-300" style="z-index: 99980 !important;">
+  <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
     
-    <!-- Modal Header -->
-    <div class="bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-3.5 flex items-center justify-between text-white shadow-sm">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg shadow-inner">
-          <i class="fa-solid fa-bolt text-amber-100"></i>
+    <!-- Modal Header (Blue Brand Gradient) -->
+    <div class="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 px-4 py-3.5 sm:px-5 flex items-center justify-between text-white shadow-md relative overflow-hidden">
+      <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+
+      <div class="flex items-center gap-3 relative z-10">
+        <div class="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs text-white flex items-center justify-center text-lg border border-white/20 shadow-inner">
+          <i class="fa-solid fa-bolt text-blue-100"></i>
         </div>
         <div>
-          <h3 class="font-black text-base leading-tight">Ready Sale by DSR</h3>
-          <p class="text-[11px] text-amber-100 font-medium">ভ্যান স্টক থেকে অন-দ্য-স্পট সরাসরি বিক্রি</p>
+          <div class="flex items-center gap-2">
+            <h3 class="font-extrabold text-sm sm:text-base tracking-tight leading-none text-white font-siliguri">Ready Sale Order Grid</h3>
+            <span class="text-[9.5px] uppercase font-black px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-100 border border-blue-300/30">Van Stock</span>
+          </div>
+          <p class="text-[11px] text-blue-100/90 font-medium mt-0.5 font-siliguri">স্প্রেডশীট গ্রিড স্টাইলে সরাসরি ভ্যান স্টক থেকে বিক্রয়</p>
         </div>
       </div>
-      <button onclick="closeReadySaleModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition active:scale-95">
-        <i class="fa-solid fa-xmark text-lg"></i>
+
+      <button onclick="closeReadySaleModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition active:scale-95 border border-white/20 relative z-10">
+        <i class="fa-solid fa-xmark text-sm"></i>
       </button>
     </div>
 
     <!-- Modal Body -->
-    <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-gray-800">
+    <div class="p-3 sm:p-4 overflow-y-auto space-y-3 bg-slate-50 font-siliguri text-slate-800">
       
       <!-- Hidden Date & CSRF -->
       <input type="hidden" id="rs_csrf_token" value="<?= Helpers::csrfToken() ?>">
       <input type="hidden" id="rs_date" value="<?= $selectedDate ?? date('Y-m-d') ?>">
 
-      <!-- Retailer Selector -->
-      <div>
-        <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-          <i class="fa-solid fa-store text-amber-500 mr-1"></i> রিটেলার নির্বাচন করুন <span class="text-red-500">*</span>
-        </label>
-        <div class="flex gap-1.5 flex-wrap sm:flex-nowrap">
-          <select id="rs_retailer_id" class="flex-1 min-w-[150px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:border-amber-500 transition">
+      <!-- Retailer Toolbar (Excel Header Form Bar) -->
+      <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-xs space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-store text-blue-600"></i> রিটেলার নির্বাচন <span class="text-rose-500">*</span>
+          </label>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="openNearbyRetailerMapModal(20)" class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-blue-200/80 active:scale-95 transition shadow-2xs whitespace-nowrap" title="২০ মিটার রিটেলার ম্যাপ">
+              <i class="fa-solid fa-location-crosshairs text-blue-600"></i> ২০মি: ম্যাপ
+            </button>
+            <button type="button" onclick="openQuickAddRetailerModal()" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold flex items-center gap-1 border border-emerald-200/80 active:scale-95 transition shadow-2xs whitespace-nowrap">
+              <i class="fa-solid fa-plus text-emerald-600"></i> নতুন রিটেলার
+            </button>
+          </div>
+        </div>
+
+        <div class="relative">
+          <select id="rs_retailer_id" class="w-full bg-slate-50/80 hover:bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition shadow-2xs appearance-none">
             <option value="">-- রিটেলার পছন্দ করুন --</option>
             <?php foreach ($allRetailers ?? [] as $ret): ?>
               <option value="<?= $ret['id'] ?>" data-lat="<?= $ret['lat'] ?? '' ?>" data-lng="<?= $ret['lng'] ?? '' ?>"><?= htmlspecialchars($ret['name']) ?> (<?= htmlspecialchars($ret['phone'] ?? 'No Phone') ?>)</option>
             <?php endforeach; ?>
           </select>
-          <button type="button" onclick="openNearbyRetailerMapModal(20)" class="px-2.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold flex items-center gap-1 border border-blue-200 active:scale-95 transition whitespace-nowrap" title="20 মিটার ব্যাসার্ধের মধ্যে রিটেলার ম্যাপে দেখুন">
-            <i class="fa-solid fa-location-dot text-blue-600"></i> ২০মি: ম্যাপ
-          </button>
-          <button type="button" onclick="openQuickAddRetailerModal()" class="px-2.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-bold flex items-center gap-1 border border-amber-200 active:scale-95 transition whitespace-nowrap">
-            <i class="fa-solid fa-plus text-amber-600"></i> নতুন
-          </button>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+            <i class="fa-solid fa-chevron-down text-xs"></i>
+          </div>
         </div>
       </div>
 
-      <!-- Products Section -->
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <label class="text-xs font-bold text-gray-600 uppercase tracking-wider">
-            <i class="fa-solid fa-boxes-stacked text-amber-500 mr-1"></i> ভ্যান স্টক থেকে পণ্য যোগ করুন
-          </label>
-          <button type="button" onclick="addReadySaleRow()" class="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 active:scale-95 transition">
-            <i class="fa-solid fa-plus"></i> আইটেম যুক্ত করুন
-          </button>
-        </div>
-
-        <div class="bg-gray-50 border border-gray-200 rounded-2xl p-3 space-y-3 max-h-[300px] overflow-y-auto" id="rs_products_container">
-          <!-- Dynamic product rows will be inserted here -->
-        </div>
-      </div>
-
-      <!-- Total & Live O/C Summary Card -->
-      <div class="bg-slate-900 text-white rounded-2xl p-4 shadow-lg space-y-2">
-        <div class="flex items-center justify-between text-sm">
-          <span class="text-slate-300 font-medium">সর্বমোট টাকা (Total Value):</span>
-          <span class="font-black text-amber-400 text-base font-mono" id="rs_summary_total">৳0.00</span>
-        </div>
-        <div class="flex items-center justify-between text-sm border-t border-slate-700/60 pt-2">
-          <span class="text-slate-300 font-medium flex items-center gap-1">
-            ওভার কমিশন (Live O/C):
-            <i class="fa-solid fa-circle-info text-slate-400 text-xs" title="(Custom Unit Price - Base Price) × Quantity"></i>
+      <!-- Excel Style Items Sheet Table -->
+      <div class="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+        <!-- Sheet Header Bar -->
+        <div class="bg-slate-100/90 border-b border-slate-200 px-3 py-2 flex items-center justify-between">
+          <span class="text-xs font-black text-slate-700 uppercase tracking-tight flex items-center gap-1.5">
+            <i class="fa-solid fa-table-cells text-blue-600"></i> অর্ডারের আইটেম তালিকা (Order Grid)
           </span>
-          <span class="font-black text-sm px-2 py-0.5 rounded font-mono bg-slate-800 text-slate-300" id="rs_summary_oc">৳0.00</span>
+          <button type="button" onclick="addReadySaleRow()" class="text-xs font-extrabold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg border border-blue-200 active:scale-95 transition flex items-center gap-1.5 shadow-2xs">
+            <i class="fa-solid fa-plus text-xs"></i> রো যোগ করুন (Add Row)
+          </button>
+        </div>
+
+        <!-- Excel Table Grid -->
+        <div class="overflow-x-auto max-h-[310px]">
+          <table class="w-full text-left border-collapse min-w-[520px]" id="rs_excel_table">
+            <thead>
+              <tr class="bg-slate-100/70 text-[11px] font-black text-slate-700 uppercase tracking-tight border-b border-slate-200">
+                <th class="p-2.5 border-r border-slate-200 w-[42%]">পণ্য / আইটেম (Product)</th>
+                <th class="p-2.5 border-r border-slate-200 text-center w-[15%]">পরিমাণ (Qty)</th>
+                <th class="p-2.5 border-r border-slate-200 text-right w-[16%]">মূল দাম (Trade)</th>
+                <th class="p-2.5 border-r border-slate-200 text-right w-[17%]">বিক্রি মূল্য (Unit)</th>
+                <th class="p-2.5 text-center w-[10%]">মুছুন</th>
+              </tr>
+            </thead>
+            <tbody id="rs_products_container" class="divide-y divide-slate-200 text-xs">
+              <!-- Excel Grid Dynamic Rows Inserted Here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Excel Style Bottom Totals Toolbar -->
+      <div class="bg-slate-900 text-white rounded-xl p-3 shadow-md border border-slate-800 font-mono text-xs">
+        <div class="grid grid-cols-3 gap-2 text-center border-b border-slate-800 pb-2 mb-2 font-sans">
+          <div>
+            <span class="text-[10px] text-slate-400 uppercase font-medium block">মোট রো count</span>
+            <span class="font-extrabold text-slate-200" id="rs_summary_items_count">0 টি</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 uppercase font-medium block">লাইভ O/C</span>
+            <span class="font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] inline-block font-mono" id="rs_summary_oc">৳0.00</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 uppercase font-medium block">পেমেন্ট স্টেটাস</span>
+            <span class="font-bold text-emerald-400 text-[11px]">অন-দ্য-স্পট ক্যাশ</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between px-1">
+          <span class="text-slate-300 font-bold font-sans text-xs sm:text-sm">সর্বমোট মূল্য (Grand Total):</span>
+          <span class="font-black text-blue-400 text-lg sm:text-xl font-mono tracking-tight" id="rs_summary_total">৳0.00</span>
         </div>
       </div>
 
     </div>
 
-    <!-- Modal Footer -->
-    <div class="bg-gray-50 border-t border-gray-100 px-5 py-3.5 flex items-center justify-end gap-3">
-      <button type="button" onclick="closeReadySaleModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-xs sm:text-sm transition">
+    <!-- Modal Footer (Blue Action Button) -->
+    <div class="bg-slate-50 border-t border-slate-200 px-4 py-3 flex items-center justify-end gap-2 font-siliguri">
+      <button type="button" onclick="closeReadySaleModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs transition">
         বাতিল
       </button>
-      <button type="button" id="rs_submit_btn" onclick="submitReadySale()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs sm:text-sm shadow-lg shadow-amber-500/30 flex items-center gap-2 active:scale-95 transition">
-        <i class="fa-solid fa-check"></i> সেভ করুন (Submit)
+      <button type="button" id="rs_submit_btn" onclick="submitReadySale()" class="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-lg text-xs sm:text-sm shadow-md shadow-blue-500/20 flex items-center gap-1.5 active:scale-95 transition border border-blue-500/30">
+        <i class="fa-solid fa-check"></i> অর্ডার কনফার্ম (Save Order)
       </button>
     </div>
 
@@ -2251,72 +2427,79 @@ function handleRetailerListClick(idx) {
 </div>
 
 <!-- Quick Add Retailer Modal -->
-<div id="quickAddRetailerModal" class="fixed inset-0 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden" style="z-index: 99990 !important;">
-  <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden p-5 space-y-4">
-    <div class="flex items-center justify-between border-b pb-2">
-      <h4 class="font-bold text-gray-800 text-base">দ্রুত নতুন রিটেলার যোগ করুন</h4>
-      <button type="button" onclick="closeQuickAddRetailerModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+<div id="quickAddRetailerModal" class="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md hidden transition-all duration-300" style="z-index: 99990 !important;">
+  <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-slate-200 p-4 space-y-3 animate-in fade-in zoom-in-95 duration-200 font-siliguri">
+    <div class="flex items-center justify-between border-b border-slate-200 pb-2.5">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xs">
+          <i class="fa-solid fa-user-plus"></i>
+        </div>
+        <h4 class="font-extrabold text-slate-800 text-sm">নতুন রিটেলার যোগ করুন</h4>
+      </div>
+      <button type="button" onclick="closeQuickAddRetailerModal()" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="space-y-3">
+    
+    <div class="space-y-2.5 text-left text-xs">
       <div>
-        <label class="block text-xs font-bold text-gray-600 mb-1">রিটেলারের নাম <span class="text-red-500">*</span></label>
-        <input type="text" id="qr_name" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:border-amber-500" placeholder="দোকানের/মালিকের নাম">
+        <label class="block font-bold text-slate-700 mb-1">রিটেলারের নাম <span class="text-rose-500">*</span></label>
+        <input type="text" id="qr_name" class="w-full bg-slate-50/80 focus:bg-white border border-slate-300 rounded-lg px-3 py-2 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition" placeholder="দোকানের/মালিকের নাম">
       </div>
       <div>
-        <label class="block text-xs font-bold text-gray-600 mb-1">ফোন নাম্বার</label>
-        <input type="text" id="qr_phone" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:border-amber-500" placeholder="017xxxxxxxx">
+        <label class="block font-bold text-slate-700 mb-1">ফোন নাম্বার</label>
+        <input type="text" id="qr_phone" class="w-full bg-slate-50/80 focus:bg-white border border-slate-300 rounded-lg px-3 py-2 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition" placeholder="017xxxxxxxx">
       </div>
     </div>
-    <div class="flex justify-end gap-2 pt-2">
-      <button type="button" onclick="closeQuickAddRetailerModal()" class="px-3.5 py-2 bg-gray-200 text-gray-700 text-xs font-bold rounded-xl">বাতিল</button>
-      <button type="button" id="qr_save_btn" onclick="submitQuickAddRetailer()" class="px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl shadow">সেভ করুন</button>
+    
+    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+      <button type="button" onclick="closeQuickAddRetailerModal()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition">বাতিল</button>
+      <button type="button" id="qr_save_btn" onclick="submitQuickAddRetailer()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg shadow-sm transition">সেভ করুন</button>
     </div>
   </div>
 </div>
 
 <!-- Nearby Retailer Map Modal (20m Radius) -->
-<div id="nearbyRetailerMapModal" class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm hidden" style="z-index: 99999 !important;">
+<div id="nearbyRetailerMapModal" class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md hidden transition-all duration-300" style="z-index: 99999 !important;">
 
-  <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col h-[85vh] max-h-[650px] overflow-hidden">
+  <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col h-[85vh] max-h-[650px] overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200 font-siliguri">
     
     <!-- Header -->
-    <div class="bg-slate-900 px-5 py-3.5 flex items-center justify-between text-white shadow-md">
+    <div class="bg-slate-900 px-4 py-3 flex items-center justify-between text-white shadow-md">
       <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm border border-blue-500/30">
+        <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm border border-blue-500/30">
           <i class="fa-solid fa-location-crosshairs"></i>
         </div>
         <div>
-          <h4 class="font-black text-sm leading-tight text-white">কাছের রিটেলার ম্যাপ</h4>
-          <p class="text-[11px] text-slate-300 font-medium" id="nearbyRadiusLabel">আপনার অবস্থানের ২০ মিটার ব্যাসার্ধের মধ্যে</p>
+          <h4 class="font-extrabold text-sm leading-tight text-white">কাছের রিটেলার ম্যাপ</h4>
+          <p class="text-[11px] text-slate-300 font-medium mt-0.5" id="nearbyRadiusLabel">আপনার অবস্থানের ২০ মিটার ব্যাসার্ধের মধ্যে</p>
         </div>
       </div>
-      <button onclick="closeNearbyRetailerMapModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition">
+      <button onclick="closeNearbyRetailerMapModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition active:scale-95">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
 
     <!-- Radius Control Bar -->
-    <div class="bg-slate-100 border-b border-gray-200 px-4 py-2 flex items-center justify-between gap-2 text-xs">
-      <span class="font-bold text-gray-600">দূরত্ব ফিল্টার:</span>
+    <div class="bg-slate-100 border-b border-slate-200 px-4 py-2 flex items-center justify-between gap-2 text-xs">
+      <span class="font-bold text-slate-600">দূরত্ব ফিল্টার:</span>
       <div class="flex items-center gap-1">
-        <button type="button" onclick="setNearbyRadius(20)" id="radiusBtn20" class="px-2.5 py-1 rounded-lg font-bold transition bg-blue-600 text-white shadow-sm">২০মি:</button>
-        <button type="button" onclick="setNearbyRadius(50)" id="radiusBtn50" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-gray-700 border border-gray-200">৫০মি:</button>
-        <button type="button" onclick="setNearbyRadius(100)" id="radiusBtn100" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-gray-700 border border-gray-200">১০০মি:</button>
-        <button type="button" onclick="setNearbyRadius(999999)" id="radiusBtnAll" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-gray-700 border border-gray-200">সব</button>
+        <button type="button" onclick="setNearbyRadius(20)" id="radiusBtn20" class="px-2.5 py-1 rounded-lg font-extrabold transition bg-blue-600 text-white shadow-xs">২০মি:</button>
+        <button type="button" onclick="setNearbyRadius(50)" id="radiusBtn50" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">৫০মি:</button>
+        <button type="button" onclick="setNearbyRadius(100)" id="radiusBtn100" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">১০০মি:</button>
+        <button type="button" onclick="setNearbyRadius(999999)" id="radiusBtnAll" class="px-2.5 py-1 rounded-lg font-bold transition bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">সব</button>
       </div>
     </div>
 
     <!-- Map Container -->
-    <div class="relative flex-1 bg-gray-200 min-h-[220px]">
+    <div class="relative flex-1 bg-slate-200 min-h-[220px]">
       <div id="nearbyMapCanvas" class="w-full h-full"></div>
-      <div id="nearbyMapLoader" class="absolute inset-0 bg-white/80 z-10 flex flex-col items-center justify-center text-gray-600 text-xs font-bold gap-2">
+      <div id="nearbyMapLoader" class="absolute inset-0 bg-white/85 backdrop-blur-xs z-10 flex flex-col items-center justify-center text-slate-600 text-xs font-bold gap-2">
         <i class="fa-solid fa-circle-notch fa-spin text-2xl text-blue-600"></i>
         <span>আপনার বর্তমান লোকেশন পাওয়ার চেষ্টা চলছে...</span>
       </div>
     </div>
 
     <!-- Retailer List Sheet at bottom of map modal -->
-    <div class="bg-white border-t border-gray-200 p-3 max-h-[200px] overflow-y-auto" id="nearbyRetailersList">
+    <div class="bg-white border-t border-slate-200 p-3 max-h-[200px] overflow-y-auto" id="nearbyRetailersList">
       <!-- Dynamic list of nearby retailers -->
     </div>
 
@@ -2330,7 +2513,7 @@ let vanStockProducts = [];
 async function openReadySaleModal() {
     const modal = document.getElementById('readySaleModal');
     const container = document.getElementById('rs_products_container');
-    container.innerHTML = '<div class="text-center py-6 text-gray-400 text-sm font-medium"><i class="fa-solid fa-spinner fa-spin mr-2"></i>ভ্যান স্টক থেকে প্রোডাক্ট লোড হচ্ছে...</div>';
+    container.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400 text-xs font-medium"><i class="fa-solid fa-circle-notch fa-spin mr-2 text-blue-600"></i>ভ্যান স্টক থেকে প্রোডাক্ট লোড হচ্ছে...</td></tr>';
     
     modal.classList.remove('hidden');
 
@@ -2347,13 +2530,13 @@ async function openReadySaleModal() {
 
         container.innerHTML = '';
         if (vanStockProducts.length === 0) {
-            container.innerHTML = '<div class="text-center py-6 text-red-500 text-sm font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>আপনার ভ্যানে বর্তমানে কোনো অবশিষ্টাংশ প্রোডাক্ট নেই।</div>';
+            container.innerHTML = '<tr><td colspan="5" class="p-4 bg-rose-50 text-rose-700 text-center text-xs font-bold"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>আপনার ভ্যানে বর্তমানে কোনো অবশিষ্টাংশ প্রোডাক্ট নেই।</td></tr>';
         } else {
             addReadySaleRow();
         }
         calculateRSTotals();
     } catch (err) {
-        container.innerHTML = '<div class="text-center py-6 text-red-500 text-sm font-bold">ভ্যান স্টক লোড করতে ব্যর্থ হয়েছে।</div>';
+        container.innerHTML = '<tr><td colspan="5" class="p-4 bg-rose-50 text-rose-700 text-center text-xs font-bold">ভ্যান স্টক লোড করতে ব্যর্থ হয়েছে।</td></tr>';
     }
 }
 
@@ -2371,36 +2554,46 @@ function addReadySaleRow() {
     });
 
     const rowHtml = `
-        <div id="${rowId}" class="rs-product-row bg-white border border-gray-200 rounded-xl p-3 shadow-sm space-y-2.5">
-          <div class="flex items-center justify-between gap-2">
-            <select class="rs-prod-select flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-800 outline-none focus:border-amber-500" onchange="onRSProductChange(this)">
-              ${productOptionsHtml}
-            </select>
-            <button type="button" onclick="removeRSRow('${rowId}')" class="w-7 h-7 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg flex items-center justify-center text-xs active:scale-95 transition">
+        <tr id="${rowId}" class="rs-product-row hover:bg-blue-50/30 transition-colors border-b border-slate-200">
+          <!-- Product Selector Cell -->
+          <td class="p-2.5 border-r border-slate-200 align-middle">
+            <div class="relative">
+              <select class="rs-prod-select w-full bg-slate-50/90 hover:bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition appearance-none" onchange="onRSProductChange(this)">
+                ${productOptionsHtml}
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                <i class="fa-solid fa-chevron-down text-[9px]"></i>
+              </div>
+            </div>
+            <div class="mt-1 flex items-center justify-between px-0.5">
+              <span class="rs-avail-badge text-[9.5px] font-bold text-slate-500">Avail: -</span>
+              <span class="rs-oc-badge font-mono text-[10px] font-bold text-slate-500">O/C: ৳0.00</span>
+            </div>
+          </td>
+
+          <!-- Quantity Cell -->
+          <td class="p-2.5 border-r border-slate-200 align-middle text-center">
+            <input type="number" min="1" value="1" class="rs-qty w-full max-w-[70px] bg-white border border-slate-300 focus:border-blue-600 rounded-lg px-2 py-1 text-center font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/30 transition shadow-2xs" oninput="calculateRSTotals()">
+          </td>
+
+          <!-- Base Trade Price Cell -->
+          <td class="p-2.5 border-r border-slate-200 align-middle text-right font-mono font-bold text-slate-700 bg-slate-50/50">
+            <span class="rs-base-price-label">৳0.00</span>
+          </td>
+
+          <!-- Unit Selling Price Cell -->
+          <td class="p-2.5 border-r border-slate-200 align-middle text-right">
+            <input type="number" step="0.01" min="0" value="0.00" class="rs-unit-price w-full max-w-[85px] bg-blue-50/60 focus:bg-white border border-blue-300 focus:border-blue-600 rounded-lg px-2 py-1 text-right font-mono font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500/30 transition shadow-2xs" oninput="calculateRSTotals()">
+            <div class="text-[10px] text-slate-500 font-sans mt-0.5">টোটাল: <span class="rs-line-total font-mono font-bold text-blue-700">৳0.00</span></div>
+          </td>
+
+          <!-- Action Cell -->
+          <td class="p-2.5 align-middle text-center">
+            <button type="button" onclick="removeRSRow('${rowId}')" class="w-7 h-7 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center text-xs active:scale-95 transition border border-rose-200 mx-auto shadow-2xs" title="রো মুছে ফেলুন">
               <i class="fa-solid fa-trash-can"></i>
             </button>
-          </div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-            <div>
-              <span class="block text-[10px] font-bold text-gray-400 uppercase">পরিমাণ (Qty Pcs)</span>
-              <input type="number" min="1" value="1" class="rs-qty w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 font-bold text-gray-800 outline-none focus:border-amber-500" oninput="calculateRSTotals()">
-            </div>
-            <div>
-              <span class="block text-[10px] font-bold text-gray-400 uppercase">মূল দাম (Trade Price)</span>
-              <div class="rs-base-price-label pt-1 font-mono font-bold text-gray-600">৳0.00</div>
-            </div>
-            <div class="col-span-2 sm:col-span-1">
-              <span class="block text-[10px] font-bold text-gray-400 uppercase">বিক্রি মূল্য (Unit Price)</span>
-              <input type="number" step="0.01" min="0" value="0.00" class="rs-unit-price w-full bg-amber-50 border border-amber-300 rounded-lg px-2 py-1 font-mono font-bold text-amber-800 outline-none focus:border-amber-500" oninput="calculateRSTotals()">
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between pt-1 border-t border-gray-100 text-xs">
-            <span class="rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600 font-mono">O/C: ৳0.00</span>
-            <span class="font-bold text-gray-700">লাইন টোটাল: <span class="rs-line-total font-mono text-amber-600 font-black">৳0.00</span></span>
-          </div>
-        </div>
+          </td>
+        </tr>
     `;
 
     container.insertAdjacentHTML('beforeend', rowHtml);
@@ -2415,12 +2608,17 @@ function removeRSRow(rowId) {
 function onRSProductChange(selectEl) {
     const row = selectEl.closest('.rs-product-row');
     const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    const availBadge = row.querySelector('.rs-avail-badge');
     
     if (!selectedOpt || !selectedOpt.value) {
         row.querySelector('.rs-base-price-label').innerText = '৳0.00';
         row.querySelector('.rs-base-price-label').dataset.val = '0';
         row.querySelector('.rs-unit-price').value = '0.00';
         row.querySelector('.rs-qty').max = '';
+        if (availBadge) {
+            availBadge.innerText = 'Avail: -';
+            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold text-slate-500';
+        }
         calculateRSTotals();
         return;
     }
@@ -2432,6 +2630,16 @@ function onRSProductChange(selectEl) {
     row.querySelector('.rs-base-price-label').dataset.val = basePrice;
     row.querySelector('.rs-unit-price').value = basePrice.toFixed(2);
     row.querySelector('.rs-qty').max = availQty;
+    
+    if (availBadge) {
+        availBadge.innerText = `Avail: ${availQty} Pcs`;
+        if (availQty <= 5) {
+            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold text-amber-600';
+        } else {
+            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold text-emerald-600';
+        }
+    }
+
     if (parseInt(row.querySelector('.rs-qty').value) > availQty) {
         row.querySelector('.rs-qty').value = availQty;
     }
@@ -2443,12 +2651,14 @@ function calculateRSTotals() {
     const rows = document.querySelectorAll('.rs-product-row');
     let grandTotal = 0;
     let grandOC = 0;
+    let selectedItemCount = 0;
 
     rows.forEach(row => {
         const select = row.querySelector('.rs-prod-select');
         const selectedOpt = select ? select.options[select.selectedIndex] : null;
         if (!selectedOpt || !selectedOpt.value) return;
 
+        selectedItemCount++;
         const qtyInput = row.querySelector('.rs-qty');
         const maxAvail = parseInt(selectedOpt.dataset.avail || 99999);
         let qty = parseInt(qtyInput.value) || 0;
@@ -2473,13 +2683,16 @@ function calculateRSTotals() {
         ocBadge.innerText = `O/C: ${sign}৳` + lineOC.toFixed(2);
 
         if (lineOC > 0) {
-            ocBadge.className = 'rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-green-100 text-green-700 font-mono';
+            ocBadge.className = 'rs-oc-badge font-mono text-[10px] font-bold text-emerald-700';
         } else if (lineOC < 0) {
-            ocBadge.className = 'rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-red-100 text-red-700 font-mono';
+            ocBadge.className = 'rs-oc-badge font-mono text-[10px] font-bold text-rose-700';
         } else {
-            ocBadge.className = 'rs-oc-badge font-bold px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600 font-mono';
+            ocBadge.className = 'rs-oc-badge font-mono text-[10px] font-bold text-slate-500';
         }
     });
+
+    const itemsCountEl = document.getElementById('rs_summary_items_count');
+    if (itemsCountEl) itemsCountEl.innerText = selectedItemCount + ' টি';
 
     document.getElementById('rs_summary_total').innerText = '৳' + grandTotal.toFixed(2);
     
@@ -2488,11 +2701,11 @@ function calculateRSTotals() {
     ocSummaryEl.innerText = `O/C: ${signSum}৳` + grandOC.toFixed(2);
 
     if (grandOC > 0) {
-        ocSummaryEl.className = 'font-black text-sm px-2 py-0.5 rounded font-mono bg-green-900/60 text-green-300 border border-green-700';
+        ocSummaryEl.className = 'font-bold px-1.5 py-0.5 rounded bg-emerald-900/80 text-emerald-300 text-[11px] inline-block font-mono border border-emerald-700';
     } else if (grandOC < 0) {
-        ocSummaryEl.className = 'font-black text-sm px-2 py-0.5 rounded font-mono bg-red-900/60 text-red-300 border border-red-700';
+        ocSummaryEl.className = 'font-bold px-1.5 py-0.5 rounded bg-rose-900/80 text-rose-300 text-[11px] inline-block font-mono border border-rose-700';
     } else {
-        ocSummaryEl.className = 'font-black text-sm px-2 py-0.5 rounded font-mono bg-slate-800 text-slate-300';
+        ocSummaryEl.className = 'font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] inline-block font-mono';
     }
 }
 

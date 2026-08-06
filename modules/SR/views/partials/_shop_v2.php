@@ -219,40 +219,43 @@
 <div class="sr-sheet-overlay" id="productSheetOverlay"></div>
 <div class="sr-bottom-sheet-v2" id="productSheet">
   <div class="sr-sheet-handle-v2"></div>
-  <div class="sr-sheet-header-v2">
-    <span class="sr-sheet-title-v2">প্রোডাক্ট যোগ করুন</span>
-    <button class="sr-sheet-close-v2" id="productSheetClose"><i class="fa-solid fa-xmark"></i></button>
+  <div class="sr-sheet-header-v2 border-b border-slate-100 pb-3">
+    <span class="sr-sheet-title-v2 font-black text-slate-900 text-base">প্রোডাক্ট যোগ করুন</span>
+    <button class="sr-sheet-close-v2 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition" id="productSheetClose"><i class="fa-solid fa-xmark"></i></button>
   </div>
-  <div class="sr-sheet-body-v2">
+  <div class="sr-sheet-body-v2 space-y-4 pt-2">
     <!-- Image Wrapper -->
-    <div class="sr-prod-sheet-img-wrap-v2">
+    <div class="sr-prod-sheet-img-wrap-v2 rounded-2xl overflow-hidden border border-slate-100 shadow-2xs">
       <div id="productSheetImgWrap"></div>
     </div>
     
     <!-- Product Name -->
-    <div class="sr-prod-sheet-name-v2 font-sans font-bold text-slate-800" id="productSheetName">—</div>
+    <div class="sr-prod-sheet-name-v2 font-sans font-black text-slate-900 text-lg leading-snug" id="productSheetName">—</div>
     
     <!-- Product Info Table (Excel Style) -->
-    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white my-3 text-xs select-none">
+    <div class="overflow-hidden rounded-2xl border border-slate-200/90 bg-white text-xs select-none shadow-2xs">
       <table class="w-full text-left border-collapse">
-        <tbody class="divide-y divide-slate-200 text-slate-700">
+        <tbody class="divide-y divide-slate-100 text-slate-700">
           <tr>
-            <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 w-1/3 font-sans">প্যাকেজ টাইপ</td>
-            <td class="p-2.5 text-slate-800 font-bold font-sans" id="productSheetPackageWrap">
+            <td class="p-3 border-r border-slate-100 bg-slate-50/70 font-bold text-slate-500 w-1/3 font-sans">প্যাকেজ টাইপ</td>
+            <td class="p-3 text-slate-900 font-bold font-sans" id="productSheetPackageWrap">
               <span id="productSheetPackageInner">বক্স ( <span id="productSheetPcsPerBox">—</span> পিস )</span>
             </td>
           </tr>
           <tr>
-            <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 font-sans">প্রতি পিস মূল্য</td>
-            <td class="p-2.5 text-slate-800 font-bold font-mono text-xs" id="productSheetPerPiecePriceWrap">
+            <td class="p-3 border-r border-slate-100 bg-slate-50/70 font-bold text-slate-500 font-sans">প্রতি পিস মূল্য</td>
+            <td class="p-3 text-slate-900 font-extrabold font-mono text-xs" id="productSheetPerPiecePriceWrap">
               Tk <span id="productSheetPerPiecePriceVal">0.00</span>
-              <span id="productSheetPerPiecePriceFormula" class="text-[10px] text-slate-500 font-sans ml-1"></span>
+              <span id="productSheetPerPiecePriceFormula" class="text-[10px] text-slate-400 font-sans ml-1"></span>
             </td>
           </tr>
-          <tr>
-            <td class="p-2.5 border-r border-slate-200 bg-slate-50 font-semibold text-slate-500 font-sans">মোট মূল্য</td>
-            <td class="p-2.5 text-slate-800 font-black font-mono cursor-pointer" onclick="document.getElementById('productSheetBasePriceInput').focus()">
-              Tk <input type="number" id="productSheetBasePriceInput" value="0.00" min="0" step="any" oninput="calcFromTotal()" style="border:none; background:none; font-weight:900; width:80px; outline:none; padding:0; font-family:monospace;" class="text-slate-800">
+          <tr class="bg-blue-50/70">
+            <td class="p-3 border-r border-blue-200/80 bg-blue-100/60 font-black text-blue-900 font-sans text-xs">মোট মূল্য</td>
+            <td class="p-2.5 text-blue-950 font-black font-mono text-sm cursor-pointer" onclick="document.getElementById('productSheetBasePriceInput').focus()">
+              <div class="inline-flex items-center gap-1.5 bg-white border-2 border-blue-400 rounded-xl px-2.5 py-1 shadow-sm">
+                <span class="text-blue-600 font-black">Tk</span>
+                <input type="number" id="productSheetBasePriceInput" value="0.00" min="0" step="any" oninput="calcFromTotal()" style="border:none; background:none; font-weight:900; width:100px; outline:none; padding:0; font-family:monospace;" class="text-slate-900 text-sm font-black focus:ring-0">
+              </div>
             </td>
           </tr>
         </tbody>
@@ -260,15 +263,15 @@
     </div>
     
     <!-- Price setting override controls -->
-    <div class="sr-prod-sheet-override-header-v2" style="justify-content: flex-end; min-height: 24px;">
+    <div class="sr-prod-sheet-override-header-v2" style="justify-content: flex-end; min-height: 20px;">
       <span class="sr-prod-override-badge-v2" id="productSheetOcBadge" style="display:none;">Tk 0</span>
     </div>
     
     <!-- Big Middle counter showing Total Value -->
-    <div class="sr-prod-total-counter-box-v2" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('totalDisplayInput').focus()" style="cursor:text;">
+    <div class="sr-prod-total-counter-box-v2 rounded-2xl border-2 border-blue-100 bg-gradient-to-r from-blue-50/50 via-white to-blue-50/50 p-2 shadow-2xs" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('totalDisplayInput').focus()" style="cursor:text;">
       <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(-1)">−</button>
-      <div class="sr-prod-total-cnt-value-v2">
-        Tk <input type="number" id="totalDisplayInput" value="0.00" min="0" step="0.01" oninput="calcTotal()" style="border:none; background:none; font-weight:700; width:110px; text-align:center; color:#0f172a; outline:none;">
+      <div class="sr-prod-total-cnt-value-v2 font-black">
+        Tk <input type="number" id="totalDisplayInput" value="0.00" min="0" step="0.01" oninput="calcTotal()" style="border:none; background:none; font-weight:900; width:120px; text-align:center; color:#0f172a; outline:none;" class="font-mono text-lg">
       </div>
       <button class="sr-prod-total-cnt-btn-v2" onclick="changeTotalAmount(1)">+</button>
     </div>
@@ -277,10 +280,10 @@
     <div class="sr-prod-qty-counters-grid-v2" id="qtyCountersGrid">
       <!-- Box counter -->
       <div class="sr-prod-qty-counter-v2" id="boxCounterGroup">
-        <div class="sr-prod-qty-counter-label-v2 font-sans">বক্স</div>
-        <div class="sr-prod-qty-counter-row-v2" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('qtyCartons').focus()" style="cursor:text;">
+        <div class="sr-prod-qty-counter-label-v2 font-sans font-bold text-slate-700">বক্স</div>
+        <div class="sr-prod-qty-counter-row-v2 rounded-xl border border-slate-200 bg-white" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('qtyCartons').focus()" style="cursor:text;">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('cartons',-1)">−</button>
-          <input type="number" id="qtyCartons" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2">
+          <input type="number" id="qtyCartons" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2 font-black text-slate-900">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('cartons',1)">+</button>
         </div>
       </div>

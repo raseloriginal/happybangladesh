@@ -175,6 +175,14 @@ $router->get( '/admin/dsr-tracking',                  ['AdminController', 'dsrTr
 $router->get( '/admin/api/dsr-tracking/live',         ['AdminController', 'apiDsrTrackingLive']);
 $router->get( '/admin/api/dsr-tracking/history',      ['AdminController', 'apiDsrTrackingHistory']);
 
+// Custom Areas Map Management
+$router->get( '/admin/custom-areas',                  ['AdminController', 'customAreas']);
+$router->get( '/admin/api/custom-areas',              ['AdminController', 'apiCustomAreas']);
+$router->post('/admin/api/custom-areas/store',        ['AdminController', 'apiCustomAreaStore']);
+$router->post('/admin/api/custom-areas/update/{id}',  ['AdminController', 'apiCustomAreaUpdate']);
+$router->post('/admin/api/custom-areas/delete/{id}',  ['AdminController', 'apiCustomAreaDelete']);
+
+
 
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
