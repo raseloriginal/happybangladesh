@@ -1417,11 +1417,29 @@ class ManagerController extends Controller
                     }
 
                     // Deduct from warehouse inventory
-                    $invLotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
-                    $invParams = [$item['total_qty'], $item['product_id'], $item['warehouse_id']];
-                    if ($item['lot_id'] !== null) $invParams[] = $item['lot_id'];
-                    $this->db->prepare("UPDATE inventory SET qty_pieces = GREATEST(0, CAST(qty_pieces AS SIGNED) - CAST(? AS SIGNED)) WHERE product_id=? AND warehouse_id=? AND lot_id $invLotCondition")
-                             ->execute($invParams);
+                    $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
+                    $lotParams = $item['lot_id'] === null ? [] : [$item['lot_id']];
+                    
+                    $invQuery = $this->db->prepare("
+                        SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                        FROM inventory i 
+                        JOIN products p ON p.id = i.product_id 
+                        WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id $lotCondition
+                    ");
+                    $invQuery->execute(array_merge([$item['product_id'], $item['warehouse_id']], $lotParams));
+                    $invRow = $invQuery->fetch();
+                    
+                    if ($invRow) {
+                        $ppb = max(1, (int)$invRow['pieces_per_box']);
+                        $totalStockPcs = ((int)$invRow['qty_boxes'] * $ppb) + (int)$invRow['qty_pieces'];
+                        $newStockPcs = max(0, $totalStockPcs - (int)$item['total_qty']);
+                        
+                        $newBoxes = floor($newStockPcs / $ppb);
+                        $newPcs = $newStockPcs % $ppb;
+                        
+                        $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                                 ->execute([$newBoxes, $newPcs, $invRow['id']]);
+                    }
                 }
 
                 // 2. Mark dispatches as in_transit
@@ -1814,14 +1832,36 @@ class ManagerController extends Controller
                              ->execute([$returnId, $pid, $qty]);
                              
                     // Restore to warehouse inventory
-                    $exists = $this->db->prepare("SELECT id FROM inventory WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL");
-                    $exists->execute([$pid, $wId]);
-                    if ($exists->fetch()) {
-                        $this->db->prepare("UPDATE inventory SET qty_pieces = qty_pieces + ? WHERE product_id=? AND warehouse_id=? AND lot_id IS NULL")
-                                 ->execute([$qty, $pid, $wId]);
+                    $invQuery = $this->db->prepare("
+                        SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                        FROM inventory i 
+                        JOIN products p ON p.id = i.product_id 
+                        WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id IS NULL
+                    ");
+                    $invQuery->execute([$pid, $wId]);
+                    $invRow = $invQuery->fetch();
+                    
+                    if ($invRow) {
+                        $ppb = max(1, (int)$invRow['pieces_per_box']);
+                        $totalStockPcs = ((int)$invRow['qty_boxes'] * $ppb) + (int)$invRow['qty_pieces'];
+                        $newStockPcs = $totalStockPcs + $qty;
+                        
+                        $newBoxes = floor($newStockPcs / $ppb);
+                        $newPcs = $newStockPcs % $ppb;
+                        
+                        $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                                 ->execute([$newBoxes, $newPcs, $invRow['id']]);
                     } else {
-                        $this->db->prepare("INSERT INTO inventory (warehouse_id, product_id, qty_boxes, qty_pieces, lot_id) VALUES (?, ?, 0, ?, NULL)")
-                                 ->execute([$wId, $pid, $qty]);
+                        $pQuery = $this->db->prepare("SELECT pieces_per_box FROM products WHERE id=?");
+                        $pQuery->execute([$pid]);
+                        $pRow = $pQuery->fetch();
+                        $ppb = $pRow ? max(1, (int)$pRow['pieces_per_box']) : 1;
+                        
+                        $newBoxes = floor($qty / $ppb);
+                        $newPcs = $qty % $ppb;
+                        
+                        $this->db->prepare("INSERT INTO inventory (warehouse_id, product_id, qty_boxes, qty_pieces, lot_id) VALUES (?, ?, ?, ?, NULL)")
+                                 ->execute([$wId, $pid, $newBoxes, $newPcs]);
                     }
                 }
             }
