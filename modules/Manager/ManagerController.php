@@ -738,7 +738,7 @@ class ManagerController extends Controller
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
                 JOIN dispatches d ON d.id = di.dispatch_id
-                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
             ")->fetchColumn();
             
             $sch['total_dispatch_value'] = (float)$dispatchVal;
@@ -749,7 +749,7 @@ class ManagerController extends Controller
                 JOIN products p ON p.id = di.product_id
                 JOIN dispatches d ON d.id = di.dispatch_id
                 LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
-                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
             ")->fetchColumn();
             $sch['total_dispatch_oc'] = (float)$dispatchOC;
             $sch['total_return_value'] = (float)$this->db->query("
@@ -1145,7 +1145,7 @@ class ManagerController extends Controller
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
                 JOIN dispatches d ON d.id = di.dispatch_id
-                WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND {$companyCondition}
+                WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL) AND {$companyCondition}
             ")->fetchColumn();
             $company['dispatch_items_value'] = (float)$dispatchVal;
 
@@ -1190,7 +1190,7 @@ class ManagerController extends Controller
                            SELECT COALESCE(SUM(di.quantity), 0)
                            FROM dispatch_items di
                            JOIN dispatches d ON d.id = di.dispatch_id
-                           WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id
+                           WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
                        ) as dispatched_qty,
                        (
                            SELECT COALESCE(SUM(di.delivered_quantity), 0)
@@ -1235,7 +1235,7 @@ class ManagerController extends Controller
                            JOIN dispatches d ON d.id = di.dispatch_id
                            LEFT JOIN orders o ON o.id = d.order_id
                            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
-                           WHERE d.dispatch_date = '{$deliveryDate}' AND (o.sr_id = u.id OR (d.order_id IS NULL AND d.dsr_id = {$dsrId})) AND {$companyCondition}
+                           WHERE d.dispatch_date = '{$deliveryDate}' AND o.sr_id = u.id AND {$companyCondition}
                        ) as sale_value
                 FROM dispatch_schedule_srs dss
                 JOIN users u ON u.id = dss.sr_id
