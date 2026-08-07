@@ -214,6 +214,7 @@ $router->get( '/manager/api/dispatch/data',                  ['ManagerController
 $router->get( '/manager/api/dispatch/new-popup-data',        ['ManagerController', 'apiDispatchNewPopupData']);
 $router->post('/manager/api/dispatch/assign',                ['ManagerController', 'apiDispatchAssign']);
 $router->get( '/manager/api/dispatch/sr-details/{id}',       ['ManagerController', 'apiDispatchSrDetails']);
+$router->get( '/manager/api/dispatch/company-details/{id}',  ['ManagerController', 'apiDispatchCompanyDetails']);
 $router->get( '/manager/api/dispatch/organize-data/{id}',    ['ManagerController', 'apiDispatchOrganizeData']);
 $router->post('/manager/api/dispatch/organize-save/{id}',    ['ManagerController', 'apiDispatchOrganizeSave']);
 $router->post('/manager/api/dispatch/status-update/{id}',    ['ManagerController', 'apiDispatchStatusUpdate']);
