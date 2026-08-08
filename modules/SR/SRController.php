@@ -1068,7 +1068,18 @@ class SRController extends Controller
         // 2. Fetch Dispatched and Sell Products
         $qDispatch = $this->db->prepare("
             SELECT di.product_id, 
-                   SUM(CASE WHEN d.status != 'pending' THEN di.quantity ELSE 0 END) as dispatched_qty, 
+                   COALESCE((
+                       SELECT SUM(vs.initial_qty)
+                       FROM van_stock vs
+                       WHERE vs.product_id = di.product_id
+                         AND DATE(vs.loaded_at) = ?
+                         AND vs.dsr_id IN (
+                             SELECT DISTINCT d2.dsr_id 
+                             FROM dispatches d2 
+                             JOIN orders o2 ON o2.id = d2.order_id 
+                             WHERE o2.sr_id = ? AND DATE(o2.created_at) = ?
+                         )
+                   ), SUM(CASE WHEN d.status != 'pending' THEN di.quantity ELSE 0 END)) as dispatched_qty, 
                    SUM(CASE WHEN d.status != 'pending' THEN di.delivered_quantity ELSE 0 END) as sell_qty
             FROM dispatch_items di
             JOIN dispatches d ON d.id = di.dispatch_id
@@ -1082,7 +1093,7 @@ class SRController extends Controller
                ))
             GROUP BY di.product_id
         ");
-        $qDispatch->execute([$srId, $date, $date, $srId, $date]);
+        $qDispatch->execute([$date, $srId, $date, $srId, $date, $date, $srId, $date]);
         $dispatchData = $qDispatch->fetchAll(PDO::FETCH_ASSOC);
         
         $dispatchMap = [];

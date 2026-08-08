@@ -733,23 +733,30 @@ class ManagerController extends Controller
             ")->fetchColumn();
             $sch['total_order_oc'] = (float)$orderOC;
 
-            $dispatchVal = $this->db->query("
-                SELECT COALESCE(SUM(di.quantity * p.price), 0)
-                FROM dispatch_items di
-                JOIN products p ON p.id = di.product_id
-                JOIN dispatches d ON d.id = di.dispatch_id
-                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
-            ")->fetchColumn();
-            
-            $sch['total_dispatch_value'] = (float)$dispatchVal;
+            // Use van_stock.initial_qty as actual dispatched value (Approach 1: Van-Level Dispatch)
+            $dispatchValStmt = $this->db->prepare("
+                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+            ");
+            $dispatchValStmt->execute([$sch['dsr_id'], $delivery_date]);
+            $sch['total_dispatch_value'] = (float)$dispatchValStmt->fetchColumn();
+
 
             $dispatchOC = $this->db->query("
-                SELECT COALESCE(SUM(di.quantity * (IFNULL(oi.unit_price, p.price) - p.price)), 0)
-                FROM dispatch_items di
-                JOIN products p ON p.id = di.product_id
-                JOIN dispatches d ON d.id = di.dispatch_id
-                LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
-                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
+                SELECT COALESCE(SUM(vs.initial_qty * (COALESCE(oi.avg_unit_price, p.price) - p.price)), 0)
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                LEFT JOIN (
+                    SELECT oi.product_id, AVG(oi.unit_price) as avg_unit_price
+                    FROM dispatches d
+                    JOIN orders o ON o.id = d.order_id
+                    JOIN order_items oi ON oi.order_id = o.id
+                    WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+                    GROUP BY oi.product_id
+                ) oi ON oi.product_id = vs.product_id
+                WHERE vs.dsr_id = {$sch['dsr_id']} AND DATE(vs.loaded_at) = '{$delivery_date}'
             ")->fetchColumn();
             $sch['total_dispatch_oc'] = (float)$dispatchOC;
             $sch['total_return_value'] = (float)$this->db->query("
@@ -1157,10 +1164,9 @@ class ManagerController extends Controller
                 UNION
 
                 SELECT p.id AS product_id, p.company_id
-                FROM dispatches d
-                JOIN dispatch_items di ON di.dispatch_id = d.id
-                JOIN products p ON p.id = di.product_id
-                WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}'
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}'
 
                 UNION
 
@@ -1189,11 +1195,10 @@ class ManagerController extends Controller
             $company['ordered_value'] = (float)$orderedVal;
 
             $dispatchVal = $this->db->query("
-                SELECT COALESCE(SUM(di.quantity * p.price), 0)
-                FROM dispatch_items di
-                JOIN products p ON p.id = di.product_id
-                JOIN dispatches d ON d.id = di.dispatch_id
-                WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL) AND {$companyCondition}
+                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND {$companyCondition}
             ")->fetchColumn();
             $company['dispatch_items_value'] = (float)$dispatchVal;
 
@@ -1235,10 +1240,9 @@ class ManagerController extends Controller
                            WHERE dss.schedule_id = {$scheduleId} AND oi.product_id = p.id
                        ) as ordered_qty,
                        (
-                           SELECT COALESCE(SUM(di.quantity), 0)
-                           FROM dispatch_items di
-                           JOIN dispatches d ON d.id = di.dispatch_id
-                           WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
+                           SELECT COALESCE(SUM(vs.initial_qty), 0)
+                           FROM van_stock vs
+                           WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND vs.product_id = p.id
                        ) as dispatched_qty,
                        (
                            SELECT COALESCE(SUM(di.delivered_quantity), 0)
@@ -1439,35 +1443,11 @@ class ManagerController extends Controller
                     }
                 }
                 
-                // For negative adjustments: reduce dispatch_items.quantity for this product
-                // Distribute the reduction proportionally across all dispatch_items for this product/DSR/date
-                foreach ($negativeAdjustments as $adj) {
-                    $pid = (int)$adj['product_id'];
-                    $reduction = abs((int)$adj['diffQty']); // how many pcs to reduce in total
-                    
-                    // Fetch all dispatch_items for this product in this DSR's dispatches for delivery_date
-                    $diRows = $this->db->prepare("
-                        SELECT di.id, di.quantity
-                        FROM dispatch_items di
-                        JOIN dispatches d ON d.id = di.dispatch_id
-                        WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND di.quantity > 0
-                        ORDER BY di.id ASC
-                    ");
-                    $diRows->execute([$dsrId, $deliv_date, $pid]);
-                    $diItems = $diRows->fetchAll();
-                    
-                    // Apply reduction row by row
-                    $remaining = $reduction;
-                    foreach ($diItems as $di) {
-                        if ($remaining <= 0) break;
-                        $rowQty = (int)$di['quantity'];
-                        $subtract = min($rowQty, $remaining);
-                        $newQty = $rowQty - $subtract;
-                        $this->db->prepare("UPDATE dispatch_items SET quantity = ? WHERE id = ?")
-                                 ->execute([$newQty, $di['id']]);
-                        $remaining -= $subtract;
-                    }
-                }
+                // APPROACH 1 (Van-Level Dispatch):
+                // Negative adjustments are NO LONGER applied to dispatch_items.
+                // dispatch_items.quantity keeps the original ordered qty for billing/order reference.
+                // The actual van load qty is controlled via dispatch_extras at collection time.
+                // (See apiDispatchStatusUpdate where van_stock is loaded with the corrected qty.)
                 
                 // For positive extras: create a separate "extra stock" dispatch
                 if (!empty($positiveExtras)) {
@@ -1511,7 +1491,7 @@ class ManagerController extends Controller
         $this->db->beginTransaction();
         try {
             if ($status === 'dispatched') {
-                // 1. Get all items that are pending dispatch for this DSR today
+                // 1. Get all ordered dispatch_items (original order quantities, pending status)
                 $q = $this->db->prepare("
                     SELECT di.product_id, di.lot_id, d.warehouse_id, SUM(di.quantity) as total_qty
                     FROM dispatch_items di
@@ -1522,23 +1502,62 @@ class ManagerController extends Controller
                 $q->execute([$dsrId, $deliv_date]);
                 $itemsToLoad = $q->fetchAll();
 
+                // 2. Get dispatch_extras adjustments for this schedule (negative = manager reduced van load)
+                //    Only apply NEGATIVE adjustments — positive extras are already in separate dispatch_items.
+                $extrasQ = $this->db->prepare("
+                    SELECT de.product_id,
+                           SUM(de.qty_boxes * p.pieces_per_box + de.qty_pieces) as adj_pcs
+                    FROM dispatch_extras de
+                    JOIN products p ON p.id = de.product_id
+                    WHERE de.schedule_id = ?
+                    GROUP BY de.product_id
+                ");
+                $extrasQ->execute([$id]);
+                $extrasAdjMap = [];
+                foreach ($extrasQ->fetchAll() as $exRow) {
+                    $adj = (int)$exRow['adj_pcs'];
+                    if ($adj < 0) { // Only negative (reduction) — positive already in extra dispatch
+                        $extrasAdjMap[(int)$exRow['product_id']] = $adj;
+                    }
+                }
+
+                // 3. Apply negative adjustments to get actual van load qty per product
+                $appliedProducts = [];
+                foreach ($itemsToLoad as &$item) {
+                    $pid = (int)$item['product_id'];
+                    if (!isset($appliedProducts[$pid]) && isset($extrasAdjMap[$pid])) {
+                        $item['total_qty'] = max(0, (int)$item['total_qty'] + $extrasAdjMap[$pid]);
+                        $appliedProducts[$pid] = true;
+                    }
+                }
+                unset($item);
+
+                // 4. Load van_stock with actual organized qty, save initial_qty, and guard against date accumulation
                 foreach ($itemsToLoad as $item) {
+                    if ((int)$item['total_qty'] <= 0) continue; // Skip products with 0 organized qty
+
                     $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
                     $params = [$dsrId, $item['product_id']];
                     if ($item['lot_id'] !== null) $params[] = $item['lot_id'];
                     
-                    $check = $this->db->prepare("SELECT id FROM van_stock WHERE dsr_id=? AND product_id=? AND lot_id $lotCondition LIMIT 1");
+                    $check = $this->db->prepare("SELECT id, loaded_at FROM van_stock WHERE dsr_id=? AND product_id=? AND lot_id $lotCondition LIMIT 1");
                     $check->execute($params);
                     
                     if ($row = $check->fetch()) {
-                        $this->db->prepare("UPDATE van_stock SET quantity = quantity + ?, loaded_at = ? WHERE id=?")
-                                 ->execute([$item['total_qty'], $deliv_date, $row['id']]);
+                        // If previous load was from a different date, reset initial_qty and quantity for the new day
+                        if ($row['loaded_at'] !== $deliv_date) {
+                            $this->db->prepare("UPDATE van_stock SET quantity = ?, initial_qty = ?, loaded_at = ? WHERE id=?")
+                                     ->execute([$item['total_qty'], $item['total_qty'], $deliv_date, $row['id']]);
+                        } else {
+                            $this->db->prepare("UPDATE van_stock SET quantity = quantity + ?, initial_qty = initial_qty + ?, loaded_at = ? WHERE id=?")
+                                     ->execute([$item['total_qty'], $item['total_qty'], $deliv_date, $row['id']]);
+                        }
                     } else {
-                        $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, loaded_at) VALUES (?, ?, ?, ?, ?)")
-                                 ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $deliv_date]);
+                        $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, initial_qty, loaded_at) VALUES (?, ?, ?, ?, ?, ?)")
+                                 ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $item['total_qty'], $deliv_date]);
                     }
 
-                    // Deduct from warehouse inventory
+                    // 5. Deduct actual dispatched qty from warehouse inventory
                     $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
                     $lotParams = $item['lot_id'] === null ? [] : [$item['lot_id']];
                     
@@ -2021,6 +2040,9 @@ class ManagerController extends Controller
             
             $this->db->prepare("UPDATE dispatches SET status='returned', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status IN ('pending', 'in_transit')")
                      ->execute([$dsrId, $deliv_date]);
+
+            // Reset van_stock for this DSR on return completion to ensure a clean slate for subsequent dispatches
+            $this->db->prepare("UPDATE van_stock SET quantity = 0, initial_qty = 0 WHERE dsr_id = ?")->execute([$dsrId]);
 
             $this->db->commit();
             echo json_encode(['success' => true]);
