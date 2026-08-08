@@ -908,6 +908,26 @@ class ManagerController extends Controller
                 $delivery_date = $data['delivery_date'] ?? $date;
                 
                 if (empty($sr_ids)) continue;
+                
+                // Validate if all SRs have completed their order cutoff for the assignment date
+                if (!empty($sr_ids)) {
+                    $placeholders = implode(',', array_fill(0, count($sr_ids), '?'));
+                    $checkParams = array_merge($sr_ids, [$date]);
+                    $checkStmt = $this->db->prepare("
+                        SELECT COUNT(DISTINCT sr_id) 
+                        FROM sr_order_cutoffs 
+                        WHERE sr_id IN ($placeholders) 
+                        AND cutoff_date = ? 
+                        AND undone_by IS NULL
+                    ");
+                    $checkStmt->execute($checkParams);
+                    $completedCount = (int)$checkStmt->fetchColumn();
+                    
+                    if ($completedCount < count(array_unique($sr_ids))) {
+                        throw new \Exception("One or more SRs have not completed their order cutoff. Cannot assign.");
+                    }
+                }
+
                 $stmt = $this->db->prepare("INSERT INTO dispatch_schedules (dsr_id, dispatch_date, delivery_date, status) VALUES (?, ?, ?, 'assigned')");
                 $stmt->execute([$dsr_id, $date, $delivery_date]);
                 $schedule_id = $this->db->lastInsertId();

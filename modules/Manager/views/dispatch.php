@@ -1110,9 +1110,11 @@ function renderSrList(srs) {
   }
   
   srs.forEach(sr => {
+    const isCutoff = sr.is_cutoff == 1;
     const div = document.createElement('div');
-    div.className = 'connector-card bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between shadow-sm relative';
+    div.className = `connector-card p-4 rounded-xl border flex items-center justify-between shadow-sm relative ${isCutoff ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'}`;
     div.id = `sr-card-${sr.id}`;
+    div.setAttribute('data-is-cutoff', sr.is_cutoff || 0);
     div.innerHTML = `
       <div class="flex items-center gap-3 pointer-events-none flex-1 min-w-0">
         <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0">${sr.name.charAt(0)}</div>
@@ -1190,8 +1192,13 @@ function renderDsrList(dsrs) {
 }
 
 function handleSrClick(id) {
+  const card = document.getElementById(`sr-card-${id}`);
+  if (card && card.getAttribute('data-is-cutoff') != 1) {
+    alert('এই SR-এর অর্ডার কাটা এখনও শেষ হয়নি। Assignment করা যাবে না।');
+    return;
+  }
   document.querySelectorAll('#sr-list .connector-card').forEach(el => el.classList.remove('active'));
-  document.getElementById(`sr-card-${id}`).classList.add('active');
+  card.classList.add('active');
   activeSrId = id;
 }
 

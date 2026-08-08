@@ -1468,12 +1468,12 @@ function selectCompanyOrder(orderIndex) {
         } else if (order.status === 'partial') {
             actionContainer.innerHTML = `
                 <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
-                <button onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
+                <button id="pay-btn" onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
             `;
         } else {
             actionContainer.innerHTML = `
                 <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
-                <button onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
+                <button id="pay-btn" onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
             `;
         }
     }
@@ -1555,6 +1555,7 @@ function calcProgress(el, idx) {
     const orderGroup = el.closest('.order-group-container');
     let gettingTotal = 0;
     let anyInputFilled = false;
+    let exceedsStock = false;
     orderGroup.querySelectorAll('.product-item').forEach(pItem => {
         const bInp = pItem.querySelector('.delivery-input-box');
         const pInp = pItem.querySelector('.delivery-input-pcs');
@@ -1568,11 +1569,32 @@ function calcProgress(el, idx) {
             const tQty = (b * p_ppb) + p;
             const price = parseFloat(bInp.getAttribute('data-price')) || 0;
             gettingTotal += (tQty * price);
+            
+            const pid = bInp.getAttribute('data-pid') || pInp.getAttribute('data-pid');
+            if (pid) {
+                const vanStock = parseInt(vanStockMap[pid]) || 0;
+                if (tQty > vanStock) {
+                    exceedsStock = true;
+                }
+            }
         }
     });
     
     const bsGettingTotal = document.getElementById('bsGettingTotal');
     if (bsGettingTotal) bsGettingTotal.innerText = '৳' + gettingTotal.toFixed(0);
+
+    const payBtn = document.getElementById('pay-btn');
+    if (payBtn) {
+        if (exceedsStock) {
+            payBtn.disabled = true;
+            payBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            payBtn.title = 'পর্যাপ্ত ভ্যান স্টক নেই';
+        } else {
+            payBtn.disabled = false;
+            payBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            payBtn.removeAttribute('title');
+        }
+    }
 
     // Update due if partial info is visible
     const bsPartialInfo = document.getElementById('bsPartialInfo');
@@ -1840,6 +1862,48 @@ function redrawMapPins() {
 async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts = {}, reason = '') {
     const orders = currentRetailerObj.orders.filter(o => targetDispatchIds.map(String).includes(String(o.dispatch_id)));
     if (orders.length === 0) return;
+
+    // Validation: Check if van stock is sufficient before completing delivery (delivered or partial)
+    if (status === 'delivered' || status === 'partial') {
+        for (let i = 0; i < orders.length; i++) {
+            const o = orders[i];
+            const dispatchId = o.dispatch_id;
+            let deliveredItems = {};
+            const origIdx = currentRetailerObj.orders.findIndex(orig => orig.dispatch_id === dispatchId);
+            const orderGroup = document.getElementById(`order-group-${origIdx}`);
+            if (orderGroup) {
+                orderGroup.querySelectorAll('.product-item').forEach(pItem => {
+                    const bInp = pItem.querySelector('.delivery-input-box');
+                    const pInp = pItem.querySelector('.delivery-input-pcs');
+                    if (bInp && pInp) {
+                        const b = parseInt(bInp.value) || 0;
+                        const p = parseInt(pInp.value) || 0;
+                        const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
+                        const tQty = (b * p_ppb) + p;
+                        const pid = bInp.getAttribute('data-pid');
+                        if (pid) {
+                            deliveredItems[pid] = tQty;
+                        }
+                    }
+                });
+            } else if (o.products) {
+                o.products.forEach(p => {
+                    deliveredItems[p.product_id] = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
+                });
+            }
+
+            for (let pid in deliveredItems) {
+                const tQty = deliveredItems[pid];
+                const vanStock = parseInt(vanStockMap[pid]) || 0;
+                if (tQty > vanStock) {
+                    const prod = o.products.find(pr => String(pr.product_id) === String(pid));
+                    const prodName = prod ? prod.name : 'Product';
+                    alert(`⚠️ Delivery cannot be completed!\nVan stock for "${prodName}" is ${vanStock}, but the retailer ordered/requested quantity is ${tQty}.`);
+                    return;
+                }
+            }
+        }
+    }
 
     const btns = document.querySelectorAll('#retailerSheet button');
     btns.forEach(b => { b.disabled = true; });

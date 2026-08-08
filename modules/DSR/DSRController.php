@@ -637,20 +637,54 @@ class DSRController extends Controller
                 $this->json(['success' => false, 'message' => 'Settlement already submitted for this date. Cannot modify delivery.']);
                 return;
             }
+
+            // Check if the dispatch is already returned
+            $schCheck = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
+            $schCheck->execute([$dsrId, $dispatchDate, $dispatchDate]);
+            $schStatus = $schCheck->fetchColumn();
+            
+            if ($schStatus === 'returned') {
+                $this->json(['success' => false, 'message' => 'ডেলিভারি রিটার্ন সম্পন্ন হয়েছে। আর কোনো পরিবর্তন সম্ভব নয়।']);
+                return;
+            }
         }
         
         $notes = $this->post('notes', null);
         
-        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
-                 ->execute([$status, $paidAmount, $notes, $id, $dsrId]);
-        
-        // Deduct/adjust van_stock based on dispatch items
+        // Fetch items and delivered quantities first to perform validation
         $items = $this->db->prepare("SELECT product_id, lot_id, quantity, delivered_quantity FROM dispatch_items WHERE dispatch_id=?");
         $items->execute([$id]);
         $items = $items->fetchAll();
         
         $deliveredItemsStr = $this->post('items', '{}');
         $deliveredItems = json_decode($deliveredItemsStr, true) ?? [];
+
+        // Validate van stock sufficiency before making database updates
+        if ($status !== 'cancelled') {
+            foreach($items as $item) {
+                $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
+                $newDelivered = $item['quantity'];
+                if (isset($deliveredItems[$item['product_id']])) {
+                    $newDelivered = (int) $deliveredItems[$item['product_id']];
+                }
+                $diff = $newDelivered - $prevDelivered;
+                if ($diff > 0) {
+                    $vsQuery = $this->db->prepare("SELECT quantity FROM van_stock WHERE dsr_id = ? AND product_id = ? AND (lot_id = ? OR (? IS NULL AND lot_id IS NULL)) LIMIT 1");
+                    $vsQuery->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+                    $vanStock = (int)$vsQuery->fetchColumn();
+                    if ($diff > $vanStock) {
+                        $prodQuery = $this->db->prepare("SELECT name FROM products WHERE id = ?");
+                        $prodQuery->execute([$item['product_id']]);
+                        $prodName = $prodQuery->fetchColumn() ?: 'Product';
+                        $this->json(['success' => false, 'message' => "Insufficient van stock for '{$prodName}'. Available: {$vanStock}, requested increase: {$diff}."]);
+                        return;
+                    }
+                }
+            }
+        }
+
+        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
+                 ->execute([$status, $paidAmount, $notes, $id, $dsrId]);
         
         foreach($items as $item) {
             $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
@@ -1123,6 +1157,16 @@ class DSRController extends Controller
 
         if (empty($items)) {
             $this->json(['success' => false, 'message' => 'অন্তত একটি প্রোডাক্ট নির্বাচন করুন।']);
+            return;
+        }
+
+        // Check if the dispatch is already returned
+        $schCheck = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
+        $schCheck->execute([$dsrId, $date, $date]);
+        $schStatus = $schCheck->fetchColumn();
+        
+        if ($schStatus === 'returned') {
+            $this->json(['success' => false, 'message' => 'আজকের ডেলিভারি রিটার্ন সম্পন্ন হয়েছে। নতুন করে Ready Sale করা যাবে না।']);
             return;
         }
 
