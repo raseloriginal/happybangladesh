@@ -148,7 +148,7 @@ $hasDeliveries = !empty($retailers);
             <a href="#" class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm active:scale-95 transition text-blue-600 border border-blue-200 bg-blue-50">
               <i class="fa-solid fa-plus text-sm"></i>
             </a>
-            <button onclick="openDamageModal()" id="damageBtn" class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm active:scale-95 transition text-red-600 border border-red-200 bg-red-50" title="ক্ষতিগ্রস্ত পণ্য">
+            <button onclick="openDamageModal()" id="damageBtn" class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm active:scale-95 transition text-red-600 border border-red-200 bg-red-50" title="ক্ষতিগ্রস্ত পণ্য" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '' ?>>
               <i class="fa-solid fa-ban text-xs"></i>
             </button>
           </div>
@@ -1462,7 +1462,7 @@ function selectCompanyOrder(orderIndex) {
     const actionContainer = document.getElementById('bsActionButtons');
     if (actionContainer) {
         if (order.status === 'cancelled') {
-            actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-2.5 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2"><i class="fa-solid fa-rotate-left"></i> আবার চেষ্টা করুন</button>`;
+            actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-2.5 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Action disabled"' : '' ?>><i class="fa-solid fa-rotate-left"></i> আবার চেষ্টা করুন</button>`;
         } else if (order.status === 'delivered') {
             actionContainer.innerHTML = '';
         } else if (order.status === 'partial') {
