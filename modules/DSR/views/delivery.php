@@ -1293,7 +1293,9 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
 
                     const qty = parseInt(p.quantity); // pieces dispatched on van
 
-                    let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+                    // Always show the ordered quantity in the input; the pay button will be
+                    // disabled automatically by calcProgress() if van stock is insufficient.
+                    let initialDeliveredQty = qty;
 
                     const initialBoxes = Math.floor(initialDeliveredQty / ppb);
                     const initialPcs = initialDeliveredQty % ppb;
