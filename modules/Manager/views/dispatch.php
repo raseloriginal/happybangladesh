@@ -248,43 +248,6 @@
   </div>
 </div>
 
-<!-- ========================================== -->
-<!-- 3. EDIT DSR MODAL                          -->
-<!-- ========================================== -->
-<div id="edit-dsr-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-6">
-    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-user-pen text-blue-500 mr-2"></i> Change Dispatch DSR</h3>
-    <input type="hidden" id="edit-dsr-schedule-id">
-    <div class="mb-5">
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select New DSR</label>
-      <select id="edit-dsr-select" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-gray-700">
-        <!-- populated via JS -->
-      </select>
-    </div>
-    <div class="flex gap-3">
-      <button onclick="closeEditDsrModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
-      <button onclick="saveDsrChange()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Save Change</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========================================== -->
-<!-- 3.5. EDIT DELIVERY DATE MODAL              -->
-<!-- ========================================== -->
-<div id="edit-delivery-date-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-6">
-    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-calendar-days text-blue-500 mr-2"></i> Change Delivery Date</h3>
-    <input type="hidden" id="edit-delivery-date-schedule-id">
-    <div class="mb-5">
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select New Delivery Date</label>
-      <input type="date" id="edit-delivery-date-input" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-gray-700">
-    </div>
-    <div class="flex gap-3">
-      <button onclick="closeEditDeliveryDateModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
-      <button onclick="saveDeliveryDateChange()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Save Date</button>
-    </div>
-  </div>
-</div>
 
 <!-- ========================================== -->
 <!-- 4. RETURN MODAL                            -->
@@ -390,7 +353,6 @@ function renderSchedules() {
         <div class="text-xs font-bold text-gray-800">Order: ${sch.dispatch_date}</div>
         <div class="text-[11px] text-gray-500 font-medium mt-0.5 flex items-center gap-1">
           <span>Deliv: ${sch.delivery_date || sch.dispatch_date}</span>
-          ${sch.status !== 'returned' ? `<button onclick="openEditDeliveryDateModal(${sch.id}, '${sch.delivery_date || sch.dispatch_date}')" class="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change Delivery Date"><i class="fa-solid fa-pen text-[10px]"></i></button>` : ''}
         </div>
       </td>
       <td>
@@ -399,9 +361,6 @@ function renderSchedules() {
             <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs border border-blue-200">${sch.dsr_name.charAt(0)}</div>
             <span class="font-bold text-gray-800 text-xs">${sch.dsr_name}</span>
           </div>
-          <button onclick="openEditDsrModal(${sch.id}, ${sch.dsr_id})" class="text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change DSR">
-            <i class="fa-solid fa-pen text-xs"></i>
-          </button>
         </div>
       </td>
       <td class="excel-money">
@@ -734,97 +693,6 @@ async function deleteSchedule(id) {
     loadSchedules();
   } else {
     alert("Error deleting: " + data.message);
-  }
-}
-
-function openEditDsrModal(scheduleId, currentDsrId) {
-  document.getElementById('edit-dsr-schedule-id').value = scheduleId;
-  const select = document.getElementById('edit-dsr-select');
-  select.innerHTML = '';
-  
-  allDsrs.forEach(dsr => {
-    const opt = document.createElement('option');
-    opt.value = dsr.id;
-    opt.textContent = dsr.name;
-    if (parseInt(dsr.id) === parseInt(currentDsrId)) {
-      opt.selected = true;
-    }
-    select.appendChild(opt);
-  });
-  
-  document.getElementById('edit-dsr-modal').classList.remove('hidden');
-}
-
-function closeEditDsrModal() {
-  document.getElementById('edit-dsr-modal').classList.add('hidden');
-}
-
-async function saveDsrChange() {
-  const scheduleId = document.getElementById('edit-dsr-schedule-id').value;
-  const dsrId = document.getElementById('edit-dsr-select').value;
-  
-  if (!scheduleId || !dsrId) return;
-  
-  try {
-    const res = await fetch('<?= url("manager/api/dispatch/update-dsr") ?>', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ schedule_id: scheduleId, dsr_id: dsrId })
-    });
-    
-    const result = await res.json();
-    if (result.success) {
-      closeEditDsrModal();
-      loadSchedules();
-    } else {
-      alert(result.message || 'Failed to update DSR');
-    }
-  } catch (err) {
-    console.error(err);
-    alert('An error occurred while updating DSR');
-  }
-}
-
-function openEditDeliveryDateModal(scheduleId, currentDate) {
-  document.getElementById('edit-delivery-date-schedule-id').value = scheduleId;
-  document.getElementById('edit-delivery-date-input').value = currentDate;
-  document.getElementById('edit-delivery-date-modal').classList.remove('hidden');
-}
-
-function closeEditDeliveryDateModal() {
-  document.getElementById('edit-delivery-date-modal').classList.add('hidden');
-}
-
-async function saveDeliveryDateChange() {
-  const scheduleId = document.getElementById('edit-delivery-date-schedule-id').value;
-  const deliveryDate = document.getElementById('edit-delivery-date-input').value;
-  
-  if (!scheduleId || !deliveryDate) {
-    alert('Please select a valid date.');
-    return;
-  }
-  
-  try {
-    const res = await fetch('<?= url("manager/api/dispatch/update-delivery-date") ?>', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ schedule_id: scheduleId, delivery_date: deliveryDate })
-    });
-    
-    const result = await res.json();
-    if (result.success) {
-      closeEditDeliveryDateModal();
-      loadSchedules();
-    } else {
-      alert(result.message || 'Failed to update delivery date');
-    }
-  } catch (err) {
-    console.error(err);
-    alert('An error occurred while updating delivery date');
   }
 }
 
