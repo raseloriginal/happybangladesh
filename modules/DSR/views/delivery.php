@@ -52,7 +52,7 @@ $hasDeliveries = !empty($retailers);
           </a>
         <?php endif; ?>
 
-        <button onclick="openReadySaleModal()" class="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2">
+        <button onclick="openReadySaleModal()" class="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Ready Sale is disabled"' : '' ?>>
           <i class="fa-solid fa-bolt"></i>
           <span>Ready Sale by DSR (রেডি সেল)</span>
         </button>
@@ -93,7 +93,7 @@ $hasDeliveries = !empty($retailers);
         </div>
         <div class="text-white text-base font-black leading-tight truncate"><?= count($retailers) ?> Retailer<?= count($retailers) !== 1 ? 's' : '' ?> on Van</div>
       </div>
-      <button onclick="openReadySaleModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 active:scale-95 transition">
+      <button onclick="openReadySaleModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 active:scale-95 transition" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Ready Sale is disabled"' : '' ?>>
         <i class="fa-solid fa-bolt text-amber-100"></i> Ready Sale
       </button>
       <button onclick="openRetailerListModal()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md active:scale-95 transition">

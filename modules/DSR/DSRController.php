@@ -616,7 +616,12 @@ class DSRController extends Controller
         $allRetailersStmt = $this->db->query("SELECT id, name, phone, address, lat, lng FROM retailers ORDER BY name ASC");
         $allRetailers = $allRetailersStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'selectedDate', 'vanStockMap', 'srsList', 'allRetailers'), 'dsr_app');
+        // Check if dispatch is returned
+        $retQ = $this->db->prepare("SELECT COUNT(*) FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) AND status = 'returned'");
+        $retQ->execute([$dsrId, $selectedDate, $selectedDate]);
+        $isReturned = ($retQ->fetchColumn() > 0);
+
+        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'isReturned', 'selectedDate', 'vanStockMap', 'srsList', 'allRetailers'), 'dsr_app');
     }
 
     public function deliveryUpdate(string $id): void
