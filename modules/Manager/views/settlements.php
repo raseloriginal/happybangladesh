@@ -160,7 +160,13 @@
               $breakdown = json_decode($s['cash_breakdown'], true) ?? [];
               $dsrNote = $breakdown['note'] ?? '';
               $denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
-              $diff = floatval($s['difference']);
+
+              $dmg = $isPending ? (floatval($s['live_damage']) > 0 ? $s['live_damage'] : $s['total_damage']) : $s['total_damage'];
+              $exp = $isPending ? (floatval($s['live_expense']) > 0 ? $s['live_expense'] : $s['total_expense']) : $s['total_expense'];
+              $oc  = $isPending ? (floatval($s['live_delivery_oc']) != 0 ? $s['live_delivery_oc'] : $s['delivery_oc']) : $s['delivery_oc'];
+              
+              $sp = $isPending ? ($s['total_dispatched'] - $s['total_returned'] - $dmg - $exp + $oc) : $s['should_pay'];
+              $diff = $isPending ? ($s['counted_cash'] - $sp) : floatval($s['difference']);
           ?>
           <tr class="hover:bg-blue-50/50 transition-colors group" id="settlement-card-<?= $s['id'] ?>">
             <td class="excel-row-num"><?= $idx + 1 ?></td>
@@ -175,12 +181,12 @@
             </td>
             <td class="excel-money">৳ <?= number_format($s['total_dispatched'], 2) ?></td>
             <td class="excel-money text-rose-600">- ৳ <?= number_format($s['total_returned'], 2) ?></td>
-            <td class="excel-money text-amber-600">৳ <?= number_format($s['total_damage'], 2) ?></td>
-            <td class="excel-money text-orange-600">৳ <?= number_format($s['total_expense'], 2) ?></td>
-            <td class="excel-money <?= $s['delivery_oc'] >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
-              <?= $s['delivery_oc'] >= 0 ? '+' : '' ?>৳ <?= number_format($s['delivery_oc'], 2) ?>
+            <td class="excel-money text-amber-600">৳ <?= number_format($dmg, 2) ?></td>
+            <td class="excel-money text-orange-600">৳ <?= number_format($exp, 2) ?></td>
+            <td class="excel-money <?= $oc >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
+              <?= $oc >= 0 ? '+' : '' ?>৳ <?= number_format($oc, 2) ?>
             </td>
-            <td class="excel-money text-gray-900 font-bold" id="should-pay-<?= $s['id'] ?>">৳ <?= number_format($s['should_pay'], 2) ?></td>
+            <td class="excel-money text-gray-900 font-bold" id="should-pay-<?= $s['id'] ?>">৳ <?= number_format($sp, 2) ?></td>
             <td class="excel-money text-blue-700 font-bold" id="counted-cash-<?= $s['id'] ?>">৳ <?= number_format($s['counted_cash'], 2) ?></td>
             <td class="excel-money <?= $diff < 0 ? 'text-rose-600' : ($diff > 0 ? 'text-emerald-600' : 'text-blue-600') ?>" id="diff-<?= $s['id'] ?>">
               <?= $diff > 0 ? '+' : '' ?>৳ <?= number_format($diff, 2) ?>
@@ -196,7 +202,8 @@
             </td>
           </tr>
 
-          <!-- Expa          <tr id="details-<?= $s['id'] ?>" class="hidden bg-slate-100/70">
+          <!-- Expanded Details Row -->
+          <tr id="details-<?= $s['id'] ?>" class="hidden bg-slate-100/70">
             <td colspan="13" class="p-4 border-b border-gray-300">
               <div class="excel-container p-5 bg-white shadow-sm border border-slate-300">
                 
@@ -222,7 +229,7 @@
                       <label class="text-xs font-bold text-amber-800">Total Damage</label>
                       <div class="relative w-36">
                         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-500 font-bold text-xs">৳</span>
-                        <input type="number" step="0.01" id="inp-dmg-<?= $s['id'] ?>" value="<?= number_format($s['total_damage'], 2, '.', '') ?>" class="w-full bg-white border border-amber-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-amber-800 outline-none focus:ring-1 focus:ring-amber-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
+                        <input type="number" step="0.01" id="inp-dmg-<?= $s['id'] ?>" value="<?= number_format($dmg, 2, '.', '') ?>" class="w-full bg-white border border-amber-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-amber-800 outline-none focus:ring-1 focus:ring-amber-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
                       </div>
                     </div>
  
@@ -230,7 +237,7 @@
                       <label class="text-xs font-bold text-orange-800">Total Expense</label>
                       <div class="relative w-36">
                         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-orange-500 font-bold text-xs">৳</span>
-                        <input type="number" step="0.01" id="inp-exp-<?= $s['id'] ?>" value="<?= number_format($s['total_expense'], 2, '.', '') ?>" class="w-full bg-white border border-orange-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-orange-800 outline-none focus:ring-1 focus:ring-orange-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
+                        <input type="number" step="0.01" id="inp-exp-<?= $s['id'] ?>" value="<?= number_format($exp, 2, '.', '') ?>" class="w-full bg-white border border-orange-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-orange-800 outline-none focus:ring-1 focus:ring-orange-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
                       </div>
                     </div>
 
@@ -238,7 +245,7 @@
                       <label class="text-xs font-bold text-blue-800">Delivery O/C (কমিশন/ওভার)</label>
                       <div class="relative w-36">
                         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-500 font-bold text-xs">৳</span>
-                        <input type="number" step="0.01" id="inp-oc-<?= $s['id'] ?>" value="<?= number_format($s['delivery_oc'], 2, '.', '') ?>" class="w-full bg-white border border-blue-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-blue-800 outline-none focus:ring-1 focus:ring-blue-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
+                        <input type="number" step="0.01" id="inp-oc-<?= $s['id'] ?>" value="<?= number_format($oc, 2, '.', '') ?>" class="w-full bg-white border border-blue-300 rounded-md py-1 pl-6 pr-2 text-right font-mono font-bold text-xs text-blue-800 outline-none focus:ring-1 focus:ring-blue-500 <?= !$isPending ? 'opacity-70 cursor-not-allowed' : '' ?>" <?= !$isPending ? 'readonly' : '' ?> oninput="recalc(<?= $s['id'] ?>)">
                       </div>
                     </div>
 

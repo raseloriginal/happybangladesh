@@ -1558,7 +1558,36 @@ class ManagerController extends Controller
     public function settlements(): void
     {
         $items = $this->db->query("
-            SELECT s.*, u.name AS dsr_name
+            SELECT s.*, u.name AS dsr_name,
+            (
+                COALESCE((
+                    SELECT SUM(ri.quantity * p.price)
+                    FROM returns r
+                    JOIN return_items ri ON ri.return_id=r.id
+                    JOIN products p ON p.id=ri.product_id
+                    WHERE r.dsr_id=s.dsr_id AND r.return_date=s.date AND r.reason='Damage'
+                ), 0)
+                +
+                COALESCE((
+                    SELECT SUM(CAST(SUBSTRING_INDEX(r.reason, 'Amount: ', -1) AS DECIMAL(14,2)))
+                    FROM returns r
+                    LEFT JOIN return_items ri ON ri.return_id=r.id
+                    WHERE r.dsr_id=s.dsr_id AND r.return_date=s.date AND r.reason LIKE 'Damage%' AND ri.id IS NULL
+                ), 0)
+            ) AS live_damage,
+            (
+                SELECT COALESCE(SUM(amount), 0)
+                FROM expenses
+                WHERE dsr_id=s.dsr_id AND date=s.date
+            ) AS live_expense,
+            (
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON d.id = di.dispatch_id
+                JOIN products p ON p.id = di.product_id
+                LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+                WHERE d.dsr_id = s.dsr_id AND d.dispatch_date = s.date AND d.status IN ('delivered', 'partial')
+            ) AS live_delivery_oc
             FROM settlements s
             LEFT JOIN users u ON u.id = s.dsr_id
             ORDER BY s.date DESC, s.created_at DESC
