@@ -1432,3 +1432,52 @@ function handleSuggestionSelect(ret) {
 }
 </style>
 
+  font-weight: 700 !important;
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.18) !important;
+  transition: all 0.2s !important;
+}
+.sr-card-action-btn:hover {
+  background: #1d4ed8 !important;
+  box-shadow: 0 6px 15px rgba(37, 99, 235, 0.25) !important;
+}
+
+/* Address styling */
+.sr-card-address-row {
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+  margin-top: 1px;
+}
+.sr-card-address-row i {
+  color: #94a3b8 !important;
+}
+
+/* Tags spacing and style */
+.sr-card-tags-row {
+  margin-top: 4px !important;
+  gap: 6px !important;
+}
+.sr-card-tag {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #64748b !important;
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
+  font-weight: 700 !important;
+}
+.sr-card-tag i {
+  font-size: 0.65rem;
+}
+.sr-card-tag.tag-success {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+.sr-card-tag.tag-pending {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+}
+</style>
+
