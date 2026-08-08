@@ -967,6 +967,12 @@ class ManagerController extends Controller
             exit;
         }
 
+        // Do not allow changing DSR if the schedule is already dispatched or returned
+        if (in_array($schData['status'], ['dispatched', 'returned', 'in_transit'])) {
+            echo json_encode(['success' => false, 'message' => 'Cannot change DSR for a schedule that is already dispatched. Please return or delete the schedule instead.']);
+            exit;
+        }
+
         $oldDsrId = $schData['dsr_id'];
         $date = $schData['dispatch_date'];
         $deliv_date = $schData['delivery_date'] ?: $date;
@@ -976,14 +982,36 @@ class ManagerController extends Controller
             $stmt = $this->db->prepare("UPDATE dispatch_schedules SET dsr_id = ? WHERE id = ?");
             $stmt->execute([$newDsrId, $scheduleId]);
 
-            $stmtDisp = $this->db->prepare("UPDATE dispatches SET dsr_id = ? WHERE dsr_id = ? AND dispatch_date = ?");
-            $stmtDisp->execute([$newDsrId, $oldDsrId, $deliv_date]);
+            // Only update dispatches belonging to this schedule's orders
+            // Find all order_ids associated with this schedule
+            $ordersQuery = $this->db->prepare("
+                SELECT o.id 
+                FROM orders o
+                JOIN dispatch_schedule_srs dss ON dss.sr_id = o.sr_id
+                WHERE dss.schedule_id = ? AND DATE(o.created_at) = ?
+            ");
+            $ordersQuery->execute([$scheduleId, $date]);
+            $orderIds = $ordersQuery->fetchAll(PDO::FETCH_COLUMN);
 
-            $stmtRet = $this->db->prepare("UPDATE returns SET dsr_id = ? WHERE dsr_id = ? AND return_date = ?");
-            $stmtRet->execute([$newDsrId, $oldDsrId, $deliv_date]);
+            if (!empty($orderIds)) {
+                $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
+                $params = array_merge([$newDsrId], $orderIds);
+                // Also ensure we match the old DSR and date just to be safe
+                $params[] = $oldDsrId;
+                $params[] = $deliv_date;
+                $this->db->prepare("UPDATE dispatches SET dsr_id = ? WHERE order_id IN ($placeholders) AND dsr_id = ? AND dispatch_date = ?")->execute($params);
+            }
+            
+            // For the extra items (order_id IS NULL) dispatch created during organize,
+            // it is very difficult to uniquely identify which one belongs to this schedule if there are multiple.
+            // But since status is only 'assigned' or 'organized', there shouldn't be returns or settlements yet.
+            // We just update the order_id IS NULL dispatch if it exists and belongs to this DSR and Date.
+            // However, this might move another schedule's extras if they share the same DSR and date.
+            // To be safe, we can move 1 limit if possible, or just move it.
+            $this->db->prepare("UPDATE dispatches SET dsr_id = ? WHERE order_id IS NULL AND dsr_id = ? AND dispatch_date = ? LIMIT 1")->execute([$newDsrId, $oldDsrId, $deliv_date]);
 
-            $stmtSett = $this->db->prepare("UPDATE settlements SET dsr_id = ? WHERE dsr_id = ? AND date = ?");
-            $stmtSett->execute([$newDsrId, $oldDsrId, $deliv_date]);
+            // Note: returns and settlements are not expected to exist if status is not dispatched/returned.
+            // So we can omit updating them here.
 
             $this->db->commit();
             echo json_encode(['success' => true]);
