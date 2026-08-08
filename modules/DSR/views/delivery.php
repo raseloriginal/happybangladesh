@@ -1321,37 +1321,39 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                         </div>
 
                         <!-- Delivered Input Cell -->
-                        <div class="w-[175px] flex flex-col justify-center shrink-0 p-2 bg-white gap-2">
+                        <div class="w-[160px] flex flex-col justify-center shrink-0 px-2 py-2.5 bg-white gap-2.5">
                             ${isPcs ? `
                                 <input type="hidden" value="0" class="delivery-input-box"
                                     data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}">
                             ` : `
-                                <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
-                                    <span>বক্স</span>
-                                    <div class="flex items-center border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[9px] text-gray-400 font-extrabold uppercase tracking-wide">বক্স</span>
+                                    <div class="flex items-center gap-1.5">
                                         <button type="button" onclick="changeQty(this, -1, 'box', '${orderIdx}-${idx}')"
-                                            class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">−</button>
+                                            class="w-6 h-6 rounded-full bg-red-50 border border-red-200 text-red-500 flex items-center justify-center text-sm font-black leading-none active:scale-90 transition-transform select-none">−</button>
                                         <input type="number" min="0" value="${initialBoxes}"
-                                            class="w-[36px] text-center font-black text-gray-800 outline-none bg-transparent delivery-input-box text-sm py-1"
+                                            style="-webkit-appearance:none;-moz-appearance:textfield;"
+                                            class="w-8 text-center font-black text-gray-900 text-sm outline-none bg-gray-50 border border-gray-200 rounded-md py-0.5 delivery-input-box"
                                             data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                             oninput="calcProgress(this, '${orderIdx}-${idx}')">
                                         <button type="button" onclick="changeQty(this, +1, 'box', '${orderIdx}-${idx}')"
-                                            class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">+</button>
+                                            class="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center text-sm font-black leading-none active:scale-90 transition-transform select-none">+</button>
                                     </div>
                                 </div>
                             `}
-                            
-                            <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
-                                <span>পিস</span>
-                                <div class="flex items-center border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm">
+
+                            <div class="flex items-center justify-between">
+                                <span class="text-[9px] text-gray-400 font-extrabold uppercase tracking-wide">পিস</span>
+                                <div class="flex items-center gap-1.5">
                                     <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')"
-                                        class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">−</button>
+                                        class="w-6 h-6 rounded-full bg-red-50 border border-red-200 text-red-500 flex items-center justify-center text-sm font-black leading-none active:scale-90 transition-transform select-none">−</button>
                                     <input type="number" min="0" value="${isPcs ? initialDeliveredQty : initialPcs}"
-                                        class="w-[36px] text-center font-black text-gray-800 outline-none bg-transparent delivery-input-pcs text-sm py-1"
+                                        style="-webkit-appearance:none;-moz-appearance:textfield;"
+                                        class="w-8 text-center font-black text-gray-900 text-sm outline-none bg-gray-50 border border-gray-200 rounded-md py-0.5 delivery-input-pcs"
                                         data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                         oninput="calcProgress(this, '${orderIdx}-${idx}')">
                                     <button type="button" onclick="changeQty(this, +1, 'pcs', '${orderIdx}-${idx}')"
-                                        class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">+</button>
+                                        class="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center text-sm font-black leading-none active:scale-90 transition-transform select-none">+</button>
                                 </div>
                             </div>
                         </div>
