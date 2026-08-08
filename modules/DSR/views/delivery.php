@@ -1328,26 +1328,22 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                             ` : `
                                 <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
                                     <span>বক্স</span>
-                                    <div class="flex items-center border border-gray-200 bg-white rounded-md overflow-hidden shadow-sm">
-                                        <button type="button" onclick="changeQty(this, -1, 'box', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center text-gray-600 font-black text-sm shrink-0 select-none border-r border-gray-200 transition-colors bg-transparent">-</button>
-                                        <input type="number" min="0" value="${initialBoxes}"
-                                            class="w-12 text-center font-black text-gray-800 outline-none bg-transparent delivery-input-box text-base"
+                                    <div class="flex items-center border border-gray-200 bg-gray-50 rounded-md overflow-hidden shadow-sm w-[90px]">
+                                        <input type="number" min="0" value="${initialBoxes}" readonly
+                                            class="w-full text-center font-black text-gray-800 outline-none bg-transparent delivery-input-box text-base py-1 cursor-not-allowed"
                                             data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                             oninput="calcProgress(this, '${orderIdx}-${idx}')">
-                                        <button type="button" onclick="changeQty(this, 1, 'box', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 flex items-center justify-center font-black text-sm shrink-0 select-none border-l border-[#217346] text-white active:scale-95 transition-all" style="background-color: #217346;">+</button>
                                     </div>
                                 </div>
                             `}
                             
                             <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
                                 <span>পিস</span>
-                                <div class="flex items-center border border-gray-200 bg-white rounded-md overflow-hidden shadow-sm">
-                                    <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center text-gray-600 font-black text-sm shrink-0 select-none border-r border-gray-200 transition-colors bg-transparent">-</button>
-                                    <input type="number" min="0" value="${isPcs ? initialDeliveredQty : initialPcs}"
-                                        class="w-12 text-center font-black text-gray-800 outline-none bg-transparent delivery-input-pcs text-base"
+                                <div class="flex items-center border border-gray-200 bg-gray-50 rounded-md overflow-hidden shadow-sm w-[90px]">
+                                    <input type="number" min="0" value="${isPcs ? initialDeliveredQty : initialPcs}" readonly
+                                        class="w-full text-center font-black text-gray-800 outline-none bg-transparent delivery-input-pcs text-base py-1 cursor-not-allowed"
                                         data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                         oninput="calcProgress(this, '${orderIdx}-${idx}')">
-                                    <button type="button" onclick="changeQty(this, 1, 'pcs', '${orderIdx}-${idx}')" class="qty-btn w-9 h-9 flex items-center justify-center font-black text-sm shrink-0 select-none border-l border-[#217346] text-white active:scale-95 transition-all" style="background-color: #217346;">+</button>
                                 </div>
                             </div>
                         </div>
