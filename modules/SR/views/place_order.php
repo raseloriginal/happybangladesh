@@ -1,4 +1,41 @@
-<?php $pageTitle = 'Place Order'; ?>
+<?php 
+$pageTitle = 'Place Order'; 
+
+// Group products by category or name keywords
+$groupedProducts = [];
+foreach ($products as $p) {
+    // If category is not set, try to guess from name
+    $catName = !empty($p['category_name']) ? $p['category_name'] : null;
+    
+    if (!$catName) {
+        $name = strtolower($p['name']);
+        if (preg_match('/mosla|masala|spices|halud|morich|jeera|dhaniya|daruchini|elachi|lobongo|powder|holud/i', $name)) {
+            $catName = 'Mosla (মসলা)';
+        } elseif (strpos($name, 'chips') !== false || strpos($name, 'চিপস') !== false) {
+            $catName = 'Chips (চিপস)';
+        } elseif (strpos($name, 'chanachur') !== false || strpos($name, 'চানাচুর') !== false) {
+            $catName = 'Chanachur (চানাচুর)';
+        } elseif (preg_match('/biscuit|toast|cookies|বিস্কুট/i', $name)) {
+            $catName = 'Biscuits (বিস্কুট)';
+        } elseif (preg_match('/cake|কেক/i', $name)) {
+            $catName = 'Cakes (কেক)';
+        } elseif (preg_match('/juice|drink|water|জুস|পানি/i', $name)) {
+            $catName = 'Beverages (পানীয়)';
+        } elseif (preg_match('/candy|chocolate|gum|লজেন্স|চকলেট/i', $name)) {
+            $catName = 'Candy & Chocolates';
+        } elseif (preg_match('/noodles|pasta|নুডলস/i', $name)) {
+            $catName = 'Noodles (নুডলস)';
+        } elseif (preg_match('/dal|rice|sugar|salt|lobon|ডাল|চাল|চিনি|লবণ/i', $name)) {
+            $catName = 'Groceries (মুদি)';
+        } else {
+            $catName = 'Aro (অন্যান্য)';
+        }
+    }
+    
+    $groupedProducts[$catName][] = $p;
+}
+ksort($groupedProducts);
+?>
 <div class="page-header">
   <div><h1 class="page-title">Place Order</h1><div class="breadcrumb"><a href="<?= url('sr/orders') ?>">Orders</a> &rsaquo; Place Order</div></div>
   <a href="<?= url('sr/orders') ?>" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Back</a>
@@ -51,10 +88,14 @@
               <label class="form-label text-xs">Product</label>
               <select name="product_id[]" required class="form-input text-sm py-2">
                 <option value="">— Select Product —</option>
-                <?php foreach ($products as $p): ?>
-                  <option value="<?= $p['id'] ?>" data-price="<?= $p['price'] ?>" data-company="<?= $p['company_id'] ?>">
-                    <?= h($p['name']) ?> (<?= h($p['sku']) ?>)
-                  </option>
+                <?php foreach ($groupedProducts as $category => $catProducts): ?>
+                  <optgroup label="<?= h($category) ?>">
+                    <?php foreach ($catProducts as $p): ?>
+                      <option value="<?= $p['id'] ?>" data-price="<?= $p['price'] ?>" data-company="<?= $p['company_id'] ?>">
+                        <?= h($p['name']) ?> (<?= h($p['sku']) ?>)
+                      </option>
+                    <?php endforeach; ?>
+                  </optgroup>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -98,10 +139,14 @@
       <label class="form-label text-xs">Product</label>
       <select name="product_id[]" required class="form-input text-sm py-2">
         <option value="">— Select Product —</option>
-        <?php foreach ($products as $p): ?>
-          <option value="<?= $p['id'] ?>" data-price="<?= $p['price'] ?>" data-company="<?= $p['company_id'] ?>">
-            <?= h($p['name']) ?> (<?= h($p['sku']) ?>)
-          </option>
+        <?php foreach ($groupedProducts as $category => $catProducts): ?>
+          <optgroup label="<?= h($category) ?>">
+            <?php foreach ($catProducts as $p): ?>
+              <option value="<?= $p['id'] ?>" data-price="<?= $p['price'] ?>" data-company="<?= $p['company_id'] ?>">
+                <?= h($p['name']) ?> (<?= h($p['sku']) ?>)
+              </option>
+            <?php endforeach; ?>
+          </optgroup>
         <?php endforeach; ?>
       </select>
     </div>
@@ -160,6 +205,17 @@ function filterOptions() {
           if (row) { row.querySelector('.item-price').value = '0'; calcTotal(); }
         }
       }
+    });
+
+    // Hide empty optgroups
+    select.querySelectorAll('optgroup').forEach(group => {
+      let hasVisibleOption = false;
+      Array.from(group.querySelectorAll('option')).forEach(opt => {
+        if (opt.style.display !== 'none') {
+          hasVisibleOption = true;
+        }
+      });
+      group.style.display = hasVisibleOption ? '' : 'none';
     });
   });
 }
