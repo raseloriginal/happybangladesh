@@ -19,10 +19,6 @@
         <span class="w-3 h-3 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-0.5 -right-0.5 shadow-2xs"></span>
       </div>
       <div>
-        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 text-[9.5px] font-black text-blue-700 uppercase tracking-wide border border-blue-200">
-          <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
-          ডেলিভারি ড্যাশবোর্ড
-        </div>
         <h2 class="text-base sm:text-lg font-black text-slate-900 leading-tight mt-0.5"><?= h(Auth::name()) ?></h2>
       </div>
     </div>
@@ -120,7 +116,7 @@
   <div class="space-y-3 pt-1">
     <div class="flex items-center justify-between px-1">
       <div class="text-[11px] font-black text-slate-400 tracking-wider uppercase">কুইক অ্যাকশন মেনু</div>
-      <span class="text-[10px] font-bold text-slate-400">৪ টি বিষয়বস্তু</span>
+      <span class="text-[10px] font-bold text-slate-400">৫ টি বিষয়বস্তু</span>
     </div>
     
     <div class="grid grid-cols-2 gap-3">
@@ -205,6 +201,22 @@
           </div>
         </div>
       <?php endif; ?>
+
+      <!-- Card 5: QR Code -->
+      <a href="<?= url('dsr/qr-code') ?>" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md hover:-translate-y-0.5 hover:border-purple-400 transition-all duration-200 flex flex-col justify-between space-y-4 group">
+        <div class="flex items-center justify-between">
+          <div class="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center text-xl group-hover:bg-purple-600 group-hover:text-white transition duration-200 shadow-2xs">
+            <i class="fa-solid fa-qrcode"></i>
+          </div>
+          <span class="w-7 h-7 rounded-full bg-slate-100 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center text-slate-400 text-xs transition duration-200">
+            <i class="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-200"></i>
+          </span>
+        </div>
+        <div>
+          <h3 class="font-extrabold text-xs sm:text-sm text-slate-900 group-hover:text-purple-600 transition">QR কোড</h3>
+          <p class="text-[10px] text-slate-500 font-medium mt-0.5">পেমেন্ট QR কোড দেখুন</p>
+        </div>
+      </a>
     </div>
   </div>
 

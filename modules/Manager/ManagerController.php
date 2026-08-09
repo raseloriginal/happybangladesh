@@ -1843,36 +1843,52 @@ class ManagerController extends Controller
     // ══════════════════════════════════════════════════════════
     public function attendance(): void
     {
-        $date  = $this->get('date', date('Y-m-d'));
-        $items = $this->db->prepare("
-            SELECT a.*, u.name AS user_name, r.name AS role_name
-            FROM attendance a
-            JOIN users u ON u.id = a.user_id
-            JOIN roles r ON r.id = u.role_id
-            WHERE a.date = ?
-            ORDER BY u.name
-        ");
-        $items->execute([$date]);
-        $items = $items->fetchAll();
+        $this->ensureAttendanceQrTable();
+        $date = $this->get('date', date('Y-m-d'));
 
+        // DSR attendance from QR scans
+        $q = $this->db->prepare("
+            SELECT da.*, u.name AS user_name, u.phone
+            FROM dsr_attendance da
+            JOIN users u ON u.id = da.dsr_id
+            WHERE da.attendance_date = ?
+            ORDER BY da.scan_time ASC
+        ");
+        $q->execute([$date]);
+        $items = $q->fetchAll();
+
+        // All DSRs
+        try {
+            $dsrs = $this->db->query("
+                SELECT u.id, u.name, u.phone FROM users u
+                WHERE u.role_id = (SELECT id FROM roles WHERE slug='dsr' LIMIT 1)
+                ORDER BY u.name
+            ")->fetchAll();
+        } catch (PDOException $e) { $dsrs = []; }
+
+        // Active QR code
+        try {
+            $qrRow = $this->db->query("SELECT * FROM attendance_qr_codes WHERE is_active=1 ORDER BY id DESC LIMIT 1")->fetch();
+        } catch (PDOException $e) { $qrRow = null; }
+
+        // Users for manual form (kept for backwards compat)
         $users = $this->db->query("
             SELECT u.*, r.slug AS role_slug FROM users u JOIN roles r ON r.id=u.role_id
             WHERE r.slug IN ('sr','dsr') AND u.status=1 ORDER BY u.name
         ")->fetchAll();
 
-        $this->render('attendance', compact('items', 'users', 'date'));
+        $this->render('attendance', compact('items', 'users', 'date', 'dsrs', 'qrRow'));
     }
 
     public function attendanceStore(): void
     {
         $this->verifyCsrf();
-        $userId = $this->post('user_id');
-        $date   = $this->post('date', date('Y-m-d'));
-        $status = $this->post('status', 'present');
+        $userId   = $this->post('user_id');
+        $date     = $this->post('date', date('Y-m-d'));
+        $status   = $this->post('status', 'present');
         $checkIn  = $this->post('check_in') ?: null;
         $checkOut = $this->post('check_out') ?: null;
 
-        // Upsert
         $exists = $this->db->prepare("SELECT id FROM attendance WHERE user_id=? AND date=?");
         $exists->execute([$userId, $date]);
         if ($exists->fetch()) {
@@ -2204,6 +2220,63 @@ class ManagerController extends Controller
             $this->db->rollBack();
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        exit;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Attendance QR API
+    // ══════════════════════════════════════════════════════════
+    private function ensureAttendanceQrTable(): void
+    {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS attendance_qr_codes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    qr_code VARCHAR(100) NOT NULL UNIQUE,
+                    generated_by INT NOT NULL,
+                    is_active TINYINT(1) NOT NULL DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (PDOException $e) {}
+
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS dsr_attendance (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    dsr_id INT NOT NULL,
+                    attendance_date DATE NOT NULL,
+                    scan_time TIME NOT NULL,
+                    status ENUM('present','late','absent') NOT NULL,
+                    latitude DECIMAL(10,8) DEFAULT NULL,
+                    longitude DECIMAL(11,8) DEFAULT NULL,
+                    address TEXT DEFAULT NULL,
+                    device_info VARCHAR(500) DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_daily (dsr_id, attendance_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (PDOException $e) {}
+    }
+
+    public function apiAttendanceQrGet(): void
+    {
+        $this->ensureAttendanceQrTable();
+        $row = $this->db->query("SELECT * FROM attendance_qr_codes WHERE is_active=1 ORDER BY id DESC LIMIT 1")->fetch();
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'qr' => $row ?: null], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public function apiAttendanceQrGenerate(): void
+    {
+        $this->ensureAttendanceQrTable();
+        $this->db->exec("UPDATE attendance_qr_codes SET is_active=0");
+        $code = 'HAPPYBANGLADESH_DSR_ATTENDANCE_' . strtoupper(bin2hex(random_bytes(6)));
+        $this->db->prepare("INSERT INTO attendance_qr_codes (qr_code, generated_by, is_active) VALUES (?, ?, 1)")
+                 ->execute([$code, Auth::id()]);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'qr_code' => $code], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }

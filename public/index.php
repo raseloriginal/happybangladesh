@@ -231,8 +231,10 @@ $router->post('/manager/api/dispatch/update-delivery-date',     ['ManagerControl
 $router->post('/manager/api/dispatch/delete/{id}',            ['ManagerController', 'apiDispatchDelete']);
 $router->get( '/manager/settlements',               ['ManagerController', 'settlements']);
 $router->post('/manager/api/settlements/update/{id}',['ManagerController', 'apiSettlementUpdate']);
-$router->get( '/manager/attendance',          ['ManagerController', 'attendance']);
-$router->post('/manager/attendance/store',    ['ManagerController', 'attendanceStore']);
+$router->get( '/manager/attendance',                    ['ManagerController', 'attendance']);
+$router->post('/manager/attendance/store',              ['ManagerController', 'attendanceStore']);
+$router->get( '/manager/api/attendance/qr',             ['ManagerController', 'apiAttendanceQrGet']);
+$router->post('/manager/api/attendance/qr/generate',    ['ManagerController', 'apiAttendanceQrGenerate']);
 $router->get( '/manager/readysale',           ['ManagerController', 'readysale']);
 $router->post('/manager/readysale/store',     ['ManagerController', 'readysaleStore']);
 
@@ -281,6 +283,8 @@ $router->get( '/dsr/api/companies-products',   ['DSRController', 'apiCompanyProd
 $router->post('/dsr/api/location/push',       ['DSRController', 'apiPushLocation']);
 $router->get( '/dsr/api/van-stock',           ['DSRController', 'apiVanStock']);
 $router->post('/dsr/ready-sale/store',         ['DSRController', 'readySaleStore']);
+$router->get( '/dsr/qr-code',                  ['DSRController', 'qrCode']);
+$router->post('/dsr/qr-code/mark',             ['DSRController', 'qrCodeMark']);
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);
