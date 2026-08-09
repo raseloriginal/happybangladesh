@@ -1993,7 +1993,7 @@ class ManagerController extends Controller
             $base64Data = $matches[2];
             $decoded = base64_decode($base64Data);
             if ($decoded !== false && strlen($decoded) > 0) {
-                $tempFile = sys_get_temp_dir() . '/img_data_' . uniqid() . '.' . $imgType;
+                $tempFile = rtrim($uploadDir, '/') . '/img_data_' . uniqid() . '.' . $imgType;
                 file_put_contents($tempFile, $decoded);
                 
                 $filename = 'prod_' . uniqid() . '.webp';
@@ -2038,7 +2038,7 @@ class ManagerController extends Controller
 
         $imgData = $this->fetchUrlContent($url);
         if ($imgData !== false && strlen($imgData) > 0) {
-            $tempFile = sys_get_temp_dir() . '/dl_img_' . uniqid();
+            $tempFile = rtrim($uploadDir, '/') . '/dl_img_' . uniqid();
             file_put_contents($tempFile, $imgData);
             
             $imgInfo = @getimagesize($tempFile);
