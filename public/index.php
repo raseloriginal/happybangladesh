@@ -207,6 +207,12 @@ $router->post('/manager/api/lots/delete',     ['ManagerController', 'apiLotDelet
 $router->post('/manager/api/lots/delete-batch',['ManagerController', 'apiLotBatchDelete']);
 $router->post('/manager/api/lots/update-batch',['ManagerController', 'apiLotBatchUpdate']);
 
+// Manager Orders
+$router->get( '/manager/orders',                             ['ManagerController', 'orders']);
+$router->get( '/manager/api/orders/companies',               ['ManagerController', 'apiOrdersCompanies']);
+$router->get( '/manager/api/orders/srs',                     ['ManagerController', 'apiOrdersSrs']);
+$router->get( '/manager/api/orders/products',                ['ManagerController', 'apiOrdersProducts']);
+
 // Other manager pages
 $router->get( '/manager/inventory',           ['ManagerController', 'inventory']);
 $router->get( '/manager/dispatch',                           ['ManagerController', 'dispatch']);

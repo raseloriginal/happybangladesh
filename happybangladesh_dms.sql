@@ -993,6 +993,7 @@ CREATE TABLE `van_stock` (
   `product_id` int(10) unsigned NOT NULL,
   `lot_id` int(10) unsigned DEFAULT NULL,
   `quantity` int(11) NOT NULL DEFAULT 0,
+  `initial_qty` int(11) NOT NULL DEFAULT 0,
   `loaded_at` date DEFAULT NULL,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),

@@ -760,17 +760,19 @@ class DSRController extends Controller
         if ($schId) {
             $extrasQ = $this->db->prepare("
                 SELECT de.product_id,
-                       SUM(de.qty_boxes * p.pieces_per_box + de.qty_pieces) as adj_pcs
+                       de.qty_boxes,
+                       de.qty_pieces,
+                       p.pieces_per_box
                 FROM dispatch_extras de
                 JOIN products p ON p.id = de.product_id
                 WHERE de.schedule_id = ?
-                GROUP BY de.product_id
             ");
             $extrasQ->execute([$schId]);
             foreach ($extrasQ->fetchAll() as $exRow) {
-                $adj = (int)$exRow['adj_pcs'];
+                $ppb = max(1, (int)$exRow['pieces_per_box']);
+                $adj = ((int)$exRow['qty_boxes'] * $ppb) + (int)$exRow['qty_pieces'];
                 if ($adj < 0) {
-                    $extrasAdjMap[(int)$exRow['product_id']] = $adj;
+                    $extrasAdjMap[(int)$exRow['product_id']] = ($extrasAdjMap[(int)$exRow['product_id']] ?? 0) + $adj;
                 }
             }
         }
@@ -852,8 +854,33 @@ class DSRController extends Controller
         $q->execute([$dsrId, $selectedDate]);
         $res = $q->fetch();
         
-        $dispatchedValue = $res['dispatched_value'] ?: 0;
-        $returnedValue   = $res['spot_return_value'] ?: 0;
+        $dispatchedValue = (float)($res['dispatched_value'] ?: 0);
+
+        // Fallback for dispatched value if van_stock initial_qty is not set
+        if ($dispatchedValue <= 0) {
+            $qFallback = $this->db->prepare("
+                SELECT COALESCE(SUM(di.quantity * p.price), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                JOIN products p ON p.id = di.product_id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ?
+            ");
+            $qFallback->execute([$dsrId, $selectedDate]);
+            $dispatchedValue = (float)$qFallback->fetchColumn();
+        }
+
+        // Calculate returned value: from returns table (if recorded by manager/system) OR remaining unsold spot van_stock
+        $qRet = $this->db->prepare("
+            SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+            FROM returns r
+            JOIN return_items ri ON ri.return_id = r.id
+            JOIN products p ON p.id = ri.product_id
+            WHERE r.dsr_id = ? AND r.return_date = ? AND (r.reason != 'Damage' OR r.reason IS NULL)
+        ");
+        $qRet->execute([$dsrId, $selectedDate]);
+        $recordedReturn = (float)$qRet->fetchColumn();
+
+        $returnedValue = $recordedReturn > 0 ? $recordedReturn : (float)($res['spot_return_value'] ?: 0);
         
         // Damage amount (calculates product return items OR manual damage entries recorded in returns header/reason)
         $q3 = $this->db->prepare("
@@ -966,20 +993,37 @@ class DSRController extends Controller
         $dsrId = Auth::id();
         $date  = $_GET['date'] ?? date('Y-m-d');
 
-        // Spot returns: remaining items on van (not yet delivered) — use van_stock.quantity
+        // 1. Check if returns are recorded in returns table
         $q = $this->db->prepare("
             SELECT p.name AS product_name,
-                   SUM(vs.quantity) AS qty,
+                   SUM(ri.quantity) AS qty,
                    p.price,
-                   SUM(vs.quantity * p.price) AS total
-            FROM van_stock vs
-            JOIN products p ON p.id = vs.product_id
-            WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
-              AND vs.quantity > 0
-            GROUP BY vs.product_id, p.name, p.price
+                   SUM(ri.quantity * p.price) AS total
+            FROM returns r
+            JOIN return_items ri ON ri.return_id = r.id
+            JOIN products p ON p.id = ri.product_id
+            WHERE r.dsr_id = ? AND r.return_date = ? AND (r.reason != 'Damage' OR r.reason IS NULL)
+            GROUP BY ri.product_id, p.name, p.price
         ");
         $q->execute([$dsrId, $date]);
         $items = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        // 2. If not in returns table, fallback to live unsold van_stock
+        if (empty($items)) {
+            $q2 = $this->db->prepare("
+                SELECT p.name AS product_name,
+                       SUM(vs.quantity) AS qty,
+                       p.price,
+                       SUM(vs.quantity * p.price) AS total
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+                  AND vs.quantity > 0
+                GROUP BY vs.product_id, p.name, p.price
+            ");
+            $q2->execute([$dsrId, $date]);
+            $items = $q2->fetchAll(PDO::FETCH_ASSOC);
+        }
 
         header('Content-Type: application/json');
         echo json_encode([

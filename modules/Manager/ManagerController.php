@@ -36,6 +36,158 @@ class ManagerController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════
+    //  Orders (Nested drill-down)
+    // ══════════════════════════════════════════════════════════
+    public function orders(): void
+    {
+        $limit = 15;
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $offset = ($page - 1) * $limit;
+
+        $dateFrom = $_GET['date_from'] ?? '';
+        $dateTo = $_GET['date_to'] ?? '';
+
+        $where = " WHERE 1=1 ";
+        $params = [];
+        if (!empty($dateFrom)) {
+            $where .= " AND DATE(o.created_at) >= ? ";
+            $params[] = $dateFrom;
+        }
+        if (!empty($dateTo)) {
+            $where .= " AND DATE(o.created_at) <= ? ";
+            $params[] = $dateTo;
+        }
+
+        $qCount = $this->db->prepare("SELECT COUNT(DISTINCT DATE(o.created_at)) FROM orders o $where");
+        $qCount->execute($params);
+        $totalDates = $qCount->fetchColumn();
+        $totalPages = ceil($totalDates / $limit);
+
+        $q = $this->db->prepare("
+            SELECT DATE(o.created_at) as order_date,
+                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.total_price) as total_sr_value
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            JOIN products p ON p.id = oi.product_id
+            $where
+            GROUP BY DATE(o.created_at)
+            ORDER BY DATE(o.created_at) DESC
+            LIMIT $limit OFFSET $offset
+        ");
+        $q->execute($params);
+        $orderDates = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->render('orders/index', compact('orderDates', 'page', 'totalPages', 'dateFrom', 'dateTo'));
+    }
+
+    public function apiOrdersCompanies(): void
+    {
+        header('Content-Type: application/json');
+        $date = $_GET['date'] ?? '';
+        if (!$date) { echo json_encode([]); exit; }
+
+        $q = $this->db->prepare("
+            SELECT c.id as company_id,
+                   c.name as company_name,
+                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.total_price) as total_sr_value
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            JOIN products p ON p.id = oi.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
+            WHERE DATE(o.created_at) = ?
+            GROUP BY c.id
+            ORDER BY c.name ASC
+        ");
+        $q->execute([$date]);
+        echo json_encode($q->fetchAll(PDO::FETCH_ASSOC));
+        exit;
+    }
+
+    public function apiOrdersSrs(): void
+    {
+        header('Content-Type: application/json');
+        $date = $_GET['date'] ?? '';
+        $companyId = $_GET['company_id'] ?? '';
+        if (!$date || $companyId === '') { echo json_encode([]); exit; }
+
+        $q = $this->db->prepare("
+            SELECT u.id as sr_id,
+                   u.name as sr_name,
+                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.total_price) as total_sr_value,
+                   SUM(oi.total_price - (oi.quantity * p.price)) as total_oc
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            JOIN products p ON p.id = oi.product_id
+            JOIN users u ON u.id = o.sr_id
+            WHERE DATE(o.created_at) = ? AND (p.company_id = ? OR (? = 0 AND p.company_id IS NULL))
+            GROUP BY u.id
+            ORDER BY u.name ASC
+        ");
+        $q->execute([$date, $companyId, $companyId]);
+        echo json_encode($q->fetchAll(PDO::FETCH_ASSOC));
+        exit;
+    }
+
+    public function apiOrdersProducts(): void
+    {
+        header('Content-Type: application/json');
+        $date = $_GET['date'] ?? '';
+        $companyId = $_GET['company_id'] ?? '';
+        $srId = $_GET['sr_id'] ?? '';
+        if (!$date || $companyId === '' || !$srId) { echo json_encode([]); exit; }
+        
+        $wid = Auth::warehouseId();
+
+        $q = $this->db->prepare("
+            SELECT p.id as product_id,
+                   p.name as product_name,
+                   p.pieces_per_box,
+                   p.box_type,
+                   SUM(oi.quantity) as total_qty,
+                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.total_price) as total_sr_value
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            JOIN products p ON p.id = oi.product_id
+            WHERE DATE(o.created_at) = ? AND (p.company_id = ? OR (? = 0 AND p.company_id IS NULL)) AND o.sr_id = ?
+            GROUP BY p.id
+            ORDER BY p.name ASC
+        ");
+        $q->execute([$date, $companyId, $companyId, $srId]);
+        $products = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($products)) {
+            $pIds = array_column($products, 'product_id');
+            $inClause = implode(',', array_fill(0, count($pIds), '?'));
+            $invParams = array_merge([$wid], $pIds);
+            
+            $qInv = $this->db->prepare("
+                SELECT product_id, SUM(qty_pieces) as stock_pieces, SUM(qty_boxes) as stock_boxes
+                FROM inventory 
+                WHERE warehouse_id = ? AND product_id IN ($inClause)
+                GROUP BY product_id
+            ");
+            $qInv->execute($invParams);
+            $stockData = [];
+            while ($row = $qInv->fetch(PDO::FETCH_ASSOC)) {
+                $stockData[$row['product_id']] = $row;
+            }
+
+            foreach ($products as &$p) {
+                $pId = $p['product_id'];
+                $p['stock_pieces'] = $stockData[$pId]['stock_pieces'] ?? 0;
+                $p['stock_boxes'] = $stockData[$pId]['stock_boxes'] ?? 0;
+            }
+        }
+        
+        echo json_encode($products);
+        exit;
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  Products CRUD
     // ══════════════════════════════════════════════════════════
     public function products(): void
@@ -1506,18 +1658,20 @@ class ManagerController extends Controller
                 //    Only apply NEGATIVE adjustments — positive extras are already in separate dispatch_items.
                 $extrasQ = $this->db->prepare("
                     SELECT de.product_id,
-                           SUM(de.qty_boxes * p.pieces_per_box + de.qty_pieces) as adj_pcs
+                           de.qty_boxes,
+                           de.qty_pieces,
+                           p.pieces_per_box
                     FROM dispatch_extras de
                     JOIN products p ON p.id = de.product_id
                     WHERE de.schedule_id = ?
-                    GROUP BY de.product_id
                 ");
                 $extrasQ->execute([$id]);
                 $extrasAdjMap = [];
                 foreach ($extrasQ->fetchAll() as $exRow) {
-                    $adj = (int)$exRow['adj_pcs'];
+                    $ppb = max(1, (int)$exRow['pieces_per_box']);
+                    $adj = ((int)$exRow['qty_boxes'] * $ppb) + (int)$exRow['qty_pieces'];
                     if ($adj < 0) { // Only negative (reduction) — positive already in extra dispatch
-                        $extrasAdjMap[(int)$exRow['product_id']] = $adj;
+                        $extrasAdjMap[(int)$exRow['product_id']] = ($extrasAdjMap[(int)$exRow['product_id']] ?? 0) + $adj;
                     }
                 }
 
@@ -2041,8 +2195,8 @@ class ManagerController extends Controller
             $this->db->prepare("UPDATE dispatches SET status='returned', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status IN ('pending', 'in_transit')")
                      ->execute([$dsrId, $deliv_date]);
 
-            // Reset van_stock for this DSR on return completion to ensure a clean slate for subsequent dispatches
-            $this->db->prepare("UPDATE van_stock SET quantity = 0, initial_qty = 0 WHERE dsr_id = ?")->execute([$dsrId]);
+            // Reset remaining van_stock quantity for this DSR on return completion (preserve initial_qty for historical records & settlements)
+            $this->db->prepare("UPDATE van_stock SET quantity = 0 WHERE dsr_id = ?")->execute([$dsrId]);
 
             $this->db->commit();
             echo json_encode(['success' => true]);

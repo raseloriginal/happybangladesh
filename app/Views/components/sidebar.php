@@ -37,6 +37,7 @@ $menus = [
         ['icon' => 'fa-layer-group',  'label' => 'Lots',        'url' => '/manager/lots'],
         ['icon' => 'fa-cubes',        'label' => 'Inventory',   'url' => '/manager/inventory'],
         ['section' => 'OPERATIONS'],
+        ['icon' => 'fa-file-invoice', 'label' => 'Orders',      'url' => '/manager/orders'],
         ['icon' => 'fa-truck-fast',   'label' => 'Dispatch',    'url' => '/manager/dispatch'],
         ['icon' => 'fa-file-invoice-dollar','label' => 'Settlements', 'url' => '/manager/settlements'],
         ['icon' => 'fa-calendar-check','label'=> 'Attendance',  'url' => '/manager/attendance'],

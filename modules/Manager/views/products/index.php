@@ -84,12 +84,25 @@
                                             <div class="text-sm font-medium text-gray-800"><?= htmlspecialchars($p['company_name'] ?? 'General') ?></div>
                                             <div class="text-xs text-gray-500"><?= htmlspecialchars($p['category_name'] ?? 'Uncategorized') ?></div>
                                         </td>
-                                        <td class="py-4 px-6 text-center">
-                                             <?php $isLowStock = ($totalPieces < 10); ?>
-                                             <div class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium <?= $isLowStock ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' ?>">
-                                                 <div><?= $totalPieces ?> Pcs</div>
-                                             </div>
-                                        </td>
+                                         <td class="py-4 px-6 text-center">
+                                              <?php $isLowStock = ($totalPieces < 10); ?>
+                                              <div class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium <?= $isLowStock ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' ?>">
+                                                   <div>
+                                                       <?php
+                                                       $boxType = trim($p['box_type'] ?? '');
+                                                       $boxTypeLower = strtolower($boxType);
+                                                       if ($boxTypeLower === 'pcs') {
+                                                           echo $totalPieces . ' পিস';
+                                                       } elseif ($boxType === 'পিস' || $boxType === 'পলি' || $boxType === 'জার') {
+                                                           echo $totalPieces . ' ' . htmlspecialchars($boxType);
+                                                       } else {
+                                                           $boxLabel = !empty($boxType) ? $boxType : 'Box';
+                                                           echo $displayBoxes . ' ' . htmlspecialchars($boxLabel) . ' - ' . $displayPieces . ' পিস';
+                                                       }
+                                                       ?>
+                                                   </div>
+                                              </div>
+                                         </td>
                                         <td class="py-4 px-6 text-right">
                                             <?php $sellPricePerBox = (float)$p['buying_price'] * (1 + (float)$p['dealer_percentage'] / 100); ?>
                                             <div class="text-sm font-bold text-gray-900">Sell: ৳<?= number_format($sellPricePerBox, 2) ?></div>
