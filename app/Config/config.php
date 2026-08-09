@@ -63,8 +63,8 @@ if ($isLocalhost) {
 } elseif ($isv1) {
     define('DB_HOST', 'localhost');
     define('DB_PORT', '3306');
-    define('DB_NAME', 'happybangladesh_v1');
-    define('DB_USER', 'happybangladesh_v1');
+    define('DB_NAME', 'happybangladeshV1');
+    define('DB_USER', 'happybangladeshV1');
     define('DB_PASS', 'OaSaTHTEbWrt5I607RTo');
 } else {
     define('DB_HOST', 'localhost');
