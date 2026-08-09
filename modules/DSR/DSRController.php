@@ -20,6 +20,7 @@ class DSRController extends Controller
             $this->ensureReturnRetailerColumn();
             $this->ensureReadySaleColumn();
             $this->ensureDeliveryOcColumn();
+            $this->ensureAttendanceTable();
             self::$schemaChecked = true;
         }
     }
@@ -96,6 +97,112 @@ class DSRController extends Controller
             } catch (PDOException $ex) {
                 // Ignore
             }
+        }
+    }
+
+    private function ensureAttendanceTable(): void
+    {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS dsr_attendance (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    dsr_id INT NOT NULL,
+                    attendance_date DATE NOT NULL,
+                    scan_time TIME NOT NULL,
+                    status ENUM('present','late','absent') NOT NULL,
+                    latitude DECIMAL(10,8) DEFAULT NULL,
+                    longitude DECIMAL(11,8) DEFAULT NULL,
+                    address TEXT DEFAULT NULL,
+                    device_info VARCHAR(500) DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_daily (dsr_id, attendance_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (PDOException $e) {
+            // Ignore — table may already exist
+        }
+    }
+
+    public function qrCode(): void
+    {
+        $dsrId = Auth::id();
+        $today = date('Y-m-d');
+        $q = $this->db->prepare("SELECT * FROM dsr_attendance WHERE dsr_id=? AND attendance_date=? LIMIT 1");
+        $q->execute([$dsrId, $today]);
+        $todayAttendance = $q->fetch() ?: null;
+        $this->render('qr_code', compact('todayAttendance'), 'dsr_app');
+    }
+
+    public function qrCodeMark(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $dsrId = Auth::id();
+        $today = date('Y-m-d');
+        $nowTime = date('H:i:s');
+
+        // Check already marked
+        $chk = $this->db->prepare("SELECT id, status, scan_time FROM dsr_attendance WHERE dsr_id=? AND attendance_date=? LIMIT 1");
+        $chk->execute([$dsrId, $today]);
+        $existing = $chk->fetch();
+        if ($existing) {
+            echo json_encode([
+                'success'        => false,
+                'already_marked' => true,
+                'status'         => $existing['status'],
+                'scan_time'      => $existing['scan_time'],
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        // QR code validation — check against active code in DB
+        $qrContent = trim($_POST['qr_content'] ?? '');
+        try {
+            $qrCheck = $this->db->prepare("SELECT id FROM attendance_qr_codes WHERE qr_code=? AND is_active=1 LIMIT 1");
+            $qrCheck->execute([$qrContent]);
+            $validQr = $qrCheck->fetchColumn();
+        } catch (PDOException $e) {
+            $validQr = false;
+        }
+        if (!$validQr) {
+            echo json_encode(['success' => false, 'message' => 'অবৈধ QR কোড! অফিসের QR কোড স্ক্যান করুন।'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        // Determine status
+        $hour = (int)date('H');
+        $min  = (int)date('i');
+        $totalMinutes = $hour * 60 + $min;
+        if ($totalMinutes < 8 * 60) {
+            $status = 'present';
+        } elseif ($totalMinutes < 9 * 60) {
+            $status = 'late';
+        } else {
+            $status = 'absent';
+        }
+
+        $lat    = isset($_POST['latitude'])  && is_numeric($_POST['latitude'])  ? (float)$_POST['latitude']  : null;
+        $lng    = isset($_POST['longitude']) && is_numeric($_POST['longitude']) ? (float)$_POST['longitude'] : null;
+        $addr   = htmlspecialchars(trim($_POST['address'] ?? ''), ENT_QUOTES, 'UTF-8') ?: null;
+        $device = htmlspecialchars(substr($_POST['device_info'] ?? '', 0, 500), ENT_QUOTES, 'UTF-8') ?: null;
+
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO dsr_attendance (dsr_id, attendance_date, scan_time, status, latitude, longitude, address, device_info)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$dsrId, $today, $nowTime, $status, $lat, $lng, $addr, $device]);
+            echo json_encode([
+                'success'   => true,
+                'status'    => $status,
+                'scan_time' => $nowTime,
+                'date'      => $today,
+                'latitude'  => $lat,
+                'longitude' => $lng,
+                'address'   => $addr,
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'message' => 'সেভ করতে সমস্যা হয়েছে।'], JSON_UNESCAPED_UNICODE);
         }
     }
 
