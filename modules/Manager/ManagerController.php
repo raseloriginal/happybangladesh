@@ -2028,6 +2028,14 @@ class ManagerController extends Controller
 
         // 3. HTTP / HTTPS URL download
         $url = str_replace(' ', '%20', $rawUrl);
+        if (strpos($url, 'drive.google.com') !== false) {
+            if (preg_match('/id=([a-zA-Z0-9_-]+)/', $url, $m)) {
+                $url = 'https://drive.google.com/uc?export=download&id=' . $m[1];
+            } elseif (preg_match('/d\/([a-zA-Z0-9_-]+)/', $url, $m)) {
+                $url = 'https://drive.google.com/uc?export=download&id=' . $m[1];
+            }
+        }
+
         if (!preg_match('/^https?:\/\//i', $url)) {
             if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}/i', $url)) {
                 $url = 'http://' . $url;
@@ -2037,6 +2045,10 @@ class ManagerController extends Controller
         }
 
         $imgData = $this->fetchUrlContent($url);
+        $debugLogPath = ROOT_PATH . '/logs/image_download_debug.log';
+        if ($imgData === false || strlen($imgData) == 0) {
+            @file_put_contents($debugLogPath, "[" . date('Y-m-d H:i:s') . "] fetchUrlContent failed or empty for URL: " . $url . "\n", FILE_APPEND);
+        }
         if ($imgData !== false && strlen($imgData) > 0) {
             $tempFile = rtrim($uploadDir, '/') . '/dl_img_' . uniqid();
             file_put_contents($tempFile, $imgData);
@@ -2055,8 +2067,12 @@ class ManagerController extends Controller
                     if (@copy($tempFile, $uploadDir . $filename)) {
                         @unlink($tempFile);
                         return 'assets/uploads/' . $filename;
+                    } else {
+                        @file_put_contents($debugLogPath, "[" . date('Y-m-d H:i:s') . "] copy fallback failed for URL: " . $url . "\n", FILE_APPEND);
                     }
                 }
+            } else {
+                @file_put_contents($debugLogPath, "[" . date('Y-m-d H:i:s') . "] getimagesize failed for URL: " . $url . ". First 100 chars: " . substr($imgData, 0, 100) . "\n", FILE_APPEND);
             }
             @unlink($tempFile);
         }
