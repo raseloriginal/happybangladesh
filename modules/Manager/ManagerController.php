@@ -1551,11 +1551,11 @@ class ManagerController extends Controller
                              ->execute([$o['id'], $dsrId, $o['warehouse_id'], $deliv_date]);
                     $dispatchId = $this->db->lastInsertId();
                     
-                    $items = $this->db->prepare("SELECT product_id, lot_id, quantity FROM order_items WHERE order_id=?");
+                    $items = $this->db->prepare("SELECT * FROM order_items WHERE order_id=?");
                     $items->execute([$o['id']]);
                     foreach($items->fetchAll() as $item) {
-                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity) VALUES (?, ?, ?, ?)")
-                                 ->execute([$dispatchId, $item['product_id'], $item['lot_id'], $item['quantity']]);
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                                 ->execute([$dispatchId, $item['product_id'], $item['lot_id'], $item['quantity'], $item['product_name'], $item['box_type'], $item['pieces_per_box'], $item['unit_price'], $item['total_price']]);
                     }
                     
                     // Update order status so they don't get dispatched twice
@@ -1613,8 +1613,13 @@ class ManagerController extends Controller
                     
                     foreach ($positiveExtras as $ex) {
                         $qty = $ex['diffQty'];
-                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity) VALUES (?, ?, NULL, ?)")
-                                 ->execute([$extraDispatchId, $ex['product_id'], $qty]);
+                        
+                        $pQuery = $this->db->prepare("SELECT name, box_type, pieces_per_box, price FROM products WHERE id=?");
+                        $pQuery->execute([$ex['product_id']]);
+                        $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
+                        
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, total_price) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)")
+                                 ->execute([$extraDispatchId, $ex['product_id'], $qty, $pd['name'], $pd['box_type'], $pd['pieces_per_box'], $pd['price'], $qty * $pd['price']]);
                     }
                 }
             }
@@ -1926,8 +1931,13 @@ class ManagerController extends Controller
     public function readysaleStore(): void
     {
         $this->verifyCsrf();
-        $this->db->prepare("INSERT INTO readysales (warehouse_id,product_id,lot_id,quantity,price) VALUES (?,?,?,?,?)")
-                 ->execute([$this->post('warehouse_id'), $this->post('product_id'), $this->post('lot_id') ?: null, $this->post('quantity',0), $this->post('price',0)]);
+        $pId = $this->post('product_id');
+        $pQuery = $this->db->prepare("SELECT name, box_type, pieces_per_box FROM products WHERE id=?");
+        $pQuery->execute([$pId]);
+        $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
+
+        $this->db->prepare("INSERT INTO readysales (warehouse_id,product_id,lot_id,quantity,price,product_name,box_type,pieces_per_box) VALUES (?,?,?,?,?,?,?,?)")
+                 ->execute([$this->post('warehouse_id'), $pId, $this->post('lot_id') ?: null, $this->post('quantity',0), $this->post('price',0), $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1]);
         $this->flash('success', 'Ready sale record added.'); $this->redirect('manager/readysale');
     }
 
@@ -2187,8 +2197,12 @@ class ManagerController extends Controller
                     $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, quantity - ?) WHERE dsr_id = ? AND product_id = ?")
                              ->execute([$qty, $dsrId, $pid]);
                              
-                    $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason) VALUES (?, ?, ?, 'good')")
-                             ->execute([$returnId, $pid, $qty]);
+                    $pQuery = $this->db->prepare("SELECT name, box_type, pieces_per_box, price FROM products WHERE id=?");
+                    $pQuery->execute([$pid]);
+                    $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
+
+                    $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason, product_name, box_type, pieces_per_box, unit_price) VALUES (?, ?, ?, 'good', ?, ?, ?, ?)")
+                             ->execute([$returnId, $pid, $qty, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1, $pd['price'] ?? 0]);
                              
                     // Restore to warehouse inventory
                     $invQuery = $this->db->prepare("
