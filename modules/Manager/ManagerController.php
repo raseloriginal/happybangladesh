@@ -236,11 +236,14 @@ class ManagerController extends Controller
             exit;
         }
 
-        // Build an ordered list of row indices to pair items with uploaded files
-        $rowIndices = isset($_POST['row_indices']) ? (array)$_POST['row_indices'] : [];
-
         $uploadDir = PUB_PATH . '/assets/uploads/';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+        $debugLogPath = $uploadDir . 'image_download_debug.log';
+        @file_put_contents($debugLogPath, "[" . date('Y-m-d H:i:s') . "] apiProductStore received items: " . json_encode($items) . "\n", FILE_APPEND);
+
+        // Build an ordered list of row indices to pair items with uploaded files
+        $rowIndices = isset($_POST['row_indices']) ? (array)$_POST['row_indices'] : [];
 
         $this->db->beginTransaction();
         try {
@@ -2045,7 +2048,7 @@ class ManagerController extends Controller
         }
 
         $imgData = $this->fetchUrlContent($url);
-        $debugLogPath = ROOT_PATH . '/logs/image_download_debug.log';
+        $debugLogPath = rtrim($uploadDir, '/') . '/image_download_debug.log';
         if ($imgData === false || strlen($imgData) == 0) {
             @file_put_contents($debugLogPath, "[" . date('Y-m-d H:i:s') . "] fetchUrlContent failed or empty for URL: " . $url . "\n", FILE_APPEND);
         }
