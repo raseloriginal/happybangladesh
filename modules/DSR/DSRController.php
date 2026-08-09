@@ -1398,10 +1398,12 @@ class DSRController extends Controller
                 $checkQ->execute([$dsrId, $pid, $date]);
                 $avail = (int)$checkQ->fetchColumn();
 
+                $pNameStmt = $this->db->prepare("SELECT * FROM products WHERE id = ?");
+                $pNameStmt->execute([$pid]);
+                $pData = $pNameStmt->fetch(PDO::FETCH_ASSOC);
+
                 if ($qty > $avail) {
-                    $pNameStmt = $this->db->prepare("SELECT name FROM products WHERE id = ?");
-                    $pNameStmt->execute([$pid]);
-                    $pName = $pNameStmt->fetchColumn();
+                    $pName = $pData['name'] ?? 'Unknown';
                     $this->db->rollBack();
                     $this->json(['success' => false, 'message' => "প্রোডাক্ট '{$pName}'-এর পর্যাপ্ত স্টক ভ্যানে নেই। এভেলেবল: {$avail}, আপনি চেয়েছেন: {$qty}"]);
                     return;
@@ -1415,7 +1417,11 @@ class DSRController extends Controller
                     'lot_id'      => $lotId,
                     'quantity'    => $qty,
                     'unit_price'  => $unitPrice,
-                    'total_price' => $lineTotal
+                    'total_price' => $lineTotal,
+                    'product_name'=> $pData['name'] ?? null,
+                    'box_type'    => $pData['box_type'] ?? null,
+                    'pieces_per_box' => $pData['pieces_per_box'] ?? 1,
+                    'buying_price' => $pData['buying_price'] ?? 0
                 ];
             }
 
@@ -1426,20 +1432,34 @@ class DSRController extends Controller
             }
 
             // 1. Insert Order
+            $retName = null;
+            $retPhone = null;
+            $retAddress = null;
+            if ($retailerId) {
+                $retStmt = $this->db->prepare("SELECT name, phone, address FROM retailers WHERE id = ?");
+                $retStmt->execute([$retailerId]);
+                $retInfo = $retStmt->fetch(PDO::FETCH_ASSOC);
+                if ($retInfo) {
+                    $retName = $retInfo['name'];
+                    $retPhone = $retInfo['phone'];
+                    $retAddress = $retInfo['address'];
+                }
+            }
+
             $orderStmt = $this->db->prepare("
-                INSERT INTO orders (sr_id, retailer_id, warehouse_id, status, total_amount, notes, is_ready_sale, created_at, updated_at)
-                VALUES (?, ?, ?, 'delivered', ?, 'Ready Sale by DSR', 1, NOW(), NOW())
+                INSERT INTO orders (sr_id, retailer_id, warehouse_id, status, total_amount, notes, is_ready_sale, created_at, updated_at, retailer_name, retailer_phone, retailer_address)
+                VALUES (?, ?, ?, 'delivered', ?, 'Ready Sale by DSR', 1, NOW(), NOW(), ?, ?, ?)
             ");
-            $orderStmt->execute([$dsrId, $retailerId, $warehouseId, $totalAmount]);
+            $orderStmt->execute([$dsrId, $retailerId, $warehouseId, $totalAmount, $retName, $retPhone, $retAddress]);
             $orderId = (int)$this->db->lastInsertId();
 
             // 2. Insert Order Items
             $itemStmt = $this->db->prepare("
-                INSERT INTO order_items (order_id, product_id, lot_id, quantity, unit_price, total_price)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO order_items (order_id, product_id, lot_id, quantity, unit_price, total_price, product_name, box_type, pieces_per_box, buying_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             foreach ($orderItemsToInsert as $oi) {
-                $itemStmt->execute([$orderId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['unit_price'], $oi['total_price']]);
+                $itemStmt->execute([$orderId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['unit_price'], $oi['total_price'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['buying_price']]);
             }
 
             // 3. Insert Dispatch
@@ -1452,11 +1472,11 @@ class DSRController extends Controller
 
             // 4. Insert Dispatch Items & update existing delivered_quantity
             $dItemStmt = $this->db->prepare("
-                INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, delivered_quantity)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, delivered_quantity, product_name, box_type, pieces_per_box, unit_price, total_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             foreach ($orderItemsToInsert as $oi) {
-                $dItemStmt->execute([$dispatchId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['quantity']]);
+                $dItemStmt->execute([$dispatchId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['quantity'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['unit_price'], $oi['total_price']]);
 
                 // Allocate delivered_quantity to earlier active dispatch_items
                 $activeDiStmt = $this->db->prepare("
