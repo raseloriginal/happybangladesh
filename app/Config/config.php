@@ -13,7 +13,7 @@ $isMainDomain = (
     $hostname === 'happybangladesh.com'  || $hostname === 'www.happybangladesh.com' ||
     $hostname === 'happybangladesh.site' || $hostname === 'www.happybangladesh.site'
 );
-$isv1 = ($hostname === 'v1.happybangladesh.com' || $hostname === 'www.v1.happybangladesh.com');
+$isv1 = ($hostname === 'v1.happybangladesh.site' || $hostname === 'www.v1.happybangladesh.site');
 $isDraft = ($hostname === 'happydraft.raseloriginal.digital');
 $isHttps = (!$isLocalhost)
     || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
