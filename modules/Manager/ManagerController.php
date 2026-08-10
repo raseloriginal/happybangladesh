@@ -365,6 +365,53 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiAdjustBuyingPrice(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verifyCsrf();
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        
+        $pid = (int)($input['product_id'] ?? $input['id'] ?? 0);
+        $new_buying_price = (float)($input['buying_price'] ?? 0);
+
+        if (!$pid) {
+            echo json_encode(['success' => false, 'message' => 'Product ID is required']);
+            exit;
+        }
+
+        try {
+            $stmt = $this->db->prepare("SELECT name, pieces_per_box, dealer_percentage FROM products WHERE id=?");
+            $stmt->execute([$pid]);
+            $p = $stmt->fetch();
+
+            if (!$p) {
+                echo json_encode(['success' => false, 'message' => 'Product not found']);
+                exit;
+            }
+
+            $ppb = max(1, (float)$p['pieces_per_box']);
+            $dp  = (float)$p['dealer_percentage'];
+            
+            // Calculate new selling price per piece
+            $selling_price = round($new_buying_price * (1 + $dp / 100) / $ppb, 2);
+
+            $this->db->prepare("UPDATE products SET buying_price=?, price=? WHERE id=?")
+                     ->execute([$new_buying_price, $selling_price, $pid]);
+
+            \Helpers::logManagerActivity(
+                \Auth::id(), 
+                'adjust_buying_price', 
+                "Adjusted buying price for {$p['name']} to ৳{$new_buying_price}", 
+                $pid
+            );
+
+            echo json_encode(['success' => true, 'new_buying_price' => $new_buying_price, 'new_selling_price' => $selling_price]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function apiStockAdjust(): void
     {
         $this->verifyCsrf();
