@@ -246,11 +246,39 @@ $pageTitle = 'Retailers';
     // Default center to Bangladesh coordinates
     map = L.map('retailer-map').setView([23.8103, 90.4125], 7);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    // Base Maps
+    const googleMap = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    });
+
+    const googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    });
+
+    const googleTerrain = L.tileLayer('http://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    });
+
+    const lightMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 20
-    }).addTo(map);
+    });
+
+    // Add default map
+    googleMap.addTo(map);
+
+    const baseMaps = {
+      "Google Map": googleMap,
+      "Google Hybrid": googleHybrid,
+      "Terrain": googleTerrain,
+      "Light": lightMap
+    };
+
+    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
     const bounds = [];
     
