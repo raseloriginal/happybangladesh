@@ -16,6 +16,7 @@ $menus = [
         ['icon' => 'fa-building',     'label' => 'Companies',   'url' => '/admin/companies'],
         ['icon' => 'fa-person-walking','label'=> 'Sales Reps',  'url' => '/admin/srs'],
         ['icon' => 'fa-store',        'label' => 'Dealers',     'url' => '/admin/dealers'],
+        ['icon' => 'fa-shop',         'label' => 'Retailers',   'url' => '/admin/retailers'],
         ['section' => 'BUSINESS'],
         ['icon' => 'fa-file-invoice', 'label' => 'Orders',      'url' => '/admin/orders'],
         ['icon' => 'fa-circle-check', 'label' => 'Approvals',   'url' => '/admin/approvals'],
