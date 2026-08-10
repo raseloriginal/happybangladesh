@@ -1487,6 +1487,99 @@ class AdminController extends Controller
         echo json_encode(['success' => true, 'message' => 'Custom area deleted successfully.']);
         exit;
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Retailers Page
+    // ══════════════════════════════════════════════════════════
+    public function retailers(): void
+    {
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $search = trim($_GET['search'] ?? '');
+        
+        $where = " WHERE 1=1 ";
+        $params = [];
+        
+        if ($search !== '') {
+            $where .= " AND (name LIKE ? OR phone LIKE ? OR address LIKE ?) ";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        $qCount = $this->db->prepare("SELECT COUNT(*) FROM retailers $where");
+        $qCount->execute($params);
+        $totalRows = (int)$qCount->fetchColumn();
+        $totalPages = max(1, ceil($totalRows / $limit));
+
+        $q = $this->db->prepare("
+            SELECT * FROM retailers
+            $where
+            ORDER BY created_at DESC
+            LIMIT $limit OFFSET $offset
+        ");
+        $q->execute($params);
+        $items = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        // Map data: fetch all retailers with valid coordinates
+        $qMap = $this->db->query("SELECT name, phone, address, lat, lng FROM retailers WHERE lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0");
+        $mapData = $qMap->fetchAll(PDO::FETCH_ASSOC);
+
+        $pageTitle = 'Retailers';
+        $this->render('retailers/index', compact('items', 'page', 'totalPages', 'search', 'totalRows', 'mapData', 'pageTitle', 'offset'), 'main');
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Manager Logs
+    // ══════════════════════════════════════════════════════════
+    public function managerLogs(): void
+    {
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $dateFrom = $_GET['date_from'] ?? '';
+        $dateTo = $_GET['date_to'] ?? '';
+        $managerId = $_GET['manager_id'] ?? '';
+
+        $where = " WHERE 1=1 ";
+        $params = [];
+        if (!empty($dateFrom)) {
+            $where .= " AND DATE(ma.created_at) >= ? ";
+            $params[] = $dateFrom;
+        }
+        if (!empty($dateTo)) {
+            $where .= " AND DATE(ma.created_at) <= ? ";
+            $params[] = $dateTo;
+        }
+        if (!empty($managerId)) {
+            $where .= " AND ma.manager_id = ? ";
+            $params[] = $managerId;
+        }
+
+        $qCount = $this->db->prepare("SELECT COUNT(*) FROM manager_activities ma $where");
+        $qCount->execute($params);
+        $totalLogs = $qCount->fetchColumn();
+        $totalPages = ceil($totalLogs / $limit);
+
+        $q = $this->db->prepare("
+            SELECT ma.*, u.name AS manager_name
+            FROM manager_activities ma
+            LEFT JOIN users u ON u.id = ma.manager_id
+            $where
+            ORDER BY ma.created_at DESC
+            LIMIT $limit OFFSET $offset
+        ");
+        $q->execute($params);
+        $logs = $q->fetchAll();
+
+        $managers = $this->db->query("SELECT u.id, u.name FROM users u JOIN roles r ON r.id=u.role_id WHERE r.slug='manager'")->fetchAll();
+
+        $pageTitle = 'Manager Activities';
+        $this->render('manager_logs', compact('logs', 'page', 'totalPages', 'managers', 'managerId', 'dateFrom', 'dateTo', 'pageTitle'), 'main');
+    }
 }
 
 

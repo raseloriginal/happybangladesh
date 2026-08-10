@@ -153,6 +153,18 @@ class Helpers
         }
         return $init;
     }
+
+    /**
+     * Log a manager's activity.
+     */
+    public static function logManagerActivity(?int $managerId, string $actionType, string $description, ?string $targetId = null): void
+    {
+        $db = Database::getInstance();
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $managerId = $managerId ?: 0;
+        $stmt = $db->prepare("INSERT INTO manager_activities (manager_id, action_type, description, target_id, ip_address) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$managerId, $actionType, $description, $targetId, $ip]);
+    }
 }
 
 // Short alias functions for views

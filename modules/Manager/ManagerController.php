@@ -345,6 +345,7 @@ class ManagerController extends Controller
             $params[] = $id;
 
             $this->db->prepare($query)->execute($params);
+            \Helpers::logManagerActivity(\Auth::id(), 'edit_product', 'Edited product: ' . trim($_POST['name']), $id);
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -358,6 +359,7 @@ class ManagerController extends Controller
         $input = json_decode(file_get_contents('php://input'), true);
         if ($id = $input['id'] ?? null) {
             $this->db->prepare("DELETE FROM products WHERE id=?")->execute([$id]);
+            \Helpers::logManagerActivity(\Auth::id(), 'delete_product', 'Deleted product ID: ' . $id, $id);
             echo json_encode(['success' => true]);
         }
         exit;
@@ -663,6 +665,7 @@ class ManagerController extends Controller
             }
 
             $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'edit_lot', 'Edited lot ID: ' . $input['id'], $input['id']);
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             $this->db->rollBack();
@@ -698,6 +701,7 @@ class ManagerController extends Controller
             $this->db->prepare("DELETE FROM lots WHERE id=?")->execute([$input['id']]);
 
             $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'delete_lot', 'Deleted lot ID: ' . $input['id'], $input['id']);
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             $this->db->rollBack();
@@ -1741,6 +1745,7 @@ class ManagerController extends Controller
             $this->db->prepare("UPDATE dispatch_schedules SET status = ? WHERE id = ?")->execute([$status, $id]);
             
             $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'dispatch_status_change', "Changed dispatch schedule $id status to $status", $id);
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             $this->db->rollBack();
@@ -1826,6 +1831,7 @@ class ManagerController extends Controller
                      ->execute([$status, $managerNotes, $totalDamage, $totalExpense, $deliveryOc, $shouldPay, $countedCash, $difference, $cashBreakdown, $id]);
             
             $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'settlement_status_change', "Changed settlement $id status to $status", $id);
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             $this->db->rollBack();
@@ -2434,6 +2440,8 @@ class ManagerController extends Controller
                 json_encode(['total_amount' => $newTotal])
             ]);
 
+            \Helpers::logManagerActivity(\Auth::id(), 'edit_order', 'Edited operation order ID: ' . $id . ' for reason: ' . $reason, $id);
+
             $this->db->commit();
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
@@ -2502,6 +2510,8 @@ class ManagerController extends Controller
                 json_encode(['paid_amount' => $oldPaid]),
                 json_encode(['paid_amount' => $paidAmount])
             ]);
+
+            \Helpers::logManagerActivity(\Auth::id(), 'edit_delivery', 'Edited operation delivery ID: ' . $id . ' for reason: ' . $reason, $id);
 
             $this->db->commit();
             echo json_encode(['success' => true]);

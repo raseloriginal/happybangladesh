@@ -153,7 +153,8 @@ $router->get( '/admin/database-sync',         ['AdminController', 'databaseSync'
 $router->post('/admin/database-sync/run',     ['AdminController', 'databaseSyncRun']);
 $router->post('/admin/database-sync/clear',   ['AdminController', 'databaseClear']);
 
-// Import Retailers
+// Retailers
+$router->get( '/admin/retailers',             ['AdminController', 'retailers']);
 $router->get( '/admin/retailers/import',      ['AdminController', 'retailersImport']);
 $router->post('/admin/retailers/import',      ['AdminController', 'retailersImportPost']);
 
@@ -182,6 +183,8 @@ $router->post('/admin/api/custom-areas/store',        ['AdminController', 'apiCu
 $router->post('/admin/api/custom-areas/update/{id}',  ['AdminController', 'apiCustomAreaUpdate']);
 $router->post('/admin/api/custom-areas/delete/{id}',  ['AdminController', 'apiCustomAreaDelete']);
 
+// Manager Logs
+$router->get( '/admin/manager-logs',                  ['AdminController', 'managerLogs']);
 
 
 // ── Manager routes ────────────────────────────────────────────

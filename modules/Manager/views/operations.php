@@ -2,7 +2,7 @@
 
 <div class="p-4 sm:ml-64 bg-slate-50 min-h-screen">
     <!-- Premium Header -->
-    <div class="bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl shadow-lg mb-6 overflow-hidden relative">
+    <div class="rounded-2xl shadow-lg mb-6 overflow-hidden relative text-white" style="background: #0b1b3d !important;">
         <div class="absolute inset-0 bg-black/10 backdrop-blur-sm"></div>
         <div class="relative p-8 flex flex-col md:flex-row items-center justify-between z-10">
             <div class="text-white flex items-center gap-4">
