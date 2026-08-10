@@ -242,6 +242,15 @@ $router->post('/manager/readysale/store',     ['ManagerController', 'readysaleSt
 $router->get( '/manager/api/sr-cutoff-status',              ['ManagerController', 'apiSrCutoffStatus']);
 $router->post('/manager/api/order-cutoff/undo/{srId}',      ['ManagerController', 'apiUndoOrderCutoff']);
 
+// Operations Panel
+$router->get( '/manager/operations',                          ['ManagerController', 'operations']);
+$router->get( '/manager/api/operations/orders',               ['ManagerController', 'apiOperationsOrders']);
+$router->get( '/manager/api/operations/deliveries',           ['ManagerController', 'apiOperationsDeliveries']);
+$router->post('/manager/api/operations/edit-order/{id}',      ['ManagerController', 'apiOperationsEditOrder']);
+$router->post('/manager/api/operations/edit-delivery/{id}',   ['ManagerController', 'apiOperationsEditDelivery']);
+$router->post('/manager/api/operations/place-order',          ['ManagerController', 'apiOperationsPlaceOrder']);
+$router->post('/manager/api/operations/make-delivery',        ['ManagerController', 'apiOperationsMakeDelivery']);
+
 // ── SR routes ─────────────────────────────────────────────────
 $router->get( '/sr/dashboard',                ['SRController', 'dashboard']);
 $router->get( '/sr/transactions',             ['SRController', 'transactions']);

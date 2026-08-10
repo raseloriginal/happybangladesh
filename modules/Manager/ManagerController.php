@@ -65,7 +65,7 @@ class ManagerController extends Controller
 
         $q = $this->db->prepare("
             SELECT DATE(o.created_at) as order_date,
-                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.quantity * oi.buying_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -90,7 +90,7 @@ class ManagerController extends Controller
         $q = $this->db->prepare("
             SELECT c.id as company_id,
                    c.name as company_name,
-                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.quantity * oi.buying_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -115,7 +115,7 @@ class ManagerController extends Controller
         $q = $this->db->prepare("
             SELECT u.id as sr_id,
                    u.name as sr_name,
-                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.quantity * oi.buying_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value,
                    SUM(oi.total_price - (oi.quantity * p.price)) as total_oc
             FROM orders o
@@ -147,7 +147,7 @@ class ManagerController extends Controller
                    p.pieces_per_box,
                    p.box_type,
                    SUM(oi.quantity) as total_qty,
-                   SUM(oi.quantity * p.price) as total_base_value,
+                   SUM(oi.quantity * oi.buying_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -879,53 +879,42 @@ class ManagerController extends Controller
             $sch['total_order_value'] = (float)$orderVal;
 
             $orderOC = $this->db->query("
-                SELECT COALESCE(SUM((oi.unit_price - p.price) * oi.quantity), 0)
+                SELECT COALESCE(SUM((oi.unit_price - oi.buying_price) * oi.quantity), 0)
                 FROM dispatch_schedule_srs dss
                 JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$sch['dispatch_date']}'
                 JOIN order_items oi ON oi.order_id = o.id
-                JOIN products p ON p.id = oi.product_id
                 WHERE dss.schedule_id = $sid
             ")->fetchColumn();
             $sch['total_order_oc'] = (float)$orderOC;
 
-            // Use van_stock.initial_qty as actual dispatched value (Approach 1: Van-Level Dispatch)
+            // Use dispatch_items as actual dispatched value
             $dispatchValStmt = $this->db->prepare("
-                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
-                FROM van_stock vs
-                JOIN products p ON p.id = vs.product_id
-                WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+                SELECT COALESCE(SUM(di.quantity * di.unit_price), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ?
             ");
             $dispatchValStmt->execute([$sch['dsr_id'], $delivery_date]);
             $sch['total_dispatch_value'] = (float)$dispatchValStmt->fetchColumn();
 
-
             $dispatchOC = $this->db->query("
-                SELECT COALESCE(SUM(vs.initial_qty * (COALESCE(oi.avg_unit_price, p.price) - p.price)), 0)
-                FROM van_stock vs
-                JOIN products p ON p.id = vs.product_id
-                LEFT JOIN (
-                    SELECT oi.product_id, AVG(oi.unit_price) as avg_unit_price
-                    FROM dispatches d
-                    JOIN orders o ON o.id = d.order_id
-                    JOIN order_items oi ON oi.order_id = o.id
-                    WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
-                    GROUP BY oi.product_id
-                ) oi ON oi.product_id = vs.product_id
-                WHERE vs.dsr_id = {$sch['dsr_id']} AND DATE(vs.loaded_at) = '{$delivery_date}'
+                SELECT COALESCE(SUM(di.quantity * (di.unit_price - di.buying_price)), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
             ")->fetchColumn();
             $sch['total_dispatch_oc'] = (float)$dispatchOC;
             $sch['total_return_value'] = (float)$this->db->query("
-                SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                SELECT COALESCE(SUM(ri.quantity * ri.unit_price), 0)
                 FROM returns r
                 JOIN return_items ri ON ri.return_id = r.id
-                JOIN products p ON p.id = ri.product_id
                 WHERE r.dsr_id = {$sch['dsr_id']} AND r.return_date = '{$delivery_date}' AND (r.reason != 'Damage' OR r.reason IS NULL)
             ")->fetchColumn();
             
             $sch['total_damage_value'] = (float)$this->db->query("
                 SELECT 
                     COALESCE((
-                        SELECT SUM(ri.quantity * p.price)
+                        SELECT SUM(ri.quantity * ri.unit_price)
                         FROM returns r
                         JOIN return_items ri ON ri.return_id = r.id
                         JOIN products p ON p.id = ri.product_id
@@ -941,9 +930,8 @@ class ManagerController extends Controller
             ")->fetchColumn();
             
             $saleVal = $this->db->query("
-                SELECT COALESCE(SUM(di.delivered_quantity * p.price), 0)
+                SELECT COALESCE(SUM(di.delivered_quantity * di.unit_price), 0)
                 FROM dispatch_items di
-                JOIN products p ON p.id = di.product_id
                 JOIN dispatches d ON d.id = di.dispatch_id
                 WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
             ")->fetchColumn();
@@ -1350,15 +1338,16 @@ class ManagerController extends Controller
             $company['ordered_value'] = (float)$orderedVal;
 
             $dispatchVal = $this->db->query("
-                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
-                FROM van_stock vs
-                JOIN products p ON p.id = vs.product_id
-                WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND {$companyCondition}
+                SELECT COALESCE(SUM(di.quantity * di.unit_price), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                JOIN products p ON p.id = di.product_id
+                WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND {$companyCondition}
             ")->fetchColumn();
             $company['dispatch_items_value'] = (float)$dispatchVal;
 
             $returnVal = $this->db->query("
-                SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                SELECT COALESCE(SUM(ri.quantity * ri.unit_price), 0)
                 FROM returns r
                 JOIN return_items ri ON ri.return_id = r.id
                 JOIN products p ON p.id = ri.product_id
@@ -1367,7 +1356,7 @@ class ManagerController extends Controller
             $company['return_value'] = (float)$returnVal;
 
             $damageVal = $this->db->query("
-                SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+                SELECT COALESCE(SUM(ri.quantity * ri.unit_price), 0)
                 FROM returns r
                 JOIN return_items ri ON ri.return_id = r.id
                 JOIN products p ON p.id = ri.product_id
@@ -1376,11 +1365,10 @@ class ManagerController extends Controller
             $company['damage_value'] = (float)$damageVal;
 
             $saleVal = $this->db->query("
-                SELECT COALESCE(SUM(di.delivered_quantity * IFNULL(oi.unit_price, p.price)), 0)
+                SELECT COALESCE(SUM(di.delivered_quantity * di.unit_price), 0)
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
                 JOIN dispatches d ON d.id = di.dispatch_id
-                LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
                 WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND {$companyCondition}
             ")->fetchColumn();
             $company['sale_value'] = (float)$saleVal;
@@ -1429,7 +1417,7 @@ class ManagerController extends Controller
                            WHERE o.sr_id = u.id AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
                        ) as order_value,
                        (
-                           SELECT COALESCE(SUM((oi.unit_price - p.price) * oi.quantity), 0)
+                           SELECT COALESCE(SUM((oi.unit_price - oi.buying_price) * oi.quantity), 0)
                            FROM orders o
                            JOIN order_items oi ON oi.order_id = o.id
                            JOIN products p ON p.id = oi.product_id
@@ -1554,8 +1542,8 @@ class ManagerController extends Controller
                     $items = $this->db->prepare("SELECT * FROM order_items WHERE order_id=?");
                     $items->execute([$o['id']]);
                     foreach($items->fetchAll() as $item) {
-                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                                 ->execute([$dispatchId, $item['product_id'], $item['lot_id'], $item['quantity'], $item['product_name'], $item['box_type'], $item['pieces_per_box'], $item['unit_price'], $item['total_price']]);
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, buying_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                                 ->execute([$dispatchId, $item['product_id'], $item['lot_id'], $item['quantity'], $item['product_name'], $item['box_type'], $item['pieces_per_box'], $item['unit_price'], $item['buying_price'] ?? $item['unit_price'], $item['total_price']]);
                     }
                     
                     // Update order status so they don't get dispatched twice
@@ -1618,8 +1606,8 @@ class ManagerController extends Controller
                         $pQuery->execute([$ex['product_id']]);
                         $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
                         
-                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, total_price) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)")
-                                 ->execute([$extraDispatchId, $ex['product_id'], $qty, $pd['name'], $pd['box_type'], $pd['pieces_per_box'], $pd['price'], $qty * $pd['price']]);
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, buying_price, total_price) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)")
+                                 ->execute([$extraDispatchId, $ex['product_id'], $qty, $pd['name'], $pd['box_type'], $pd['pieces_per_box'], $pd['price'], $pd['price'], $qty * $pd['price']]);
                     }
                 }
             }
@@ -1770,7 +1758,7 @@ class ManagerController extends Controller
             SELECT s.*, u.name AS dsr_name,
             (
                 COALESCE((
-                    SELECT SUM(ri.quantity * p.price)
+                    SELECT SUM(ri.quantity * ri.unit_price)
                     FROM returns r
                     JOIN return_items ri ON ri.return_id=r.id
                     JOIN products p ON p.id=ri.product_id
@@ -1790,7 +1778,7 @@ class ManagerController extends Controller
                 WHERE dsr_id=s.dsr_id AND date=s.date
             ) AS live_expense,
             (
-                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)), 0)
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(di.unit_price, p.price) - di.buying_price)), 0)
                 FROM dispatches d
                 JOIN dispatch_items di ON d.id = di.dispatch_id
                 JOIN products p ON p.id = di.product_id
@@ -1936,8 +1924,8 @@ class ManagerController extends Controller
         $pQuery->execute([$pId]);
         $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
 
-        $this->db->prepare("INSERT INTO readysales (warehouse_id,product_id,lot_id,quantity,price,product_name,box_type,pieces_per_box) VALUES (?,?,?,?,?,?,?,?)")
-                 ->execute([$this->post('warehouse_id'), $pId, $this->post('lot_id') ?: null, $this->post('quantity',0), $this->post('price',0), $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1]);
+        $this->db->prepare("INSERT INTO readysales (warehouse_id,product_id,lot_id,quantity,price,buying_price,product_name,box_type,pieces_per_box) VALUES (?,?,?,?,?,?,?,?,?)")
+                 ->execute([$this->post('warehouse_id'), $pId, $this->post('lot_id') ?: null, $this->post('quantity',0), $this->post('price',0), $pd['price'] ?? 0, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1]);
         $this->flash('success', 'Ready sale record added.'); $this->redirect('manager/readysale');
     }
 
@@ -2201,8 +2189,8 @@ class ManagerController extends Controller
                     $pQuery->execute([$pid]);
                     $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
 
-                    $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason, product_name, box_type, pieces_per_box, unit_price) VALUES (?, ?, ?, 'good', ?, ?, ?, ?)")
-                             ->execute([$returnId, $pid, $qty, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1, $pd['price'] ?? 0]);
+                    $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason, product_name, box_type, pieces_per_box, unit_price, buying_price) VALUES (?, ?, ?, 'good', ?, ?, ?, ?, ?)")
+                             ->execute([$returnId, $pid, $qty, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1, $pd['price'] ?? 0, $pd['price'] ?? 0]);
                              
                     // Restore to warehouse inventory
                     $invQuery = $this->db->prepare("
@@ -2310,6 +2298,233 @@ class ManagerController extends Controller
                  ->execute([$code, Auth::id()]);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true, 'qr_code' => $code], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  Operations Panel (Correcting SR/DSR Mistakes)
+    // ──────────────────────────────────────────────────────────────
+    public function operations(): void
+    {
+        $this->render('operations');
+    }
+
+    public function apiOperationsOrders(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $wId = Auth::warehouseId();
+            // Get orders from last 2 days
+            $sql = "SELECT o.*, u.name as sr_name, r.name as retailer_name, r.address as retailer_address 
+                    FROM orders o
+                    LEFT JOIN users u ON o.sr_id = u.id
+                    LEFT JOIN retailers r ON o.retailer_id = r.id
+                    WHERE o.warehouse_id = ? AND o.created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
+                    ORDER BY o.id DESC";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$wId]);
+            $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($orders as &$order) {
+                $stmt = $this->db->prepare("SELECT oi.*, p.name as product_name, p.pieces_per_box as pack_size 
+                                            FROM order_items oi 
+                                            JOIN products p ON oi.product_id = p.id 
+                                            WHERE oi.order_id = ?");
+                $stmt->execute([$order['id']]);
+                $order['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+            echo json_encode(['success' => true, 'data' => $orders]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsDeliveries(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $wId = Auth::warehouseId();
+            // Get dispatches from last 2 days
+            $sql = "SELECT d.*, o.id as invoice_no, o.total_amount as order_total, u.name as dsr_name, r.name as retailer_name,
+                           (o.total_amount - d.paid_amount) as due_amount
+                    FROM dispatches d
+                    JOIN orders o ON d.order_id = o.id
+                    LEFT JOIN users u ON d.dsr_id = u.id
+                    LEFT JOIN retailers r ON o.retailer_id = r.id
+                    WHERE d.warehouse_id = ? AND d.created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
+                    ORDER BY d.id DESC";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$wId]);
+            $deliveries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($deliveries as &$del) {
+                $itemsStmt = $this->db->prepare("SELECT di.*, p.name as product_name, p.pieces_per_box as pack_size 
+                                                 FROM dispatch_items di 
+                                                 JOIN products p ON di.product_id = p.id 
+                                                 WHERE di.dispatch_id = ?");
+                $itemsStmt->execute([$del['id']]);
+                $del['items'] = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+            echo json_encode(['success' => true, 'data' => $deliveries]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsEditOrder(string $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $id = (int)$id;
+        $reason = $this->post('reason');
+        $itemsJson = $this->post('items');
+        
+        if (empty($reason) || empty($itemsJson)) {
+            echo json_encode(['success' => false, 'message' => 'Reason and items are required.']);
+            exit;
+        }
+        
+        $items = json_decode($itemsJson, true);
+        if (!is_array($items)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid items format.']);
+            exit;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $order = $this->db->query("SELECT * FROM orders WHERE id = $id")->fetch(PDO::FETCH_ASSOC);
+            if (!$order) {
+                throw new \Exception("Order not found.");
+            }
+
+            // Check if within 2 days
+            $orderDate = new \DateTime($order['created_at']);
+            $now = new \DateTime();
+            if ($now->diff($orderDate)->days > 2) {
+                throw new \Exception("Cannot edit orders older than 2 days.");
+            }
+
+            $oldTotal = (float)$order['total_amount'];
+            $newTotal = 0;
+
+            foreach ($items as $item) {
+                $itemId = (int)$item['id'];
+                $price = (float)$item['price'];
+                $qty = (int)$item['qty'];
+                
+                $newTotal += ($price * $qty);
+                
+                $this->db->prepare("UPDATE order_items SET quantity = ?, unit_price = ?, total_price = ? WHERE id = ? AND order_id = ?")
+                         ->execute([$qty, $price, $qty * $price, $itemId, $id]);
+            }
+
+            // Update order total
+            $this->db->prepare("UPDATE orders SET total_amount = ? WHERE id = ?")->execute([$newTotal, $id]);
+
+            // Log the operation
+            $logStmt = $this->db->prepare("INSERT INTO operations_logs (action_type, reference_id, manager_id, reason, old_data, new_data) VALUES (?, ?, ?, ?, ?, ?)");
+            $logStmt->execute([
+                'edit_order',
+                $id,
+                Auth::id(),
+                $reason,
+                json_encode(['total_amount' => $oldTotal]),
+                json_encode(['total_amount' => $newTotal])
+            ]);
+
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsEditDelivery(string $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $id = (int)$id;
+        $reason = $this->post('reason');
+        $paidAmount = (float)$this->post('paid_amount');
+        $itemsJson = $this->post('items');
+        
+        if (empty($reason) || empty($itemsJson)) {
+            echo json_encode(['success' => false, 'message' => 'Reason and items are required.']);
+            exit;
+        }
+        
+        $items = json_decode($itemsJson, true);
+        if (!is_array($items)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid items format.']);
+            exit;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $dispatch = $this->db->query("SELECT * FROM dispatches WHERE id = $id")->fetch(PDO::FETCH_ASSOC);
+            if (!$dispatch) {
+                throw new \Exception("Delivery/Dispatch not found.");
+            }
+
+            // Check if within 2 days
+            $dispatchDate = new \DateTime($dispatch['created_at']);
+            $now = new \DateTime();
+            if ($now->diff($dispatchDate)->days > 2) {
+                throw new \Exception("Cannot edit deliveries older than 2 days.");
+            }
+
+            $oldPaid = (float)$dispatch['paid_amount'];
+
+            foreach ($items as $item) {
+                $itemId = (int)$item['id'];
+                $qty = (int)$item['qty'];
+                
+                $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ? AND dispatch_id = ?")
+                         ->execute([$qty, $itemId, $id]);
+            }
+
+            // Update dispatch paid_amount
+            $this->db->prepare("UPDATE dispatches SET paid_amount = ? WHERE id = ?")->execute([$paidAmount, $id]);
+
+            // Log the operation
+            $logStmt = $this->db->prepare("INSERT INTO operations_logs (action_type, reference_id, manager_id, reason, old_data, new_data) VALUES (?, ?, ?, ?, ?, ?)");
+            $logStmt->execute([
+                'edit_delivery',
+                $id,
+                Auth::id(),
+                $reason,
+                json_encode(['paid_amount' => $oldPaid]),
+                json_encode(['paid_amount' => $paidAmount])
+            ]);
+
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsPlaceOrder(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Not implemented yet']);
+        exit;
+    }
+
+    public function apiOperationsMakeDelivery(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Not implemented yet']);
         exit;
     }
 }
