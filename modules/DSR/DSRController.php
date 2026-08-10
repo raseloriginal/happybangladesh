@@ -413,7 +413,7 @@ class DSRController extends Controller
         $saleQ = $this->db->prepare("
             SELECT di.product_id, 
                    SUM(COALESCE(di.delivered_quantity, 0)) as qty,
-                   SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)) as oc_val
+                   SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)) as oc_val
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
@@ -451,7 +451,7 @@ class DSRController extends Controller
         $readySaleQ = $this->db->prepare("
             SELECT di.product_id, 
                    SUM(COALESCE(di.delivered_quantity, di.quantity, 0)) as qty,
-                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)) as oc_val
+                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * (oi.unit_price - oi.buying_price)) as oc_val
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
@@ -620,8 +620,8 @@ class DSRController extends Controller
             $iq = $this->db->query("
                 SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
                        p.name, p.image, p.pieces_per_box, p.box_type,
-                       p.price as base_price,
-                       COALESCE(oi.unit_price, p.price) as price
+                       di.buying_price as base_price,
+                       di.unit_price as price
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
                 JOIN dispatches d ON d.id = di.dispatch_id
@@ -949,54 +949,36 @@ class DSRController extends Controller
         $retSch = (int)($schRow['returned_schedules'] ?? 0);
         $scheduleStatus = ($totSch > 0 && $totSch === $retSch) ? 'returned' : 'pending';
 
-        // Calculate Dispatched Value and Spot Return Value using van_stock table (Approach 1: Van-Level)
+        // Calculate Dispatched Value
         $q = $this->db->prepare("
             SELECT 
-                COALESCE(SUM(vs.initial_qty * p.price), 0) as dispatched_value,
-                COALESCE(SUM(vs.quantity * p.price), 0) as spot_return_value
-            FROM van_stock vs
-            JOIN products p ON p.id = vs.product_id
-            WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+                COALESCE(SUM(di.quantity * di.unit_price), 0) as dispatched_value
+            FROM dispatches d
+            JOIN dispatch_items di ON di.dispatch_id = d.id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ?
         ");
         $q->execute([$dsrId, $selectedDate]);
         $res = $q->fetch();
         
         $dispatchedValue = (float)($res['dispatched_value'] ?: 0);
 
-        // Fallback for dispatched value if van_stock initial_qty is not set
-        if ($dispatchedValue <= 0) {
-            $qFallback = $this->db->prepare("
-                SELECT COALESCE(SUM(di.quantity * p.price), 0)
-                FROM dispatches d
-                JOIN dispatch_items di ON di.dispatch_id = d.id
-                JOIN products p ON p.id = di.product_id
-                WHERE d.dsr_id = ? AND d.dispatch_date = ?
-            ");
-            $qFallback->execute([$dsrId, $selectedDate]);
-            $dispatchedValue = (float)$qFallback->fetchColumn();
-        }
-
-        // Calculate returned value: from returns table (if recorded by manager/system) OR remaining unsold spot van_stock
+        // Calculate returned value: from returns table
         $qRet = $this->db->prepare("
-            SELECT COALESCE(SUM(ri.quantity * p.price), 0)
+            SELECT COALESCE(SUM(ri.quantity * ri.unit_price), 0)
             FROM returns r
             JOIN return_items ri ON ri.return_id = r.id
-            JOIN products p ON p.id = ri.product_id
             WHERE r.dsr_id = ? AND r.return_date = ? AND (r.reason != 'Damage' OR r.reason IS NULL)
         ");
         $qRet->execute([$dsrId, $selectedDate]);
-        $recordedReturn = (float)$qRet->fetchColumn();
-
-        $returnedValue = $recordedReturn > 0 ? $recordedReturn : (float)($res['spot_return_value'] ?: 0);
+        $returnedValue = (float)$qRet->fetchColumn();
         
         // Damage amount (calculates product return items OR manual damage entries recorded in returns header/reason)
         $q3 = $this->db->prepare("
             SELECT 
                 COALESCE((
-                    SELECT SUM(ri.quantity * p.price)
+                    SELECT SUM(ri.quantity * ri.unit_price)
                     FROM returns r
                     JOIN return_items ri ON ri.return_id=r.id
-                    JOIN products p ON p.id=ri.product_id
                     WHERE r.dsr_id=? AND r.return_date=? AND r.reason='Damage'
                 ), 0)
                 +
@@ -1022,7 +1004,7 @@ class DSRController extends Controller
         // Total Delivery O/C
         $qOc = $this->db->prepare("
             SELECT 
-                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)), 0) as delivery_oc
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)), 0) as delivery_oc
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
@@ -1104,13 +1086,13 @@ class DSRController extends Controller
         $q = $this->db->prepare("
             SELECT p.name AS product_name,
                    SUM(ri.quantity) AS qty,
-                   p.price,
-                   SUM(ri.quantity * p.price) AS total
+                   ri.unit_price as price,
+                   SUM(ri.quantity * ri.unit_price) AS total
             FROM returns r
             JOIN return_items ri ON ri.return_id = r.id
             JOIN products p ON p.id = ri.product_id
             WHERE r.dsr_id = ? AND r.return_date = ? AND (r.reason != 'Damage' OR r.reason IS NULL)
-            GROUP BY ri.product_id, p.name, p.price
+            GROUP BY ri.product_id, p.name, ri.unit_price
         ");
         $q->execute([$dsrId, $date]);
         $items = $q->fetchAll(PDO::FETCH_ASSOC);
@@ -1148,7 +1130,7 @@ class DSRController extends Controller
         $q = $this->db->prepare("
             SELECT 
                 u.name AS sr_name,
-                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(oi.unit_price, p.price) - p.price)), 0) as sr_oc
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)), 0) as sr_oc
             FROM dispatches d
             JOIN orders o ON o.id = d.order_id
             JOIN users u ON u.id = o.sr_id
