@@ -2587,6 +2587,16 @@ class ManagerController extends Controller
 
             \Helpers::logManagerActivity(\Auth::id(), 'delete_order', 'Deleted operation order ID: ' . $id . ' for reason: ' . $reason, $id);
 
+            // Delete dispatches & dispatch items if any
+            $dispatchesStmt = $this->db->prepare("SELECT id FROM dispatches WHERE order_id = ?");
+            $dispatchesStmt->execute([$id]);
+            $dispatchIds = $dispatchesStmt->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($dispatchIds)) {
+                $inQuery = implode(',', array_fill(0, count($dispatchIds), '?'));
+                $this->db->prepare("DELETE FROM dispatch_items WHERE dispatch_id IN ($inQuery)")->execute($dispatchIds);
+                $this->db->prepare("DELETE FROM dispatches WHERE order_id = ?")->execute([$id]);
+            }
+
             // Delete order items
             $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$id]);
             
