@@ -96,6 +96,28 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
+     RETAILER FILTER MODAL
+══════════════════════════════════════════════════════════════ -->
+<div class="sr-sheet-overlay" id="filterModalOverlay"></div>
+<div class="sr-bottom-sheet" id="filterModalSheet" style="font-family: 'Hind Siliguri', sans-serif;">
+  <div class="sr-sheet-handle"></div>
+  <div class="sr-sheet-header">
+    <span class="sr-sheet-title"><i class="fa-solid fa-filter" style="color:var(--sr-primary);margin-right:8px;"></i>দোকানের নাম ফিল্টার</span>
+    <button class="sr-sheet-close" id="filterModalClose"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div class="sr-sheet-body">
+    <div class="sr-form-group" style="position: relative;">
+      <label class="sr-form-label">দোকানের নাম</label>
+      <input type="text" class="sr-form-input" id="filterSearchInput" placeholder="দোকানের নাম টাইপ করুন..." autocomplete="off">
+      <div class="sr-search-suggestions" id="filterSearchSuggestions" style="top: 100%; width: 100%; border-radius: 8px; max-height: 200px;"></div>
+    </div>
+    <button type="button" class="sr-add-cart-btn" id="filterSearchBtn" style="margin-top:16px; font-family: 'Hind Siliguri', sans-serif;">
+      <i class="fa-solid fa-search"></i> Search
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
      FULLSCREEN PIN MAP OVERLAY
 ══════════════════════════════════════════════════════════════ -->
 <div class="sr-fullmap-overlay hidden" id="fullMapOverlay" style="font-family: 'Hind Siliguri', sans-serif;">
@@ -969,7 +991,7 @@ function initEventListeners() {
   const filterBtn = document.getElementById('mapFilterBtn');
   if (filterBtn) {
     filterBtn.addEventListener('click', () => {
-      showMiniToast('ℹ️ Filter settings are fully optimized for nearest retailers');
+      openSheet('filterModalSheet', 'filterModalOverlay');
     });
   }
 
@@ -1081,6 +1103,99 @@ function initEventListeners() {
       }
     });
   }
+
+  // ── Filter Modal Logic ──
+  const filterModalOverlay = document.getElementById('filterModalOverlay');
+  const filterModalClose = document.getElementById('filterModalClose');
+  if (filterModalOverlay) filterModalOverlay.addEventListener('click', () => closeSheet('filterModalSheet','filterModalOverlay'));
+  if (filterModalClose) filterModalClose.addEventListener('click', () => closeSheet('filterModalSheet','filterModalOverlay'));
+
+  const filterSearchInput = document.getElementById('filterSearchInput');
+  const filterSearchSuggestions = document.getElementById('filterSearchSuggestions');
+  
+  if (filterSearchInput && filterSearchSuggestions) {
+    filterSearchInput.addEventListener('input', () => {
+      const q = filterSearchInput.value.trim();
+      if (q.length < 2) {
+        filterSearchSuggestions.innerHTML = '';
+        filterSearchSuggestions.classList.remove('open');
+        return;
+      }
+      const normalizedQ = normalizeBanglish(q.toLowerCase());
+      if (!globalFuse && allRetailersData && allRetailersData.length > 0) {
+          initOrUpdateFuse();
+      }
+      let localMatches = [];
+      if (globalFuse) {
+          localMatches = globalFuse.search(normalizedQ).map(res => res.item).slice(0, 10);
+      }
+      if (localMatches.length > 0) {
+        filterSearchSuggestions.innerHTML = localMatches.map(ret => {
+          return `
+            <div class="sr-suggestion-item" onclick="selectFilterSuggestion('${escHtml(ret.name).replace(/'/g, "\\'")}')">
+              <span class="sr-suggestion-title"><i class="fa-solid fa-store" style="color:#2563eb; margin-right:6px; font-size:0.8rem;"></i>${escHtml(ret.name)}</span>
+            </div>
+          `;
+        }).join('');
+      } else {
+        filterSearchSuggestions.innerHTML = `<div style="padding: 12px; color: #94a3b8; font-size: 0.82rem; text-align: center;">No matching retailers</div>`;
+      }
+      filterSearchSuggestions.classList.add('open');
+    });
+
+    document.addEventListener('click', e => {
+      if (!filterSearchInput.contains(e.target) && !filterSearchSuggestions.contains(e.target)) {
+        filterSearchSuggestions.classList.remove('open');
+      }
+    });
+  }
+
+  const filterSearchBtn = document.getElementById('filterSearchBtn');
+  if (filterSearchBtn) {
+    filterSearchBtn.addEventListener('click', () => {
+      const queryName = (filterSearchInput?.value || '').trim().toLowerCase();
+      closeSheet('filterModalSheet', 'filterModalOverlay');
+      
+      clearAllRetailerMarkers();
+      
+      if (!queryName) {
+        // Restore nearby default if empty
+        const nearby = allRetailersData.filter(ret => {
+           const dist = ret.dist !== undefined ? ret.dist : calculateDistance(myLat, myLng, parseFloat(ret.lat || 0), parseFloat(ret.lng || 0));
+           return dist <= 100;
+        });
+        nearby.forEach(ret => addRetailerPin(ret));
+        setTimeout(() => computeSpiderPositions(), 50);
+        renderRetailerCards(nearby);
+        return;
+      }
+
+      const matchingRetailers = allRetailersData.filter(ret => {
+        if (!ret.name) return false;
+        const nameLower = ret.name.toLowerCase();
+        // Match substring in actual name or the banglish normalized name
+        return nameLower.includes(queryName) || 
+               (typeof normalizeBanglish === 'function' && normalizeBanglish(nameLower).includes(normalizeBanglish(queryName)));
+      });
+      
+      if (matchingRetailers.length > 0) {
+        matchingRetailers.forEach(ret => addRetailerPin(ret));
+        setTimeout(() => computeSpiderPositions(), 50);
+        renderRetailerCards(matchingRetailers);
+        mainMap.flyTo([matchingRetailers[0].lat, matchingRetailers[0].lng], 16, { duration: 1.0 });
+      } else {
+        showMiniToast('No retailers found with that exact name.', true);
+        renderRetailerCards([]);
+      }
+    });
+  }
+}
+
+function selectFilterSuggestion(name) {
+  const input = document.getElementById('filterSearchInput');
+  const sugg = document.getElementById('filterSearchSuggestions');
+  if (input) input.value = name;
+  if (sugg) sugg.classList.remove('open');
 }
 
 function doMapSearch() {
