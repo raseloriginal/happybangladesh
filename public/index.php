@@ -117,6 +117,8 @@ $router->post('/admin/srs/store',         ['AdminController', 'srStore']);
 $router->get( '/admin/srs/edit/{id}',     ['AdminController', 'srEdit']);
 $router->post('/admin/srs/update/{id}',   ['AdminController', 'srUpdate']);
 $router->post('/admin/srs/delete/{id}',   ['AdminController', 'srDelete']);
+$router->get( '/admin/api/sr-orders-cutoff',        ['AdminController', 'apiSrOrdersCutoff']);
+$router->post('/admin/api/sr-orders-cutoff/toggle', ['AdminController', 'apiToggleSrOrderCutoff']);
 
 // DSRs
 $router->get( '/admin/dsrs',              ['AdminController', 'dsrs']);

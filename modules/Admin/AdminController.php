@@ -273,6 +273,79 @@ class AdminController extends Controller
         $this->flash('success', 'SR deleted.'); $this->redirect('admin/srs');
     }
 
+    public function apiSrOrdersCutoff(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $srId = (int)($_GET['sr_id'] ?? 0);
+        if (!$srId) {
+            echo json_encode(['success' => false, 'message' => 'Invalid SR ID']);
+            exit;
+        }
+
+        $days = [];
+        for ($i = 0; $i < 5; $i++) {
+            $date = date('Y-m-d', strtotime("-$i days"));
+            $formattedDate = date('d M, Y (D)', strtotime("-$i days"));
+
+            $qOrd = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id = ? AND DATE(created_at) = ?");
+            $qOrd->execute([$srId, $date]);
+            $orderCount = (int)$qOrd->fetchColumn();
+
+            $qCutoff = $this->db->prepare("SELECT id FROM sr_order_cutoffs WHERE sr_id = ? AND cutoff_date = ? AND undone_by IS NULL");
+            $qCutoff->execute([$srId, $date]);
+            $isCompleted = (bool)$qCutoff->fetchColumn();
+
+            $days[] = [
+                'date'           => $date,
+                'formatted_date' => $formattedDate,
+                'order_count'    => $orderCount,
+                'is_completed'   => $isCompleted,
+            ];
+        }
+
+        echo json_encode(['success' => true, 'days' => $days]);
+        exit;
+    }
+
+    public function apiToggleSrOrderCutoff(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input     = json_decode(file_get_contents('php://input'), true);
+        $srId      = (int)($input['sr_id'] ?? 0);
+        $date      = trim($input['date'] ?? '');
+        $completed = (bool)($input['completed'] ?? false);
+        $adminId   = Auth::id() ?? 1;
+
+        if (!$srId || !$date) {
+            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+            exit;
+        }
+
+        if ($completed) {
+            $check = $this->db->prepare("SELECT id FROM sr_order_cutoffs WHERE sr_id = ? AND cutoff_date = ?");
+            $check->execute([$srId, $date]);
+            $existingId = $check->fetchColumn();
+
+            if ($existingId) {
+                $up = $this->db->prepare("UPDATE sr_order_cutoffs SET undone_by = NULL, undone_at = NULL, cutoff_at = NOW() WHERE id = ?");
+                $up->execute([$existingId]);
+            } else {
+                $ins = $this->db->prepare("INSERT INTO sr_order_cutoffs (sr_id, cutoff_date, cutoff_at, is_auto) VALUES (?, ?, NOW(), 0)");
+                $ins->execute([$srId, $date]);
+            }
+        } else {
+            $up = $this->db->prepare("UPDATE sr_order_cutoffs SET undone_by = ?, undone_at = NOW() WHERE sr_id = ? AND cutoff_date = ? AND undone_by IS NULL");
+            $up->execute([$adminId, $srId, $date]);
+        }
+
+        echo json_encode([
+            'success'      => true,
+            'is_completed' => $completed,
+            'message'      => $completed ? 'Order marked as completed' : 'Order completion undone'
+        ]);
+        exit;
+    }
+
     // ── DSRs ──────────────────────────────────────────────────
     public function dsrs(): void
     {

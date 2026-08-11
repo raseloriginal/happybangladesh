@@ -155,9 +155,15 @@
                 <form id="editOrderForm" onsubmit="submitEditOrder(event)">
                     <input type="hidden" id="edit-order-id" name="order_id">
                     
-                    <div class="mb-6">
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Edit <span class="text-red-500">*</span></label>
-                        <input type="text" id="edit-order-reason" name="reason" required placeholder="e.g. Wrong quantity entered by SR" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Edit <span class="text-red-500">*</span></label>
+                            <input type="text" id="edit-order-reason" name="reason" required placeholder="e.g. Wrong quantity entered by SR" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Order Date <span class="text-red-500">*</span></label>
+                            <input type="date" id="edit-order-date" name="order_date" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                        </div>
                     </div>
                     
                     <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -341,9 +347,12 @@ function renderOrders(ordersData) {
             </td>
             <td class="px-6 py-4 font-bold text-slate-800">Tk ${parseFloat(o.total_amount).toFixed(2)}</td>
             <td class="px-6 py-4 text-slate-500 text-xs font-medium"><i class="fa-regular fa-clock mr-1"></i> ${o.created_at}</td>
-            <td class="px-6 py-4 text-center">
-                <button onclick="editOrder(${o.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+            <td class="px-6 py-4 text-center flex items-center justify-center gap-2">
+                <button onclick="editOrder(${o.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Edit">
                     <i class="fa-solid fa-pen"></i>
+                </button>
+                <button onclick="deleteOrder(${o.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Delete">
+                    <i class="fa-solid fa-trash"></i>
                 </button>
             </td>
         </tr>`;
@@ -423,6 +432,8 @@ function editOrder(id) {
     
     document.getElementById('edit-order-id-display').innerText = '#' + order.id;
     document.getElementById('edit-order-id').value = order.id;
+    const orderDate = order.created_at ? order.created_at.split(' ')[0] : '';
+    document.getElementById('edit-order-date').value = orderDate;
     
     let itemsHtml = '';
     let total = 0;
@@ -473,6 +484,7 @@ async function submitEditOrder(e) {
     e.preventDefault();
     const id = document.getElementById('edit-order-id').value;
     const reason = document.getElementById('edit-order-reason').value;
+    const orderDate = document.getElementById('edit-order-date').value;
     
     const items = [];
     document.querySelectorAll('#edit-order-items tr').forEach(row => {
@@ -486,6 +498,7 @@ async function submitEditOrder(e) {
     const formData = new FormData();
     formData.append('order_id', id);
     formData.append('reason', reason);
+    formData.append('order_date', orderDate);
     formData.append('items', JSON.stringify(items));
     
     try {
@@ -504,6 +517,36 @@ async function submitEditOrder(e) {
     } catch (e) {
         console.error(e);
         alert('An error occurred.');
+    }
+}
+
+async function deleteOrder(id) {
+    const reason = prompt(`WARNING: You are about to permanently delete Order #${id}.\n\nPlease provide a reason for deletion:`);
+    if (reason === null) return; // User cancelled
+    if (reason.trim() === '') {
+        alert("A reason is required to delete an order.");
+        return;
+    }
+    
+    if (confirm(`Are you absolutely sure you want to delete Order #${id}? This cannot be undone.`)) {
+        try {
+            const formData = new FormData();
+            formData.append('reason', reason);
+            const res = await fetch(basePath + '/manager/api/operations/delete-order/' + id, {
+                method: 'POST',
+                body: formData
+            });
+            const json = await res.json();
+            if (json.success) {
+                alert('Order deleted successfully!');
+                fetchOrders();
+            } else {
+                alert('Error: ' + json.message);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('An error occurred.');
+        }
     }
 }
 
