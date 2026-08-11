@@ -647,12 +647,21 @@ class AdminController extends Controller
             $filename = basename($filePath);
             $record = $migrationMap[$filename] ?? null;
 
+            $currentHash = md5_file($filePath);
             $status = $record ? $record['status'] : 'pending';
             $executedAt = $record ? $record['executed_at'] : null;
             $errorMessage = $record ? $record['error_message'] : null;
+            $storedHash = $record ? ($record['file_hash'] ?? null) : null;
 
+            $isModified = false;
             if ($status === 'success') {
-                $syncedCount++;
+                if ($storedHash !== null && $storedHash !== $currentHash) {
+                    $status = 'modified';
+                    $isModified = true;
+                    $pendingCount++;
+                } else {
+                    $syncedCount++;
+                }
             } elseif ($status === 'failed') {
                 $failedCount++;
             } else {
@@ -663,7 +672,8 @@ class AdminController extends Controller
                 'filename'      => $filename,
                 'path'          => $filePath,
                 'size'          => filesize($filePath),
-                'status'        => $status, // 'success', 'failed', or 'pending'
+                'status'        => $status, // 'success', 'failed', 'pending', or 'modified'
+                'is_modified'   => $isModified,
                 'executed_at'   => $executedAt,
                 'error_message' => $errorMessage,
             ];
@@ -684,7 +694,7 @@ class AdminController extends Controller
         $this->verifyCsrf();
         $this->ensureMigrationsTable();
 
-        $targetFile = $this->post('file', ''); // specific file or 'all'
+        $targetFile = $this->post('file', ''); // specific file, 'all', or 'force:filename'
         $updatesDir = ROOT_PATH . '/database/updates';
 
         if (!is_dir($updatesDir)) {
@@ -693,28 +703,46 @@ class AdminController extends Controller
             return;
         }
 
-        // Fetch already executed successful migrations
-        $syncedFiles = $this->db->query("SELECT migration_file FROM database_migrations WHERE status = 'success'")
-                                ->fetchAll(PDO::FETCH_COLUMN);
+        $executedStmt = $this->db->query("SELECT * FROM database_migrations");
+        $executedRows = $executedStmt->fetchAll(PDO::FETCH_ASSOC);
+        $migrationMap = [];
+        foreach ($executedRows as $row) {
+            $migrationMap[$row['migration_file']] = $row;
+        }
 
         $sqlFiles = glob($updatesDir . '/*.sql');
         sort($sqlFiles);
 
+        $isForce = false;
+        if (str_starts_with($targetFile, 'force:')) {
+            $isForce = true;
+            $targetFile = substr($targetFile, 6);
+        }
+
         $filesToRun = [];
         foreach ($sqlFiles as $filePath) {
             $filename = basename($filePath);
-            if (!in_array($filename, $syncedFiles)) {
-                if ($targetFile === 'all' || $targetFile === $filename) {
-                    $filesToRun[] = [
-                        'filename' => $filename,
-                        'path'     => $filePath
-                    ];
+            $record = $migrationMap[$filename] ?? null;
+            $currentHash = md5_file($filePath);
+            $status = $record ? $record['status'] : 'pending';
+            $storedHash = $record ? ($record['file_hash'] ?? null) : null;
+
+            $needsRun = ($status !== 'success')
+                || ($storedHash !== null && $storedHash !== $currentHash)
+                || ($storedHash === null && $status === 'success' && $isForce)
+                || $isForce;
+
+            if ($targetFile === 'all') {
+                if ($needsRun) {
+                    $filesToRun[] = ['filename' => $filename, 'path' => $filePath, 'hash' => $currentHash];
                 }
+            } elseif ($targetFile === $filename) {
+                $filesToRun[] = ['filename' => $filename, 'path' => $filePath, 'hash' => $currentHash];
             }
         }
 
         if (empty($filesToRun)) {
-            $this->flash('warning', 'No pending migrations found to execute.');
+            $this->flash('warning', 'No pending or modified migrations found to execute.');
             $this->redirect('admin/database-sync');
             return;
         }
@@ -726,6 +754,7 @@ class AdminController extends Controller
         foreach ($filesToRun as $fileInfo) {
             $filename = $fileInfo['filename'];
             $filePath = $fileInfo['path'];
+            $fileHash = $fileInfo['hash'];
             $sqlContent = file_get_contents($filePath);
 
             try {
@@ -739,7 +768,15 @@ class AdminController extends Controller
                     $cleanQuery = preg_replace('/--.*$/m', '', $query);
                     $cleanQuery = preg_replace('/\/\*.*?\*\//s', '', $cleanQuery);
                     if (!empty(trim($cleanQuery))) {
-                        $this->db->exec($query);
+                        try {
+                            $this->db->exec($query);
+                        } catch (\PDOException $pe) {
+                            $errInfo = $pe->errorInfo[1] ?? 0;
+                            // Ignore duplicate column (1060), duplicate key (1061), table exists (1050)
+                            if (!in_array($errInfo, [1060, 1061, 1050])) {
+                                throw $pe;
+                            }
+                        }
                     }
                 }
 
@@ -747,11 +784,11 @@ class AdminController extends Controller
 
                 // Record successful execution
                 $stmt = $this->db->prepare("
-                    INSERT INTO database_migrations (migration_file, status, error_message, executed_at) 
-                    VALUES (?, 'success', NULL, NOW()) 
-                    ON DUPLICATE KEY UPDATE status = 'success', error_message = NULL, executed_at = NOW()
+                    INSERT INTO database_migrations (migration_file, status, file_hash, error_message, executed_at) 
+                    VALUES (?, 'success', ?, NULL, NOW()) 
+                    ON DUPLICATE KEY UPDATE status = 'success', file_hash = ?, error_message = NULL, executed_at = NOW()
                 ");
-                $stmt->execute([$filename]);
+                $stmt->execute([$filename, $fileHash, $fileHash]);
 
                 if ($this->db->inTransaction()) {
                     $this->db->commit();
@@ -771,11 +808,11 @@ class AdminController extends Controller
 
                 // Record failure
                 $stmt = $this->db->prepare("
-                    INSERT INTO database_migrations (migration_file, status, error_message, executed_at) 
-                    VALUES (?, 'failed', ?, NOW()) 
-                    ON DUPLICATE KEY UPDATE status = 'failed', error_message = ?, executed_at = NOW()
+                    INSERT INTO database_migrations (migration_file, status, file_hash, error_message, executed_at) 
+                    VALUES (?, 'failed', ?, ?, NOW()) 
+                    ON DUPLICATE KEY UPDATE status = 'failed', file_hash = ?, error_message = ?, executed_at = NOW()
                 ");
-                $stmt->execute([$filename, $errorDetails, $errorDetails]);
+                $stmt->execute([$filename, $fileHash, $errorDetails, $fileHash, $errorDetails]);
 
                 // Stop immediately on failure
                 break;
@@ -801,11 +838,19 @@ class AdminController extends Controller
             `id` INT AUTO_INCREMENT PRIMARY KEY,
             `migration_file` VARCHAR(255) NOT NULL UNIQUE,
             `status` ENUM('success', 'failed') NOT NULL DEFAULT 'success',
+            `file_hash` VARCHAR(64) NULL,
             `error_message` TEXT NULL,
             `executed_at` DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 
         $this->db->exec($sql);
+
+        try {
+            $cols = $this->db->query("SHOW COLUMNS FROM `database_migrations` LIKE 'file_hash'")->fetch();
+            if (!$cols) {
+                $this->db->exec("ALTER TABLE `database_migrations` ADD COLUMN `file_hash` VARCHAR(64) NULL AFTER `status`;");
+            }
+        } catch (\Throwable $t) {}
     }
 
     public function databaseClear(): void
