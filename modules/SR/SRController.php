@@ -701,11 +701,13 @@ class SRController extends Controller
         $validCompanies = $validCompanyIdsStmt->fetchAll(PDO::FETCH_COLUMN);
 
         $placeholders = str_repeat('?,', count($productIds) - 1) . '?';
-        $checkProds = $this->db->prepare("SELECT id, company_id FROM products WHERE id IN ($placeholders)");
+        $checkProds = $this->db->prepare("SELECT * FROM products WHERE id IN ($placeholders)");
         $checkProds->execute($productIds);
-        $prodData = $checkProds->fetchAll(PDO::FETCH_ASSOC);
+        $prodDataRaw = $checkProds->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($prodData as $pd) {
+        $prodData = [];
+        foreach ($prodDataRaw as $pd) {
+            $prodData[$pd['id']] = $pd;
             if (!in_array($pd['company_id'], $validCompanies)) {
                 if ($this->post('ajax')) {
                     $this->json(['success' => false, 'message' => 'Unauthorized product selected for this SR.']);
@@ -731,16 +733,37 @@ class SRController extends Controller
             $total += ($quantities[$k] ?? 0) * ($prices[$k] ?? 0);
         }
 
-        $stmt = $this->db->prepare("INSERT INTO orders (sr_id,dealer_id,retailer_id,warehouse_id,total_amount,notes) VALUES (?,?,?,?,?,?)");
-        $stmt->execute([Auth::id(), $dealerId, $retailerId, $warehouseId, $total, $notes]);
+        $retName = null;
+        $retPhone = null;
+        $retAddress = null;
+        if ($retailerId) {
+            $retStmt = $this->db->prepare("SELECT name, phone, address FROM retailers WHERE id = ?");
+            $retStmt->execute([$retailerId]);
+            $retInfo = $retStmt->fetch(PDO::FETCH_ASSOC);
+            if ($retInfo) {
+                $retName = $retInfo['name'];
+                $retPhone = $retInfo['phone'];
+                $retAddress = $retInfo['address'];
+            }
+        }
+
+        $stmt = $this->db->prepare("INSERT INTO orders (sr_id,dealer_id,retailer_id,warehouse_id,total_amount,notes,retailer_name,retailer_phone,retailer_address) VALUES (?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([Auth::id(), $dealerId, $retailerId, $warehouseId, $total, $notes, $retName, $retPhone, $retAddress]);
         $orderId = $this->db->lastInsertId();
 
+        $insStmt = $this->db->prepare("INSERT INTO order_items (order_id,product_id,quantity,unit_price,total_price,product_name,box_type,pieces_per_box,buying_price) VALUES (?,?,?,?,?,?,?,?,?)");
         foreach ($productIds as $k => $pid) {
             $qty   = intval($quantities[$k] ?? 0);
             $price = floatval($prices[$k] ?? 0);
             if ($qty <= 0) continue;
-            $this->db->prepare("INSERT INTO order_items (order_id,product_id,quantity,unit_price,total_price) VALUES (?,?,?,?,?)")
-                     ->execute([$orderId, $pid, $qty, $price, $qty * $price]);
+
+            $pd = $prodData[$pid] ?? [];
+            $pName = $pd['name'] ?? null;
+            $pBoxType = $pd['box_type'] ?? null;
+            $pPcs = $pd['pieces_per_box'] ?? 1;
+            $pBuying = $pd['buying_price'] ?? 0;
+
+            $insStmt->execute([$orderId, $pid, $qty, $price, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
         }
 
         $this->flash('success', "Order #$orderId placed successfully!");
@@ -783,11 +806,13 @@ class SRController extends Controller
         $validCompanies = $validCompanyIdsStmt->fetchAll(PDO::FETCH_COLUMN);
 
         $placeholders = str_repeat('?,', count($productIds) - 1) . '?';
-        $checkProds = $this->db->prepare("SELECT id, company_id FROM products WHERE id IN ($placeholders)");
+        $checkProds = $this->db->prepare("SELECT * FROM products WHERE id IN ($placeholders)");
         $checkProds->execute($productIds);
-        $prodData = $checkProds->fetchAll(PDO::FETCH_ASSOC);
+        $prodDataRaw = $checkProds->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($prodData as $pd) {
+        $prodData = [];
+        foreach ($prodDataRaw as $pd) {
+            $prodData[$pd['id']] = $pd;
             if (!empty($validCompanies) && !in_array($pd['company_id'], $validCompanies)) {
                 $this->json(['success' => false, 'message' => 'অননুমোদিত পণ্য নির্বাচন করা হয়েছে।']);
                 return;
@@ -817,12 +842,19 @@ class SRController extends Controller
             $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$orderId]);
 
             // Insert updated items
-            $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)");
+            $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, product_name, box_type, pieces_per_box, buying_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             foreach ($productIds as $k => $pid) {
                 $qty   = intval($quantities[$k] ?? 0);
                 $price = floatval($prices[$k] ?? 0);
                 if ($qty <= 0) continue;
-                $insStmt->execute([$orderId, $pid, $qty, $price, $qty * $price]);
+                
+                $pd = $prodData[$pid] ?? [];
+                $pName = $pd['name'] ?? null;
+                $pBoxType = $pd['box_type'] ?? null;
+                $pPcs = $pd['pieces_per_box'] ?? 1;
+                $pBuying = $pd['buying_price'] ?? 0;
+
+                $insStmt->execute([$orderId, $pid, $qty, $price, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
             }
 
             // Update order total amount
@@ -1068,7 +1100,18 @@ class SRController extends Controller
         // 2. Fetch Dispatched and Sell Products
         $qDispatch = $this->db->prepare("
             SELECT di.product_id, 
-                   SUM(CASE WHEN d.status != 'pending' THEN di.quantity ELSE 0 END) as dispatched_qty, 
+                   COALESCE((
+                       SELECT SUM(vs.initial_qty)
+                       FROM van_stock vs
+                       WHERE vs.product_id = di.product_id
+                         AND DATE(vs.loaded_at) = ?
+                         AND vs.dsr_id IN (
+                             SELECT DISTINCT d2.dsr_id 
+                             FROM dispatches d2 
+                             JOIN orders o2 ON o2.id = d2.order_id 
+                             WHERE o2.sr_id = ? AND DATE(o2.created_at) = ?
+                         )
+                   ), SUM(CASE WHEN d.status != 'pending' THEN di.quantity ELSE 0 END)) as dispatched_qty, 
                    SUM(CASE WHEN d.status != 'pending' THEN di.delivered_quantity ELSE 0 END) as sell_qty
             FROM dispatch_items di
             JOIN dispatches d ON d.id = di.dispatch_id
@@ -1082,7 +1125,7 @@ class SRController extends Controller
                ))
             GROUP BY di.product_id
         ");
-        $qDispatch->execute([$srId, $date, $date, $srId, $date]);
+        $qDispatch->execute([$date, $srId, $date, $srId, $date, $date, $srId, $date]);
         $dispatchData = $qDispatch->fetchAll(PDO::FETCH_ASSOC);
         
         $dispatchMap = [];

@@ -160,18 +160,9 @@ $truncateName = function($name) {
                 <?php endif; ?>
               </td>
 
-              <!-- Action Column (Edit Order & Invoice View) -->
+              <!-- Action Column (Invoice View) -->
               <td class="p-3 text-center align-middle bg-white" id="order-actions-cell-<?= $ord['id'] ?>">
                 <div class="flex items-center justify-center gap-1.5">
-                  <!-- Edit Button -->
-                  <button type="button" 
-                          id="btn-edit-order-<?= $ord['id'] ?>"
-                          onclick='openEditOrderModal(<?= htmlspecialchars(json_encode($ord), ENT_QUOTES, "UTF-8") ?>)'
-                          class="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-600 hover:bg-amber-600 hover:text-white transition duration-200 flex items-center justify-center shadow-3xs active:scale-95"
-                          title="অর্ডার এডিট করুন">
-                    <i class="fa-solid fa-pen-to-square text-xs"></i>
-                  </button>
-
                   <!-- Invoice Button -->
                   <button type="button" 
                           id="btn-invoice-order-<?= $ord['id'] ?>"
@@ -1028,11 +1019,6 @@ function updateOrderTableRow(order) {
   }
 
   // Update action buttons with refreshed order JSON
-  const btnEdit = document.getElementById(`btn-edit-order-${orderId}`);
-  if (btnEdit) {
-    btnEdit.setAttribute('onclick', `openEditOrderModal(ORDERS_MAP[${orderId}])`);
-  }
-
   const btnInvoice = document.getElementById(`btn-invoice-order-${orderId}`);
   if (btnInvoice) {
     btnInvoice.setAttribute('onclick', `openInvoiceModal(ORDERS_MAP[${orderId}])`);

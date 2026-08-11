@@ -30,23 +30,9 @@ $isExpenses   = str_contains($uri, '/dsr/expenses');
 
   <!-- Tab 3: Stock -->
   <a href="<?= url('dsr/van-stock') ?>" 
-     class="flex-1 flex flex-col items-center justify-center gap-1 border-r border-slate-200 transition-all pt-1 pb-1 <?= $isStock ? 'bg-white border-t-[3.5px] border-blue-600 text-blue-600 font-extrabold shadow-2xs' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-t-[3.5px] border-transparent' ?>">
+     class="flex-1 flex flex-col items-center justify-center gap-1 transition-all pt-1 pb-1 <?= $isStock ? 'bg-white border-t-[3.5px] border-blue-600 text-blue-600 font-extrabold shadow-2xs' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-t-[3.5px] border-transparent' ?>">
     <i class="fa-solid fa-boxes-stacked text-lg <?= $isStock ? 'scale-110' : '' ?> transition duration-200"></i>
     <span class="text-[12px] tracking-tight font-bold">স্টক</span>
-  </a>
-
-  <!-- Tab 4: Settlement -->
-  <a href="<?= url('dsr/settlement') ?>" 
-     class="flex-1 flex flex-col items-center justify-center gap-1 border-r border-slate-200 transition-all pt-1 pb-1 <?= $isSettlement ? 'bg-white border-t-[3.5px] border-blue-600 text-blue-600 font-extrabold shadow-2xs' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-t-[3.5px] border-transparent' ?>">
-    <i class="fa-solid fa-file-invoice-dollar text-lg <?= $isSettlement ? 'scale-110' : '' ?> transition duration-200"></i>
-    <span class="text-[12px] tracking-tight font-bold">হিসাব</span>
-  </a>
-
-  <!-- Tab 5: Expenses -->
-  <a href="<?= url('dsr/expenses') ?>" 
-     class="flex-1 flex flex-col items-center justify-center gap-1 transition-all pt-1 pb-1 <?= $isExpenses ? 'bg-white border-t-[3.5px] border-blue-600 text-blue-600 font-extrabold shadow-2xs' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border-t-[3.5px] border-transparent' ?>">
-    <i class="fa-solid fa-receipt text-lg <?= $isExpenses ? 'scale-110' : '' ?> transition duration-200"></i>
-    <span class="text-[12px] tracking-tight font-bold">খরচ</span>
   </a>
 
 </div>

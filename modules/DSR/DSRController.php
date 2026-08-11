@@ -18,6 +18,9 @@ class DSRController extends Controller
             $this->ensurePaidAmountColumn();
             $this->ensureDeliveredQuantityColumn();
             $this->ensureReturnRetailerColumn();
+            $this->ensureReadySaleColumn();
+            $this->ensureDeliveryOcColumn();
+            $this->ensureAttendanceTable();
             self::$schemaChecked = true;
         }
     }
@@ -58,6 +61,148 @@ class DSRController extends Controller
             } catch (PDOException $ex) {
                 // Ignore
             }
+        }
+    }
+
+    private function ensureReadySaleColumn(): void
+    {
+        try {
+            $this->db->query("SELECT is_ready_sale FROM orders LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE orders ADD COLUMN is_ready_sale TINYINT(1) NOT NULL DEFAULT 0 AFTER total_amount");
+            } catch (PDOException $ex) {
+                // Ignore
+            }
+        }
+
+        try {
+            $this->db->query("SELECT is_ready_sale FROM dispatches LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE dispatches ADD COLUMN is_ready_sale TINYINT(1) NOT NULL DEFAULT 0 AFTER paid_amount");
+            } catch (PDOException $ex) {
+                // Ignore
+            }
+        }
+    }
+
+    private function ensureDeliveryOcColumn(): void
+    {
+        try {
+            $this->db->query("SELECT delivery_oc FROM settlements LIMIT 1");
+        } catch (PDOException $e) {
+            try {
+                $this->db->exec("ALTER TABLE settlements ADD COLUMN delivery_oc DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER total_expense");
+            } catch (PDOException $ex) {
+                // Ignore
+            }
+        }
+    }
+
+    private function ensureAttendanceTable(): void
+    {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS dsr_attendance (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    dsr_id INT NOT NULL,
+                    attendance_date DATE NOT NULL,
+                    scan_time TIME NOT NULL,
+                    status ENUM('present','late','absent') NOT NULL,
+                    latitude DECIMAL(10,8) DEFAULT NULL,
+                    longitude DECIMAL(11,8) DEFAULT NULL,
+                    address TEXT DEFAULT NULL,
+                    device_info VARCHAR(500) DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_daily (dsr_id, attendance_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (PDOException $e) {
+            // Ignore — table may already exist
+        }
+    }
+
+    public function qrCode(): void
+    {
+        $dsrId = Auth::id();
+        $today = date('Y-m-d');
+        $q = $this->db->prepare("SELECT * FROM dsr_attendance WHERE dsr_id=? AND attendance_date=? LIMIT 1");
+        $q->execute([$dsrId, $today]);
+        $todayAttendance = $q->fetch() ?: null;
+        $this->render('qr_code', compact('todayAttendance'), 'dsr_app');
+    }
+
+    public function qrCodeMark(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $dsrId = Auth::id();
+        $today = date('Y-m-d');
+        $nowTime = date('H:i:s');
+
+        // Check already marked
+        $chk = $this->db->prepare("SELECT id, status, scan_time FROM dsr_attendance WHERE dsr_id=? AND attendance_date=? LIMIT 1");
+        $chk->execute([$dsrId, $today]);
+        $existing = $chk->fetch();
+        if ($existing) {
+            echo json_encode([
+                'success'        => false,
+                'already_marked' => true,
+                'status'         => $existing['status'],
+                'scan_time'      => $existing['scan_time'],
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        // QR code validation — check against active code in DB
+        $qrContent = trim($_POST['qr_content'] ?? '');
+        try {
+            $qrCheck = $this->db->prepare("SELECT id FROM attendance_qr_codes WHERE qr_code=? AND is_active=1 LIMIT 1");
+            $qrCheck->execute([$qrContent]);
+            $validQr = $qrCheck->fetchColumn();
+        } catch (PDOException $e) {
+            $validQr = false;
+        }
+        if (!$validQr) {
+            echo json_encode(['success' => false, 'message' => 'অবৈধ QR কোড! অফিসের QR কোড স্ক্যান করুন।'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        // Determine status
+        $hour = (int)date('H');
+        $min  = (int)date('i');
+        $totalMinutes = $hour * 60 + $min;
+        if ($totalMinutes < 8 * 60) {
+            $status = 'present';
+        } elseif ($totalMinutes < 9 * 60) {
+            $status = 'late';
+        } else {
+            $status = 'absent';
+        }
+
+        $lat    = isset($_POST['latitude'])  && is_numeric($_POST['latitude'])  ? (float)$_POST['latitude']  : null;
+        $lng    = isset($_POST['longitude']) && is_numeric($_POST['longitude']) ? (float)$_POST['longitude'] : null;
+        $addr   = htmlspecialchars(trim($_POST['address'] ?? ''), ENT_QUOTES, 'UTF-8') ?: null;
+        $device = htmlspecialchars(substr($_POST['device_info'] ?? '', 0, 500), ENT_QUOTES, 'UTF-8') ?: null;
+
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO dsr_attendance (dsr_id, attendance_date, scan_time, status, latitude, longitude, address, device_info)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$dsrId, $today, $nowTime, $status, $lat, $lng, $addr, $device]);
+            echo json_encode([
+                'success'   => true,
+                'status'    => $status,
+                'scan_time' => $nowTime,
+                'date'      => $today,
+                'latitude'  => $lat,
+                'longitude' => $lng,
+                'address'   => $addr,
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'message' => 'সেভ করতে সমস্যা হয়েছে।'], JSON_UNESCAPED_UNICODE);
         }
     }
 
@@ -200,9 +345,7 @@ class DSRController extends Controller
         }
 
         $this->json(['success' => false, 'message' => "No product found for code: {$code}"]);
-    }
-
-    public function vanStock(): void
+    }    public function vanStock(): void
     {
         $dsrId = Auth::id();
         $date = $_GET['date'] ?? date('Y-m-d');
@@ -211,13 +354,20 @@ class DSRController extends Controller
         // We will build an aggregated structure in PHP.
 
         $productsData = [
-            'outside' => [],
-            'sale' => [],
-            'inside' => [],
-            'damage' => []
+            'outside'    => [],
+            'sale'       => [],
+            'ready_sale' => [],
+            'inside'     => [],
+            'damage'     => []
         ];
         
-        $totals = ['outside' => 0, 'sale' => 0, 'inside' => 0, 'damage' => 0];
+        $totals = [
+            'outside'    => 0, 'outside_oc'    => 0,
+            'sale'       => 0, 'sale_oc'       => 0,
+            'ready_sale' => 0, 'ready_sale_oc' => 0,
+            'inside'     => 0, 'inside_oc'     => 0,
+            'damage'     => 0, 'damage_oc'     => 0
+        ];
 
         // Helper to fetch basic product info + trade_price
         // First get all relevant products to prevent many queries
@@ -227,110 +377,138 @@ class DSRController extends Controller
             $productMap[$row['id']] = $row;
         }
 
-        // 1. OUTSIDE (Dispatches loaded onto van)
+        // 1. OUTSIDE (Products actually loaded onto van — use van_stock.initial_qty for accurate dispatched qty)
         $outsideQ = $this->db->prepare("
-            SELECT di.product_id, SUM(di.quantity) as qty
-            FROM dispatches d
-            JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
-            GROUP BY di.product_id
+            SELECT vs.product_id,
+                   SUM(vs.initial_qty) as qty
+            FROM van_stock vs
+            WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+            GROUP BY vs.product_id
         ");
         $outsideQ->execute([$dsrId, $date]);
+        $outsideDataMap = [];
         foreach ($outsideQ->fetchAll() as $row) {
-            $pid = $row['product_id'];
-            if(isset($productMap[$pid])) {
+            $pid = (int)$row['product_id'];
+            $outsideDataMap[$pid] = [
+                'qty' => (int)$row['qty'],
+                'oc_val' => 0 // OC tracked separately per order delivery
+            ];
+            if (isset($productMap[$pid])) {
                 $p = $productMap[$pid];
                 $val = $row['qty'] * $p['price'];
                 $totals['outside'] += $val;
+                $totals['outside_oc'] += 0;
                 $productsData['outside'][] = [
-                    'name' => $p['name'],
-                    'qty' => (int)$row['qty'],
-                    'pcs_per_box' => (int)$p['pieces_per_box'],
-                    'trade_price' => $p['price'],
-                    'value' => $val,
-                    'oc_value' => 0
+                    'name'       => $p['name'],
+                    'qty'        => (int)$row['qty'],
+                    'pcs_per_box'=> (int)$p['pieces_per_box'],
+                    'trade_price'=> $p['price'],
+                    'value'      => $val,
+                    'oc_value'   => 0
                 ];
             }
         }
 
-        // 2. SALE (Delivered orders)
-        // Orders dispatched by this DSR for this dispatch_date where status is delivered or partial
+        // 2. SALE (Delivered regular orders excluding ready sales)
         $saleQ = $this->db->prepare("
-            SELECT di.product_id, SUM(di.delivered_quantity) as qty
+            SELECT di.product_id, 
+                   SUM(COALESCE(di.delivered_quantity, 0)) as qty,
+                   SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)) as oc_val
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
+            JOIN products p ON p.id = di.product_id
+            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
             GROUP BY di.product_id
         ");
         $saleQ->execute([$dsrId, $date]);
+        $saleDataMap = [];
         foreach ($saleQ->fetchAll() as $row) {
-            $pid = $row['product_id'];
-            if(isset($productMap[$pid]) && $row['qty'] > 0) {
+            $pid = (int)$row['product_id'];
+            $qty = (int)$row['qty'];
+            $ocVal = (float)($row['oc_val'] ?? 0);
+            $saleDataMap[$pid] = [
+                'qty' => $qty,
+                'oc_val' => $ocVal
+            ];
+            if (isset($productMap[$pid]) && $qty > 0) {
                 $p = $productMap[$pid];
-                $val = $row['qty'] * $p['price'];
+                $val = $qty * $p['price'];
                 $totals['sale'] += $val;
+                $totals['sale_oc'] += $ocVal;
                 $productsData['sale'][] = [
                     'name' => $p['name'],
-                    'qty' => (int)$row['qty'],
+                    'qty' => $qty,
                     'pcs_per_box' => (int)$p['pieces_per_box'],
                     'trade_price' => $p['price'],
                     'value' => $val,
-                    'oc_value' => 0 // In real app, calculate actual OC if stored
+                    'oc_value' => $ocVal
                 ];
             }
         }
 
-        // 3. INSIDE = Outside - Sale (per product)
-        // Build a map of outside quantities keyed by product_id for easy subtraction
-        $outsideQtyMap = [];
-        foreach ($productsData['outside'] as $item) {
-            // find product_id from productMap by name match is fragile; re-query instead
-        }
-        // Re-fetch outside as map keyed by product_id
-        $outsideMapQ = $this->db->prepare("
-            SELECT di.product_id, SUM(di.quantity) as qty
+        // 2b. READY SALE (Delivered ready sales on the spot)
+        $readySaleQ = $this->db->prepare("
+            SELECT di.product_id, 
+                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0)) as qty,
+                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * (oi.unit_price - oi.buying_price)) as oc_val
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
+            JOIN products p ON p.id = di.product_id
+            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND d.is_ready_sale = 1
             GROUP BY di.product_id
         ");
-        $outsideMapQ->execute([$dsrId, $date]);
-        foreach ($outsideMapQ->fetchAll() as $row) {
-            $outsideQtyMap[(int)$row['product_id']] = (int)$row['qty'];
+        $readySaleQ->execute([$dsrId, $date]);
+        $readySaleDataMap = [];
+        foreach ($readySaleQ->fetchAll() as $row) {
+            $pid = (int)$row['product_id'];
+            $qty = (int)$row['qty'];
+            $ocVal = (float)($row['oc_val'] ?? 0);
+            $readySaleDataMap[$pid] = [
+                'qty' => $qty,
+                'oc_val' => $ocVal
+            ];
+            if (isset($productMap[$pid]) && $qty > 0) {
+                $p = $productMap[$pid];
+                $val = $qty * $p['price'];
+                $totals['ready_sale'] += $val;
+                $totals['ready_sale_oc'] += $ocVal;
+                $productsData['ready_sale'][] = [
+                    'name' => $p['name'],
+                    'qty' => $qty,
+                    'pcs_per_box' => (int)$p['pieces_per_box'],
+                    'trade_price' => $p['price'],
+                    'value' => $val,
+                    'oc_value' => $ocVal
+                ];
+            }
         }
 
-        // Re-fetch sale as map keyed by product_id
-        $saleQtyMap = [];
-        $saleMapQ = $this->db->prepare("
-            SELECT di.product_id, SUM(di.delivered_quantity) as qty
-            FROM dispatches d
-            JOIN dispatch_items di ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
-            GROUP BY di.product_id
-        ");
-        $saleMapQ->execute([$dsrId, $date]);
-        foreach ($saleMapQ->fetchAll() as $row) {
-            $saleQtyMap[(int)$row['product_id']] = (int)$row['qty'];
-        }
-
-        // Inside = Outside qty - Sale qty for each product that was dispatched
-        $allPids = array_unique(array_merge(array_keys($outsideQtyMap), array_keys($saleQtyMap)));
+        // 3. INSIDE = Outside - Regular Sale - Ready Sale (per product)
+        $allPids = array_unique(array_merge(array_keys($outsideDataMap), array_keys($saleDataMap), array_keys($readySaleDataMap)));
         foreach ($allPids as $pid) {
             if (!isset($productMap[$pid])) continue;
-            $p        = $productMap[$pid];
-            $oQty     = $outsideQtyMap[$pid] ?? 0;
-            $sQty     = $saleQtyMap[$pid]    ?? 0;
-            $insideQty = $oQty - $sQty;
+            $p         = $productMap[$pid];
+            $oData     = $outsideDataMap[$pid]    ?? ['qty' => 0, 'oc_val' => 0];
+            $sData     = $saleDataMap[$pid]       ?? ['qty' => 0, 'oc_val' => 0];
+            $rsData    = $readySaleDataMap[$pid]  ?? ['qty' => 0, 'oc_val' => 0];
+            $insideQty = $oData['qty'] - $sData['qty'] - $rsData['qty'];
             if ($insideQty <= 0) continue;
-            $val = $insideQty * $p['price'];
-            $totals['inside'] += $val;
+            
+            $insideVal   = $insideQty * $p['price'];
+            $insideOcVal = max(0, $oData['oc_val'] - $sData['oc_val'] - $rsData['oc_val']);
+            
+            $totals['inside'] += $insideVal;
+            $totals['inside_oc'] += $insideOcVal;
+            
             $productsData['inside'][] = [
                 'name'        => $p['name'],
                 'qty'         => $insideQty,
                 'pcs_per_box' => (int)$p['pieces_per_box'],
                 'trade_price' => $p['price'],
-                'value'       => $val,
-                'oc_value'    => 0
+                'value'       => $insideVal,
+                'oc_value'    => $insideOcVal
             ];
         }
 
@@ -376,8 +554,8 @@ class DSRController extends Controller
             }
         }
 
-        // Final: Inside total = Outside total - Sale total
-        $totals['inside'] = max(0, $totals['outside'] - $totals['sale']);
+        // Ensure Inside base total matches Outside base - Regular Sale base - Ready Sale base
+        $totals['inside'] = max(0, $totals['outside'] - $totals['sale'] - $totals['ready_sale']);
 
         $this->render('van_stock', [
             'products' => $productsData,
@@ -442,8 +620,8 @@ class DSRController extends Controller
             $iq = $this->db->query("
                 SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
                        p.name, p.image, p.pieces_per_box, p.box_type,
-                       p.price as base_price,
-                       COALESCE(oi.unit_price, p.price) as price
+                       di.buying_price as base_price,
+                       di.unit_price as price
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
                 JOIN dispatches d ON d.id = di.dispatch_id
@@ -504,20 +682,17 @@ class DSRController extends Controller
         
         $isCompleted = ($qItems->fetchColumn() > 0 && $check->fetchColumn() == 0);
 
-        // Van stock: total dispatched qty minus delivered qty for today
+        // Van stock: use van_stock table directly (reflects actual loaded qty minus delivered)
         $vanQ = $this->db->prepare("
-            SELECT di.product_id, 
-                   SUM(di.quantity) as dispatched,
-                   SUM(COALESCE(di.delivered_quantity, 0)) as delivered
-            FROM dispatch_items di
-            JOIN dispatches d ON d.id = di.dispatch_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status != 'pending'
-            GROUP BY di.product_id
+            SELECT product_id, SUM(quantity) as remaining_qty
+            FROM van_stock
+            WHERE dsr_id = ? AND DATE(loaded_at) = ?
+            GROUP BY product_id
         ");
         $vanQ->execute([$dsrId, $selectedDate]);
         $vanStockMap = [];
         foreach ($vanQ->fetchAll() as $row) {
-            $remaining = (int)$row['dispatched'] - (int)$row['delivered'];
+            $remaining = (int)$row['remaining_qty'];
             if ($remaining > 0) {
                 $vanStockMap[(int)$row['product_id']] = $remaining;
             }
@@ -536,7 +711,16 @@ class DSRController extends Controller
         $srsStmt->execute([$dsrId, $selectedDate]);
         $srsList = $srsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'selectedDate', 'vanStockMap', 'srsList'), 'dsr_app');
+        // Fetch all retailers for Ready Sale selection
+        $allRetailersStmt = $this->db->query("SELECT id, name, phone, address, lat, lng FROM retailers ORDER BY name ASC");
+        $allRetailers = $allRetailersStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Check if dispatch is returned
+        $retQ = $this->db->prepare("SELECT COUNT(*) FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) AND status = 'returned'");
+        $retQ->execute([$dsrId, $selectedDate, $selectedDate]);
+        $isReturned = ($retQ->fetchColumn() > 0);
+
+        $this->render('delivery', compact('orderedRetailers', 'isCompleted', 'isReturned', 'selectedDate', 'vanStockMap', 'srsList', 'allRetailers'), 'dsr_app');
     }
 
     public function deliveryUpdate(string $id): void
@@ -557,20 +741,54 @@ class DSRController extends Controller
                 $this->json(['success' => false, 'message' => 'Settlement already submitted for this date. Cannot modify delivery.']);
                 return;
             }
+
+            // Check if the dispatch is already returned
+            $schCheck = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
+            $schCheck->execute([$dsrId, $dispatchDate, $dispatchDate]);
+            $schStatus = $schCheck->fetchColumn();
+            
+            if ($schStatus === 'returned') {
+                $this->json(['success' => false, 'message' => 'ডেলিভারি রিটার্ন সম্পন্ন হয়েছে। আর কোনো পরিবর্তন সম্ভব নয়।']);
+                return;
+            }
         }
         
         $notes = $this->post('notes', null);
         
-        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
-                 ->execute([$status, $paidAmount, $notes, $id, $dsrId]);
-        
-        // Deduct/adjust van_stock based on dispatch items
+        // Fetch items and delivered quantities first to perform validation
         $items = $this->db->prepare("SELECT product_id, lot_id, quantity, delivered_quantity FROM dispatch_items WHERE dispatch_id=?");
         $items->execute([$id]);
         $items = $items->fetchAll();
         
         $deliveredItemsStr = $this->post('items', '{}');
         $deliveredItems = json_decode($deliveredItemsStr, true) ?? [];
+
+        // Validate van stock sufficiency before making database updates
+        if ($status !== 'cancelled') {
+            foreach($items as $item) {
+                $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
+                $newDelivered = $item['quantity'];
+                if (isset($deliveredItems[$item['product_id']])) {
+                    $newDelivered = (int) $deliveredItems[$item['product_id']];
+                }
+                $diff = $newDelivered - $prevDelivered;
+                if ($diff > 0) {
+                    $vsQuery = $this->db->prepare("SELECT quantity FROM van_stock WHERE dsr_id = ? AND product_id = ? AND (lot_id = ? OR (? IS NULL AND lot_id IS NULL)) LIMIT 1");
+                    $vsQuery->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+                    $vanStock = (int)$vsQuery->fetchColumn();
+                    if ($diff > $vanStock) {
+                        $prodQuery = $this->db->prepare("SELECT name FROM products WHERE id = ?");
+                        $prodQuery->execute([$item['product_id']]);
+                        $prodName = $prodQuery->fetchColumn() ?: 'Product';
+                        $this->json(['success' => false, 'message' => "Insufficient van stock for '{$prodName}'. Available: {$vanStock}, requested increase: {$diff}."]);
+                        return;
+                    }
+                }
+            }
+        }
+
+        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
+                 ->execute([$status, $paidAmount, $notes, $id, $dsrId]);
         
         foreach($items as $item) {
             $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
@@ -640,29 +858,74 @@ class DSRController extends Controller
         $q->execute([$dsrId, $date]);
         $itemsToLoad = $q->fetchAll();
 
+        // 2. Fetch dispatch schedule and negative adjustments (organized reductions)
+        $schStmt = $this->db->prepare("SELECT id FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
+        $schStmt->execute([$dsrId, $date, $date]);
+        $schId = $schStmt->fetchColumn();
+
+        $extrasAdjMap = [];
+        if ($schId) {
+            $extrasQ = $this->db->prepare("
+                SELECT de.product_id,
+                       de.qty_boxes,
+                       de.qty_pieces,
+                       p.pieces_per_box
+                FROM dispatch_extras de
+                JOIN products p ON p.id = de.product_id
+                WHERE de.schedule_id = ?
+            ");
+            $extrasQ->execute([$schId]);
+            foreach ($extrasQ->fetchAll() as $exRow) {
+                $ppb = max(1, (int)$exRow['pieces_per_box']);
+                $adj = ((int)$exRow['qty_boxes'] * $ppb) + (int)$exRow['qty_pieces'];
+                if ($adj < 0) {
+                    $extrasAdjMap[(int)$exRow['product_id']] = ($extrasAdjMap[(int)$exRow['product_id']] ?? 0) + $adj;
+                }
+            }
+        }
+
+        // 3. Apply negative adjustments to match organized quantities
+        $appliedProducts = [];
+        foreach ($itemsToLoad as &$item) {
+            $pid = (int)$item['product_id'];
+            if (!isset($appliedProducts[$pid]) && isset($extrasAdjMap[$pid])) {
+                $item['total_qty'] = max(0, (int)$item['total_qty'] + $extrasAdjMap[$pid]);
+                $appliedProducts[$pid] = true;
+            }
+        }
+        unset($item);
+
+        // 4. Load van_stock with actual organized qty and guard against date accumulation
         foreach ($itemsToLoad as $item) {
+            if ((int)$item['total_qty'] <= 0) continue;
+
             $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
             $params = [$dsrId, $item['product_id']];
             if ($item['lot_id'] !== null) $params[] = $item['lot_id'];
             
-            $check = $this->db->prepare("SELECT id FROM van_stock WHERE dsr_id=? AND product_id=? AND lot_id $lotCondition LIMIT 1");
+            $check = $this->db->prepare("SELECT id, loaded_at FROM van_stock WHERE dsr_id=? AND product_id=? AND lot_id $lotCondition LIMIT 1");
             $check->execute($params);
             
             if ($row = $check->fetch()) {
-                $this->db->prepare("UPDATE van_stock SET quantity = quantity + ?, loaded_at = ? WHERE id=?")
-                         ->execute([$item['total_qty'], $date, $row['id']]);
+                if ($row['loaded_at'] !== $date) {
+                    $this->db->prepare("UPDATE van_stock SET quantity = ?, initial_qty = ?, loaded_at = ? WHERE id=?")
+                             ->execute([$item['total_qty'], $item['total_qty'], $date, $row['id']]);
+                } else {
+                    $this->db->prepare("UPDATE van_stock SET quantity = quantity + ?, initial_qty = initial_qty + ?, loaded_at = ? WHERE id=?")
+                             ->execute([$item['total_qty'], $item['total_qty'], $date, $row['id']]);
+                }
             } else {
-                $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, loaded_at) VALUES (?, ?, ?, ?, ?)")
-                         ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $date]);
+                $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, initial_qty, loaded_at) VALUES (?, ?, ?, ?, ?, ?)")
+                         ->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['total_qty'], $item['total_qty'], $date]);
             }
         }
 
-        // 3. Mark dispatches as in_transit
+        // 5. Mark dispatches as in_transit
         $this->db->prepare("UPDATE dispatches SET status='in_transit', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status='pending'")
                  ->execute([$dsrId, $date]);
 
-        // 4. Update the manager's dispatch schedule status to 'dispatched'
-        $this->db->prepare("UPDATE dispatch_schedules SET status='dispatched' WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) AND status='organized'")
+        // 6. Update the manager's dispatch schedule status to 'dispatched'
+        $this->db->prepare("UPDATE dispatch_schedules SET status='dispatched' WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) AND status IN ('organized', 'assigned')")
                  ->execute([$dsrId, $date, $date]);
         
         $this->json(['success' => true]);
@@ -686,30 +949,36 @@ class DSRController extends Controller
         $retSch = (int)($schRow['returned_schedules'] ?? 0);
         $scheduleStatus = ($totSch > 0 && $totSch === $retSch) ? 'returned' : 'pending';
 
-        // Calculate Dispatched Value and Spot Return Value (from deliveries)
+        // Calculate Dispatched Value
         $q = $this->db->prepare("
             SELECT 
-                COALESCE(SUM(di.quantity * p.price), 0) as dispatched_value,
-                COALESCE(SUM((di.quantity - COALESCE(di.delivered_quantity, 0)) * p.price), 0) as spot_return_value
-            FROM dispatch_items di
-            JOIN dispatches d ON d.id=di.dispatch_id
-            JOIN products p ON p.id=di.product_id
-            WHERE d.dsr_id=? AND d.dispatch_date=?
+                COALESCE(SUM(di.quantity * di.unit_price), 0) as dispatched_value
+            FROM dispatches d
+            JOIN dispatch_items di ON di.dispatch_id = d.id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ?
         ");
         $q->execute([$dsrId, $selectedDate]);
         $res = $q->fetch();
         
-        $dispatchedValue = $res['dispatched_value'] ?: 0;
-        $returnedValue   = $res['spot_return_value'] ?: 0;
+        $dispatchedValue = (float)($res['dispatched_value'] ?: 0);
+
+        // Calculate returned value: from returns table
+        $qRet = $this->db->prepare("
+            SELECT COALESCE(SUM(ri.quantity * ri.unit_price), 0)
+            FROM returns r
+            JOIN return_items ri ON ri.return_id = r.id
+            WHERE r.dsr_id = ? AND r.return_date = ? AND (r.reason != 'Damage' OR r.reason IS NULL)
+        ");
+        $qRet->execute([$dsrId, $selectedDate]);
+        $returnedValue = (float)$qRet->fetchColumn();
         
         // Damage amount (calculates product return items OR manual damage entries recorded in returns header/reason)
         $q3 = $this->db->prepare("
             SELECT 
                 COALESCE((
-                    SELECT SUM(ri.quantity * p.price)
+                    SELECT SUM(ri.quantity * ri.unit_price)
                     FROM returns r
                     JOIN return_items ri ON ri.return_id=r.id
-                    JOIN products p ON p.id=ri.product_id
                     WHERE r.dsr_id=? AND r.return_date=? AND r.reason='Damage'
                 ), 0)
                 +
@@ -732,12 +1001,25 @@ class DSRController extends Controller
         $q4->execute([$dsrId, $selectedDate]);
         $totalExpense = (float) $q4->fetchColumn();
 
+        // Total Delivery O/C
+        $qOc = $this->db->prepare("
+            SELECT 
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)), 0) as delivery_oc
+            FROM dispatches d
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            JOIN products p ON p.id = di.product_id
+            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
+        ");
+        $qOc->execute([$dsrId, $selectedDate]);
+        $deliveryOc = (float)$qOc->fetchColumn();
+
         // Check if settlement already submitted for this date
         $check = $this->db->prepare("SELECT * FROM settlements WHERE dsr_id=? AND date=?");
         $check->execute([$dsrId, $selectedDate]);
         $existingSettlement = $check->fetch() ?: null;
 
-        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'selectedDate', 'existingSettlement', 'scheduleStatus'), 'dsr_app');
+        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'deliveryOc', 'selectedDate', 'existingSettlement', 'scheduleStatus'), 'dsr_app');
     }
 
     public function settlementSubmit(): void
@@ -777,6 +1059,7 @@ class DSRController extends Controller
         $returned = (float) $this->post('returned_value', 0);
         $damage = (float) $this->post('damage_amount', 0);
         $expense = (float) $this->post('total_expense', 0);
+        $deliveryOc = (float) $this->post('delivery_oc', 0);
         $shouldPay = (float) $this->post('should_pay', 0);
         $countedCash = (float) $this->post('counted_cash', 0);
         $difference = (float) $this->post('difference', 0);
@@ -786,9 +1069,9 @@ class DSRController extends Controller
         $cashBreakdownStr = json_encode($cashBreakdown);
 
         $this->db->prepare("
-            INSERT INTO settlements (dsr_id, date, total_dispatched, total_returned, total_damage, total_expense, should_pay, counted_cash, difference, cash_breakdown)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ")->execute([$dsrId, $date, $dispatched, $returned, $damage, $expense, $shouldPay, $countedCash, $difference, $cashBreakdownStr]);
+            INSERT INTO settlements (dsr_id, date, total_dispatched, total_returned, total_damage, total_expense, delivery_oc, should_pay, counted_cash, difference, cash_breakdown)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute([$dsrId, $date, $dispatched, $returned, $damage, $expense, $deliveryOc, $shouldPay, $countedCash, $difference, $cashBreakdownStr]);
 
         $this->flash('success', 'Settlement submitted for Manager approval.');
         $this->redirect('dsr/dashboard');
@@ -799,18 +1082,63 @@ class DSRController extends Controller
         $dsrId = Auth::id();
         $date  = $_GET['date'] ?? date('Y-m-d');
 
-        // Spot returns: dispatched but not delivered
+        // 1. Check if returns are recorded in returns table
         $q = $this->db->prepare("
             SELECT p.name AS product_name,
-                   SUM(di.quantity - COALESCE(di.delivered_quantity, 0)) AS qty,
-                   p.price,
-                   SUM((di.quantity - COALESCE(di.delivered_quantity, 0)) * p.price) AS total
-            FROM dispatch_items di
-            JOIN dispatches d ON d.id = di.dispatch_id
-            JOIN products p   ON p.id = di.product_id
-            WHERE d.dsr_id = ? AND d.dispatch_date = ?
-              AND (di.quantity - COALESCE(di.delivered_quantity, 0)) > 0
-            GROUP BY p.id, p.name, p.price
+                   SUM(ri.quantity) AS qty,
+                   ri.unit_price as price,
+                   SUM(ri.quantity * ri.unit_price) AS total
+            FROM returns r
+            JOIN return_items ri ON ri.return_id = r.id
+            JOIN products p ON p.id = ri.product_id
+            WHERE r.dsr_id = ? AND r.return_date = ? AND (r.reason != 'Damage' OR r.reason IS NULL)
+            GROUP BY ri.product_id, p.name, ri.unit_price
+        ");
+        $q->execute([$dsrId, $date]);
+        $items = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        // 2. If not in returns table, fallback to live unsold van_stock
+        if (empty($items)) {
+            $q2 = $this->db->prepare("
+                SELECT p.name AS product_name,
+                       SUM(vs.quantity) AS qty,
+                       p.price,
+                       SUM(vs.quantity * p.price) AS total
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+                  AND vs.quantity > 0
+                GROUP BY vs.product_id, p.name, p.price
+            ");
+            $q2->execute([$dsrId, $date]);
+            $items = $q2->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'items'   => $items,
+        ]);
+        exit;
+    }
+
+    public function apiSettlementOc(): void
+    {
+        $dsrId = Auth::id();
+        $date  = $_GET['date'] ?? date('Y-m-d');
+
+        $q = $this->db->prepare("
+            SELECT 
+                u.name AS sr_name,
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)), 0) as sr_oc
+            FROM dispatches d
+            JOIN orders o ON o.id = d.order_id
+            JOIN users u ON u.id = o.sr_id
+            JOIN dispatch_items di ON d.id = di.dispatch_id
+            JOIN products p ON p.id = di.product_id
+            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+            WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
+            GROUP BY o.sr_id, u.name
         ");
         $q->execute([$dsrId, $date]);
         $items = $q->fetchAll(PDO::FETCH_ASSOC);
@@ -931,5 +1259,238 @@ class DSRController extends Controller
         ")->execute([$dsrId, $lat, $lng, $address ?: null, $accuracy ?: null]);
 
         $this->json(['success' => true, 'message' => 'Location recorded']);
+    }
+
+    /**
+     * GET /dsr/api/van-stock
+     * Returns products currently available on DSR's van for the selected date
+     */
+    public function apiVanStock(): void
+    {
+        $dsrId = Auth::id();
+        $date = $_GET['date'] ?? date('Y-m-d');
+
+        // Use van_stock table directly for accurate remaining qty (Approach 1: Van-Level Dispatch)
+        $vanQ = $this->db->prepare("
+            SELECT vs.product_id,
+                   vs.lot_id,
+                   p.name as product_name,
+                   p.sku,
+                   p.price as base_price,
+                   p.pieces_per_box,
+                   c.name as company_name,
+                   SUM(vs.initial_qty) as dispatched_qty,
+                   SUM(vs.quantity) as available_qty
+            FROM van_stock vs
+            JOIN products p ON p.id = vs.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
+            WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+            GROUP BY vs.product_id, vs.lot_id, p.id, p.name, p.sku, p.price, p.pieces_per_box, c.name
+        ");
+        $vanQ->execute([$dsrId, $date]);
+        $items = [];
+        foreach ($vanQ->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $available = (int)$row['available_qty'];
+            if ($available > 0) {
+                $items[] = [
+                    'product_id'     => (int)$row['product_id'],
+                    'lot_id'         => $row['lot_id'] ? (int)$row['lot_id'] : null,
+                    'product_name'   => $row['product_name'],
+                    'sku'            => $row['sku'],
+                    'company_name'   => $row['company_name'] ?: 'No Company',
+                    'base_price'     => (float)$row['base_price'],
+                    'pieces_per_box' => (int)$row['pieces_per_box'],
+                    'available_qty'  => $available
+                ];
+            }
+        }
+
+        $this->json(['success' => true, 'items' => $items]);
+    }
+
+    /**
+     * POST /dsr/ready-sale/store
+     * Processes on-the-spot Ready Sale by DSR
+     */
+    public function readySaleStore(): void
+    {
+        $this->verifyCsrf();
+        $dsrId = Auth::id();
+        $date = $this->post('date', date('Y-m-d'));
+        $retailerId = (int)$this->post('retailer_id', 0);
+        $itemsJson = $_POST['items'] ?? '[]';
+        $items = json_decode($itemsJson, true) ?? [];
+
+        if ($retailerId <= 0) {
+            $this->json(['success' => false, 'message' => 'রিটেলার সিলেক্ট করুন।']);
+            return;
+        }
+
+        if (empty($items)) {
+            $this->json(['success' => false, 'message' => 'অন্তত একটি প্রোডাক্ট নির্বাচন করুন।']);
+            return;
+        }
+
+        // Check if the dispatch is already returned
+        $schCheck = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
+        $schCheck->execute([$dsrId, $date, $date]);
+        $schStatus = $schCheck->fetchColumn();
+        
+        if ($schStatus === 'returned') {
+            $this->json(['success' => false, 'message' => 'আজকের ডেলিভারি রিটার্ন সম্পন্ন হয়েছে। নতুন করে Ready Sale করা যাবে না।']);
+            return;
+        }
+
+        // Get DSR user info to get warehouse_id
+        $dsrUser = $this->db->prepare("SELECT warehouse_id FROM users WHERE id = ?");
+        $dsrUser->execute([$dsrId]);
+        $warehouseId = (int)$dsrUser->fetchColumn();
+
+        if (!$warehouseId) {
+            $wStmt = $this->db->prepare("SELECT warehouse_id FROM dispatches WHERE dsr_id = ? AND dispatch_date = ? LIMIT 1");
+            $wStmt->execute([$dsrId, $date]);
+            $warehouseId = (int)$wStmt->fetchColumn();
+        }
+        if (!$warehouseId) {
+            $warehouseId = 1;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $totalAmount = 0.0;
+            $orderItemsToInsert = [];
+
+            foreach ($items as $item) {
+                $pid       = (int)($item['product_id'] ?? 0);
+                $qty       = (int)($item['qty'] ?? 0);
+                $unitPrice = (float)($item['unit_price'] ?? 0);
+                $lotId     = !empty($item['lot_id']) ? (int)$item['lot_id'] : null;
+
+                if ($pid <= 0 || $qty <= 0 || $unitPrice < 0) {
+                    continue;
+                }
+
+                // Check available van stock using van_stock table (Approach 1: Van-Level Dispatch)
+                $checkQ = $this->db->prepare("
+                    SELECT SUM(quantity) as avail
+                    FROM van_stock
+                    WHERE dsr_id = ? AND product_id = ? AND DATE(loaded_at) = ?
+                ");
+                $checkQ->execute([$dsrId, $pid, $date]);
+                $avail = (int)$checkQ->fetchColumn();
+
+                $pNameStmt = $this->db->prepare("SELECT * FROM products WHERE id = ?");
+                $pNameStmt->execute([$pid]);
+                $pData = $pNameStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($qty > $avail) {
+                    $pName = $pData['name'] ?? 'Unknown';
+                    $this->db->rollBack();
+                    $this->json(['success' => false, 'message' => "প্রোডাক্ট '{$pName}'-এর পর্যাপ্ত স্টক ভ্যানে নেই। এভেলেবল: {$avail}, আপনি চেয়েছেন: {$qty}"]);
+                    return;
+                }
+
+                $lineTotal = round($qty * $unitPrice, 2);
+                $totalAmount += $lineTotal;
+
+                $orderItemsToInsert[] = [
+                    'product_id'  => $pid,
+                    'lot_id'      => $lotId,
+                    'quantity'    => $qty,
+                    'unit_price'  => $unitPrice,
+                    'total_price' => $lineTotal,
+                    'product_name'=> $pData['name'] ?? null,
+                    'box_type'    => $pData['box_type'] ?? null,
+                    'pieces_per_box' => $pData['pieces_per_box'] ?? 1,
+                    'buying_price' => $pData['buying_price'] ?? 0
+                ];
+            }
+
+            if (empty($orderItemsToInsert)) {
+                $this->db->rollBack();
+                $this->json(['success' => false, 'message' => 'সঠিক প্রোডাক্ট ও পরিমাণ দিন।']);
+                return;
+            }
+
+            // 1. Insert Order
+            $retName = null;
+            $retPhone = null;
+            $retAddress = null;
+            if ($retailerId) {
+                $retStmt = $this->db->prepare("SELECT name, phone, address FROM retailers WHERE id = ?");
+                $retStmt->execute([$retailerId]);
+                $retInfo = $retStmt->fetch(PDO::FETCH_ASSOC);
+                if ($retInfo) {
+                    $retName = $retInfo['name'];
+                    $retPhone = $retInfo['phone'];
+                    $retAddress = $retInfo['address'];
+                }
+            }
+
+            $orderStmt = $this->db->prepare("
+                INSERT INTO orders (sr_id, retailer_id, warehouse_id, status, total_amount, notes, is_ready_sale, created_at, updated_at, retailer_name, retailer_phone, retailer_address)
+                VALUES (?, ?, ?, 'delivered', ?, 'Ready Sale by DSR', 1, NOW(), NOW(), ?, ?, ?)
+            ");
+            $orderStmt->execute([$dsrId, $retailerId, $warehouseId, $totalAmount, $retName, $retPhone, $retAddress]);
+            $orderId = (int)$this->db->lastInsertId();
+
+            // 2. Insert Order Items
+            $itemStmt = $this->db->prepare("
+                INSERT INTO order_items (order_id, product_id, lot_id, quantity, unit_price, total_price, product_name, box_type, pieces_per_box, buying_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            foreach ($orderItemsToInsert as $oi) {
+                $itemStmt->execute([$orderId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['unit_price'], $oi['total_price'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['buying_price']]);
+            }
+
+            // 3. Insert Dispatch
+            $dispatchStmt = $this->db->prepare("
+                INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status, notes, paid_amount, is_ready_sale, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'delivered', 'Ready Sale by DSR', ?, 1, NOW(), NOW())
+            ");
+            $dispatchStmt->execute([$orderId, $dsrId, $warehouseId, $date, $totalAmount]);
+            $dispatchId = (int)$this->db->lastInsertId();
+
+            // 4. Insert Dispatch Items & update existing delivered_quantity
+            $dItemStmt = $this->db->prepare("
+                INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, delivered_quantity, product_name, box_type, pieces_per_box, unit_price, total_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            foreach ($orderItemsToInsert as $oi) {
+                $dItemStmt->execute([$dispatchId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['quantity'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['unit_price'], $oi['total_price']]);
+
+                // Allocate delivered_quantity to earlier active dispatch_items
+                $activeDiStmt = $this->db->prepare("
+                    SELECT di.id, di.quantity, COALESCE(di.delivered_quantity, 0) as del_qty
+                    FROM dispatch_items di
+                    JOIN dispatches d ON d.id = di.dispatch_id
+                    WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND d.status != 'pending' AND d.id != ?
+                    ORDER BY di.id ASC
+                ");
+                $activeDiStmt->execute([$dsrId, $date, $oi['product_id'], $dispatchId]);
+                $remainingToAllocate = $oi['quantity'];
+                foreach ($activeDiStmt->fetchAll(PDO::FETCH_ASSOC) as $diRow) {
+                    if ($remainingToAllocate <= 0) break;
+                    $canAllocate = (int)$diRow['quantity'] - (int)$diRow['del_qty'];
+                    if ($canAllocate > 0) {
+                        $allocate = min($remainingToAllocate, $canAllocate);
+                        $updDi = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = COALESCE(delivered_quantity, 0) + ? WHERE id = ?");
+                        $updDi->execute([$allocate, $diRow['id']]);
+                        $remainingToAllocate -= $allocate;
+                    }
+                }
+
+                // Deduct from van_stock table
+                $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, quantity - ?) WHERE dsr_id = ? AND product_id = ?")
+                         ->execute([$oi['quantity'], $dsrId, $oi['product_id']]);
+            }
+
+            $this->db->commit();
+            $this->json(['success' => true, 'message' => 'রেডি সেল সফলভাবে সম্পন্ন হয়েছে!']);
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            $this->json(['success' => false, 'message' => 'রেডি সেল জমা দিতে ব্যর্থ হয়েছে: ' . $e->getMessage()]);
+        }
     }
 }

@@ -3,6 +3,7 @@ $pageTitle = 'Daily Settlement';
 $isSubmitted = !empty($existingSettlement);
 $savedDamage = $isSubmitted ? $existingSettlement['total_damage'] : $totalDamage;
 $savedExpense = $isSubmitted ? $existingSettlement['total_expense'] : $totalExpense;
+$savedDeliveryOc = $isSubmitted ? $existingSettlement['delivery_oc'] : $deliveryOc;
 $cashBreakdown = $isSubmitted && !empty($existingSettlement['cash_breakdown']) ? json_decode($existingSettlement['cash_breakdown'], true) : [];
 $savedNote = $cashBreakdown['note'] ?? '';
 
@@ -60,224 +61,261 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 }
 </style>
 
-<div class="p-3 sm:p-4 space-y-3 pb-24 max-w-4xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none">
+<!-- Daily Settlement Page (Modern Dashboard Style) -->
+<div class="p-3 sm:p-5 space-y-4 pb-28 max-w-4xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none">
 
-  <!-- EXCEL RIBBON & FORMULA HEADER -->
-  <div class="excel-container shadow-sm border border-slate-300 overflow-hidden">
+  <!-- Header Card (Modern Minimal) -->
+  <div class="bg-white px-4 py-3.5 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
+    <div class="flex items-center gap-3">
+      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center justify-center shadow-2xs active:scale-95 print:hidden">
+        <i class="fa-solid fa-arrow-left text-xs sm:text-sm"></i>
+      </a>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+            দৈনিক হিসাব সেটেলমেন্ট
+          </h1>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200/60 print:hidden">
+            <i class="fa-solid fa-calculator text-[9px] mr-1"></i> হিসাব মিলানো
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 font-medium leading-tight mt-0.5">দিনের ক্যাশ নোট গণনা ও নিট হিসাব সমর্পণ</p>
+      </div>
+    </div>
     
-    <!-- Excel Ribbon Header -->
-    <div class="excel-ribbon py-2 px-3 justify-between">
-      <div class="flex items-center gap-2">
-        <a href="<?= url('dsr/dashboard') ?>" class="w-7 h-7 rounded bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition text-xs">
-          <i class="fa-solid fa-arrow-left"></i>
-        </a>
-        <div class="excel-ribbon-badge py-0.5 px-2.5 text-xs font-bold">
-          <i class="fa-solid fa-file-excel text-blue-200"></i>
-          <span>হিসাব মিলাও</span>
-        </div>
-      </div>
-
+    <div class="flex items-center gap-2 print:hidden">
       <!-- Date Selector -->
-      <form method="GET" action="<?= url('dsr/settlement') ?>" id="dateForm" class="flex items-center gap-2">
-        <input type="date" id="dateInput" name="date" value="<?= h($selectedDate) ?>" onchange="document.getElementById('dateForm').submit()" class="bg-white text-slate-900 font-mono text-xs font-bold px-2 py-0.5 rounded border border-white/40 outline-none cursor-pointer">
+      <form method="GET" action="<?= url('dsr/settlement') ?>" id="dateForm" class="relative flex items-center">
+        <button type="button" onclick="const inp=document.getElementById('dateInput'); if(inp.showPicker){inp.showPicker()}else{inp.click()}" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition active:scale-95 shadow-2xs border border-slate-200" title="তারিখ পরিবর্তন">
+          <i class="fa-regular fa-calendar-days text-sm"></i>
+        </button>
+        <input type="date" id="dateInput" name="date" value="<?= h($selectedDate) ?>" onchange="document.getElementById('dateForm').submit()" class="absolute opacity-0 pointer-events-none inset-0 w-full h-full">
       </form>
-    </div>
-
-    <!-- Excel Formula (fx) Bar -->
-    <div class="excel-formula-bar py-1.5 px-3 gap-2 text-xs bg-slate-50 border-b border-slate-300">
-      <span class="fx-symbol text-xs">fx</span>
-      <div class="excel-pill">
-        <span class="text-slate-500">লোড:</span>
-        <strong class="text-slate-900 font-mono">৳<?= number_format($dispatchedValue) ?></strong>
-      </div>
-      <div class="excel-pill">
-        <span class="text-slate-500">ফেরত:</span>
-        <strong class="text-rose-600 font-mono">৳<?= number_format($returnedValue) ?></strong>
-      </div>
-      <div class="excel-pill bg-blue-50 border-blue-200">
-        <span class="text-blue-700 font-bold">নিট জমা:</span>
-        <strong id="fxShouldPay" class="text-blue-800 font-mono font-bold">৳0</strong>
-      </div>
-    </div>
-
-    <!-- Cash Progress Bar -->
-    <div class="bg-slate-100 px-3 py-1 border-t border-slate-200 flex items-center justify-between text-[11px]">
-      <div class="flex items-center gap-2 flex-1 max-w-xs">
-        <span class="font-bold text-slate-600 shrink-0">গণনা:</span>
-        <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-          <div id="cashProgressBar" class="bg-emerald-500 h-full progress-bar-fill w-0"></div>
-        </div>
-      </div>
-      <span id="cashProgressText" class="font-mono font-bold text-slate-700 ml-2">0%</span>
     </div>
   </div>
 
-  <form action="<?= url('dsr/settlement/submit') ?>" method="POST" id="settlementForm" class="space-y-3">
+  <!-- Quick Status Banners -->
+  <?php if ($isSubmitted): ?>
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 flex items-center gap-3 text-xs text-blue-900 shadow-2xs">
+      <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-sm shrink-0">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <div>
+        <span class="font-black text-sm block">সেটেলমেন্ট জমা সম্পূর্ণ &amp; লকড</span>
+        <span class="text-blue-700 font-medium">আজকের দিনের হিসাব ইতিপূর্বে সফলভাবে ক্যাশারে জমা দেওয়া হয়েছে।</span>
+      </div>
+    </div>
+  <?php elseif (!$isReturned): ?>
+    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-center gap-3 text-xs text-amber-900 shadow-2xs">
+      <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-sm shrink-0">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div>
+        <span class="font-black text-sm block">স্ট্যাটাস অপেক্ষমাণ</span>
+        <span class="text-amber-800 font-medium">ম্যানেজার কর্তৃক ডেলিভারি স্ট্যাটাস 'Returned' সম্পন্ন হওয়ার পর ক্যাশ মেলানো যাবে।</span>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <!-- Summary KPI Overview Bar (3 Key Metrics) -->
+  <div class="grid grid-cols-3 gap-2.5">
+    <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+      <span class="text-[11px] font-bold text-slate-500 block">মোট লোড (Dispatch)</span>
+      <span class="font-black text-sm sm:text-base text-slate-900 font-mono tracking-tight block">৳<?= number_format($dispatchedValue) ?></span>
+    </div>
+
+    <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+      <span class="text-[11px] font-bold text-slate-500 block">ফেরত মাল (Return)</span>
+      <span class="font-black text-sm sm:text-base text-rose-600 font-mono tracking-tight block">৳<?= number_format($returnedValue) ?></span>
+    </div>
+
+    <div class="bg-blue-600 text-white p-3 rounded-2xl border border-blue-700 shadow-xs space-y-1">
+      <span class="text-[11px] font-bold text-blue-100 block">নিট জমা (Net Pay)</span>
+      <span id="fxShouldPay" class="font-black text-sm sm:text-base text-white font-mono tracking-tight block">৳0</span>
+    </div>
+  </div>
+
+  <form action="<?= url('dsr/settlement/submit') ?>" method="POST" id="settlementForm" class="space-y-4">
     <?= Helpers::csrfField() ?>
     <input type="hidden" name="dispatched_value" value="<?= $dispatchedValue ?>">
     <input type="hidden" name="returned_value" value="<?= $returnedValue ?>">
+    <input type="hidden" name="damage_amount" value="<?= $savedDamage ?>">
+    <input type="hidden" name="total_expense" value="<?= $savedExpense ?>">
+    <input type="hidden" name="delivery_oc" id="formDeliveryOc" value="<?= $savedDeliveryOc ?>">
     <input type="hidden" name="should_pay" id="formShouldPay" value="0">
     <input type="hidden" name="counted_cash" id="formCountedCash" value="0">
     <input type="hidden" name="difference" id="formDifference" value="0">
     <input type="hidden" name="cash_breakdown" id="formCashBreakdown" value="{}">
     <input type="hidden" name="settlement_date" value="<?= htmlspecialchars($selectedDate) ?>">
 
-    <?php if ($isSubmitted): ?>
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-2.5 flex items-center gap-2 text-xs">
-        <i class="fa-solid fa-lock text-blue-600"></i>
-        <span class="font-bold text-blue-900">এই দিনের সেটেলমেন্ট লক করা হয়েছে।</span>
-      </div>
-    <?php elseif (!$isReturned): ?>
-      <div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-center gap-2 text-xs">
-        <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
-        <span class="font-bold text-amber-900">ম্যানেজার কর্তৃক ডেলিভারি স্ট্যাটাস 'Returned' হওয়ার পর হিসাব মিলানো ও জমা দেওয়া যাবে।</span>
-      </div>
-    <?php endif; ?>
-
-    <!-- 1. ACCOUNT BREAKDOWN TABLE -->
-    <div class="excel-container shadow-sm border border-slate-300">
-      <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-300 text-xs font-bold text-slate-800">
-        ১. হিসাব বিবরণী
+    <!-- SECTION 1: ACCOUNT STATEMENT BREAKDOWN CARD -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">১</span>
+          <h2 class="font-black text-xs sm:text-sm text-slate-800 uppercase tracking-tight">হিসাব বিবরণী (Account Breakdown)</h2>
+        </div>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="excel-table text-xs">
-          <thead>
-            <tr>
-              <th class="excel-row-num">#</th>
-              <th>বিবরণ</th>
-              <th class="text-right">টাকা (৳)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="excel-row-num">1</td>
-              <td class="font-bold text-slate-800">মোট লোড করা মাল</td>
-              <td class="excel-money text-slate-900">৳ <?= number_format($dispatchedValue) ?></td>
-            </tr>
-            <tr class="hover:bg-blue-50/50 cursor-pointer" onclick="openReturnModal()" title="বিস্তারিত দেখুন">
-              <td class="excel-row-num">2</td>
-              <td class="font-bold text-slate-800 flex items-center gap-1.5">
-                <span>ফেরত মালের মূল্য (-)</span>
-                <span class="text-[10px] text-blue-600 font-bold bg-blue-50 px-1 py-0.2 rounded border border-blue-200">দেখুন</span>
-              </td>
-              <td class="excel-money text-rose-600 font-bold">
-                - ৳ <?= number_format($returnedValue) ?>
-              </td>
-            </tr>
-            <tr>
-              <td class="excel-row-num">3</td>
-              <td class="font-bold text-slate-800">ড্যামেজ পণ্য (-)</td>
-              <td class="excel-money text-amber-600 font-bold">৳ <?= number_format($savedDamage) ?></td>
-            </tr>
-            <tr>
-              <td class="excel-row-num">4</td>
-              <td class="font-bold text-slate-800">সারাদিনের খরচ (-)</td>
-              <td class="excel-money text-purple-600 font-bold">৳ <?= number_format($savedExpense) ?></td>
-            </tr>
-            <tr class="bg-blue-50/70 border-t-2 border-slate-300">
-              <td class="excel-row-num text-blue-700 font-black">∑</td>
-              <td class="font-black text-slate-900 text-xs">ক্যাশারে জমা (নিট)</td>
-              <td class="excel-money text-blue-700 text-sm font-black" id="displayShouldPay">৳ 0</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="divide-y divide-slate-100 text-xs sm:text-sm">
+        <!-- Row 1: Total Dispatch -->
+        <div class="p-3.5 flex items-center justify-between hover:bg-slate-50/50 transition">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-truck"></i>
+            </div>
+            <span class="font-bold text-slate-800">মোট লোড করা মাল</span>
+          </div>
+          <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue) ?></span>
+        </div>
+
+        <!-- Row 2: Returned Goods -->
+        <div class="p-3.5 flex items-center justify-between hover:bg-rose-50/40 transition cursor-pointer" onclick="openReturnModal()" title="ফেরত মালের বিস্তারিত দেখুন">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-rotate-left"></i>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800 block leading-tight">ফেরত মালের মূল্য (-)</span>
+              <span class="text-[10px] text-blue-600 font-bold underline">বিস্তারিত দেখুন</span>
+            </div>
+          </div>
+          <span class="font-black text-rose-600 font-mono">- ৳ <?= number_format($returnedValue) ?></span>
+        </div>
+
+        <!-- Row 3: Damage Items -->
+        <div class="p-3.5 flex items-center justify-between hover:bg-amber-50/40 transition">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-box-open"></i>
+            </div>
+            <span class="font-bold text-slate-800">ড্যামেজ পণ্য (-)</span>
+          </div>
+          <span class="font-black text-amber-600 font-mono">- ৳ <?= number_format($savedDamage) ?></span>
+        </div>
+
+        <!-- Row 4: Daily Expenses -->
+        <div class="p-3.5 flex items-center justify-between hover:bg-purple-50/40 transition">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-receipt"></i>
+            </div>
+            <span class="font-bold text-slate-800">সারাদিনের খরচ (-)</span>
+          </div>
+          <span class="font-black text-purple-600 font-mono">- ৳ <?= number_format($savedExpense) ?></span>
+        </div>
+
+        <!-- Row 5: Delivery OC -->
+        <div class="p-3.5 flex items-center justify-between hover:bg-blue-50/40 transition cursor-pointer" onclick="openOcModal()" title="O/C বিস্তারিত দেখুন">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-coins"></i>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800 block leading-tight">ডেলিভারি O/C (কমিশন/ওভার)</span>
+              <span class="text-[10px] text-blue-600 font-bold underline">SR অনুযায়ী O/C দেখুন</span>
+            </div>
+          </div>
+          <span class="font-black <?= $savedDeliveryOc >= 0 ? 'text-emerald-600' : 'text-rose-600' ?> font-mono">
+            <?= $savedDeliveryOc >= 0 ? '+' : '' ?>৳ <?= number_format($savedDeliveryOc) ?>
+          </span>
+        </div>
+
+        <!-- Net Total Header -->
+        <div class="p-4 bg-blue-50/80 flex items-center justify-between border-t-2 border-slate-200">
+          <span class="font-black text-slate-900 text-xs sm:text-sm">ক্যাশারে জমা (নিট দেয় মূল্য):</span>
+          <span class="font-black text-blue-800 text-base sm:text-lg font-mono tracking-tight" id="displayShouldPay">৳ 0</span>
+        </div>
       </div>
     </div>
 
-    <!-- 2. CASH NOTE COUNTING TABLE -->
-    <div class="excel-container shadow-sm border border-slate-300">
-      <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-300 flex justify-between items-center text-xs font-bold text-slate-800">
-        <span>২. নোট গণনাকারক</span>
+    <!-- SECTION 2: CASH DENOMINATION COUNTER CARD -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden space-y-3">
+      <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black">২</span>
+          <h2 class="font-black text-xs sm:text-sm text-slate-800 uppercase tracking-tight">ক্যাশ নোট গণনাকারক (Cash Notes)</h2>
+        </div>
         
         <?php if (!$isLocked): ?>
-        <div class="flex items-center gap-1">
-          <button type="button" onclick="autoFillCash()" class="px-2 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded transition active:scale-95">
-            <i class="fa-solid fa-wand-magic-sparkles text-emerald-600"></i> অটো ফিল
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="autoFillCash()" class="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition active:scale-95 shadow-2xs">
+            <i class="fa-solid fa-wand-magic-sparkles text-emerald-600 mr-1"></i> অটো ফিল
           </button>
-          <button type="button" onclick="clearCash()" class="px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 bg-white hover:bg-slate-200 border border-slate-300 rounded transition active:scale-95">
+          <button type="button" onclick="clearCash()" class="px-2.5 py-1 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition active:scale-95 shadow-2xs">
             ক্লিয়ার
           </button>
         </div>
         <?php endif; ?>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="excel-table text-xs">
-          <thead>
-            <tr>
-              <th class="excel-row-num">#</th>
-              <th>নোট</th>
-              <th class="text-center w-28 sm:w-36">সংখ্যা</th>
-              <th class="text-right">মোট (৳)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php 
-              $denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
-              foreach ($denominations as $rowIdx => $d): 
-                $qty = $cashBreakdown[$d] ?? '';
-            ?>
-            <tr class="hover:bg-blue-50/40 transition-colors" id="denom-row-<?= $d ?>">
-              <td class="excel-row-num"><?= $rowIdx + 1 ?></td>
-              <td class="font-bold text-slate-800">
-                <span class="inline-block w-12 text-center font-mono font-black bg-emerald-50 text-emerald-700 py-0.5 px-1 rounded border border-emerald-200">৳ <?= $d ?></span>
-              </td>
-              <td class="p-1">
-                <div class="flex items-center justify-center gap-1 bg-white border border-slate-300 rounded p-0.5">
-                  <?php if (!$isLocked): ?>
-                  <button type="button" onclick="stepDenom(<?= $d ?>, -1)" class="qty-btn bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300">-</button>
-                  <?php endif; ?>
-                  
-                  <input type="number" min="0" id="denom-input-<?= $d ?>" class="w-10 sm:w-14 bg-slate-50 border border-slate-200 rounded py-1 px-1 text-center font-mono font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 text-xs denomination-input <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
-                  
-                  <?php if (!$isLocked): ?>
-                  <button type="button" onclick="stepDenom(<?= $d ?>, 1)" class="qty-btn bg-blue-600 text-white hover:bg-blue-700 border border-blue-600">+</button>
-                  <?php endif; ?>
-                </div>
-              </td>
-              <td class="excel-money text-slate-900 font-bold" id="subtotal-<?= $d ?>">৳ 0</td>
-            </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
+      <!-- Denominations Grid Cards (Clean Touch-Friendly Inputs) -->
+      <div class="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <?php 
+          $denominations = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+          foreach ($denominations as $d): 
+            $qty = $cashBreakdown[$d] ?? '';
+        ?>
+        <div class="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between gap-2 hover:bg-white hover:border-slate-300 transition shadow-2xs" id="denom-row-<?= $d ?>">
+          <div class="flex items-center gap-2">
+            <span class="w-12 text-center font-mono font-black text-xs bg-emerald-100/80 text-emerald-800 py-1 px-1.5 rounded-lg border border-emerald-200/80">৳ <?= $d ?></span>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <?php if (!$isLocked): ?>
+            <button type="button" onclick="stepDenom(<?= $d ?>, -1)" class="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold text-sm flex items-center justify-center active:scale-90 transition">-</button>
+            <?php endif; ?>
+
+            <input type="number" min="0" id="denom-input-<?= $d ?>" class="w-12 sm:w-16 bg-white border border-slate-300 rounded-lg py-1 px-1 text-center font-mono font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 text-xs denomination-input shadow-2xs <?= $isLocked ? 'opacity-70' : '' ?>" data-val="<?= $d ?>" value="<?= $qty ?>" oninput="calculate()" <?= $readonlyAttr ?>>
+
+            <?php if (!$isLocked): ?>
+            <button type="button" onclick="stepDenom(<?= $d ?>, 1)" class="w-7 h-7 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold text-sm flex items-center justify-center active:scale-90 transition">+</button>
+            <?php endif; ?>
+          </div>
+
+          <div class="w-16 text-right font-mono font-bold text-xs text-slate-800" id="subtotal-<?= $d ?>">৳ 0</div>
+        </div>
+        <?php endforeach; ?>
       </div>
 
-      <!-- Aggregate Footer -->
-      <div class="bg-slate-50 border-t-2 border-slate-300 p-2.5 space-y-1.5 text-xs">
+      <!-- Live Calculation & Difference Bar -->
+      <div class="bg-slate-900 text-white p-3.5 space-y-2 text-xs font-siliguri border-t border-slate-800">
         <div class="flex justify-between items-center">
-          <span class="font-bold text-slate-700">গণনাকৃত ক্যাশ:</span>
-          <span class="text-sm font-black text-slate-900 font-mono" id="displayCountedCash">৳ 0</span>
+          <span class="text-slate-300 font-medium">গণনাকৃত মোট ক্যাশ:</span>
+          <span class="text-base font-black text-white font-mono" id="displayCountedCash">৳ 0</span>
         </div>
 
-        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
+        <div class="flex justify-between items-center pt-2 border-t border-slate-800">
           <div class="flex items-center gap-2">
-            <span class="font-bold text-slate-700">পার্থক্য:</span>
+            <span class="text-slate-300 font-medium">পার্থক্য (Difference):</span>
             <span class="font-mono font-black text-sm" id="displayDifference">৳ 0</span>
           </div>
-          <div id="statusBadge" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-slate-200 text-slate-700 uppercase tracking-wider border border-slate-300">
+          <div id="statusBadge" class="px-3 py-1 text-[10px] font-black rounded-full bg-slate-800 text-slate-300 uppercase tracking-wider border border-slate-700">
             পেন্ডিং
           </div>
         </div>
       </div>
-
     </div>
 
-    <!-- 3. Optional Note -->
-    <div class="excel-container p-2.5 border border-slate-300 bg-white shadow-sm space-y-1 text-left">
-      <label class="text-xs font-bold text-slate-700 block">মন্তব্য (নোট)</label>
-      <textarea name="note" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs text-slate-800 outline-none focus:border-blue-500 <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="কোনো মন্তব্য থাকলে লিখুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
+    <!-- SECTION 3: REMARKS NOTE CARD -->
+    <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-1.5 text-left">
+      <label class="text-xs font-black text-slate-700 block uppercase tracking-wider">
+        <i class="fa-solid fa-pen text-slate-400 mr-1"></i> মন্তব্য / নোট (Optional Remarks)
+      </label>
+      <textarea name="note" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition <?= $isLocked ? 'opacity-70' : '' ?>" rows="2" placeholder="হিসাব সংক্রান্ত কোনো বিশেষ মন্তব্য থাকলে উল্লেখ করুন..." <?= $readonlyAttr ?>><?= htmlspecialchars($savedNote) ?></textarea>
     </div>
 
-    <!-- Submit Button -->
+    <!-- SUBMIT ACTION BUTTON -->
     <?php if (!$isLocked): ?>
-      <button type="submit" class="w-full py-3 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg active:scale-[0.99] transition shadow text-sm font-siliguri flex items-center justify-center gap-2">
+      <button type="submit" class="w-full py-3.5 font-extrabold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-2xl active:scale-[0.99] transition shadow-lg shadow-blue-500/20 text-sm sm:text-base font-siliguri flex items-center justify-center gap-2 border border-blue-500/30">
         <i class="fa-solid fa-check-circle"></i>
-        <span>হিসাব জমা দিন</span>
+        <span>সেটেলমেন্ট হিসাব জমা দিন (Submit Settlement)</span>
       </button>
     <?php endif; ?>
 
   </form>
+
+</div>
 
 </div>
 
@@ -309,11 +347,40 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
   </div>
 </div>
 
+<!-- ===== OC Detail Modal ===== -->
+<div id="ocModal" class="fixed inset-0 z-[100] hidden" aria-modal="true" role="dialog">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-xs" onclick="closeOcModal()"></div>
+
+  <div class="absolute top-4 left-4 right-4 max-w-lg mx-auto bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-300" style="animation: slideDown .25s ease">
+    
+    <div class="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-100">
+      <div class="text-left">
+        <h2 class="text-xs font-bold text-slate-900">SR অনুযায়ী O/C বিবরণ</h2>
+        <p class="text-[10px] text-slate-500 font-mono" id="ocModalDate"></p>
+      </div>
+      <button onclick="closeOcModal()" class="w-6 h-6 rounded bg-white border border-slate-300 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+
+    <div class="overflow-y-auto flex-1 p-3 space-y-3" id="ocModalBody">
+      <!-- filled by JS -->
+    </div>
+
+    <div class="px-3 py-2 border-t border-slate-200 flex justify-between items-center bg-blue-50/80">
+      <span class="text-xs font-bold text-blue-800">মোট O/C:</span>
+      <span class="text-sm font-black text-blue-700 font-mono" id="ocModalTotal">৳ 0</span>
+    </div>
+
+  </div>
+</div>
+
 <script>
 const dispatched = <?= (float)$dispatchedValue ?>;
 const returned = <?= (float)$returnedValue ?>;
 const damageVal = <?= (float)$savedDamage ?>;
 const expenseVal = <?= (float)$savedExpense ?>;
+const deliveryOcVal = <?= (float)$savedDeliveryOc ?>;
 
 function stepDenom(denom, step) {
   const input = document.getElementById(`denom-input-${denom}`);
@@ -325,7 +392,7 @@ function stepDenom(denom, step) {
 }
 
 function autoFillCash() {
-  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal);
+  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal + deliveryOcVal);
   if (shouldPay <= 0) return;
   
   document.querySelectorAll('.denomination-input').forEach(inp => inp.value = '');
@@ -351,7 +418,7 @@ function clearCash() {
 }
 
 function calculate() {
-    const shouldPay = dispatched - returned - damageVal - expenseVal;
+    const shouldPay = dispatched - returned - damageVal - expenseVal + deliveryOcVal;
     const roundedShouldPay = Math.round(shouldPay);
     
     document.getElementById('displayShouldPay').innerText = '৳ ' + roundedShouldPay.toLocaleString('en-US');
@@ -489,5 +556,74 @@ function closeReturnModal() {
     document.body.style.overflow = '';
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeReturnModal(); });
+function openOcModal() {
+    const modal = document.getElementById('ocModal');
+    const body  = document.getElementById('ocModalBody');
+    const total = document.getElementById('ocModalTotal');
+    const dateEl = document.getElementById('ocModalDate');
+
+    dateEl.textContent = '<?= date('d M Y', strtotime($selectedDate)) ?>';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    body.innerHTML = `
+      <div class="flex justify-center py-6">
+        <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent animate-spin rounded-full"></div>
+      </div>`;
+
+    fetch(`<?= url('dsr/api/settlement/oc') ?>?date=${selectedDate}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.items || !data.items.length) {
+                body.innerHTML = '<p class="text-center text-slate-400 text-xs py-6 font-siliguri">এই তারিখে কোনো O/C নেই।</p>';
+                total.textContent = '৳ 0';
+                return;
+            }
+
+            let grandTotal = 0;
+            let rows = '';
+
+            data.items.forEach((item, idx) => {
+                const t = parseFloat(item.sr_oc);
+                grandTotal += t;
+                rows += `
+                  <tr class="font-siliguri">
+                    <td class="excel-row-num">${idx + 1}</td>
+                    <td class="font-bold text-slate-800 text-xs text-left">${item.sr_name}</td>
+                    <td class="excel-money ${t >= 0 ? 'text-emerald-600' : 'text-rose-600'} font-bold">
+                      ${t >= 0 ? '+' : ''}৳ ${Math.round(t).toLocaleString('en-US')}
+                    </td>
+                  </tr>`;
+            });
+
+            body.innerHTML = `
+              <div class="excel-container shadow-2xs border border-slate-300">
+                <table class="excel-table text-xs">
+                  <thead>
+                    <tr>
+                      <th class="excel-row-num">#</th>
+                      <th>SR নাম</th>
+                      <th class="text-right">O/C মোট</th>
+                    </tr>
+                  </thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              </div>`;
+
+            total.textContent = (grandTotal >= 0 ? '+' : '') + '৳ ' + Math.round(grandTotal).toLocaleString('en-US');
+        })
+        .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-6 font-siliguri">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
+}
+
+function closeOcModal() {
+    document.getElementById('ocModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => { 
+    if (e.key === 'Escape') {
+        closeReturnModal();
+        closeOcModal();
+    }
+});
 </script>

@@ -39,12 +39,8 @@
           <td class="py-3.5 px-4">
             <div class="flex items-center justify-center gap-1.5">
               <!-- View Invoice Button -->
-              <button type="button" onclick='viewBatchInvoice(<?= json_encode($b, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' class="w-8 h-8 rounded bg-[#334155] hover:bg-slate-800 text-white flex items-center justify-center transition-colors shadow-xs" title="View Invoice">
-                <i class="fa-solid fa-eye text-xs"></i>
-              </button>
-              <!-- Edit Batch Button -->
-              <button type="button" onclick='editBatchLots(<?= json_encode($b, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' class="w-8 h-8 rounded bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition-colors shadow-xs" title="Edit Lot Batch">
-                <i class="fa-solid fa-pen text-xs"></i>
+              <button type="button" onclick='viewBatchInvoice(<?= json_encode($b, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' class="w-8 h-8 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors shadow-xs" title="View Invoice">
+                <i class="fa-solid fa-file-invoice text-xs"></i>
               </button>
               <!-- Delete Batch Button -->
               <button type="button" onclick="deleteBatchLots(<?= (int)$b['company_id'] ?>, '<?= h($b['lot_date']) ?>', '<?= addslashes(h($b['company_name'])) ?>')" class="w-8 h-8 rounded bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors shadow-xs" title="Delete Lot Batch">
@@ -519,6 +515,12 @@ function selectProductForActiveRow(product) {
     const qtyInput = row.querySelector('.row-qty');
     if (qtyInput) {
         updatePiecesHelper(qtyInput);
+    }
+    
+    const priceInput = row.querySelector('.row-price');
+    if (priceInput && product.buying_price !== undefined && product.buying_price !== null) {
+        priceInput.value = parseFloat(product.buying_price).toFixed(2);
+        calculateTotals();
     }
 }
 

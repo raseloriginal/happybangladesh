@@ -248,43 +248,6 @@
   </div>
 </div>
 
-<!-- ========================================== -->
-<!-- 3. EDIT DSR MODAL                          -->
-<!-- ========================================== -->
-<div id="edit-dsr-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-6">
-    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-user-pen text-blue-500 mr-2"></i> Change Dispatch DSR</h3>
-    <input type="hidden" id="edit-dsr-schedule-id">
-    <div class="mb-5">
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select New DSR</label>
-      <select id="edit-dsr-select" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-gray-700">
-        <!-- populated via JS -->
-      </select>
-    </div>
-    <div class="flex gap-3">
-      <button onclick="closeEditDsrModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
-      <button onclick="saveDsrChange()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Save Change</button>
-    </div>
-  </div>
-</div>
-
-<!-- ========================================== -->
-<!-- 3.5. EDIT DELIVERY DATE MODAL              -->
-<!-- ========================================== -->
-<div id="edit-delivery-date-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all p-6">
-    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fa-solid fa-calendar-days text-blue-500 mr-2"></i> Change Delivery Date</h3>
-    <input type="hidden" id="edit-delivery-date-schedule-id">
-    <div class="mb-5">
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select New Delivery Date</label>
-      <input type="date" id="edit-delivery-date-input" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-gray-700">
-    </div>
-    <div class="flex gap-3">
-      <button onclick="closeEditDeliveryDateModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
-      <button onclick="saveDeliveryDateChange()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Save Date</button>
-    </div>
-  </div>
-</div>
 
 <!-- ========================================== -->
 <!-- 4. RETURN MODAL                            -->
@@ -359,7 +322,7 @@ function renderSchedules() {
   let totalReturnDmgVal = 0;
   
   schedules.forEach((sch, idx) => {
-    const orderVal = parseFloat(sch.total_order_value || 0);
+    const orderVal = parseFloat(sch.total_order_value || 0) - parseFloat(sch.total_order_oc || 0);
     const dispatchVal = parseFloat(sch.total_dispatch_value || 0);
     const returnVal = parseFloat(sch.total_return_value || 0);
     const damageVal = parseFloat(sch.total_damage_value || 0);
@@ -390,7 +353,6 @@ function renderSchedules() {
         <div class="text-xs font-bold text-gray-800">Order: ${sch.dispatch_date}</div>
         <div class="text-[11px] text-gray-500 font-medium mt-0.5 flex items-center gap-1">
           <span>Deliv: ${sch.delivery_date || sch.dispatch_date}</span>
-          ${sch.status !== 'returned' ? `<button onclick="openEditDeliveryDateModal(${sch.id}, '${sch.delivery_date || sch.dispatch_date}')" class="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change Delivery Date"><i class="fa-solid fa-pen text-[10px]"></i></button>` : ''}
         </div>
       </td>
       <td>
@@ -399,31 +361,14 @@ function renderSchedules() {
             <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs border border-blue-200">${sch.dsr_name.charAt(0)}</div>
             <span class="font-bold text-gray-800 text-xs">${sch.dsr_name}</span>
           </div>
-          <button onclick="openEditDsrModal(${sch.id}, ${sch.dsr_id})" class="text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors opacity-0 group-hover:opacity-100 no-print" title="Change DSR">
-            <i class="fa-solid fa-pen text-xs"></i>
-          </button>
         </div>
       </td>
       <td class="excel-money">
         ৳ ${orderVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
-        ${(()=>{ 
-          const oc = parseFloat(sch.total_order_oc||0); 
-          if(oc===0) return ''; 
-          const sign=oc>0?'+':'-'; 
-          const color=oc>0?'#10b981':'#ef4444'; 
-          return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
-        })()}
       </td>
       <td class="excel-money">
         ${(sch.status === 'dispatched' || sch.status === 'returned') ? `
           ৳ ${dispatchVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
-          ${(()=>{ 
-            const oc = parseFloat(sch.total_dispatch_oc||0); 
-            if(oc===0) return ''; 
-            const sign=oc>0?'+':'-'; 
-            const color=oc>0?'#10b981':'#ef4444'; 
-            return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
-          })()}
         ` : '-'}
       </td>
       <td class="excel-money text-rose-600">${(sch.status === 'returned') ? '৳ ' + returnVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
@@ -479,12 +424,12 @@ async function toggleSrRow(schId) {
   const sch = schedules.find(s => s.id == schId);
   const showValues = sch && (sch.status === 'dispatched' || sch.status === 'returned');
   
-  // Fetch SR details
-  const res = await fetch(`<?= url("manager/api/dispatch/sr-details/") ?>${schId}`);
-  const srs = await res.json();
+  // Fetch Company details
+  const res = await fetch(`<?= url("manager/api/dispatch/company-details/") ?>${schId}`);
+  const companies = await res.json();
   
-  if (srs.length === 0) {
-    container.innerHTML = '<div class="text-xs text-gray-500 p-2 italic">No SRs assigned to this dispatch.</div>';
+  if (companies.length === 0) {
+    container.innerHTML = '<div class="text-xs text-gray-500 p-2 italic">No company products assigned to this dispatch.</div>';
     return;
   }
   
@@ -492,63 +437,60 @@ async function toggleSrRow(schId) {
     <table class="excel-table sub-table">
       <thead><tr>
         <th class="excel-row-num">#</th>
-        <th>SR Name</th>
-        <th class="text-right">Orders Value</th>
-        <th class="text-right">Dispatch Items</th>
-        <th class="text-right">Return Items</th>
-        <th class="text-right">Damage</th>
-        <th class="text-right">Sale Value</th>
+        <th>Company Name</th>
+        <th class="text-right">Total Ordered Value</th>
+        <th class="text-right">Dispatch Items Value</th>
+        <th class="text-right">Returned Value</th>
+        <th class="text-right">Damage Value</th>
+        <th class="text-right">Sales Value</th>
         <th class="text-center no-print">Action</th>
       </tr></thead>
       <tbody>`;
       
-  srs.forEach((sr, srIdx) => {
-    const ordersVal = parseFloat(sr.orders_value || 0);
-    const dispatchItemsVal = parseFloat(sr.dispatch_items_value || 0);
-    const returnItemsVal = parseFloat(sr.return_items_value || 0);
-    const damageVal = parseFloat(sr.damage_value || 0);
-    const saleVal = parseFloat(sr.sale_value || 0);
+  companies.forEach((comp, compIdx) => {
+    const orderedVal = parseFloat(comp.ordered_value || 0);
+    const dispatchItemsVal = parseFloat(comp.dispatch_items_value || 0);
+    const returnVal = parseFloat(comp.return_value || 0);
+    const damageVal = parseFloat(comp.damage_value || 0);
+    const saleVal = parseFloat(comp.sale_value || 0);
 
     html += `<tr>
-      <td class="excel-row-num">${srIdx + 1}</td>
-      <td class="font-bold text-gray-800 text-xs">${sr.name}</td>
+      <td class="excel-row-num">${compIdx + 1}</td>
+      <td class="font-bold text-gray-800 text-xs">
+        <i class="fa-solid fa-building text-blue-600 text-xs mr-1"></i>${comp.name}
+      </td>
       <td class="excel-money">
-        ৳ ${ordersVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
-        ${(()=>{ 
-          const oc = parseFloat(sr.orders_oc||0); 
-          if(oc===0) return ''; 
-          const sign=oc>0?'+':'-'; 
-          const color=oc>0?'#10b981':'#ef4444'; 
-          return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
-        })()}
+        ৳ ${orderedVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
       </td>
       <td class="excel-money">
         ${showValues ? `
           ৳ ${dispatchItemsVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
-          ${(()=>{ 
-            const oc = parseFloat(sr.dispatch_items_oc||0); 
-            if(oc===0) return ''; 
-            const sign=oc>0?'+':'-'; 
-            const color=oc>0?'#10b981':'#ef4444'; 
-            return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
-          })()}
         ` : '-'}
       </td>
-      <td class="excel-money text-rose-600">${sch.status === 'returned' ? '৳ ' + returnItemsVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+      <td class="excel-money text-rose-600">${sch.status === 'returned' ? '৳ ' + returnVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
       <td class="excel-money text-amber-600">${showValues ? '৳ ' + damageVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
       <td class="excel-money text-emerald-600 font-bold">${showValues ? '৳ ' + saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
       <td class="text-center no-print">
-        <button onclick="toggleProductRow(${schId}, ${sr.id})" class="text-xs text-gray-700 hover:text-blue-700 px-2 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-semibold transition">
-          <i class="fa-solid fa-list mr-1 text-blue-600"></i> Products
-        </button>
+        <div class="flex items-center justify-center gap-1.5">
+          <button onclick="toggleProductRow(${schId}, ${comp.id})" class="text-xs text-gray-700 hover:text-blue-700 px-2 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-semibold transition">
+            <i class="fa-solid fa-box-archive mr-1 text-blue-600"></i> Products
+          </button>
+          <button onclick="toggleCompanySrRow(${schId}, ${comp.id})" class="text-xs text-gray-700 hover:text-purple-700 px-2 py-1 bg-gray-100 hover:bg-purple-100 border border-gray-300 rounded font-semibold transition">
+            <i class="fa-solid fa-users mr-1 text-purple-600"></i> SRs
+          </button>
+        </div>
       </td>
     </tr>
-    <tr id="exp-prod-${schId}-${sr.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
-      <div id="prod-container-${schId}-${sr.id}" class="p-2"></div>
+    <tr id="exp-prod-${schId}-${comp.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
+      <div id="prod-container-${schId}-${comp.id}" class="p-2"></div>
+    </td></tr>
+    <tr id="exp-sr-${schId}-${comp.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
+      <div id="sr-container-${schId}-${comp.id}" class="p-2"></div>
     </td></tr>`;
     
-    // Store products for later rendering
-    window[`prod_data_${schId}_${sr.id}`] = sr.products;
+    // Store products & srs for later rendering
+    window[`prod_data_${schId}_${comp.id}`] = comp.products;
+    window[`sr_data_${schId}_${comp.id}`] = comp.srs;
   });
   
   html += `</tbody></table></div>`;
@@ -590,18 +532,15 @@ async function undoOrderCutoff(srId, btnEl) {
   }
 }
 
-function toggleProductRow(schId, srId) {
-  const row = document.getElementById(`exp-prod-${schId}-${srId}`);
+function toggleProductRow(schId, compId) {
+  const row = document.getElementById(`exp-prod-${schId}-${compId}`);
   if (row.classList.contains('hidden')) {
     row.classList.remove('hidden');
-    const container = document.getElementById(`prod-container-${schId}-${srId}`);
-    const products = window[`prod_data_${schId}_${srId}`] || [];
-    
-    const sch = schedules.find(s => s.id == schId);
-    const showValues = sch && (sch.status === 'dispatched' || sch.status === 'returned');
+    const container = document.getElementById(`prod-container-${schId}-${compId}`);
+    const products = window[`prod_data_${schId}_${compId}`] || [];
     
     if (products.length === 0) {
-      container.innerHTML = '<div class="text-xs text-gray-400 p-2 italic">No products found.</div>';
+      container.innerHTML = '<div class="text-xs text-gray-400 p-2 italic">No products found for this company.</div>';
       return;
     }
     
@@ -611,28 +550,114 @@ function toggleProductRow(schId, srId) {
         <th>Product Name</th>
         <th class="text-center">Ordered Qty</th>
         <th class="text-center">Dispatched Qty</th>
-        <th class="text-center">Returned Qty</th>
-        <th class="text-right">Sale Value</th>
+        <th class="text-center">Sale Qty</th>
+        <th class="text-center">Return Qty</th>
       </tr></thead><tbody>`;
       
     products.forEach((p, pIdx) => {
-      const saleVal = parseFloat(p.sale_value || 0);
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
         <td class="font-bold text-gray-800">${p.name}</td>
-        <td class="excel-qty">${p.ordered_qty}</td>
-        <td class="excel-qty">${showValues ? p.dispatched_qty : '-'}</td>
-        <td class="excel-qty text-rose-600">${sch.status === 'returned' ? p.returned_qty : '-'}</td>
-        <td class="excel-money text-emerald-600 font-bold">
-          ৳ ${saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
-          ${(()=>{ 
-            const oc = parseFloat(p.order_oc||0); 
-            if(oc===0) return ''; 
-            const sign=oc>0?'+':'-'; 
-            const color=oc>0?'#10b981':'#ef4444'; 
-            return `<div style="font-size:10px;font-weight:700;color:${color};margin-top:1px;">(${sign}৳${Math.abs(oc).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})})</div>`; 
-          })()}
+        <td class="excel-qty text-center">${p.ordered_qty || 0}</td>
+        <td class="excel-qty text-center">${p.dispatched_qty || 0}</td>
+        <td class="excel-qty text-center font-bold text-emerald-700">${p.sale_qty || 0}</td>
+        <td class="excel-qty text-center text-rose-600">${p.returned_qty || 0}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+  } else {
+    row.classList.add('hidden');
+  }
+}
+
+function toggleCompanySrRow(schId, compId) {
+  const row = document.getElementById(`exp-sr-${schId}-${compId}`);
+  if (row.classList.contains('hidden')) {
+    row.classList.remove('hidden');
+    const container = document.getElementById(`sr-container-${schId}-${compId}`);
+    const srs = window[`sr_data_${schId}_${compId}`] || [];
+    
+    const sch = schedules.find(s => s.id == schId);
+    const showValues = sch && (sch.status === 'dispatched' || sch.status === 'returned');
+    
+    if (srs.length === 0) {
+      container.innerHTML = '<div class="text-xs text-gray-400 p-2 italic">No SRs found for this company.</div>';
+      return;
+    }
+    
+    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+      <thead><tr>
+        <th class="excel-row-num">#</th>
+        <th>SR Name</th>
+        <th class="text-right">Order Value</th>
+        <th class="text-right">Sale Value</th>
+        <th class="text-right">Total O/C</th>
+        <th class="text-center no-print">Action</th>
+      </tr></thead><tbody>`;
+      
+    srs.forEach((sr, srIdx) => {
+      const orderVal = parseFloat(sr.order_value || 0);
+      const saleVal = parseFloat(sr.sale_value || 0);
+      const totalOc = parseFloat(sr.total_oc || 0);
+      
+      html += `<tr>
+        <td class="excel-row-num">${srIdx + 1}</td>
+        <td class="font-bold text-gray-800 text-xs">
+          <i class="fa-solid fa-user text-purple-600 mr-1 text-[11px]"></i>${sr.name}
         </td>
+        <td class="excel-money">
+          ৳ ${orderVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+        </td>
+        <td class="excel-money text-emerald-600 font-bold">
+          ${showValues ? '৳ ' + saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}
+        </td>
+        <td class="excel-money text-indigo-600 font-semibold">
+          ৳ ${totalOc.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+        </td>
+        <td class="text-center no-print">
+          <button onclick="toggleSrProductRow(${schId}, ${compId}, ${sr.id})" class="text-xs text-gray-700 hover:text-blue-700 px-2 py-0.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-semibold transition">
+            <i class="fa-solid fa-list mr-1 text-blue-600"></i> Products
+          </button>
+        </td>
+      </tr>
+      <tr id="exp-sr-prod-${schId}-${compId}-${sr.id}" class="hidden bg-white"><td colspan="6" class="p-0 border-b border-gray-300">
+        <div id="sr-prod-container-${schId}-${compId}-${sr.id}" class="p-2"></div>
+      </td></tr>`;
+      
+      window[`sr_prod_data_${schId}_${compId}_${sr.id}`] = sr.products;
+    });
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+  } else {
+    row.classList.add('hidden');
+  }
+}
+
+function toggleSrProductRow(schId, compId, srId) {
+  const row = document.getElementById(`exp-sr-prod-${schId}-${compId}-${srId}`);
+  if (row.classList.contains('hidden')) {
+    row.classList.remove('hidden');
+    const container = document.getElementById(`sr-prod-container-${schId}-${compId}-${srId}`);
+    const products = window[`sr_prod_data_${schId}_${compId}_${srId}`] || [];
+    
+    if (products.length === 0) {
+      container.innerHTML = '<div class="text-xs text-gray-400 p-2 italic">No products found for this SR.</div>';
+      return;
+    }
+    
+    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+      <thead><tr>
+        <th class="excel-row-num">#</th>
+        <th>Product Name</th>
+        <th class="text-center">Ordered Qty</th>
+      </tr></thead><tbody>`;
+      
+    products.forEach((p, pIdx) => {
+      html += `<tr>
+        <td class="excel-row-num">${pIdx + 1}</td>
+        <td class="font-bold text-gray-800">${p.name}</td>
+        <td class="excel-qty text-center">${p.ordered_qty || 0}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;
@@ -668,97 +693,6 @@ async function deleteSchedule(id) {
     loadSchedules();
   } else {
     alert("Error deleting: " + data.message);
-  }
-}
-
-function openEditDsrModal(scheduleId, currentDsrId) {
-  document.getElementById('edit-dsr-schedule-id').value = scheduleId;
-  const select = document.getElementById('edit-dsr-select');
-  select.innerHTML = '';
-  
-  allDsrs.forEach(dsr => {
-    const opt = document.createElement('option');
-    opt.value = dsr.id;
-    opt.textContent = dsr.name;
-    if (parseInt(dsr.id) === parseInt(currentDsrId)) {
-      opt.selected = true;
-    }
-    select.appendChild(opt);
-  });
-  
-  document.getElementById('edit-dsr-modal').classList.remove('hidden');
-}
-
-function closeEditDsrModal() {
-  document.getElementById('edit-dsr-modal').classList.add('hidden');
-}
-
-async function saveDsrChange() {
-  const scheduleId = document.getElementById('edit-dsr-schedule-id').value;
-  const dsrId = document.getElementById('edit-dsr-select').value;
-  
-  if (!scheduleId || !dsrId) return;
-  
-  try {
-    const res = await fetch('<?= url("manager/api/dispatch/update-dsr") ?>', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ schedule_id: scheduleId, dsr_id: dsrId })
-    });
-    
-    const result = await res.json();
-    if (result.success) {
-      closeEditDsrModal();
-      loadSchedules();
-    } else {
-      alert(result.message || 'Failed to update DSR');
-    }
-  } catch (err) {
-    console.error(err);
-    alert('An error occurred while updating DSR');
-  }
-}
-
-function openEditDeliveryDateModal(scheduleId, currentDate) {
-  document.getElementById('edit-delivery-date-schedule-id').value = scheduleId;
-  document.getElementById('edit-delivery-date-input').value = currentDate;
-  document.getElementById('edit-delivery-date-modal').classList.remove('hidden');
-}
-
-function closeEditDeliveryDateModal() {
-  document.getElementById('edit-delivery-date-modal').classList.add('hidden');
-}
-
-async function saveDeliveryDateChange() {
-  const scheduleId = document.getElementById('edit-delivery-date-schedule-id').value;
-  const deliveryDate = document.getElementById('edit-delivery-date-input').value;
-  
-  if (!scheduleId || !deliveryDate) {
-    alert('Please select a valid date.');
-    return;
-  }
-  
-  try {
-    const res = await fetch('<?= url("manager/api/dispatch/update-delivery-date") ?>', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ schedule_id: scheduleId, delivery_date: deliveryDate })
-    });
-    
-    const result = await res.json();
-    if (result.success) {
-      closeEditDeliveryDateModal();
-      loadSchedules();
-    } else {
-      alert(result.message || 'Failed to update delivery date');
-    }
-  } catch (err) {
-    console.error(err);
-    alert('An error occurred while updating delivery date');
   }
 }
 
@@ -1044,9 +978,11 @@ function renderSrList(srs) {
   }
   
   srs.forEach(sr => {
+    const isCutoff = sr.is_cutoff == 1;
     const div = document.createElement('div');
-    div.className = 'connector-card bg-white p-4 rounded-xl border border-gray-200 flex items-center justify-between shadow-sm relative';
+    div.className = `connector-card p-4 rounded-xl border flex items-center justify-between shadow-sm relative ${isCutoff ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-300 opacity-60'}`;
     div.id = `sr-card-${sr.id}`;
+    div.setAttribute('data-is-cutoff', sr.is_cutoff || 0);
     div.innerHTML = `
       <div class="flex items-center gap-3 pointer-events-none flex-1 min-w-0">
         <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold shrink-0">${sr.name.charAt(0)}</div>
@@ -1124,8 +1060,13 @@ function renderDsrList(dsrs) {
 }
 
 function handleSrClick(id) {
+  const card = document.getElementById(`sr-card-${id}`);
+  if (card && card.getAttribute('data-is-cutoff') != 1) {
+    alert('এই SR-এর অর্ডার কাটা এখনও শেষ হয়নি। Assignment করা যাবে না।');
+    return;
+  }
   document.querySelectorAll('#sr-list .connector-card').forEach(el => el.classList.remove('active'));
-  document.getElementById(`sr-card-${id}`).classList.add('active');
+  card.classList.add('active');
   activeSrId = id;
 }
 

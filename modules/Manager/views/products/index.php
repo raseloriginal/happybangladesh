@@ -84,13 +84,25 @@
                                             <div class="text-sm font-medium text-gray-800"><?= htmlspecialchars($p['company_name'] ?? 'General') ?></div>
                                             <div class="text-xs text-gray-500"><?= htmlspecialchars($p['category_name'] ?? 'Uncategorized') ?></div>
                                         </td>
-                                        <td class="py-4 px-6 text-center">
-                                             <?php $isLowStock = ($displayBoxes == 0 && $displayPieces < 10); ?>
-                                             <div class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium <?= $isLowStock ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' ?>">
-                                                 <div><?= $displayBoxes ?> Box</div>
-                                                 <div><?= $displayPieces ?> Pcs</div>
-                                             </div>
-                                        </td>
+                                         <td class="py-4 px-6 text-center">
+                                              <?php $isLowStock = ($totalPieces < 10); ?>
+                                              <div class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium <?= $isLowStock ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' ?>">
+                                                   <div>
+                                                       <?php
+                                                       $boxType = trim($p['box_type'] ?? '');
+                                                       $boxTypeLower = strtolower($boxType);
+                                                       if ($boxTypeLower === 'pcs') {
+                                                           echo $totalPieces . ' পিস';
+                                                       } elseif ($boxType === 'পিস' || $boxType === 'পলি' || $boxType === 'জার') {
+                                                           echo $totalPieces . ' ' . htmlspecialchars($boxType);
+                                                       } else {
+                                                           $boxLabel = !empty($boxType) ? $boxType : 'Box';
+                                                           echo $displayBoxes . ' ' . htmlspecialchars($boxLabel) . ' - ' . $displayPieces . ' পিস';
+                                                       }
+                                                       ?>
+                                                   </div>
+                                              </div>
+                                         </td>
                                         <td class="py-4 px-6 text-right">
                                             <?php $sellPricePerBox = (float)$p['buying_price'] * (1 + (float)$p['dealer_percentage'] / 100); ?>
                                             <div class="text-sm font-bold text-gray-900">Sell: ৳<?= number_format($sellPricePerBox, 2) ?></div>
@@ -102,11 +114,14 @@
                                             <div class="text-xs text-gray-500"><?= $p['pieces_per_box'] ?> Pcs/Box</div>
                                         </td>
                                         <td class="py-4 px-6 text-right">
-                                            <div class="flex justify-end gap-2">
-                                                <button onclick='editProduct(<?= json_encode($p) ?>)' class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium" title="Edit Product">
-                                                    <i class="fas fa-pen"></i>
-                                                </button>
-                                            </div>
+                                             <div class="flex justify-end gap-2">
+                                                 <button onclick='openAdjustPriceModal(<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>)' class="bg-amber-50 text-amber-600 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium" title="Adjust Buying Price">
+                                                     <i class="fas fa-tag"></i>
+                                                 </button>
+                                                 <button onclick='editProduct(<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>)' class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium" title="Edit Product">
+                                                     <i class="fas fa-pen"></i>
+                                                 </button>
+                                             </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -303,7 +318,65 @@
     </div>
 </div>
 
+<!-- Adjust Buying Price Modal -->
+<div id="adjust-price-modal" class="modal-overlay hidden">
+    <div class="modal-box p-6 max-w-md w-full">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b">
+            <div>
+                <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-tag text-amber-500"></i> Adjust Buying Price
+                </h3>
+                <p id="adjust-product-name" class="text-xs text-gray-500 font-medium mt-0.5"></p>
+            </div>
+            <button onclick="closeModal('adjust-price-modal')" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
 
+        <form id="adjust-price-form" class="space-y-4">
+            <input type="hidden" id="adjust-product-id">
+            <input type="hidden" id="adjust-dealer-pct-val" value="0">
+            <input type="hidden" id="adjust-pcs-per-box-val" value="1">
+
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-2 text-xs text-amber-900">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 font-medium">Current Buying Price:</span>
+                    <span id="adjust-curr-buy" class="font-bold text-gray-900 text-sm">৳0.00</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 font-medium">Dealer Commission:</span>
+                    <span id="adjust-dealer-pct" class="font-bold text-indigo-700">0%</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 font-medium">Current Selling Price:</span>
+                    <span id="adjust-curr-sell" class="font-bold text-emerald-700">৳0.00</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">New Buying Price (৳) *</label>
+                <div class="relative flex items-center">
+                    <span class="absolute left-3 text-gray-500 font-bold text-base pointer-events-none z-10 select-none">৳</span>
+                    <input type="number" step="0.01" min="0" id="adjust-new-buy-price" class="form-input text-sm w-full py-2 font-semibold text-gray-900" style="padding-left: 2.25rem !important;" placeholder="0.00" required>
+                </div>
+            </div>
+
+            <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3.5 text-xs text-indigo-950">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600 font-medium">New Calculated Selling Price (per piece):</span>
+                    <span id="calc-new-sell-piece" class="font-bold text-indigo-700 text-sm">৳0.00</span>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-3 border-t mt-4">
+                <button type="button" onclick="closeModal('adjust-price-modal')" class="btn btn-secondary flex-1">Cancel</button>
+                <button type="submit" id="btn-submit-adjust-price" class="btn btn-primary bg-amber-600 hover:bg-amber-700 border-amber-600 flex-1 flex items-center justify-center gap-2">
+                    <i class="fas fa-check"></i> Update Price
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script>
 // UI State
@@ -792,6 +865,84 @@ window.addEventListener('paste', (e) => {
             fileInput.files = dataTransfer.files;
             previewBulkImage(fileInput);
         }
+    }
+});
+
+// Adjust Buying Price Functions
+function openAdjustPriceModal(p) {
+    document.getElementById('adjust-product-id').value = p.id;
+    document.getElementById('adjust-product-name').textContent = p.name + (p.sku ? ' (SKU: ' + p.sku + ')' : '');
+    
+    const buyPrice = parseFloat(p.buying_price || 0);
+    const dealerPct = parseFloat(p.dealer_percentage || 0);
+    const pcsPerBox = Math.max(1, parseFloat(p.pieces_per_box || 1));
+    const currSellPriceBox = buyPrice * (1 + dealerPct / 100);
+
+    document.getElementById('adjust-curr-buy').textContent = '৳' + buyPrice.toFixed(2);
+    document.getElementById('adjust-dealer-pct').textContent = dealerPct + '%';
+    document.getElementById('adjust-curr-sell').textContent = '৳' + currSellPriceBox.toFixed(2);
+
+    document.getElementById('adjust-dealer-pct-val').value = dealerPct;
+    document.getElementById('adjust-pcs-per-box-val').value = pcsPerBox;
+    document.getElementById('adjust-new-buy-price').value = buyPrice ? buyPrice.toFixed(2) : '';
+
+    calculateNewSellingPrice();
+    openModal('adjust-price-modal');
+}
+
+function calculateNewSellingPrice() {
+    const newBuy = parseFloat(document.getElementById('adjust-new-buy-price').value) || 0;
+    const dealerPct = parseFloat(document.getElementById('adjust-dealer-pct-val').value) || 0;
+    const pcsPerBox = Math.max(1, parseFloat(document.getElementById('adjust-pcs-per-box-val').value) || 1);
+
+    const newSellBox = newBuy * (1 + dealerPct / 100);
+    const newSellPiece = newSellBox / pcsPerBox;
+
+    const elBox = document.getElementById('calc-new-sell-box');
+    if (elBox) elBox.textContent = '৳' + newSellBox.toFixed(2);
+    
+    const elPiece = document.getElementById('calc-new-sell-piece');
+    if (elPiece) elPiece.textContent = '৳' + newSellPiece.toFixed(2);
+}
+
+document.getElementById('adjust-new-buy-price').addEventListener('input', calculateNewSellingPrice);
+
+document.getElementById('adjust-price-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const pid = document.getElementById('adjust-product-id').value;
+    const newBuyPrice = document.getElementById('adjust-new-buy-price').value;
+    const csrf = document.getElementById('csrf').value;
+
+    if (!pid || !newBuyPrice) return alert('Please enter a valid buying price.');
+
+    const btn = document.getElementById('btn-submit-adjust-price');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+
+    try {
+        const res = await fetch('<?= BASE_URL ?>/manager/api/products/adjust-buying-price', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                csrf_token: csrf,
+                product_id: pid,
+                buying_price: newBuyPrice
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to update buying price'));
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    } catch (err) {
+        alert('Network error: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 });
 

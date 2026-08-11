@@ -251,18 +251,46 @@
 </div>
 
 <script>
+let cutoffCountdownTimer = null;
+
 function openCutoffConfirmModal() {
   const modal = document.getElementById('cutoffConfirmModal');
   const content = document.getElementById('cutoffConfirmContent');
+  const confirmBtn = document.getElementById('cutoffConfirmOkBtn');
+  
   modal.classList.remove('hidden');
   modal.classList.add('flex');
   setTimeout(() => {
     content.classList.remove('scale-95', 'opacity-0');
     content.classList.add('scale-100', 'opacity-100');
   }, 10);
+
+  // Countdown initialization
+  if (cutoffCountdownTimer) clearInterval(cutoffCountdownTimer);
+  let seconds = 10;
+  confirmBtn.disabled = true;
+  confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+  confirmBtn.innerHTML = `হ্যাঁ, শেষ করুন (${seconds}s)`;
+
+  cutoffCountdownTimer = setInterval(() => {
+    seconds--;
+    if (seconds > 0) {
+      confirmBtn.innerHTML = `হ্যাঁ, শেষ করুন (${seconds}s)`;
+    } else {
+      clearInterval(cutoffCountdownTimer);
+      cutoffCountdownTimer = null;
+      confirmBtn.disabled = false;
+      confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      confirmBtn.innerHTML = 'হ্যাঁ, শেষ করুন';
+    }
+  }, 1000);
 }
 
 function closeCutoffConfirmModal() {
+  if (cutoffCountdownTimer) {
+    clearInterval(cutoffCountdownTimer);
+    cutoffCountdownTimer = null;
+  }
   const modal = document.getElementById('cutoffConfirmModal');
   const content = document.getElementById('cutoffConfirmContent');
   content.classList.remove('scale-100', 'opacity-100');

@@ -13,6 +13,7 @@ $isMainDomain = (
     $hostname === 'happybangladesh.com'  || $hostname === 'www.happybangladesh.com' ||
     $hostname === 'happybangladesh.site' || $hostname === 'www.happybangladesh.site'
 );
+$isv1 = ($hostname === 'v1.happybangladesh.site' || $hostname === 'www.v1.happybangladesh.site');
 $isDraft = ($hostname === 'happydraft.raseloriginal.digital');
 $isHttps = (!$isLocalhost)
     || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -54,11 +55,17 @@ if ($isLocalhost) {
     define('DB_USER', 'happybd');
     define('DB_PASS', '9pH{53ff.uB5Qehh');
 } elseif ($isDraft) {
-  define('DB_HOST', 'localhost');
+    define('DB_HOST', 'localhost');
     define('DB_PORT', '3306');
     define('DB_NAME', 'happybddraft');
     define('DB_USER', 'happybddraft');
     define('DB_PASS', '9pH{53ff.uB5Qehh');
+} elseif ($isv1) {
+    define('DB_HOST', 'localhost');
+    define('DB_PORT', '3306');
+    define('DB_NAME', 'happybangladeshV1');
+    define('DB_USER', 'happybangladeshV1');
+    define('DB_PASS', 'OaSaTHTEbWrt5I607RTo');
 } else {
     define('DB_HOST', 'localhost');
     define('DB_PORT', '3306');

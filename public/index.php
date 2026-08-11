@@ -153,7 +153,8 @@ $router->get( '/admin/database-sync',         ['AdminController', 'databaseSync'
 $router->post('/admin/database-sync/run',     ['AdminController', 'databaseSyncRun']);
 $router->post('/admin/database-sync/clear',   ['AdminController', 'databaseClear']);
 
-// Import Retailers
+// Retailers
+$router->get( '/admin/retailers',             ['AdminController', 'retailers']);
 $router->get( '/admin/retailers/import',      ['AdminController', 'retailersImport']);
 $router->post('/admin/retailers/import',      ['AdminController', 'retailersImportPost']);
 
@@ -175,6 +176,16 @@ $router->get( '/admin/dsr-tracking',                  ['AdminController', 'dsrTr
 $router->get( '/admin/api/dsr-tracking/live',         ['AdminController', 'apiDsrTrackingLive']);
 $router->get( '/admin/api/dsr-tracking/history',      ['AdminController', 'apiDsrTrackingHistory']);
 
+// Custom Areas Map Management
+$router->get( '/admin/custom-areas',                  ['AdminController', 'customAreas']);
+$router->get( '/admin/api/custom-areas',              ['AdminController', 'apiCustomAreas']);
+$router->post('/admin/api/custom-areas/store',        ['AdminController', 'apiCustomAreaStore']);
+$router->post('/admin/api/custom-areas/update/{id}',  ['AdminController', 'apiCustomAreaUpdate']);
+$router->post('/admin/api/custom-areas/delete/{id}',  ['AdminController', 'apiCustomAreaDelete']);
+
+// Manager Logs
+$router->get( '/admin/manager-logs',                  ['AdminController', 'managerLogs']);
+
 
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
@@ -183,6 +194,7 @@ $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']
 $router->get( '/manager/products',            ['ManagerController', 'products']);
 $router->post('/manager/api/products',        ['ManagerController', 'apiProductStore']);
 $router->post('/manager/api/products/update', ['ManagerController', 'apiProductUpdate']);
+$router->post('/manager/api/products/adjust-buying-price', ['ManagerController', 'apiAdjustBuyingPrice']);
 $router->post('/manager/api/products/delete', ['ManagerController', 'apiProductDelete']);
 $router->post('/manager/api/stock/adjust',    ['ManagerController', 'apiStockAdjust']);
 
@@ -199,6 +211,12 @@ $router->post('/manager/api/lots/delete',     ['ManagerController', 'apiLotDelet
 $router->post('/manager/api/lots/delete-batch',['ManagerController', 'apiLotBatchDelete']);
 $router->post('/manager/api/lots/update-batch',['ManagerController', 'apiLotBatchUpdate']);
 
+// Manager Orders
+$router->get( '/manager/orders',                             ['ManagerController', 'orders']);
+$router->get( '/manager/api/orders/companies',               ['ManagerController', 'apiOrdersCompanies']);
+$router->get( '/manager/api/orders/srs',                     ['ManagerController', 'apiOrdersSrs']);
+$router->get( '/manager/api/orders/products',                ['ManagerController', 'apiOrdersProducts']);
+
 // Other manager pages
 $router->get( '/manager/inventory',           ['ManagerController', 'inventory']);
 $router->get( '/manager/dispatch',                           ['ManagerController', 'dispatch']);
@@ -206,6 +224,7 @@ $router->get( '/manager/api/dispatch/data',                  ['ManagerController
 $router->get( '/manager/api/dispatch/new-popup-data',        ['ManagerController', 'apiDispatchNewPopupData']);
 $router->post('/manager/api/dispatch/assign',                ['ManagerController', 'apiDispatchAssign']);
 $router->get( '/manager/api/dispatch/sr-details/{id}',       ['ManagerController', 'apiDispatchSrDetails']);
+$router->get( '/manager/api/dispatch/company-details/{id}',  ['ManagerController', 'apiDispatchCompanyDetails']);
 $router->get( '/manager/api/dispatch/organize-data/{id}',    ['ManagerController', 'apiDispatchOrganizeData']);
 $router->post('/manager/api/dispatch/organize-save/{id}',    ['ManagerController', 'apiDispatchOrganizeSave']);
 $router->post('/manager/api/dispatch/status-update/{id}',    ['ManagerController', 'apiDispatchStatusUpdate']);
@@ -216,14 +235,25 @@ $router->post('/manager/api/dispatch/update-delivery-date',     ['ManagerControl
 $router->post('/manager/api/dispatch/delete/{id}',            ['ManagerController', 'apiDispatchDelete']);
 $router->get( '/manager/settlements',               ['ManagerController', 'settlements']);
 $router->post('/manager/api/settlements/update/{id}',['ManagerController', 'apiSettlementUpdate']);
-$router->get( '/manager/attendance',          ['ManagerController', 'attendance']);
-$router->post('/manager/attendance/store',    ['ManagerController', 'attendanceStore']);
+$router->get( '/manager/attendance',                    ['ManagerController', 'attendance']);
+$router->post('/manager/attendance/store',              ['ManagerController', 'attendanceStore']);
+$router->get( '/manager/api/attendance/qr',             ['ManagerController', 'apiAttendanceQrGet']);
+$router->post('/manager/api/attendance/qr/generate',    ['ManagerController', 'apiAttendanceQrGenerate']);
 $router->get( '/manager/readysale',           ['ManagerController', 'readysale']);
 $router->post('/manager/readysale/store',     ['ManagerController', 'readysaleStore']);
 
 // Order Cutoff
 $router->get( '/manager/api/sr-cutoff-status',              ['ManagerController', 'apiSrCutoffStatus']);
 $router->post('/manager/api/order-cutoff/undo/{srId}',      ['ManagerController', 'apiUndoOrderCutoff']);
+
+// Operations Panel
+$router->get( '/manager/operations',                          ['ManagerController', 'operations']);
+$router->get( '/manager/api/operations/orders',               ['ManagerController', 'apiOperationsOrders']);
+$router->get( '/manager/api/operations/deliveries',           ['ManagerController', 'apiOperationsDeliveries']);
+$router->post('/manager/api/operations/edit-order/{id}',      ['ManagerController', 'apiOperationsEditOrder']);
+$router->post('/manager/api/operations/edit-delivery/{id}',   ['ManagerController', 'apiOperationsEditDelivery']);
+$router->post('/manager/api/operations/place-order',          ['ManagerController', 'apiOperationsPlaceOrder']);
+$router->post('/manager/api/operations/make-delivery',        ['ManagerController', 'apiOperationsMakeDelivery']);
 
 // ── SR routes ─────────────────────────────────────────────────
 $router->get( '/sr/dashboard',                ['SRController', 'dashboard']);
@@ -258,11 +288,16 @@ $router->post('/dsr/collection/complete',     ['DSRController', 'collectionCompl
 $router->get( '/dsr/settlement',              ['DSRController', 'settlement']);
 $router->post('/dsr/settlement/submit',       ['DSRController', 'settlementSubmit']);
 $router->get( '/dsr/api/settlement/returns',  ['DSRController', 'apiSettlementReturns']);
+$router->get( '/dsr/api/settlement/oc',       ['DSRController', 'apiSettlementOc']);
 $router->get( '/dsr/profile',                 ['DSRController', 'profile']);
 $router->post('/dsr/api/retailers/store',     ['DSRController', 'apiStoreRetailer']);
 $router->post('/dsr/damage/store',            ['DSRController', 'damageStore']);
 $router->get( '/dsr/api/companies-products',   ['DSRController', 'apiCompanyProducts']);
 $router->post('/dsr/api/location/push',       ['DSRController', 'apiPushLocation']);
+$router->get( '/dsr/api/van-stock',           ['DSRController', 'apiVanStock']);
+$router->post('/dsr/ready-sale/store',         ['DSRController', 'readySaleStore']);
+$router->get( '/dsr/qr-code',                  ['DSRController', 'qrCode']);
+$router->post('/dsr/qr-code/mark',             ['DSRController', 'qrCodeMark']);
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);

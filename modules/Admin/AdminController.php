@@ -1392,6 +1392,194 @@ class AdminController extends Controller
 
         $this->redirect('admin/sessions');
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Custom Areas Map Management
+    // ══════════════════════════════════════════════════════════
+    public function customAreas(): void
+    {
+        $srs = $this->db->query("SELECT u.id, u.name FROM users u JOIN roles r ON r.id=u.role_id WHERE r.slug='sr' AND u.status=1 ORDER BY u.name ASC")->fetchAll();
+        $dsrs = $this->db->query("SELECT u.id, u.name FROM users u JOIN roles r ON r.id=u.role_id WHERE r.slug='dsr' AND u.status=1 ORDER BY u.name ASC")->fetchAll();
+        $warehouses = $this->db->query("SELECT id, name FROM warehouses WHERE status=1 ORDER BY name ASC")->fetchAll();
+
+        $pageTitle = 'Custom Area Map Management';
+        $this->render('custom_areas', compact('srs', 'dsrs', 'warehouses', 'pageTitle'));
+    }
+
+    public function apiCustomAreas(): void
+    {
+        header('Content-Type: application/json');
+        $areas = $this->db->query("SELECT * FROM custom_areas WHERE status=1 ORDER BY created_at DESC")->fetchAll();
+        foreach ($areas as &$area) {
+            $area['coordinates'] = json_decode($area['coordinates']);
+        }
+        echo json_encode(['success' => true, 'data' => $areas]);
+        exit;
+    }
+
+    public function apiCustomAreaStore(): void
+    {
+        header('Content-Type: application/json');
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+        if (!$input) { $input = $_POST; }
+
+        $name          = trim($input['name'] ?? '');
+        $description   = trim($input['description'] ?? '');
+        $type          = trim($input['type'] ?? 'polygon');
+        $coordinates   = is_array($input['coordinates'] ?? null) ? json_encode($input['coordinates']) : ($input['coordinates'] ?? '');
+        $strokeColor   = trim($input['stroke_color'] ?? '#3b82f6');
+        $fillColor     = trim($input['fill_color'] ?? '#93c5fd');
+        $fillOpacity   = floatval($input['fill_opacity'] ?? 0.35);
+        $assignedType  = !empty($input['assigned_type']) ? trim($input['assigned_type']) : null;
+        $assignedId    = !empty($input['assigned_id']) ? (int)$input['assigned_id'] : null;
+
+        if (!$name || !$coordinates) {
+            echo json_encode(['success' => false, 'message' => 'Area name and valid geometry coordinates are required.']);
+            exit;
+        }
+
+        $stmt = $this->db->prepare("INSERT INTO custom_areas (name, description, type, coordinates, stroke_color, fill_color, fill_opacity, assigned_type, assigned_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $description, $type, $coordinates, $strokeColor, $fillColor, $fillOpacity, $assignedType, $assignedId]);
+        $id = $this->db->lastInsertId();
+
+        echo json_encode(['success' => true, 'id' => $id, 'message' => 'Custom area saved successfully.']);
+        exit;
+    }
+
+    public function apiCustomAreaUpdate(string $id): void
+    {
+        header('Content-Type: application/json');
+        $rawInput = file_get_contents('php://input');
+        $input = json_decode($rawInput, true);
+        if (!$input) { $input = $_POST; }
+
+        $areaId = (int)$id;
+        $name          = trim($input['name'] ?? '');
+        $description   = trim($input['description'] ?? '');
+        $type          = trim($input['type'] ?? 'polygon');
+        $coordinates   = is_array($input['coordinates'] ?? null) ? json_encode($input['coordinates']) : ($input['coordinates'] ?? '');
+        $strokeColor   = trim($input['stroke_color'] ?? '#3b82f6');
+        $fillColor     = trim($input['fill_color'] ?? '#93c5fd');
+        $fillOpacity   = floatval($input['fill_opacity'] ?? 0.35);
+        $assignedType  = !empty($input['assigned_type']) ? trim($input['assigned_type']) : null;
+        $assignedId    = !empty($input['assigned_id']) ? (int)$input['assigned_id'] : null;
+
+        if (!$name || !$coordinates) {
+            echo json_encode(['success' => false, 'message' => 'Area name and valid geometry coordinates are required.']);
+            exit;
+        }
+
+        $stmt = $this->db->prepare("UPDATE custom_areas SET name=?, description=?, type=?, coordinates=?, stroke_color=?, fill_color=?, fill_opacity=?, assigned_type=?, assigned_id=? WHERE id=?");
+        $stmt->execute([$name, $description, $type, $coordinates, $strokeColor, $fillColor, $fillOpacity, $assignedType, $assignedId, $areaId]);
+
+        echo json_encode(['success' => true, 'message' => 'Custom area updated successfully.']);
+        exit;
+    }
+
+    public function apiCustomAreaDelete(string $id): void
+    {
+        header('Content-Type: application/json');
+        $areaId = (int)$id;
+        $stmt = $this->db->prepare("DELETE FROM custom_areas WHERE id=?");
+        $stmt->execute([$areaId]);
+
+        echo json_encode(['success' => true, 'message' => 'Custom area deleted successfully.']);
+        exit;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Retailers Page
+    // ══════════════════════════════════════════════════════════
+    public function retailers(): void
+    {
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $search = trim($_GET['search'] ?? '');
+        
+        $where = " WHERE 1=1 ";
+        $params = [];
+        
+        if ($search !== '') {
+            $where .= " AND (name LIKE ? OR phone LIKE ? OR address LIKE ?) ";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        $qCount = $this->db->prepare("SELECT COUNT(*) FROM retailers $where");
+        $qCount->execute($params);
+        $totalRows = (int)$qCount->fetchColumn();
+        $totalPages = max(1, ceil($totalRows / $limit));
+
+        $q = $this->db->prepare("
+            SELECT * FROM retailers
+            $where
+            ORDER BY created_at DESC
+            LIMIT $limit OFFSET $offset
+        ");
+        $q->execute($params);
+        $items = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        // Map data: fetch all retailers with valid coordinates
+        $qMap = $this->db->query("SELECT name, phone, address, lat, lng FROM retailers WHERE lat IS NOT NULL AND lng IS NOT NULL AND lat != 0 AND lng != 0");
+        $mapData = $qMap->fetchAll(PDO::FETCH_ASSOC);
+
+        $pageTitle = 'Retailers';
+        $this->render('retailers/index', compact('items', 'page', 'totalPages', 'search', 'totalRows', 'mapData', 'pageTitle', 'offset'), 'main');
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Manager Logs
+    // ══════════════════════════════════════════════════════════
+    public function managerLogs(): void
+    {
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $dateFrom = $_GET['date_from'] ?? '';
+        $dateTo = $_GET['date_to'] ?? '';
+        $managerId = $_GET['manager_id'] ?? '';
+
+        $where = " WHERE 1=1 ";
+        $params = [];
+        if (!empty($dateFrom)) {
+            $where .= " AND DATE(ma.created_at) >= ? ";
+            $params[] = $dateFrom;
+        }
+        if (!empty($dateTo)) {
+            $where .= " AND DATE(ma.created_at) <= ? ";
+            $params[] = $dateTo;
+        }
+        if (!empty($managerId)) {
+            $where .= " AND ma.manager_id = ? ";
+            $params[] = $managerId;
+        }
+
+        $qCount = $this->db->prepare("SELECT COUNT(*) FROM manager_activities ma $where");
+        $qCount->execute($params);
+        $totalLogs = $qCount->fetchColumn();
+        $totalPages = ceil($totalLogs / $limit);
+
+        $q = $this->db->prepare("
+            SELECT ma.*, u.name AS manager_name
+            FROM manager_activities ma
+            LEFT JOIN users u ON u.id = ma.manager_id
+            $where
+            ORDER BY ma.created_at DESC
+            LIMIT $limit OFFSET $offset
+        ");
+        $q->execute($params);
+        $logs = $q->fetchAll();
+
+        $managers = $this->db->query("SELECT u.id, u.name FROM users u JOIN roles r ON r.id=u.role_id WHERE r.slug='manager'")->fetchAll();
+
+        $pageTitle = 'Manager Activities';
+        $this->render('manager_logs', compact('logs', 'page', 'totalPages', 'managers', 'managerId', 'dateFrom', 'dateTo', 'pageTitle'), 'main');
+    }
 }
 
 
