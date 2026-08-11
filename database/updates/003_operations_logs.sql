@@ -11,3 +11,5 @@ CREATE TABLE IF NOT EXISTS `operations_logs` (
   KEY `manager_id` (`manager_id`),
   CONSTRAINT `fk_operations_manager_id` FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE `operations_logs` MODIFY COLUMN `action_type` VARCHAR(50) NOT NULL;
