@@ -2431,6 +2431,7 @@ class ManagerController extends Controller
         header('Content-Type: application/json; charset=utf-8');
         $id = (int)$id;
         $reason = $this->post('reason');
+        $orderDateInput = $this->post('order_date');
         $itemsJson = $this->post('items');
         
         if (empty($reason) || empty($itemsJson)) {
@@ -2459,6 +2460,30 @@ class ManagerController extends Controller
                 throw new \Exception("Cannot edit orders older than 2 days.");
             }
 
+            $originalDateStr = $orderDate->format('Y-m-d');
+            $newDateStr = $orderDateInput ? date('Y-m-d', strtotime($orderDateInput)) : $originalDateStr;
+            
+            if ($newDateStr !== $originalDateStr) {
+                // Check if SR is assigned on the original date OR the new date
+                $checkAssign = $this->db->prepare("
+                    SELECT COUNT(*) 
+                    FROM dispatch_schedules ds 
+                    JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
+                    WHERE dss.sr_id = ? AND (ds.dispatch_date = ? OR ds.dispatch_date = ?)
+                ");
+                $checkAssign->execute([$order['sr_id'], $originalDateStr, $newDateStr]);
+                $isAssigned = $checkAssign->fetchColumn();
+
+                if ($isAssigned > 0) {
+                    throw new \Exception("Cannot change date. The SR is already assigned to a dispatch on the original or new date.");
+                }
+
+                // Update created_at with new date but keep original time
+                $originalTime = $orderDate->format('H:i:s');
+                $newTimestamp = $newDateStr . ' ' . $originalTime;
+                $this->db->prepare("UPDATE orders SET created_at = ? WHERE id = ?")->execute([$newTimestamp, $id]);
+            }
+
             $oldTotal = (float)$order['total_amount'];
             $newTotal = 0;
 
@@ -2476,6 +2501,13 @@ class ManagerController extends Controller
             // Update order total
             $this->db->prepare("UPDATE orders SET total_amount = ? WHERE id = ?")->execute([$newTotal, $id]);
 
+            $oldLogData = ['total_amount' => $oldTotal];
+            $newLogData = ['total_amount' => $newTotal];
+            if (isset($newDateStr) && isset($originalDateStr) && $newDateStr !== $originalDateStr) {
+                $oldLogData['order_date'] = $originalDateStr;
+                $newLogData['order_date'] = $newDateStr;
+            }
+
             // Log the operation
             $logStmt = $this->db->prepare("INSERT INTO operations_logs (action_type, reference_id, manager_id, reason, old_data, new_data) VALUES (?, ?, ?, ?, ?, ?)");
             $logStmt->execute([
@@ -2483,11 +2515,83 @@ class ManagerController extends Controller
                 $id,
                 Auth::id(),
                 $reason,
-                json_encode(['total_amount' => $oldTotal]),
-                json_encode(['total_amount' => $newTotal])
+                json_encode($oldLogData),
+                json_encode($newLogData)
             ]);
 
             \Helpers::logManagerActivity(\Auth::id(), 'edit_order', 'Edited operation order ID: ' . $id . ' for reason: ' . $reason, $id);
+
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsDeleteOrder(string $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $id = (int)$id;
+        $reason = $this->post('reason');
+        
+        if (empty($reason)) {
+            echo json_encode(['success' => false, 'message' => 'Reason is required.']);
+            exit;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $order = $this->db->query("SELECT * FROM orders WHERE id = $id")->fetch(PDO::FETCH_ASSOC);
+            if (!$order) {
+                throw new \Exception("Order not found.");
+            }
+
+            // Check if within 2 days
+            $orderDate = new \DateTime($order['created_at']);
+            $now = new \DateTime();
+            if ($now->diff($orderDate)->days > 2) {
+                throw new \Exception("Cannot delete orders older than 2 days.");
+            }
+
+            $orderDateStr = $orderDate->format('Y-m-d');
+            
+            // Check if SR is assigned on the date
+            $checkAssign = $this->db->prepare("
+                SELECT COUNT(*) 
+                FROM dispatch_schedules ds 
+                JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
+                WHERE dss.sr_id = ? AND ds.dispatch_date = ?
+            ");
+            $checkAssign->execute([$order['sr_id'], $orderDateStr]);
+            $isAssigned = $checkAssign->fetchColumn();
+
+            if ($isAssigned > 0) {
+                throw new \Exception("Cannot delete order. The SR is already assigned to a dispatch on this date.");
+            }
+
+            // Log the operation
+            $logStmt = $this->db->prepare("INSERT INTO operations_logs (action_type, reference_id, manager_id, reason, old_data, new_data) VALUES (?, ?, ?, ?, ?, ?)");
+            $logStmt->execute([
+                'delete_order',
+                $id,
+                Auth::id(),
+                $reason,
+                json_encode(['order_data' => $order]),
+                json_encode(['status' => 'deleted'])
+            ]);
+
+            \Helpers::logManagerActivity(\Auth::id(), 'delete_order', 'Deleted operation order ID: ' . $id . ' for reason: ' . $reason, $id);
+
+            // Delete order items
+            $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$id]);
+            
+            // Delete order
+            $this->db->prepare("DELETE FROM orders WHERE id = ?")->execute([$id]);
 
             $this->db->commit();
             echo json_encode(['success' => true]);
