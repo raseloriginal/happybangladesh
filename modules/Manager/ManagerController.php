@@ -2718,6 +2718,7 @@ class ManagerController extends Controller
         $id = (int)$id;
         $reason = $this->post('reason');
         $paidAmount = (float)$this->post('paid_amount');
+        $status = $this->post('status');
         $itemsJson = $this->post('items');
         
         if (empty($reason) || empty($itemsJson)) {
@@ -2756,8 +2757,8 @@ class ManagerController extends Controller
                          ->execute([$qty, $itemId, $id]);
             }
 
-            // Update dispatch paid_amount
-            $this->db->prepare("UPDATE dispatches SET paid_amount = ? WHERE id = ?")->execute([$paidAmount, $id]);
+            // Update dispatch paid_amount and status
+            $this->db->prepare("UPDATE dispatches SET paid_amount = ?, status = ? WHERE id = ?")->execute([$paidAmount, $status, $id]);
 
             // Log the operation
             $logStmt = $this->db->prepare("INSERT INTO operations_logs (action_type, reference_id, manager_id, reason, old_data, new_data) VALUES (?, ?, ?, ?, ?, ?)");
