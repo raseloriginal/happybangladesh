@@ -58,11 +58,36 @@
                     </div>
                 </div>
 
+                <!-- Bulk Date Change Toolbar -->
+                <div id="bulk-order-toolbar" class="hidden mb-4 p-4 bg-slate-900 text-white rounded-xl shadow-lg border border-slate-700 transition-all flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center font-bold text-sm text-blue-400">
+                            <i class="fa-solid fa-check-double"></i>
+                        </span>
+                        <div>
+                            <span class="font-bold text-sm text-white" id="selected-orders-count">0 orders selected</span>
+                            <p class="text-xs text-slate-400 font-medium">Bulk change date for all checked orders</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <div class="flex flex-wrap items-center gap-2 bg-slate-800 p-1.5 rounded-lg border border-slate-700 w-full md:w-auto">
+                            <input type="date" id="bulk-order-date-input" class="px-3 py-1.5 bg-white text-slate-800 text-xs font-bold rounded shadow-sm outline-none border border-slate-200">
+                            <input type="text" id="bulk-order-reason-input" placeholder="Reason (required)..." class="px-3 py-1.5 bg-white text-slate-800 text-xs font-medium rounded shadow-sm outline-none border border-slate-200 w-full md:w-64">
+                        </div>
+                        <button type="button" onclick="submitBulkDateChange()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-md transition-all flex items-center gap-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-calendar-check"></i> Apply Date Change
+                        </button>
+                    </div>
+                </div>
+
                 <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-slate-600 whitespace-nowrap">
                             <thead class="text-xs text-slate-500 uppercase tracking-wider bg-slate-50 font-bold border-b border-slate-200">
                                 <tr>
+                                    <th class="px-4 py-4 w-10 text-center">
+                                        <input type="checkbox" id="select-all-orders" onchange="toggleSelectAllOrders(this)" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer" title="Select All">
+                                    </th>
                                     <th class="px-6 py-4">Order ID</th>
                                     <th class="px-6 py-4">SR Name</th>
                                     <th class="px-6 py-4">Retailer</th>
@@ -72,7 +97,7 @@
                                 </tr>
                             </thead>
                             <tbody id="orders-list" class="divide-y divide-slate-100">
-                                <tr><td colspan="6" class="text-center py-8 font-medium text-slate-500">Loading...</td></tr>
+                                <tr><td colspan="7" class="text-center py-8 font-medium text-slate-500">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -305,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function fetchOrders() {
-    document.getElementById('orders-list').innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
+    document.getElementById('orders-list').innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading...</td></tr>';
     try {
         const res = await fetch(basePath + '/manager/api/operations/orders');
         const json = await res.json();
@@ -313,10 +338,10 @@ async function fetchOrders() {
             windowOrdersData = json.data;
             renderOrders(windowOrdersData);
         } else {
-            document.getElementById('orders-list').innerHTML = `<tr><td colspan="6" class="text-center text-red-500 py-4">${json.message || 'Failed to fetch orders'}</td></tr>`;
+            document.getElementById('orders-list').innerHTML = `<tr><td colspan="7" class="text-center text-red-500 py-4">${json.message || 'Failed to fetch orders'}</td></tr>`;
         }
     } catch (e) {
-        document.getElementById('orders-list').innerHTML = '<tr><td colspan="6" class="text-center text-red-500 py-4">Network error or invalid response.</td></tr>';
+        document.getElementById('orders-list').innerHTML = '<tr><td colspan="7" class="text-center text-red-500 py-4">Network error or invalid response.</td></tr>';
         console.error(e);
     }
 }
@@ -338,6 +363,9 @@ function renderOrders(ordersData) {
     let html = '';
     filtered.forEach(o => {
         html += `<tr class="hover:bg-slate-50/50 transition-colors group">
+            <td class="px-4 py-4 text-center">
+                <input type="checkbox" class="order-checkbox w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer" value="${o.id}" onchange="updateBulkOrderActionState()">
+            </td>
             <td class="px-6 py-4 font-bold text-slate-700">#${o.id}</td>
             <td class="px-6 py-4 font-medium text-slate-700">${o.sr_name || '-'}</td>
             <td class="px-6 py-4">
@@ -358,8 +386,86 @@ function renderOrders(ordersData) {
         </tr>`;
     });
     
-    if(filtered.length === 0) html = '<tr><td colspan="6" class="text-center py-8 font-medium text-slate-500">No matching orders found</td></tr>';
+    if(filtered.length === 0) html = '<tr><td colspan="7" class="text-center py-8 font-medium text-slate-500">No matching orders found</td></tr>';
     document.getElementById('orders-list').innerHTML = html;
+    updateBulkOrderActionState();
+}
+
+function toggleSelectAllOrders(masterCheckbox) {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+    });
+    updateBulkOrderActionState();
+}
+
+function updateBulkOrderActionState() {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    const checked = Array.from(checkboxes).filter(cb => cb.checked);
+    const toolbar = document.getElementById('bulk-order-toolbar');
+    const countSpan = document.getElementById('selected-orders-count');
+    const masterCheckbox = document.getElementById('select-all-orders');
+    
+    if (masterCheckbox) {
+        masterCheckbox.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+    }
+    
+    if (checked.length > 0) {
+        if (toolbar) toolbar.classList.remove('hidden');
+        if (countSpan) countSpan.innerText = `${checked.length} order${checked.length > 1 ? 's' : ''} selected`;
+    } else {
+        if (toolbar) toolbar.classList.add('hidden');
+    }
+}
+
+async function submitBulkDateChange() {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select at least one order.');
+        return;
+    }
+    
+    const newDate = document.getElementById('bulk-order-date-input').value;
+    const reason = document.getElementById('bulk-order-reason-input').value.trim();
+    
+    if (!newDate) {
+        alert('Please select a target date.');
+        return;
+    }
+    
+    if (!reason) {
+        alert('Please enter a reason for changing the order dates.');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to change the date of ${selectedIds.length} order(s) to ${newDate}?`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('order_ids', JSON.stringify(selectedIds));
+    formData.append('order_date', newDate);
+    formData.append('reason', reason);
+    
+    try {
+        const res = await fetch(basePath + '/manager/api/operations/bulk-change-order-date', {
+            method: 'POST',
+            body: formData
+        });
+        const json = await res.json();
+        if (json.success) {
+            alert(json.message || 'Orders date updated successfully!');
+            document.getElementById('bulk-order-reason-input').value = '';
+            fetchOrders();
+        } else {
+            alert('Error: ' + json.message);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('An error occurred while bulk updating dates.');
+    }
 }
 
 async function fetchDeliveries() {
