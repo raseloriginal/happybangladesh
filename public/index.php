@@ -253,6 +253,7 @@ $router->get( '/manager/operations',                          ['ManagerControlle
 $router->get( '/manager/api/operations/orders',               ['ManagerController', 'apiOperationsOrders']);
 $router->get( '/manager/api/operations/deliveries',           ['ManagerController', 'apiOperationsDeliveries']);
 $router->post('/manager/api/operations/edit-order/{id}',      ['ManagerController', 'apiOperationsEditOrder']);
+$router->post('/manager/api/operations/bulk-change-order-date', ['ManagerController', 'apiOperationsBulkChangeOrderDate']);
 $router->post('/manager/api/operations/delete-order/{id}',    ['ManagerController', 'apiOperationsDeleteOrder']);
 $router->post('/manager/api/operations/edit-delivery/{id}',   ['ManagerController', 'apiOperationsEditDelivery']);
 $router->post('/manager/api/operations/place-order',          ['ManagerController', 'apiOperationsPlaceOrder']);

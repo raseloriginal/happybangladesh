@@ -2532,6 +2532,104 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiOperationsBulkChangeOrderDate(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $orderIdsRaw = $this->post('order_ids');
+        $newDateInput = $this->post('order_date');
+        $reason = trim($this->post('reason') ?? '');
+
+        if (empty($orderIdsRaw) || empty($newDateInput) || empty($reason)) {
+            echo json_encode(['success' => false, 'message' => 'Please select orders, enter a valid date, and provide a reason.']);
+            exit;
+        }
+
+        $orderIds = is_array($orderIdsRaw) ? $orderIdsRaw : json_decode($orderIdsRaw, true);
+        if (!is_array($orderIds) || empty($orderIds)) {
+            echo json_encode(['success' => false, 'message' => 'No valid orders selected.']);
+            exit;
+        }
+
+        $newDateStr = date('Y-m-d', strtotime($newDateInput));
+        $managerId = Auth::id();
+        $updatedCount = 0;
+        $errors = [];
+
+        foreach ($orderIds as $orderId) {
+            $id = (int)$orderId;
+            try {
+                $stmt = $this->db->prepare("SELECT * FROM orders WHERE id = ?");
+                $stmt->execute([$id]);
+                $order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$order) {
+                    $errors[] = "Order #{$id}: Not found.";
+                    continue;
+                }
+
+                $orderDate = new \DateTime($order['created_at']);
+                $originalDateStr = $orderDate->format('Y-m-d');
+
+                if ($originalDateStr === $newDateStr) {
+                    $updatedCount++;
+                    continue;
+                }
+
+                // Check SR dispatch schedule assignment
+                $checkAssign = $this->db->prepare("
+                    SELECT COUNT(*) 
+                    FROM dispatch_schedules ds 
+                    JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
+                    WHERE dss.sr_id = ? AND (ds.dispatch_date = ? OR ds.dispatch_date = ?)
+                ");
+                $checkAssign->execute([$order['sr_id'], $originalDateStr, $newDateStr]);
+                if ($checkAssign->fetchColumn() > 0) {
+                    $errors[] = "Order #{$id}: SR is already assigned to a dispatch on {$originalDateStr} or {$newDateStr}.";
+                    continue;
+                }
+
+                $originalTime = $orderDate->format('H:i:s');
+                $newTimestamp = $newDateStr . ' ' . $originalTime;
+
+                $this->db->beginTransaction();
+
+                $this->db->prepare("UPDATE orders SET created_at = ? WHERE id = ?")->execute([$newTimestamp, $id]);
+
+                $logStmt = $this->db->prepare("INSERT INTO operations_logs (action_type, reference_id, manager_id, reason, old_data, new_data) VALUES (?, ?, ?, ?, ?, ?)");
+                $logStmt->execute([
+                    'bulk_change_order_date',
+                    $id,
+                    $managerId,
+                    $reason,
+                    json_encode(['order_date' => $originalDateStr]),
+                    json_encode(['order_date' => $newDateStr])
+                ]);
+
+                \Helpers::logManagerActivity($managerId, 'bulk_change_order_date', 'Bulk updated date for Order #' . $id . ' to ' . $newDateStr . ' (Reason: ' . $reason . ')', $id);
+
+                $this->db->commit();
+                $updatedCount++;
+            } catch (\Exception $e) {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+                $errors[] = "Order #{$id}: " . $e->getMessage();
+            }
+        }
+
+        if ($updatedCount > 0 && empty($errors)) {
+            echo json_encode(['success' => true, 'message' => "Successfully updated date for {$updatedCount} order(s)."]);
+        } elseif ($updatedCount > 0 && !empty($errors)) {
+            echo json_encode([
+                'success' => true,
+                'message' => "Updated {$updatedCount} order(s) successfully. Some orders could not be updated:\n" . implode("\n", $errors)
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'message' => "Failed to update orders:\n" . implode("\n", $errors)]);
+        }
+        exit;
+    }
+
     public function apiOperationsDeleteOrder(string $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
