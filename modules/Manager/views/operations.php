@@ -137,6 +137,7 @@
                                     <th class="px-6 py-4">Delivery ID</th>
                                     <th class="px-6 py-4">Invoice No</th>
                                     <th class="px-6 py-4">DSR Name</th>
+                                    <th class="px-6 py-4">Retailer Name</th>
                                     <th class="px-6 py-4">Status</th>
                                     <th class="px-6 py-4">Paid Amount</th>
                                     <th class="px-6 py-4">Due Amount</th>
@@ -252,10 +253,20 @@
                 <form id="editDeliveryForm" onsubmit="submitEditDelivery(event)">
                     <input type="hidden" id="edit-delivery-id" name="delivery_id">
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Edit <span class="text-red-500">*</span></label>
                             <input type="text" id="edit-delivery-reason" name="reason" required placeholder="e.g. Delivered 3 pcs instead of 3 box" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Status <span class="text-red-500">*</span></label>
+                            <select id="edit-delivery-status" name="status" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition shadow-sm">
+                                <option value="pending">Pending</option>
+                                <option value="in_transit">In Transit</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="partial">Partial</option>
+                                <option value="returned">Returned</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Paid Amount (Tk) <span class="text-red-500">*</span></label>
@@ -505,18 +516,31 @@ function renderDeliveries(deliveriesData) {
         const due = parseFloat(d.due_amount) || 0;
         
         let statusBadge = '';
-        if (d.status === 'Delivered') {
+        const dStatus = d.status ? d.status.toLowerCase() : '';
+        if (dStatus === 'delivered') {
             statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i> Delivered</span>`;
-        } else if (d.status === 'Partial') {
+        } else if (dStatus === 'partial') {
             statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-circle-half-stroke mr-1"></i> Partial</span>`;
+        } else if (dStatus === 'pending') {
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200"><i class="fa-regular fa-clock mr-1"></i> Pending</span>`;
+        } else if (dStatus === 'in_transit') {
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200"><i class="fa-solid fa-truck-arrow-right mr-1"></i> In Transit</span>`;
+        } else if (dStatus === 'returned') {
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Returned</span>`;
         } else {
-            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">${d.status}</span>`;
+            const displayStatus = d.status ? d.status.charAt(0).toUpperCase() + d.status.slice(1) : '-';
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">${displayStatus}</span>`;
         }
 
         html += `<tr class="hover:bg-slate-50/50 transition-colors group">
             <td class="px-6 py-4 font-bold text-slate-700">#${d.id}</td>
             <td class="px-6 py-4 font-mono text-xs font-medium text-slate-500">${d.invoice_no || '-'}</td>
             <td class="px-6 py-4 font-medium text-slate-700">${d.dsr_name || '-'}</td>
+            <td class="px-6 py-4">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                    <i class="fa-solid fa-shop mr-1.5"></i> ${d.retailer_name || '-'}
+                </span>
+            </td>
             <td class="px-6 py-4">${statusBadge}</td>
             <td class="px-6 py-4 font-bold text-emerald-600">Tk ${paid.toFixed(2)}</td>
             <td class="px-6 py-4 font-bold text-red-500">Tk ${due.toFixed(2)}</td>
@@ -663,6 +687,9 @@ function editDelivery(id) {
     document.getElementById('edit-delivery-id-display').innerText = '#' + delivery.id;
     document.getElementById('edit-delivery-id').value = delivery.id;
     document.getElementById('edit-delivery-paid').value = delivery.paid_amount;
+    if (delivery.status) {
+        document.getElementById('edit-delivery-status').value = delivery.status.toLowerCase();
+    }
     
     let itemsHtml = '';
     let total = 0;
@@ -716,6 +743,7 @@ async function submitEditDelivery(e) {
     const id = document.getElementById('edit-delivery-id').value;
     const reason = document.getElementById('edit-delivery-reason').value;
     const paidAmount = document.getElementById('edit-delivery-paid').value;
+    const status = document.getElementById('edit-delivery-status').value;
     
     const items = [];
     document.querySelectorAll('#edit-delivery-items tr').forEach(row => {
@@ -728,6 +756,7 @@ async function submitEditDelivery(e) {
     formData.append('delivery_id', id);
     formData.append('reason', reason);
     formData.append('paid_amount', paidAmount);
+    formData.append('status', status);
     formData.append('items', JSON.stringify(items));
     
     try {
