@@ -1276,13 +1276,18 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                 orderHtml += `<div class="text-center py-6 text-sm text-gray-400 bg-gray-50 rounded-xl border border-gray-100"><i class="fa-solid fa-box-open mb-2 text-2xl text-gray-300"></i><br>এই অর্ডারে কোনো পণ্য পাওয়া যায়নি।</div>`;
             } else {
                 orderHtml += `
-                <div class="border border-gray-150 rounded-xl bg-white overflow-hidden max-h-[50vh] overflow-y-auto shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]">
+                <div class="border border-slate-200/80 rounded-xl bg-white overflow-hidden max-h-[50vh] overflow-y-auto shadow-xs">
                     <!-- Clean Minimal Column Header -->
-                    <div class="flex items-center text-[9px] text-gray-400 font-extrabold bg-[#fcfcfc] border-b border-gray-150 uppercase tracking-wider select-none sticky top-0 z-10">
-                        <div class="flex-1 py-2 px-3">পণ্যের বিবরণ ও স্টক</div>
-                        <div class="w-[165px] py-2 text-center shrink-0 border-l border-gray-100">ডেলিভারি পরিমাণ</div>
+                    <div class="flex items-center text-[10px] text-slate-500 font-bold bg-slate-50/90 border-b border-slate-200/80 uppercase tracking-wider select-none sticky top-0 z-10">
+                        <div class="flex-1 py-2.5 px-3 flex items-center gap-1.5 text-slate-600">
+                            <i class="fa-solid fa-boxes-packing text-blue-600 text-xs"></i>
+                            <span>পণ্যের বিবরণ ও স্টক</span>
+                        </div>
+                        <div class="w-[160px] shrink-0 py-2.5 px-2 text-center text-slate-600 border-l border-slate-200/70">
+                            ডেলিভারি পরিমাণ
+                        </div>
                     </div>
-                    <div class="divide-y divide-gray-100 bg-white">
+                    <div class="divide-y divide-slate-100 bg-white">
                 `;
                 
                 order.products.forEach((p, idx) => {
@@ -1302,58 +1307,68 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                     const isStockOk = vanStock >= qty;
 
                     orderHtml += `
-                    <div class="product-item flex items-stretch divide-x divide-gray-100 text-xs animate-fadeIn border-b border-gray-100 last:border-b-0" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
+                    <div class="product-item flex items-stretch divide-x divide-slate-100 text-xs hover:bg-slate-50/50 transition-colors" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
                         <!-- Product & Stock Cell -->
-                        <div class="flex-1 p-3 flex flex-col justify-center min-w-0 bg-white">
-                            <div class="font-black text-gray-800 text-[11px] leading-snug break-words" title="${p.name}">${p.name}</div>
+                        <div class="flex-1 p-3 flex flex-col justify-center min-w-0 bg-white space-y-1.5">
+                            <div class="font-bold text-slate-800 text-[12px] leading-snug break-words" title="${p.name}">${p.name}</div>
                             
-                            <!-- Badges -->
-                            <div class="text-[9px] mt-2 flex flex-wrap gap-1.5 items-center">
-                                <span class="bg-gray-100 border border-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold">৳${parseFloat(p.price || 0).toFixed(0)}</span>
-                                <span class="${isStockOk ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-red-50 border border-red-100 text-red-700'} px-1.5 py-0.5 rounded font-bold">স্টক: ${vanStock}</span>
-                            </div>
-
-                            <!-- Totals & OC -->
-                            <div class="flex items-center gap-1.5 mt-2.5">
-                                <span class="text-pink-600 font-black text-[11px]" id="itemPrice-${orderIdx}-${idx}">৳${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</span>
+                            <!-- Badges Row -->
+                            <div class="text-[10px] flex flex-wrap gap-1.5 items-center">
+                                <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">৳${parseFloat(p.price || 0).toFixed(0)}</span>
+                                <span class="${isStockOk ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'} px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1">
+                                    <i class="fa-solid ${isStockOk ? 'fa-check text-[9px]' : 'fa-triangle-exclamation text-[9px]'}"></i> স্টক: ${vanStock}
+                                </span>
+                                <span class="bg-blue-50 text-blue-700 font-extrabold px-1.5 py-0.5 rounded" id="itemPrice-${orderIdx}-${idx}">৳${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</span>
                                 <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
                             </div>
                         </div>
 
                         <!-- Delivered Input Cell -->
-                        <div class="w-[175px] flex flex-col justify-center shrink-0 p-2 bg-white gap-2">
+                        <div class="w-[160px] flex flex-col justify-center shrink-0 p-2 bg-slate-50/30 gap-1.5">
                             ${isPcs ? `
                                 <input type="hidden" value="0" class="delivery-input-box"
                                     data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}">
+                                <div class="flex items-center justify-between gap-1 text-[10px] text-slate-500 font-semibold">
+                                    <span>পিস</span>
+                                    <div class="inline-flex items-center border border-slate-200 bg-white rounded-lg overflow-hidden shadow-2xs">
+                                        <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')"
+                                            class="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-sm font-bold select-none cursor-pointer">−</button>
+                                        <input type="number" min="0" value="${initialDeliveredQty}"
+                                            class="w-9 text-center font-extrabold text-slate-800 outline-none bg-transparent delivery-input-pcs text-xs py-1 border-x border-slate-150"
+                                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+                                            oninput="calcProgress(this, '${orderIdx}-${idx}')">
+                                        <button type="button" onclick="changeQty(this, +1, 'pcs', '${orderIdx}-${idx}')"
+                                            class="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-sm font-bold select-none cursor-pointer">+</button>
+                                    </div>
+                                </div>
                             ` : `
-                                <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
+                                <div class="flex items-center justify-between gap-1 text-[10px] text-slate-500 font-semibold">
                                     <span>বক্স</span>
-                                    <div class="flex items-center border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm">
+                                    <div class="inline-flex items-center border border-slate-200 bg-white rounded-lg overflow-hidden shadow-2xs">
                                         <button type="button" onclick="changeQty(this, -1, 'box', '${orderIdx}-${idx}')"
-                                            class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">−</button>
+                                            class="w-6.5 h-6.5 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-xs font-bold select-none cursor-pointer">−</button>
                                         <input type="number" min="0" value="${initialBoxes}"
-                                            class="w-[36px] text-center font-black text-gray-800 outline-none bg-transparent delivery-input-box text-sm py-1"
+                                            class="w-8 text-center font-bold text-slate-800 outline-none bg-transparent delivery-input-box text-xs py-0.5 border-x border-slate-150"
                                             data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
                                             oninput="calcProgress(this, '${orderIdx}-${idx}')">
                                         <button type="button" onclick="changeQty(this, +1, 'box', '${orderIdx}-${idx}')"
-                                            class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">+</button>
+                                            class="w-6.5 h-6.5 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-xs font-bold select-none cursor-pointer">+</button>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between gap-1 text-[10px] text-slate-500 font-semibold">
+                                    <span>পিস</span>
+                                    <div class="inline-flex items-center border border-slate-200 bg-white rounded-lg overflow-hidden shadow-2xs">
+                                        <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')"
+                                            class="w-6.5 h-6.5 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-xs font-bold select-none cursor-pointer">−</button>
+                                        <input type="number" min="0" value="${initialPcs}"
+                                            class="w-8 text-center font-bold text-slate-800 outline-none bg-transparent delivery-input-pcs text-xs py-0.5 border-x border-slate-150"
+                                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+                                            oninput="calcProgress(this, '${orderIdx}-${idx}')">
+                                        <button type="button" onclick="changeQty(this, +1, 'pcs', '${orderIdx}-${idx}')"
+                                            class="w-6.5 h-6.5 flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-xs font-bold select-none cursor-pointer">+</button>
                                     </div>
                                 </div>
                             `}
-                            
-                            <div class="flex items-center justify-between gap-1 text-[10px] text-gray-500 font-bold">
-                                <span>পিস</span>
-                                <div class="flex items-center border border-gray-200 bg-white rounded-lg overflow-hidden shadow-sm">
-                                    <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')"
-                                        class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">−</button>
-                                    <input type="number" min="0" value="${isPcs ? initialDeliveredQty : initialPcs}"
-                                        class="w-[36px] text-center font-black text-gray-800 outline-none bg-transparent delivery-input-pcs text-sm py-1"
-                                        data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
-                                        oninput="calcProgress(this, '${orderIdx}-${idx}')">
-                                    <button type="button" onclick="changeQty(this, +1, 'pcs', '${orderIdx}-${idx}')"
-                                        class="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition text-base font-bold select-none">+</button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                     `;
@@ -1528,7 +1543,7 @@ function calcProgress(el, idx) {
     if (itemPriceEl) {
         const unitPrice = parseFloat(parent.getAttribute('data-price')) || 0;
         const basePrice = parseFloat(parent.getAttribute('data-baseprice')) || 0;
-        itemPriceEl.innerText = 'Tk ' + (totalDelivered * unitPrice).toFixed(0);
+        itemPriceEl.innerText = '৳' + (totalDelivered * unitPrice).toFixed(0);
         
         if (itemOcEl) {
             const oc = (unitPrice - basePrice) * totalDelivered;
