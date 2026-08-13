@@ -185,13 +185,8 @@ $formatQty = function($qty, $ppb) {
                     <?= $formatQty($p['outside_qty'], $p['pcs_per_box']) ?>
                   </div>
                   <div class="text-[10.5px] text-blue-700 font-extrabold mt-0.5 font-mono">
-                    ৳<?= number_format($p['outside_val'] + $p['outside_oc'], 2) ?>
+                    ৳<?= number_format($p['outside_val'], 2) ?>
                   </div>
-                  <?php if (!empty($p['outside_oc'])): ?>
-                    <span class="inline-block text-[9px] font-extrabold font-mono mt-1 px-1.5 py-0.2 rounded border <?= $p['outside_oc'] >= 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200' ?>">
-                      <?= $p['outside_oc'] >= 0 ? '+' : '' ?>৳<?= number_format($p['outside_oc'], 2) ?> O/C
-                    </span>
-                  <?php endif; ?>
                 </td>
 
                 <!-- Regular Sell Cell -->
@@ -200,13 +195,8 @@ $formatQty = function($qty, $ppb) {
                     <?= $formatQty($p['sale_qty'], $p['pcs_per_box']) ?>
                   </div>
                   <div class="text-[10.5px] text-emerald-700 font-extrabold mt-0.5 font-mono">
-                    ৳<?= number_format($p['sale_val'] + $p['sale_oc'], 2) ?>
+                    ৳<?= number_format($p['sale_val'], 2) ?>
                   </div>
-                  <?php if (!empty($p['sale_oc'])): ?>
-                    <span class="inline-block text-[9px] font-extrabold font-mono mt-1 px-1.5 py-0.2 rounded border <?= $p['sale_oc'] >= 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200' ?>">
-                      <?= $p['sale_oc'] >= 0 ? '+' : '' ?>৳<?= number_format($p['sale_oc'], 2) ?> O/C
-                    </span>
-                  <?php endif; ?>
                 </td>
 
                 <!-- Ready Sale Cell -->
@@ -215,13 +205,8 @@ $formatQty = function($qty, $ppb) {
                     <?= $formatQty($p['ready_sale_qty'], $p['pcs_per_box']) ?>
                   </div>
                   <div class="text-[10.5px] text-amber-700 font-extrabold mt-0.5 font-mono">
-                    ৳<?= number_format($p['ready_sale_val'] + $p['ready_sale_oc'], 2) ?>
+                    ৳<?= number_format($p['ready_sale_val'], 2) ?>
                   </div>
-                  <?php if (!empty($p['ready_sale_oc'])): ?>
-                    <span class="inline-block text-[9px] font-extrabold font-mono mt-1 px-1.5 py-0.2 rounded border <?= $p['ready_sale_oc'] >= 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200' ?>">
-                      <?= $p['ready_sale_oc'] >= 0 ? '+' : '' ?>৳<?= number_format($p['ready_sale_oc'], 2) ?> O/C
-                    </span>
-                  <?php endif; ?>
                 </td>
 
                 <!-- Remaining (In) Cell -->
@@ -230,13 +215,8 @@ $formatQty = function($qty, $ppb) {
                     <?= $formatQty($p['inside_qty'], $p['pcs_per_box']) ?>
                   </div>
                   <div class="text-[10.5px] text-purple-700 font-extrabold mt-0.5 font-mono">
-                    ৳<?= number_format($p['inside_val'] + $p['inside_oc'], 2) ?>
+                    ৳<?= number_format($p['inside_val'], 2) ?>
                   </div>
-                  <?php if (!empty($p['inside_oc'])): ?>
-                    <span class="inline-block text-[9px] font-extrabold font-mono mt-1 px-1.5 py-0.2 rounded border <?= $p['inside_oc'] >= 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-200' ?>">
-                      <?= $p['inside_oc'] >= 0 ? '+' : '' ?>৳<?= number_format($p['inside_oc'], 2) ?> O/C
-                    </span>
-                  <?php endif; ?>
                 </td>
 
                 <!-- Damage Cell -->
@@ -260,36 +240,16 @@ $formatQty = function($qty, $ppb) {
               সর্বমোট:
             </td>
             <td class="p-3 text-center border-r border-slate-200 text-blue-800 font-black font-mono">
-              <div>৳<?= number_format(($totals['outside'] ?? 0) + ($totals['outside_oc'] ?? 0), 2) ?></div>
-              <?php if (!empty($totals['outside_oc'])): ?>
-                <div class="text-[9.5px] font-bold mt-0.5 <?= ($totals['outside_oc'] ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
-                  O/C: <?= ($totals['outside_oc'] ?? 0) >= 0 ? '+' : '' ?>৳<?= number_format($totals['outside_oc'] ?? 0, 2) ?>
-                </div>
-              <?php endif; ?>
+              <div>৳<?= number_format($totals['outside'] ?? 0, 2) ?></div>
             </td>
             <td class="p-3 text-center border-r border-slate-200 text-emerald-800 font-black font-mono">
-              <div>৳<?= number_format(($totals['sale'] ?? 0) + ($totals['sale_oc'] ?? 0), 2) ?></div>
-              <?php if (!empty($totals['sale_oc'])): ?>
-                <div class="text-[9.5px] font-bold mt-0.5 <?= ($totals['sale_oc'] ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
-                  O/C: <?= ($totals['sale_oc'] ?? 0) >= 0 ? '+' : '' ?>৳<?= number_format($totals['sale_oc'] ?? 0, 2) ?>
-                </div>
-              <?php endif; ?>
+              <div>৳<?= number_format($totals['sale'] ?? 0, 2) ?></div>
             </td>
             <td class="p-3 text-center border-r border-slate-200 text-amber-800 font-black font-mono">
-              <div>৳<?= number_format(($totals['ready_sale'] ?? 0) + ($totals['ready_sale_oc'] ?? 0), 2) ?></div>
-              <?php if (!empty($totals['ready_sale_oc'])): ?>
-                <div class="text-[9.5px] font-bold mt-0.5 <?= ($totals['ready_sale_oc'] ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
-                  O/C: <?= ($totals['ready_sale_oc'] ?? 0) >= 0 ? '+' : '' ?>৳<?= number_format($totals['ready_sale_oc'] ?? 0, 2) ?>
-                </div>
-              <?php endif; ?>
+              <div>৳<?= number_format($totals['ready_sale'] ?? 0, 2) ?></div>
             </td>
             <td class="p-3 text-center border-r border-slate-200 text-purple-800 font-black font-mono">
-              <div>৳<?= number_format(($totals['inside'] ?? 0) + ($totals['inside_oc'] ?? 0), 2) ?></div>
-              <?php if (!empty($totals['inside_oc'])): ?>
-                <div class="text-[9.5px] font-bold mt-0.5 <?= ($totals['inside_oc'] ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600' ?>">
-                  O/C: <?= ($totals['inside_oc'] ?? 0) >= 0 ? '+' : '' ?>৳<?= number_format($totals['inside_oc'] ?? 0, 2) ?>
-                </div>
-              <?php endif; ?>
+              <div>৳<?= number_format($totals['inside'] ?? 0, 2) ?></div>
             </td>
             <td class="p-3 text-center text-rose-700 font-black font-mono">
               <div>৳<?= number_format($totals['damage'] ?? 0, 2) ?></div>
