@@ -196,14 +196,18 @@ class ManagerController extends Controller
         $wid = Auth::warehouseId();
         $items = $this->db->query("
             SELECT p.*, c.name AS company_name, cat.name AS category_name,
-                   IFNULL(SUM(i.qty_boxes), 0) AS stock_boxes,
-                   IFNULL(SUM(i.qty_pieces), 0) AS stock_pieces
+                   (
+                       COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
+                       -
+                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                       +
+                       COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                   ) AS stock_pieces,
+                   0 AS stock_boxes
             FROM products p
             LEFT JOIN companies c ON c.id = p.company_id
             LEFT JOIN categories cat ON cat.id = p.category_id
-            LEFT JOIN inventory i ON i.product_id = p.id AND i.warehouse_id = $wid
             WHERE p.status=1
-            GROUP BY p.id
             ORDER BY p.created_at DESC
         ")->fetchAll();
         $companies = $this->db->query("SELECT * FROM companies WHERE status=1 ORDER BY name")->fetchAll();
@@ -889,11 +893,19 @@ class ManagerController extends Controller
     public function inventory(): void
     {
         $items = $this->db->query("
-            SELECT i.*, p.name AS product_name, p.sku, w.name AS warehouse_name, l.lot_number
-            FROM inventory i
-            JOIN products p ON p.id = i.product_id
-            JOIN warehouses w ON w.id = i.warehouse_id
-            LEFT JOIN lots l ON l.id = i.lot_id
+            SELECT p.id AS product_id, p.name AS product_name, p.sku, 
+                   'All Warehouses' AS warehouse_name, 
+                   '-' AS lot_number,
+                   0 AS qty_boxes,
+                   (
+                       COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
+                       -
+                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                       +
+                       COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                   ) AS qty_pieces
+            FROM products p
+            WHERE p.status=1
             ORDER BY p.name
         ")->fetchAll();
         $this->render('inventory', compact('items'));
