@@ -104,22 +104,20 @@ class SRController extends Controller
 
         $compIn = implode(',', array_map('intval', $companyIds));
         
-        $inventoryJoin = "LEFT JOIN inventory i ON 1=0";
-        if (!empty($warehouseIds)) {
-            $whIn = implode(',', array_map('intval', $warehouseIds));
-            $inventoryJoin = "LEFT JOIN inventory i ON i.product_id = p.id AND i.warehouse_id IN ($whIn)";
-        }
-
         $q = $this->db->prepare("
             SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
                    p.buying_price, p.dealer_percentage,
-                   COALESCE(SUM(i.qty_boxes * p.pieces_per_box + i.qty_pieces), 0) AS stock
+                   (
+                       COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
+                       -
+                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                       +
+                       COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                   ) AS stock
             FROM products p
             LEFT JOIN companies c ON c.id=p.company_id
-            $inventoryJoin
             WHERE p.status=1
               AND p.company_id IN ($compIn)
-            GROUP BY p.id
             ORDER BY p.name
         ");
         $q->execute();
