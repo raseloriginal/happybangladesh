@@ -114,7 +114,7 @@ class ManagerController extends Controller
 
         $q = $this->db->prepare("
             SELECT u.id as sr_id,
-                   u.name as sr_name,
+                   IF(r.slug = 'dsr', CONCAT(u.name, ' (Ready Sale)'), u.name) as sr_name,
                    SUM(oi.quantity * oi.buying_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value,
                    SUM(oi.total_price - (oi.quantity * p.price)) as total_oc
@@ -122,6 +122,7 @@ class ManagerController extends Controller
             JOIN order_items oi ON oi.order_id = o.id
             JOIN products p ON p.id = oi.product_id
             JOIN users u ON u.id = o.sr_id
+            LEFT JOIN roles r ON r.id = u.role_id
             WHERE DATE(o.created_at) = ? AND (p.company_id = ? OR (? = 0 AND p.company_id IS NULL))
             GROUP BY u.id
             ORDER BY u.name ASC
