@@ -2766,8 +2766,23 @@ class ManagerController extends Controller
                 $itemId = (int)$item['id'];
                 $qty = (int)$item['qty'];
                 
-                $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ? AND dispatch_id = ?")
-                         ->execute([$qty, $itemId, $id]);
+                $oldItem = $this->db->prepare("SELECT product_id, COALESCE(delivered_quantity, 0) as delivered_quantity FROM dispatch_items WHERE id = ? AND dispatch_id = ?");
+                $oldItem->execute([$itemId, $id]);
+                $oldItemData = $oldItem->fetch(PDO::FETCH_ASSOC);
+
+                if ($oldItemData) {
+                    $oldQty = (int)$oldItemData['delivered_quantity'];
+                    $productId = (int)$oldItemData['product_id'];
+                    $diff = $qty - $oldQty;
+
+                    $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ? AND dispatch_id = ?")
+                             ->execute([$qty, $itemId, $id]);
+
+                    if ($diff != 0) {
+                        $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, CAST(quantity AS SIGNED) - ?) WHERE dsr_id = ? AND product_id = ?")
+                                 ->execute([$diff, $dispatch['dsr_id'], $productId]);
+                    }
+                }
             }
 
             // Update dispatch paid_amount and status
