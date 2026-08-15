@@ -307,6 +307,25 @@ class AdminController extends Controller
         exit;
     }
 
+    public function apiToggleSrPriceCorrection(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input = json_decode(file_get_contents('php://input'), true);
+        $srId = (int)($input['sr_id'] ?? 0);
+        $canCorrect = (int)($input['can_correct'] ?? 0);
+
+        if (!$srId) {
+            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+            exit;
+        }
+
+        $up = $this->db->prepare("UPDATE users SET can_correct_price = ? WHERE id = ? AND role_id = (SELECT id FROM roles WHERE slug = 'sr')");
+        $up->execute([$canCorrect, $srId]);
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     public function apiToggleSrOrderCutoff(): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -574,9 +593,27 @@ class AdminController extends Controller
 
     public function approvalApprove(string $id): void
     {
-        $this->db->prepare("UPDATE approvals SET status='approved', approved_by=?, updated_at=NOW() WHERE id=?")
-                 ->execute([Auth::id(), $id]);
-        $this->flash('success', 'Request approved.');
+        // Fetch approval
+        $stmt = $this->db->prepare("SELECT * FROM approvals WHERE id = ?");
+        $stmt->execute([$id]);
+        $approval = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($approval && $approval['status'] === 'pending') {
+            if ($approval['module'] === 'products_price' && $approval['action'] === 'edit') {
+                $newData = json_decode($approval['new_data'], true);
+                if ($newData) {
+                    $updateStmt = $this->db->prepare("UPDATE products SET buying_price = ?, price = ? WHERE id = ?");
+                    $updateStmt->execute([$newData['buying_price'], $newData['price'], $approval['record_id']]);
+                }
+            }
+
+            $this->db->prepare("UPDATE approvals SET status='approved', approved_by=?, updated_at=NOW() WHERE id=?")
+                     ->execute([Auth::id(), $id]);
+            $this->flash('success', 'Request approved.');
+        } else {
+            $this->flash('error', 'Request could not be approved.');
+        }
+        
         $this->redirect('admin/approvals');
     }
 
