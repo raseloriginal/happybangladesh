@@ -85,6 +85,14 @@ $createUrl  = url("admin/{$role}s/create");
           <td class="text-center">
             <div class="flex items-center justify-center gap-1">
               <?php if ($role === 'sr'): ?>
+              <!-- Price Correction Toggle -->
+              <button type="button" 
+                      onclick="toggleSrPriceCorrection(<?= $u['id'] ?>, <?= $u['can_correct_price'] ?? 1 ?>)" 
+                      class="btn btn-secondary btn-sm <?= ($u['can_correct_price'] ?? 1) ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' : 'text-slate-400 hover:text-slate-500 hover:bg-slate-50' ?>" 
+                      title="<?= ($u['can_correct_price'] ?? 1) ? 'Price Correction: Open (Click to Close)' : 'Price Correction: Closed (Click to Open)' ?>"
+                      id="price-toggle-<?= $u['id'] ?>">
+                <i class="fa-solid <?= ($u['can_correct_price'] ?? 1) ? 'fa-unlock' : 'fa-lock' ?>" id="price-icon-<?= $u['id'] ?>"></i>
+              </button>
               <button type="button" onclick="openSrCutoffModal(<?= $u['id'] ?>, '<?= h(addslashes($u['name'])) ?>')" class="btn btn-secondary btn-sm text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Order Completion by Date">
                 <i class="fa-solid fa-calendar-check"></i>
               </button>
@@ -278,6 +286,37 @@ async function toggleSrCutoffDate(srId, date, currentStatus) {
   } catch (err) {
     alert('Network error updating status');
     toggleSrCutoffDate(srId, date, newStatus);
+  }
+}
+async function toggleSrPriceCorrection(srId, currentStatus) {
+  const btn = document.getElementById(`price-toggle-${srId}`);
+  const icon = document.getElementById(`price-icon-${srId}`);
+  if (!btn) return;
+
+  const newStatus = currentStatus ? 0 : 1;
+  
+  // Optimistic UI update
+  btn.className = `btn btn-secondary btn-sm ${newStatus ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50' : 'text-slate-400 hover:text-slate-500 hover:bg-slate-50'}`;
+  btn.title = newStatus ? 'Price Correction: Open (Click to Close)' : 'Price Correction: Closed (Click to Open)';
+  icon.className = `fa-solid ${newStatus ? 'fa-unlock' : 'fa-lock'}`;
+  btn.setAttribute('onclick', `toggleSrPriceCorrection(${srId}, ${newStatus})`);
+
+  try {
+    const res = await fetch(`<?= url('admin/api/sr-price-correction/toggle') ?>`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sr_id: srId, can_correct: newStatus })
+    });
+    const result = await res.json();
+    if (!result.success) {
+      alert(result.message || 'Failed to update price correction access');
+      // Revert on failure
+      toggleSrPriceCorrection(srId, newStatus); 
+    }
+  } catch (err) {
+    alert('Network error updating status');
+    // Revert on failure
+    toggleSrPriceCorrection(srId, newStatus);
   }
 }
 </script>

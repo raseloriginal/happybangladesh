@@ -113,7 +113,8 @@ class SRController extends Controller
                        COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
-                   ) AS stock
+                   ) AS stock,
+                   (SELECT new_data FROM approvals WHERE module='products_price' AND record_id=p.id AND status='pending' ORDER BY id DESC LIMIT 1) AS pending_approval_data
             FROM products p
             LEFT JOIN companies c ON c.id=p.company_id
             WHERE p.status=1
@@ -1215,5 +1216,89 @@ class SRController extends Controller
         ")->execute([$srId, $lat, $lng, $address ?: null, $accuracy ?: null]);
 
         $this->json(['success' => true, 'message' => 'Location recorded']);
+    }
+
+    // ── Price Correction (SR Specific) ────────────────────────
+    public function priceCorrection(): void
+    {
+        $q = $this->db->prepare("SELECT can_correct_price FROM users WHERE id = ?");
+        $q->execute([Auth::id()]);
+        $canCorrectPrice = (bool)$q->fetchColumn();
+        
+        $this->renderApp('price_correction', ['canCorrectPrice' => $canCorrectPrice]);
+    }
+
+    public function apiPriceCorrectionModify(): void
+    {
+        $id = intval($_POST['id'] ?? 0);
+        $buying_price = floatval($_POST['buying_price'] ?? 0);
+        $srId = Auth::id();
+
+        if ($id <= 0 || $buying_price <= 0) {
+            $this->json(['status' => 'error', 'message' => 'Invalid input']);
+            return;
+        }
+
+        $q = $this->db->prepare("SELECT can_correct_price FROM users WHERE id = ?");
+        $q->execute([$srId]);
+        if (!$q->fetchColumn()) {
+            $this->json(['status' => 'error', 'message' => 'You are not allowed to correct prices.']);
+            return;
+        }
+
+        // Validate product belongs to SR's assigned companies
+        $qCheck = $this->db->prepare("
+            SELECT p.id 
+            FROM products p
+            JOIN dealer_companies dc ON dc.company_id = p.company_id
+            WHERE p.id = ? AND dc.sr_id = ?
+        ");
+        $qCheck->execute([$id, $srId]);
+        if (!$qCheck->fetch()) {
+            $this->json(['status' => 'error', 'message' => 'Unauthorized product.']);
+            return;
+        }
+
+        try {
+            $stmt = $this->db->prepare("SELECT buying_price, price, dealer_percentage FROM products WHERE id = ?");
+            $stmt->execute([$id]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$product) {
+                $this->json(['status' => 'error', 'message' => 'Product not found']);
+                return;
+            }
+
+            $dealer_percentage = floatval($product['dealer_percentage']);
+            $new_price = $buying_price + ($buying_price * ($dealer_percentage / 100));
+
+            $oldData = json_encode([
+                'buying_price' => $product['buying_price'],
+                'price' => $product['price']
+            ]);
+            
+            $newData = json_encode([
+                'buying_price' => $buying_price,
+                'price' => $new_price
+            ]);
+
+            $insertStmt = $this->db->prepare("
+                INSERT INTO approvals (requested_by, module, action, record_id, old_data, new_data, status, created_at, updated_at) 
+                VALUES (?, 'products_price', 'edit', ?, ?, ?, 'pending', NOW(), NOW())
+            ");
+            $insertStmt->execute([$srId, $id, $oldData, $newData]);
+
+            $this->json([
+                'status' => 'success',
+                'message' => 'Approval request sent to Admin successfully',
+                'data' => [
+                    'id' => $id,
+                    'buying_price' => $buying_price,
+                    'price' => $new_price
+                ]
+            ]);
+        } catch (\PDOException $e) {
+            $this->json(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+        }
     }
 }

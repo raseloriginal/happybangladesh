@@ -119,6 +119,7 @@ $router->post('/admin/srs/update/{id}',   ['AdminController', 'srUpdate']);
 $router->post('/admin/srs/delete/{id}',   ['AdminController', 'srDelete']);
 $router->get( '/admin/api/sr-orders-cutoff',        ['AdminController', 'apiSrOrdersCutoff']);
 $router->post('/admin/api/sr-orders-cutoff/toggle', ['AdminController', 'apiToggleSrOrderCutoff']);
+$router->post('/admin/api/sr-price-correction/toggle', ['AdminController', 'apiToggleSrPriceCorrection']);
 
 // DSRs
 $router->get( '/admin/dsrs',              ['AdminController', 'dsrs']);
@@ -277,6 +278,8 @@ $router->get( '/sr/api/products',             ['SRController', 'apiProducts']);
 $router->get( '/sr/api/today-order',          ['SRController', 'apiGetTodayOrder']);
 $router->post('/sr/api/location/push',        ['SRController', 'apiPushLocation']);
 $router->post('/sr/api/order-cutoff',         ['SRController', 'apiSetOrderCutoff']);
+$router->get( '/sr/price-correction',         ['SRController', 'priceCorrection']);
+$router->post('/sr/api/price-correction/modify', ['SRController', 'apiPriceCorrectionModify']);
 
 // ── DSR routes ────────────────────────────────────────────────
 $router->get( '/dsr/dashboard',               ['DSRController', 'dashboard']);
@@ -302,6 +305,8 @@ $router->get( '/dsr/api/van-stock',           ['DSRController', 'apiVanStock']);
 $router->post('/dsr/ready-sale/store',         ['DSRController', 'readySaleStore']);
 $router->get( '/dsr/qr-code',                  ['DSRController', 'qrCode']);
 $router->post('/dsr/qr-code/mark',             ['DSRController', 'qrCodeMark']);
+
+
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);
