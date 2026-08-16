@@ -188,7 +188,7 @@ async function toggleCompany(dateStr, companyId) {
                     const suid = `sr-${dateStr}-${companyId}-${sId}`;
                     const oc = parseFloat(sr.total_oc);
                     const ocClass = oc > 0 ? 'text-emerald-600' : (oc < 0 ? 'text-rose-600' : 'text-slate-500');
-                    const ocSign = oc > 0 ? '+' : '';
+                    const ocSign = oc > 0 ? '+' : (oc < 0 ? '-' : '');
                     
                     html += `
                         <tr class="hover:bg-teal-50/50 cursor-pointer transition-colors" onclick="toggleSr('${dateStr}', '${companyId}', '${sId}')">
