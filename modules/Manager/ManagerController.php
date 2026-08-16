@@ -65,7 +65,7 @@ class ManagerController extends Controller
 
         $q = $this->db->prepare("
             SELECT DATE(o.created_at) as order_date,
-                   SUM(oi.quantity * oi.buying_price) as total_base_value,
+                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -90,7 +90,7 @@ class ManagerController extends Controller
         $q = $this->db->prepare("
             SELECT c.id as company_id,
                    c.name as company_name,
-                   SUM(oi.quantity * oi.buying_price) as total_base_value,
+                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -115,7 +115,7 @@ class ManagerController extends Controller
         $q = $this->db->prepare("
             SELECT u.id as sr_id,
                    IF(r.slug = 'dsr', CONCAT(u.name, ' (Ready Sale)'), u.name) as sr_name,
-                   SUM(oi.quantity * oi.buying_price) as total_base_value,
+                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
                    SUM(oi.total_price) as total_sr_value,
                    SUM(oi.total_price - (oi.quantity * p.price)) as total_oc
             FROM orders o
@@ -148,7 +148,7 @@ class ManagerController extends Controller
                    p.pieces_per_box,
                    p.box_type,
                    SUM(oi.quantity) as total_qty,
-                   SUM(oi.quantity * oi.buying_price) as total_base_value,
+                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
