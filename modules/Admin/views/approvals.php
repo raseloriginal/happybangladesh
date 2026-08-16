@@ -55,6 +55,7 @@
           <th>Requested By</th>
           <th>Module</th>
           <th class="text-center">Action Type</th>
+          <th>Details</th>
           <th class="text-center">Status</th>
           <th>Date</th>
           <th class="text-center">Actions</th>
@@ -70,6 +71,20 @@
             <span class="badge <?= $a['action']==='delete' ? 'bg-red-100 text-red-700 font-bold' : 'bg-blue-100 text-blue-700 font-bold' ?>">
               <?= ucfirst($a['action']) ?>
             </span>
+          </td>
+          <td>
+            <?php if ($a['module'] === 'products_price' && $a['action'] === 'edit'): ?>
+              <?php 
+                $old = json_decode($a['old_data'], true);
+                $new = json_decode($a['new_data'], true);
+              ?>
+              <div class="text-xs">
+                <div><span class="text-gray-500">BP:</span> <span class="line-through text-red-500"><?= $old['buying_price'] ?? '-' ?></span> &rarr; <span class="text-emerald-600 font-bold"><?= $new['buying_price'] ?? '-' ?></span></div>
+                <div><span class="text-gray-500">SP:</span> <span class="line-through text-red-500"><?= $old['price'] ?? '-' ?></span> &rarr; <span class="text-emerald-600 font-bold"><?= $new['price'] ?? '-' ?></span></div>
+              </div>
+            <?php else: ?>
+              <span class="text-xs text-gray-400">N/A</span>
+            <?php endif; ?>
           </td>
           <td class="text-center"><?= Helpers::statusBadge($a['status']) ?></td>
           <td class="text-gray-500 font-mono text-xs"><?= Helpers::timeAgo($a['created_at']) ?></td>
@@ -92,7 +107,7 @@
         </tr>
         <?php endforeach; ?>
         <?php if (empty($items)): ?>
-          <tr><td colspan="7" class="text-center py-8 text-gray-400">No approval requests.</td></tr>
+          <tr><td colspan="8" class="text-center py-8 text-gray-400">No approval requests.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>

@@ -89,6 +89,10 @@
                   <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
                     <i class="fas fa-check text-xs"></i> Synced
                   </span>
+                <?php elseif ($file['status'] === 'modified'): ?>
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800" title="File content changed since last sync">
+                    <i class="fas fa-exclamation-circle text-xs"></i> Modified
+                  </span>
                 <?php elseif ($file['status'] === 'failed'): ?>
                   <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">
                     <i class="fas fa-times text-xs"></i> Failed
@@ -111,7 +115,7 @@
                   <span class="text-xs text-slate-400 font-mono"><?= round($file['size'] / 1024, 2) ?> KB</span>
                 <?php endif; ?>
               </td>
-              <td class="py-4 px-6 text-right">
+              <td class="py-4 px-6 text-right flex items-center justify-end gap-2">
                 <?php if ($file['status'] !== 'success'): ?>
                   <form method="POST" action="<?= url('admin/database-sync/run') ?>" class="inline-block">
                     <?= Helpers::csrfField() ?>
@@ -121,9 +125,13 @@
                     </button>
                   </form>
                 <?php else: ?>
-                  <button class="btn btn-sm bg-slate-100 text-slate-400 cursor-not-allowed font-medium px-3 py-1.5 rounded text-xs inline-flex items-center gap-1.5" disabled>
-                    <i class="fas fa-check text-[10px]"></i> Done
-                  </button>
+                  <form method="POST" action="<?= url('admin/database-sync/run') ?>" class="inline-block">
+                    <?= Helpers::csrfField() ?>
+                    <input type="hidden" name="file" value="force:<?= htmlspecialchars($file['filename']) ?>">
+                    <button type="submit" class="btn btn-sm bg-slate-200 hover:bg-indigo-600 hover:text-white text-slate-700 font-medium px-3 py-1.5 rounded text-xs transition inline-flex items-center gap-1.5" onclick="return confirm('Re-execute migration for <?= htmlspecialchars($file['filename']) ?>?')">
+                      <i class="fas fa-redo text-[10px]"></i> Re-Sync
+                    </button>
+                  </form>
                 <?php endif; ?>
               </td>
             </tr>

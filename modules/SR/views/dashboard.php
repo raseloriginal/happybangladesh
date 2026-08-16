@@ -151,6 +151,22 @@
               </span>
             </td>
           </tr>
+
+          <!-- Item 4: Price Correction -->
+          <tr class="hover:bg-slate-50/50 transition cursor-pointer group" onclick="SRLoader.start('মূল্য সংশোধন লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন'); window.location.href='<?= url('sr/price-correction') ?>'">
+            <td class="p-3 border-r border-slate-200 font-bold text-slate-800 flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-xs shrink-0 group-hover:scale-105 transition">
+                <i class="fa-solid fa-tags"></i>
+              </div>
+              <span>মূল্য সংশোধন</span>
+            </td>
+            <td class="p-3 text-center">
+              <span class="inline-block text-[10px] px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition duration-200 font-sans">
+                প্রবেশ করুন
+              </span>
+            </td>
+          </tr>
+
         </tbody>
       </table>
     </div>

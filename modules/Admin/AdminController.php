@@ -273,6 +273,98 @@ class AdminController extends Controller
         $this->flash('success', 'SR deleted.'); $this->redirect('admin/srs');
     }
 
+    public function apiSrOrdersCutoff(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $srId = (int)($_GET['sr_id'] ?? 0);
+        if (!$srId) {
+            echo json_encode(['success' => false, 'message' => 'Invalid SR ID']);
+            exit;
+        }
+
+        $days = [];
+        for ($i = 0; $i < 5; $i++) {
+            $date = date('Y-m-d', strtotime("-$i days"));
+            $formattedDate = date('d M, Y (D)', strtotime("-$i days"));
+
+            $qOrd = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE sr_id = ? AND DATE(created_at) = ?");
+            $qOrd->execute([$srId, $date]);
+            $orderCount = (int)$qOrd->fetchColumn();
+
+            $qCutoff = $this->db->prepare("SELECT id FROM sr_order_cutoffs WHERE sr_id = ? AND cutoff_date = ? AND undone_by IS NULL");
+            $qCutoff->execute([$srId, $date]);
+            $isCompleted = (bool)$qCutoff->fetchColumn();
+
+            $days[] = [
+                'date'           => $date,
+                'formatted_date' => $formattedDate,
+                'order_count'    => $orderCount,
+                'is_completed'   => $isCompleted,
+            ];
+        }
+
+        echo json_encode(['success' => true, 'days' => $days]);
+        exit;
+    }
+
+    public function apiToggleSrPriceCorrection(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input = json_decode(file_get_contents('php://input'), true);
+        $srId = (int)($input['sr_id'] ?? 0);
+        $canCorrect = (int)($input['can_correct'] ?? 0);
+
+        if (!$srId) {
+            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+            exit;
+        }
+
+        $up = $this->db->prepare("UPDATE users SET can_correct_price = ? WHERE id = ? AND role_id = (SELECT id FROM roles WHERE slug = 'sr')");
+        $up->execute([$canCorrect, $srId]);
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    public function apiToggleSrOrderCutoff(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input     = json_decode(file_get_contents('php://input'), true);
+        $srId      = (int)($input['sr_id'] ?? 0);
+        $date      = trim($input['date'] ?? '');
+        $completed = (bool)($input['completed'] ?? false);
+        $adminId   = Auth::id() ?? 1;
+
+        if (!$srId || !$date) {
+            echo json_encode(['success' => false, 'message' => 'Invalid parameters']);
+            exit;
+        }
+
+        if ($completed) {
+            $check = $this->db->prepare("SELECT id FROM sr_order_cutoffs WHERE sr_id = ? AND cutoff_date = ?");
+            $check->execute([$srId, $date]);
+            $existingId = $check->fetchColumn();
+
+            if ($existingId) {
+                $up = $this->db->prepare("UPDATE sr_order_cutoffs SET undone_by = NULL, undone_at = NULL, cutoff_at = NOW() WHERE id = ?");
+                $up->execute([$existingId]);
+            } else {
+                $ins = $this->db->prepare("INSERT INTO sr_order_cutoffs (sr_id, cutoff_date, cutoff_at, is_auto) VALUES (?, ?, NOW(), 0)");
+                $ins->execute([$srId, $date]);
+            }
+        } else {
+            $up = $this->db->prepare("UPDATE sr_order_cutoffs SET undone_by = ?, undone_at = NOW() WHERE sr_id = ? AND cutoff_date = ? AND undone_by IS NULL");
+            $up->execute([$adminId, $srId, $date]);
+        }
+
+        echo json_encode([
+            'success'      => true,
+            'is_completed' => $completed,
+            'message'      => $completed ? 'Order marked as completed' : 'Order completion undone'
+        ]);
+        exit;
+    }
+
     // ── DSRs ──────────────────────────────────────────────────
     public function dsrs(): void
     {
@@ -501,9 +593,27 @@ class AdminController extends Controller
 
     public function approvalApprove(string $id): void
     {
-        $this->db->prepare("UPDATE approvals SET status='approved', approved_by=?, updated_at=NOW() WHERE id=?")
-                 ->execute([Auth::id(), $id]);
-        $this->flash('success', 'Request approved.');
+        // Fetch approval
+        $stmt = $this->db->prepare("SELECT * FROM approvals WHERE id = ?");
+        $stmt->execute([$id]);
+        $approval = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($approval && $approval['status'] === 'pending') {
+            if ($approval['module'] === 'products_price' && $approval['action'] === 'edit') {
+                $newData = json_decode($approval['new_data'], true);
+                if ($newData) {
+                    $updateStmt = $this->db->prepare("UPDATE products SET buying_price = ?, price = ? WHERE id = ?");
+                    $updateStmt->execute([$newData['buying_price'], $newData['price'], $approval['record_id']]);
+                }
+            }
+
+            $this->db->prepare("UPDATE approvals SET status='approved', approved_by=?, updated_at=NOW() WHERE id=?")
+                     ->execute([Auth::id(), $id]);
+            $this->flash('success', 'Request approved.');
+        } else {
+            $this->flash('error', 'Request could not be approved.');
+        }
+        
         $this->redirect('admin/approvals');
     }
 
@@ -574,12 +684,21 @@ class AdminController extends Controller
             $filename = basename($filePath);
             $record = $migrationMap[$filename] ?? null;
 
+            $currentHash = md5_file($filePath);
             $status = $record ? $record['status'] : 'pending';
             $executedAt = $record ? $record['executed_at'] : null;
             $errorMessage = $record ? $record['error_message'] : null;
+            $storedHash = $record ? ($record['file_hash'] ?? null) : null;
 
+            $isModified = false;
             if ($status === 'success') {
-                $syncedCount++;
+                if ($storedHash !== null && $storedHash !== $currentHash) {
+                    $status = 'modified';
+                    $isModified = true;
+                    $pendingCount++;
+                } else {
+                    $syncedCount++;
+                }
             } elseif ($status === 'failed') {
                 $failedCount++;
             } else {
@@ -590,7 +709,8 @@ class AdminController extends Controller
                 'filename'      => $filename,
                 'path'          => $filePath,
                 'size'          => filesize($filePath),
-                'status'        => $status, // 'success', 'failed', or 'pending'
+                'status'        => $status, // 'success', 'failed', 'pending', or 'modified'
+                'is_modified'   => $isModified,
                 'executed_at'   => $executedAt,
                 'error_message' => $errorMessage,
             ];
@@ -611,7 +731,7 @@ class AdminController extends Controller
         $this->verifyCsrf();
         $this->ensureMigrationsTable();
 
-        $targetFile = $this->post('file', ''); // specific file or 'all'
+        $targetFile = $this->post('file', ''); // specific file, 'all', or 'force:filename'
         $updatesDir = ROOT_PATH . '/database/updates';
 
         if (!is_dir($updatesDir)) {
@@ -620,28 +740,46 @@ class AdminController extends Controller
             return;
         }
 
-        // Fetch already executed successful migrations
-        $syncedFiles = $this->db->query("SELECT migration_file FROM database_migrations WHERE status = 'success'")
-                                ->fetchAll(PDO::FETCH_COLUMN);
+        $executedStmt = $this->db->query("SELECT * FROM database_migrations");
+        $executedRows = $executedStmt->fetchAll(PDO::FETCH_ASSOC);
+        $migrationMap = [];
+        foreach ($executedRows as $row) {
+            $migrationMap[$row['migration_file']] = $row;
+        }
 
         $sqlFiles = glob($updatesDir . '/*.sql');
         sort($sqlFiles);
 
+        $isForce = false;
+        if (str_starts_with($targetFile, 'force:')) {
+            $isForce = true;
+            $targetFile = substr($targetFile, 6);
+        }
+
         $filesToRun = [];
         foreach ($sqlFiles as $filePath) {
             $filename = basename($filePath);
-            if (!in_array($filename, $syncedFiles)) {
-                if ($targetFile === 'all' || $targetFile === $filename) {
-                    $filesToRun[] = [
-                        'filename' => $filename,
-                        'path'     => $filePath
-                    ];
+            $record = $migrationMap[$filename] ?? null;
+            $currentHash = md5_file($filePath);
+            $status = $record ? $record['status'] : 'pending';
+            $storedHash = $record ? ($record['file_hash'] ?? null) : null;
+
+            $needsRun = ($status !== 'success')
+                || ($storedHash !== null && $storedHash !== $currentHash)
+                || ($storedHash === null && $status === 'success' && $isForce)
+                || $isForce;
+
+            if ($targetFile === 'all') {
+                if ($needsRun) {
+                    $filesToRun[] = ['filename' => $filename, 'path' => $filePath, 'hash' => $currentHash];
                 }
+            } elseif ($targetFile === $filename) {
+                $filesToRun[] = ['filename' => $filename, 'path' => $filePath, 'hash' => $currentHash];
             }
         }
 
         if (empty($filesToRun)) {
-            $this->flash('warning', 'No pending migrations found to execute.');
+            $this->flash('warning', 'No pending or modified migrations found to execute.');
             $this->redirect('admin/database-sync');
             return;
         }
@@ -653,6 +791,7 @@ class AdminController extends Controller
         foreach ($filesToRun as $fileInfo) {
             $filename = $fileInfo['filename'];
             $filePath = $fileInfo['path'];
+            $fileHash = $fileInfo['hash'];
             $sqlContent = file_get_contents($filePath);
 
             try {
@@ -666,7 +805,15 @@ class AdminController extends Controller
                     $cleanQuery = preg_replace('/--.*$/m', '', $query);
                     $cleanQuery = preg_replace('/\/\*.*?\*\//s', '', $cleanQuery);
                     if (!empty(trim($cleanQuery))) {
-                        $this->db->exec($query);
+                        try {
+                            $this->db->exec($query);
+                        } catch (\PDOException $pe) {
+                            $errInfo = $pe->errorInfo[1] ?? 0;
+                            // Ignore duplicate column (1060), duplicate key (1061), table exists (1050)
+                            if (!in_array($errInfo, [1060, 1061, 1050])) {
+                                throw $pe;
+                            }
+                        }
                     }
                 }
 
@@ -674,11 +821,11 @@ class AdminController extends Controller
 
                 // Record successful execution
                 $stmt = $this->db->prepare("
-                    INSERT INTO database_migrations (migration_file, status, error_message, executed_at) 
-                    VALUES (?, 'success', NULL, NOW()) 
-                    ON DUPLICATE KEY UPDATE status = 'success', error_message = NULL, executed_at = NOW()
+                    INSERT INTO database_migrations (migration_file, status, file_hash, error_message, executed_at) 
+                    VALUES (?, 'success', ?, NULL, NOW()) 
+                    ON DUPLICATE KEY UPDATE status = 'success', file_hash = ?, error_message = NULL, executed_at = NOW()
                 ");
-                $stmt->execute([$filename]);
+                $stmt->execute([$filename, $fileHash, $fileHash]);
 
                 if ($this->db->inTransaction()) {
                     $this->db->commit();
@@ -698,11 +845,11 @@ class AdminController extends Controller
 
                 // Record failure
                 $stmt = $this->db->prepare("
-                    INSERT INTO database_migrations (migration_file, status, error_message, executed_at) 
-                    VALUES (?, 'failed', ?, NOW()) 
-                    ON DUPLICATE KEY UPDATE status = 'failed', error_message = ?, executed_at = NOW()
+                    INSERT INTO database_migrations (migration_file, status, file_hash, error_message, executed_at) 
+                    VALUES (?, 'failed', ?, ?, NOW()) 
+                    ON DUPLICATE KEY UPDATE status = 'failed', file_hash = ?, error_message = ?, executed_at = NOW()
                 ");
-                $stmt->execute([$filename, $errorDetails, $errorDetails]);
+                $stmt->execute([$filename, $fileHash, $errorDetails, $fileHash, $errorDetails]);
 
                 // Stop immediately on failure
                 break;
@@ -728,11 +875,19 @@ class AdminController extends Controller
             `id` INT AUTO_INCREMENT PRIMARY KEY,
             `migration_file` VARCHAR(255) NOT NULL UNIQUE,
             `status` ENUM('success', 'failed') NOT NULL DEFAULT 'success',
+            `file_hash` VARCHAR(64) NULL,
             `error_message` TEXT NULL,
             `executed_at` DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 
         $this->db->exec($sql);
+
+        try {
+            $cols = $this->db->query("SHOW COLUMNS FROM `database_migrations` LIKE 'file_hash'")->fetch();
+            if (!$cols) {
+                $this->db->exec("ALTER TABLE `database_migrations` ADD COLUMN `file_hash` VARCHAR(64) NULL AFTER `status`;");
+            }
+        } catch (\Throwable $t) {}
     }
 
     public function databaseClear(): void

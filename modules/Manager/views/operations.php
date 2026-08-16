@@ -58,11 +58,36 @@
                     </div>
                 </div>
 
+                <!-- Bulk Date Change Toolbar -->
+                <div id="bulk-order-toolbar" class="hidden mb-4 p-4 bg-slate-900 text-white rounded-xl shadow-lg border border-slate-700 transition-all flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center font-bold text-sm text-blue-400">
+                            <i class="fa-solid fa-check-double"></i>
+                        </span>
+                        <div>
+                            <span class="font-bold text-sm text-white" id="selected-orders-count">0 orders selected</span>
+                            <p class="text-xs text-slate-400 font-medium">Bulk change date for all checked orders</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <div class="flex flex-wrap items-center gap-2 bg-slate-800 p-1.5 rounded-lg border border-slate-700 w-full md:w-auto">
+                            <input type="date" id="bulk-order-date-input" class="px-3 py-1.5 bg-white text-slate-800 text-xs font-bold rounded shadow-sm outline-none border border-slate-200">
+                            <input type="text" id="bulk-order-reason-input" placeholder="Reason (required)..." class="px-3 py-1.5 bg-white text-slate-800 text-xs font-medium rounded shadow-sm outline-none border border-slate-200 w-full md:w-64">
+                        </div>
+                        <button type="button" onclick="submitBulkDateChange()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-md transition-all flex items-center gap-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-calendar-check"></i> Apply Date Change
+                        </button>
+                    </div>
+                </div>
+
                 <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-slate-600 whitespace-nowrap">
                             <thead class="text-xs text-slate-500 uppercase tracking-wider bg-slate-50 font-bold border-b border-slate-200">
                                 <tr>
+                                    <th class="px-4 py-4 w-10 text-center">
+                                        <input type="checkbox" id="select-all-orders" onchange="toggleSelectAllOrders(this)" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer" title="Select All">
+                                    </th>
                                     <th class="px-6 py-4">Order ID</th>
                                     <th class="px-6 py-4">SR Name</th>
                                     <th class="px-6 py-4">Retailer</th>
@@ -72,7 +97,7 @@
                                 </tr>
                             </thead>
                             <tbody id="orders-list" class="divide-y divide-slate-100">
-                                <tr><td colspan="6" class="text-center py-8 font-medium text-slate-500">Loading...</td></tr>
+                                <tr><td colspan="7" class="text-center py-8 font-medium text-slate-500">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -112,6 +137,7 @@
                                     <th class="px-6 py-4">Delivery ID</th>
                                     <th class="px-6 py-4">Invoice No</th>
                                     <th class="px-6 py-4">DSR Name</th>
+                                    <th class="px-6 py-4">Retailer Name</th>
                                     <th class="px-6 py-4">Status</th>
                                     <th class="px-6 py-4">Paid Amount</th>
                                     <th class="px-6 py-4">Due Amount</th>
@@ -155,9 +181,15 @@
                 <form id="editOrderForm" onsubmit="submitEditOrder(event)">
                     <input type="hidden" id="edit-order-id" name="order_id">
                     
-                    <div class="mb-6">
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Edit <span class="text-red-500">*</span></label>
-                        <input type="text" id="edit-order-reason" name="reason" required placeholder="e.g. Wrong quantity entered by SR" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Edit <span class="text-red-500">*</span></label>
+                            <input type="text" id="edit-order-reason" name="reason" required placeholder="e.g. Wrong quantity entered by SR" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Order Date <span class="text-red-500">*</span></label>
+                            <input type="date" id="edit-order-date" name="order_date" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                        </div>
                     </div>
                     
                     <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -221,10 +253,20 @@
                 <form id="editDeliveryForm" onsubmit="submitEditDelivery(event)">
                     <input type="hidden" id="edit-delivery-id" name="delivery_id">
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Edit <span class="text-red-500">*</span></label>
                             <input type="text" id="edit-delivery-reason" name="reason" required placeholder="e.g. Delivered 3 pcs instead of 3 box" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Status <span class="text-red-500">*</span></label>
+                            <select id="edit-delivery-status" name="status" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition shadow-sm">
+                                <option value="pending">Pending</option>
+                                <option value="in_transit">In Transit</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="partial">Partial</option>
+                                <option value="returned">Returned</option>
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Paid Amount (Tk) <span class="text-red-500">*</span></label>
@@ -299,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function fetchOrders() {
-    document.getElementById('orders-list').innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
+    document.getElementById('orders-list').innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading...</td></tr>';
     try {
         const res = await fetch(basePath + '/manager/api/operations/orders');
         const json = await res.json();
@@ -307,10 +349,10 @@ async function fetchOrders() {
             windowOrdersData = json.data;
             renderOrders(windowOrdersData);
         } else {
-            document.getElementById('orders-list').innerHTML = `<tr><td colspan="6" class="text-center text-red-500 py-4">${json.message || 'Failed to fetch orders'}</td></tr>`;
+            document.getElementById('orders-list').innerHTML = `<tr><td colspan="7" class="text-center text-red-500 py-4">${json.message || 'Failed to fetch orders'}</td></tr>`;
         }
     } catch (e) {
-        document.getElementById('orders-list').innerHTML = '<tr><td colspan="6" class="text-center text-red-500 py-4">Network error or invalid response.</td></tr>';
+        document.getElementById('orders-list').innerHTML = '<tr><td colspan="7" class="text-center text-red-500 py-4">Network error or invalid response.</td></tr>';
         console.error(e);
     }
 }
@@ -332,6 +374,9 @@ function renderOrders(ordersData) {
     let html = '';
     filtered.forEach(o => {
         html += `<tr class="hover:bg-slate-50/50 transition-colors group">
+            <td class="px-4 py-4 text-center">
+                <input type="checkbox" class="order-checkbox w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer" value="${o.id}" onchange="updateBulkOrderActionState()">
+            </td>
             <td class="px-6 py-4 font-bold text-slate-700">#${o.id}</td>
             <td class="px-6 py-4 font-medium text-slate-700">${o.sr_name || '-'}</td>
             <td class="px-6 py-4">
@@ -341,16 +386,97 @@ function renderOrders(ordersData) {
             </td>
             <td class="px-6 py-4 font-bold text-slate-800">Tk ${parseFloat(o.total_amount).toFixed(2)}</td>
             <td class="px-6 py-4 text-slate-500 text-xs font-medium"><i class="fa-regular fa-clock mr-1"></i> ${o.created_at}</td>
-            <td class="px-6 py-4 text-center">
-                <button onclick="editOrder(${o.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+            <td class="px-6 py-4 text-center flex items-center justify-center gap-2">
+                <button onclick="editOrder(${o.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Edit">
                     <i class="fa-solid fa-pen"></i>
+                </button>
+                <button onclick="deleteOrder(${o.id})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Delete">
+                    <i class="fa-solid fa-trash"></i>
                 </button>
             </td>
         </tr>`;
     });
     
-    if(filtered.length === 0) html = '<tr><td colspan="6" class="text-center py-8 font-medium text-slate-500">No matching orders found</td></tr>';
+    if(filtered.length === 0) html = '<tr><td colspan="7" class="text-center py-8 font-medium text-slate-500">No matching orders found</td></tr>';
     document.getElementById('orders-list').innerHTML = html;
+    updateBulkOrderActionState();
+}
+
+function toggleSelectAllOrders(masterCheckbox) {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+    });
+    updateBulkOrderActionState();
+}
+
+function updateBulkOrderActionState() {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    const checked = Array.from(checkboxes).filter(cb => cb.checked);
+    const toolbar = document.getElementById('bulk-order-toolbar');
+    const countSpan = document.getElementById('selected-orders-count');
+    const masterCheckbox = document.getElementById('select-all-orders');
+    
+    if (masterCheckbox) {
+        masterCheckbox.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+    }
+    
+    if (checked.length > 0) {
+        if (toolbar) toolbar.classList.remove('hidden');
+        if (countSpan) countSpan.innerText = `${checked.length} order${checked.length > 1 ? 's' : ''} selected`;
+    } else {
+        if (toolbar) toolbar.classList.add('hidden');
+    }
+}
+
+async function submitBulkDateChange() {
+    const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select at least one order.');
+        return;
+    }
+    
+    const newDate = document.getElementById('bulk-order-date-input').value;
+    const reason = document.getElementById('bulk-order-reason-input').value.trim();
+    
+    if (!newDate) {
+        alert('Please select a target date.');
+        return;
+    }
+    
+    if (!reason) {
+        alert('Please enter a reason for changing the order dates.');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to change the date of ${selectedIds.length} order(s) to ${newDate}?`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('order_ids', JSON.stringify(selectedIds));
+    formData.append('order_date', newDate);
+    formData.append('reason', reason);
+    
+    try {
+        const res = await fetch(basePath + '/manager/api/operations/bulk-change-order-date', {
+            method: 'POST',
+            body: formData
+        });
+        const json = await res.json();
+        if (json.success) {
+            alert(json.message || 'Orders date updated successfully!');
+            document.getElementById('bulk-order-reason-input').value = '';
+            fetchOrders();
+        } else {
+            alert('Error: ' + json.message);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('An error occurred while bulk updating dates.');
+    }
 }
 
 async function fetchDeliveries() {
@@ -390,18 +516,31 @@ function renderDeliveries(deliveriesData) {
         const due = parseFloat(d.due_amount) || 0;
         
         let statusBadge = '';
-        if (d.status === 'Delivered') {
+        const dStatus = d.status ? d.status.toLowerCase() : '';
+        if (dStatus === 'delivered') {
             statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i> Delivered</span>`;
-        } else if (d.status === 'Partial') {
+        } else if (dStatus === 'partial') {
             statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-circle-half-stroke mr-1"></i> Partial</span>`;
+        } else if (dStatus === 'pending') {
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200"><i class="fa-regular fa-clock mr-1"></i> Pending</span>`;
+        } else if (dStatus === 'in_transit') {
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200"><i class="fa-solid fa-truck-arrow-right mr-1"></i> In Transit</span>`;
+        } else if (dStatus === 'returned') {
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> Returned</span>`;
         } else {
-            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">${d.status}</span>`;
+            const displayStatus = d.status ? d.status.charAt(0).toUpperCase() + d.status.slice(1) : '-';
+            statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">${displayStatus}</span>`;
         }
 
         html += `<tr class="hover:bg-slate-50/50 transition-colors group">
             <td class="px-6 py-4 font-bold text-slate-700">#${d.id}</td>
             <td class="px-6 py-4 font-mono text-xs font-medium text-slate-500">${d.invoice_no || '-'}</td>
             <td class="px-6 py-4 font-medium text-slate-700">${d.dsr_name || '-'}</td>
+            <td class="px-6 py-4">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                    <i class="fa-solid fa-shop mr-1.5"></i> ${d.retailer_name || '-'}
+                </span>
+            </td>
             <td class="px-6 py-4">${statusBadge}</td>
             <td class="px-6 py-4 font-bold text-emerald-600">Tk ${paid.toFixed(2)}</td>
             <td class="px-6 py-4 font-bold text-red-500">Tk ${due.toFixed(2)}</td>
@@ -423,6 +562,8 @@ function editOrder(id) {
     
     document.getElementById('edit-order-id-display').innerText = '#' + order.id;
     document.getElementById('edit-order-id').value = order.id;
+    const orderDate = order.created_at ? order.created_at.split(' ')[0] : '';
+    document.getElementById('edit-order-date').value = orderDate;
     
     let itemsHtml = '';
     let total = 0;
@@ -473,6 +614,7 @@ async function submitEditOrder(e) {
     e.preventDefault();
     const id = document.getElementById('edit-order-id').value;
     const reason = document.getElementById('edit-order-reason').value;
+    const orderDate = document.getElementById('edit-order-date').value;
     
     const items = [];
     document.querySelectorAll('#edit-order-items tr').forEach(row => {
@@ -486,6 +628,7 @@ async function submitEditOrder(e) {
     const formData = new FormData();
     formData.append('order_id', id);
     formData.append('reason', reason);
+    formData.append('order_date', orderDate);
     formData.append('items', JSON.stringify(items));
     
     try {
@@ -507,6 +650,36 @@ async function submitEditOrder(e) {
     }
 }
 
+async function deleteOrder(id) {
+    const reason = prompt(`WARNING: You are about to permanently delete Order #${id}.\n\nPlease provide a reason for deletion:`);
+    if (reason === null) return; // User cancelled
+    if (reason.trim() === '') {
+        alert("A reason is required to delete an order.");
+        return;
+    }
+    
+    if (confirm(`Are you absolutely sure you want to delete Order #${id}? This cannot be undone.`)) {
+        try {
+            const formData = new FormData();
+            formData.append('reason', reason);
+            const res = await fetch(basePath + '/manager/api/operations/delete-order/' + id, {
+                method: 'POST',
+                body: formData
+            });
+            const json = await res.json();
+            if (json.success) {
+                alert('Order deleted successfully!');
+                fetchOrders();
+            } else {
+                alert('Error: ' + json.message);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('An error occurred.');
+        }
+    }
+}
+
 function editDelivery(id) {
     const delivery = windowDeliveriesData.find(d => parseInt(d.id) === id);
     if (!delivery) return;
@@ -514,6 +687,9 @@ function editDelivery(id) {
     document.getElementById('edit-delivery-id-display').innerText = '#' + delivery.id;
     document.getElementById('edit-delivery-id').value = delivery.id;
     document.getElementById('edit-delivery-paid').value = delivery.paid_amount;
+    if (delivery.status) {
+        document.getElementById('edit-delivery-status').value = delivery.status.toLowerCase();
+    }
     
     let itemsHtml = '';
     let total = 0;
@@ -567,6 +743,7 @@ async function submitEditDelivery(e) {
     const id = document.getElementById('edit-delivery-id').value;
     const reason = document.getElementById('edit-delivery-reason').value;
     const paidAmount = document.getElementById('edit-delivery-paid').value;
+    const status = document.getElementById('edit-delivery-status').value;
     
     const items = [];
     document.querySelectorAll('#edit-delivery-items tr').forEach(row => {
@@ -579,6 +756,7 @@ async function submitEditDelivery(e) {
     formData.append('delivery_id', id);
     formData.append('reason', reason);
     formData.append('paid_amount', paidAmount);
+    formData.append('status', status);
     formData.append('items', JSON.stringify(items));
     
     try {
