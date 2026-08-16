@@ -166,12 +166,21 @@ class ManagerController extends Controller
             $invParams = array_merge([$wid], $pIds);
             
             $qInv = $this->db->prepare("
-                SELECT product_id, SUM(qty_pieces) as stock_pieces, SUM(qty_boxes) as stock_boxes
-                FROM inventory 
-                WHERE warehouse_id = ? AND product_id IN ($inClause)
-                GROUP BY product_id
+                SELECT p.id as product_id, 
+                       (
+                           COALESCE((SELECT SUM(qty_boxes * p.pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
+                           -
+                           COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                           +
+                           COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                           -
+                           COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
+                       ) as stock_pieces, 
+                       0 as stock_boxes
+                FROM products p 
+                WHERE p.id IN ($inClause)
             ");
-            $qInv->execute($invParams);
+            $qInv->execute($pIds);
             $stockData = [];
             while ($row = $qInv->fetch(PDO::FETCH_ASSOC)) {
                 $stockData[$row['product_id']] = $row;
@@ -202,6 +211,8 @@ class ManagerController extends Controller
                        COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                       -
+                       COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                    ) AS stock_pieces,
                    0 AS stock_boxes
             FROM products p
@@ -903,6 +914,8 @@ class ManagerController extends Controller
                        COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                       -
+                       COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                    ) AS qty_pieces
             FROM products p
             WHERE p.status=1

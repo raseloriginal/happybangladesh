@@ -12,7 +12,8 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
-    $stmt = $pdo->query('SELECT name, buying_price, price, dealer_percentage FROM products LIMIT 5');
+    $stmt = $pdo->query('DESCRIBE returns');
+    echo "RETURNS:\n";
     print_r($stmt->fetchAll());
 } catch (\PDOException $e) {
     echo $e->getMessage();
