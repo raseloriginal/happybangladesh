@@ -114,7 +114,7 @@ class ManagerController extends Controller
 
         $q = $this->db->prepare("
             SELECT u.id as sr_id,
-                   IF(r.slug = 'dsr', CONCAT(u.name, ' (Ready Sale)'), u.name) as sr_name,
+                   u.name as sr_name,
                    SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
                    SUM(oi.total_price) as total_sr_value,
                    SUM(oi.total_price - (oi.quantity * p.price)) as total_oc
@@ -173,8 +173,6 @@ class ManagerController extends Controller
                            COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                            +
                            COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
-                           -
-                           COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                        ) as stock_pieces, 
                        0 as stock_boxes
                 FROM products p 
@@ -211,8 +209,6 @@ class ManagerController extends Controller
                        COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
-                       -
-                       COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                    ) AS stock_pieces,
                    0 AS stock_boxes
             FROM products p
@@ -914,8 +910,6 @@ class ManagerController extends Controller
                        COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
-                       -
-                       COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                    ) AS qty_pieces
             FROM products p
             WHERE p.status=1
