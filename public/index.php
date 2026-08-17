@@ -213,6 +213,7 @@ $router->post('/manager/api/lots/update',     ['ManagerController', 'apiLotUpdat
 $router->post('/manager/api/lots/delete',     ['ManagerController', 'apiLotDelete']);
 $router->post('/manager/api/lots/delete-batch',['ManagerController', 'apiLotBatchDelete']);
 $router->post('/manager/api/lots/update-batch',['ManagerController', 'apiLotBatchUpdate']);
+$router->post('/manager/api/lots/request-edit', ['ManagerController', 'apiLotBatchEditRequest']);
 
 // Manager Orders
 $router->get( '/manager/orders',                             ['ManagerController', 'orders']);

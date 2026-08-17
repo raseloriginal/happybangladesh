@@ -607,6 +607,73 @@ class AdminController extends Controller
                 }
             }
 
+            // Handle lot batch edit approval
+            if ($approval['module'] === 'lots_batch' && $approval['action'] === 'edit') {
+                $newData = json_decode($approval['new_data'], true);
+                if ($newData) {
+                    $wid = $this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn() ?: 1;
+                    $orig_company_id = (int)$newData['original_company_id'];
+                    $orig_lot_date   = $newData['original_lot_date'];
+                    $new_company_id  = (int)($newData['company_id'] ?? $orig_company_id);
+                    $new_lot_date    = $newData['lot_date'] ?? $orig_lot_date;
+
+                    $this->db->beginTransaction();
+                    try {
+                        // Revert old lots inventory and delete them
+                        $oldLots = $this->db->prepare("
+                            SELECT l.id, l.product_id, l.qty_pieces
+                            FROM lots l JOIN products p ON p.id = l.product_id
+                            WHERE p.company_id = ? AND (l.lot_date = ? OR (l.lot_date IS NULL AND DATE(l.created_at) = ?))
+                        ");
+                        $oldLots->execute([$orig_company_id, $orig_lot_date, $orig_lot_date]);
+                        foreach ($oldLots->fetchAll() as $o) {
+                            $this->db->prepare(
+                                "UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
+                            )->execute([$o['qty_pieces'], $o['product_id'], $wid, $o['id']]);
+                            $this->db->prepare("DELETE FROM lots WHERE id=?")->execute([$o['id']]);
+                        }
+
+                        // Insert new lots
+                        $lotStmt = $this->db->prepare(
+                            "INSERT INTO lots (product_id, lot_date, expiry_date, qty_boxes, buying_price, lot_number, qty_pieces) VALUES (?,?,?,0,?,NULL,?)"
+                        );
+                        foreach ($newData['lots'] as $lot) {
+                            $product_id   = (int)($lot['product_id'] ?? 0);
+                            $qty_pieces   = (int)($lot['qty_pieces'] ?? 0);
+                            $buying_price = (float)($lot['buying_price'] ?? 0);
+                            $expiry_date  = $lot['expiry_date'] ?: null;
+                            if (!$product_id) continue;
+
+                            $lotStmt->execute([$product_id, $new_lot_date, $expiry_date, $buying_price, $qty_pieces]);
+                            $lot_id = $this->db->lastInsertId();
+
+                            $this->db->prepare(
+                                "INSERT INTO inventory (warehouse_id, product_id, lot_id, qty_boxes, qty_pieces)
+                                 VALUES (?,?,?,0,?)
+                                 ON DUPLICATE KEY UPDATE qty_pieces = qty_pieces + VALUES(qty_pieces)"
+                            )->execute([$wid, $product_id, $lot_id, $qty_pieces]);
+
+                            $prod = $this->db->prepare("SELECT pieces_per_box, dealer_percentage FROM products WHERE id=?");
+                            $prod->execute([$product_id]);
+                            $p = $prod->fetch();
+                            if ($p) {
+                                $ppb = max(1, (float)$p['pieces_per_box']);
+                                $dp  = (float)$p['dealer_percentage'];
+                                $selling_price = round($buying_price * (1 + $dp / 100) / $ppb, 2);
+                                $this->db->prepare("UPDATE products SET buying_price=?, price=? WHERE id=?")
+                                         ->execute([$buying_price, $selling_price, $product_id]);
+                            }
+                        }
+                        $this->db->commit();
+                    } catch (\Exception $e) {
+                        $this->db->rollBack();
+                        $this->flash('error', 'Lot batch update failed: ' . $e->getMessage());
+                        $this->redirect('admin/approvals');
+                        return;
+                    }
+                }
+            }
+
             $this->db->prepare("UPDATE approvals SET status='approved', approved_by=?, updated_at=NOW() WHERE id=?")
                      ->execute([Auth::id(), $id]);
             $this->flash('success', 'Request approved.');
