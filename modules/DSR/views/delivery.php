@@ -608,6 +608,30 @@ let markers = [];
 let currentPartialDueRetailer = null;
 let currentPartialDueOrders = [];
 
+function openRetailerListModal() {
+    const modal = document.getElementById('retailerListModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeRetailerListModal() {
+    const modal = document.getElementById('retailerListModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function handleRetailerListClick(idx) {
+    closeRetailerListModal();
+    if (orderedRetailers && orderedRetailers[idx]) {
+        const ret = orderedRetailers[idx];
+        handleRetailerClick(ret, false);
+        
+        const lat = parseFloat(ret.lat);
+        const lng = parseFloat(ret.lng);
+        if (map && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+            map.flyTo([lat, lng], 17, { animate: true, duration: 1 });
+        }
+    }
+}
+
 function handleRetailerClick(ret, shouldWarn) {
     // If the retailer has a pending order (in_transit), bypass modals and open directly to it
     const pendingIndex = ret.orders.findIndex(o => o.status === 'in_transit');
