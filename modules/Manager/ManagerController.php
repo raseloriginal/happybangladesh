@@ -623,7 +623,7 @@ class ManagerController extends Controller
                 $buying_price = (float)($lot['buying_price'] ?? 0);
                 $expiry_date  = $lot['expiry_date'] ?: null;
 
-                if (!$product_id || !$qty_pieces) continue;
+                if (!$product_id) continue;
 
                 // 1. Insert lot row
                 $lotStmt->execute([$product_id, $lot_date, $expiry_date, $buying_price, $qty_pieces]);
@@ -858,7 +858,7 @@ class ManagerController extends Controller
                 $buying_price = (float)($lot['buying_price'] ?? 0);
                 $expiry_date  = $lot['expiry_date'] ?: null;
 
-                if (!$product_id || !$qty_pieces) continue;
+                if (!$product_id) continue;
 
                 $lotStmt->execute([$product_id, $new_lot_date, $expiry_date, $buying_price, $qty_pieces]);
                 $lot_id = $this->db->lastInsertId();
@@ -891,6 +891,67 @@ class ManagerController extends Controller
             $this->db->rollBack();
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        exit;
+    }
+
+    /**
+     * Submit a lot-batch edit request for admin approval.
+     * The actual DB update happens when admin approves via AdminController::approvalApprove().
+     */
+    public function apiLotBatchEditRequest(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verifyCsrf();
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
+
+        if (!$input || empty($input['lots'])) {
+            echo json_encode(['success' => false, 'message' => 'No lots provided']); exit;
+        }
+
+        $orig_company_id = !empty($input['original_company_id']) ? (int)$input['original_company_id'] : (int)($input['company_id'] ?? 0);
+        $orig_lot_date   = !empty($input['original_lot_date'])   ? $input['original_lot_date']   : ($input['lot_date'] ?? date('Y-m-d'));
+        $new_company_id  = (int)($input['company_id'] ?? $orig_company_id);
+        $new_lot_date    = !empty($input['lot_date']) ? $input['lot_date'] : $orig_lot_date;
+
+        // Fetch old lot data for the approval record
+        $oldLots = $this->db->prepare("
+            SELECT l.id, l.product_id, l.qty_pieces, l.buying_price, l.expiry_date, l.lot_date,
+                   p.name AS product_name, c.name AS company_name
+            FROM lots l
+            JOIN products p ON p.id = l.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
+            WHERE p.company_id = ? AND (l.lot_date = ? OR (l.lot_date IS NULL AND DATE(l.created_at) = ?))
+        ");
+        $oldLots->execute([$orig_company_id, $orig_lot_date, $orig_lot_date]);
+        $oldData = $oldLots->fetchAll();
+
+        if (empty($oldData)) {
+            echo json_encode(['success' => false, 'message' => 'Original lot batch not found']); exit;
+        }
+
+        // Store approval request — record_id is the original company_id (batch key)
+        $this->db->prepare("
+            INSERT INTO approvals (requested_by, module, action, record_id, old_data, new_data, status)
+            VALUES (?, 'lots_batch', 'edit', ?, ?, ?, 'pending')
+        ")->execute([
+            \Auth::id(),
+            $orig_company_id,
+            json_encode([
+                'company_id'  => $orig_company_id,
+                'lot_date'    => $orig_lot_date,
+                'lots'        => $oldData,
+            ]),
+            json_encode([
+                'original_company_id' => $orig_company_id,
+                'original_lot_date'   => $orig_lot_date,
+                'company_id'          => $new_company_id,
+                'lot_date'            => $new_lot_date,
+                'lots'                => $input['lots'],
+            ]),
+        ]);
+
+        \Helpers::logManagerActivity(\Auth::id(), 'request_lot_edit', "Requested edit approval for lot batch: company_id={$orig_company_id}, date={$orig_lot_date}", $orig_company_id);
+        echo json_encode(['success' => true, 'message' => 'Edit request submitted. Waiting for admin approval.']);
         exit;
     }
 
