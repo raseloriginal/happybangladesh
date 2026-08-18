@@ -763,6 +763,29 @@ class DSRController extends Controller
         $deliveredItemsStr = $this->post('items', '{}');
         $deliveredItems = json_decode($deliveredItemsStr, true) ?? [];
 
+        // ── Undo-cancel: restore order to in_transit ──────────────────────────
+        // Sending status=in_transit resets delivered_quantity to 0 and restores
+        // any previously deducted van stock. No further stock validation needed.
+        if ($status === 'in_transit') {
+            $this->db->prepare("UPDATE dispatches SET status='in_transit', paid_amount=0, notes=NULL, updated_at=NOW() WHERE id=? AND dsr_id=?")
+                     ->execute([$id, $dsrId]);
+
+            foreach ($items as $item) {
+                $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
+                // Restore van stock for any quantity that was previously marked delivered
+                if ($prevDelivered > 0) {
+                    $this->db->prepare("UPDATE van_stock SET quantity = quantity + ? WHERE dsr_id=? AND product_id=? AND (lot_id=? OR (? IS NULL AND lot_id IS NULL))")
+                             ->execute([$prevDelivered, $dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+                }
+                // Reset delivered_quantity back to 0
+                $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = 0 WHERE dispatch_id = ? AND product_id = ?")
+                         ->execute([$id, $item['product_id']]);
+            }
+
+            $this->json(['success' => true]);
+            return;
+        }
+
         // Validate van stock sufficiency before making database updates
         if ($status !== 'cancelled') {
             foreach($items as $item) {
