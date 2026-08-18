@@ -280,7 +280,7 @@ async function toggleSr(dateStr, companyId, srId) {
                     const oc = parseFloat(prod.total_base_value) - parseFloat(prod.total_sr_value);
                     const ocClass = oc > 0 ? 'text-emerald-600' : (oc < 0 ? 'text-rose-600' : 'text-slate-500');
                     const ocSign = oc > 0 ? '+' : (oc < 0 ? '-' : '');
-                    const unitPrice = parseFloat(prod.total_sr_value) / Math.max(1, parseFloat(prod.total_qty));
+                    const unitPrice = parseFloat(prod.total_base_value) / Math.max(1, parseFloat(prod.total_qty));
 
                     html += `
                         <tr class="hover:bg-amber-50/30 transition-colors">
