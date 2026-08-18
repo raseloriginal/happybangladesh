@@ -544,24 +544,45 @@ function toggleProductRow(schId, compId) {
       return;
     }
     
-    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+    let html = `<div class="excel-container shadow-none border border-slate-200 overflow-x-auto"><table class="excel-table text-xs whitespace-nowrap">
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>Product Name</th>
+        <th class="text-right">Base Price</th>
         <th class="text-center">Ordered Qty</th>
+        <th class="text-right">Ordered Value</th>
         <th class="text-center">Dispatched Qty</th>
+        <th class="text-right">Dispatched Value</th>
         <th class="text-center">Sale Qty</th>
+        <th class="text-right">Sale Value</th>
         <th class="text-center">Return Qty</th>
+        <th class="text-right">Return Value</th>
       </tr></thead><tbody>`;
       
     products.forEach((p, pIdx) => {
+      const basePrice = parseFloat(p.base_price || 0);
+      const orderedQty = parseInt(p.ordered_qty || 0);
+      const dispatchedQty = parseInt(p.dispatched_qty || 0);
+      const saleQty = parseInt(p.sale_qty || 0);
+      const returnedQty = parseInt(p.returned_qty || 0);
+      
+      const orderedVal = orderedQty * basePrice;
+      const dispatchedVal = dispatchedQty * basePrice;
+      const saleVal = saleQty * basePrice;
+      const returnedVal = returnedQty * basePrice;
+      
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
         <td class="font-bold text-gray-800">${p.name}</td>
-        <td class="excel-qty text-center">${p.ordered_qty || 0}</td>
-        <td class="excel-qty text-center">${p.dispatched_qty || 0}</td>
-        <td class="excel-qty text-center font-bold text-emerald-700">${p.sale_qty || 0}</td>
-        <td class="excel-qty text-center text-rose-600">${p.returned_qty || 0}</td>
+        <td class="excel-money text-right text-amber-600">৳ ${basePrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center">${orderedQty}</td>
+        <td class="excel-money text-right text-gray-600">৳ ${orderedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center">${dispatchedQty}</td>
+        <td class="excel-money text-right text-blue-600">৳ ${dispatchedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center font-bold text-emerald-700">${saleQty}</td>
+        <td class="excel-money text-right font-bold text-emerald-700">৳ ${saleVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center text-rose-600">${returnedQty}</td>
+        <td class="excel-money text-right text-rose-600">৳ ${returnedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;

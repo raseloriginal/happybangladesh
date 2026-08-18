@@ -1506,7 +1506,7 @@ class ManagerController extends Controller
             $company['sale_value'] = (float)$saleVal;
 
             $products = $this->db->query("
-                SELECT p.id, p.name,
+                SELECT p.id, p.name, p.price AS base_price,
                        (
                            SELECT COALESCE(SUM(oi.quantity), 0)
                            FROM dispatch_schedule_srs dss
