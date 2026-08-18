@@ -1657,11 +1657,12 @@ class ManagerController extends Controller
                 $deliv_date = $sch['delivery_date'] ?: $date;
                 
                 // 1. Convert Orders into Dispatches
+                // Also include 'dispatched' orders to support re-dispatch after a dispatch-clear or re-organize
                 $orders = $this->db->prepare("
                     SELECT o.id, o.warehouse_id 
                     FROM orders o 
                     JOIN dispatch_schedule_srs dss ON dss.sr_id = o.sr_id
-                    WHERE dss.schedule_id = ? AND DATE(o.created_at) = ? AND o.status IN ('pending', 'confirmed')
+                    WHERE dss.schedule_id = ? AND DATE(o.created_at) = ? AND o.status IN ('pending', 'confirmed', 'dispatched')
                 ");
                 $orders->execute([$id, $date]);
                 $ordersList = $orders->fetchAll();

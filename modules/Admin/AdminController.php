@@ -1038,6 +1038,9 @@ class AdminController extends Controller
             // 9. readysales — ready/direct sales created during dispatch
             $this->db->exec("DELETE FROM `readysales`");
 
+            // 10. Reset orders that were dispatched back to 'confirmed' so organize can re-process them
+            $this->db->exec("UPDATE `orders` SET status = 'confirmed' WHERE status = 'dispatched'");
+
             $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
 
             $this->db->commit();
