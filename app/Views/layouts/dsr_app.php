@@ -51,6 +51,43 @@
     <!-- Main Content Area -->
     <main class="dsr-main flex-1 overflow-y-auto pb-20 relative scroll-smooth" id="dsrMain">
       
+      <!-- Global Toast Notification Container -->
+      <div id="toastContainer" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[999999] w-11/12 max-w-[420px] pointer-events-none flex flex-col gap-2"></div>
+      <script>
+        function showToast(message, type = 'default') {
+          let container = document.getElementById('toastContainer');
+          if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 z-[999999] w-11/12 max-w-[420px] pointer-events-none flex flex-col gap-2';
+            document.body.appendChild(container);
+          }
+          const toast = document.createElement('div');
+          
+          let bgClass = 'bg-slate-900 text-white border-slate-700';
+          if (type === 'error' || (typeof message === 'string' && (message.includes('❌') || message.includes('ত্রুটি') || message.includes('ব্যর্থ')))) {
+            bgClass = 'bg-rose-600 text-white border-rose-500';
+          } else if (type === 'warning' || (typeof message === 'string' && (message.includes('⚠️') || message.includes('সতর্কতা')))) {
+            bgClass = 'bg-amber-600 text-white border-amber-500';
+          } else if (type === 'success' || (typeof message === 'string' && (message.includes('✅') || message.includes('সফল')))) {
+            bgClass = 'bg-emerald-600 text-white border-emerald-500';
+          }
+
+          toast.className = `${bgClass} backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-2 pointer-events-auto transform -translate-y-2 opacity-0 transition-all duration-300 text-center`;
+          toast.innerHTML = `<span>${message}</span>`;
+          container.appendChild(toast);
+
+          setTimeout(() => {
+            toast.classList.remove('-translate-y-2', 'opacity-0');
+          }, 10);
+
+          setTimeout(() => {
+            toast.classList.add('opacity-0', '-translate-y-2');
+            setTimeout(() => toast.remove(), 300);
+          }, 3500);
+        }
+      </script>
+
       <!-- Flash alerts -->
       <?php $flash = Auth::getFlash(); if ($flash): ?>
         <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-11/12 max-w-[440px]" id="dsrFlash">
