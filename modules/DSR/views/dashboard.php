@@ -121,7 +121,7 @@
     
     <div class="grid grid-cols-2 gap-3">
       <!-- Card 1: Delivery Route -->
-      <a href="<?= url('dsr/delivery') ?>" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md hover:-translate-y-0.5 hover:border-blue-400 transition-all duration-200 flex flex-col justify-between space-y-4 group">
+      <a href="<?= url('dsr/delivery?date=' . ($activeDeliveryDate ?? date('Y-m-d'))) ?>" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md hover:-translate-y-0.5 hover:border-blue-400 transition-all duration-200 flex flex-col justify-between space-y-4 group">
         <div class="flex items-center justify-between">
           <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-xl group-hover:bg-blue-600 group-hover:text-white transition duration-200 shadow-2xs">
             <i class="fa-solid fa-truck-fast"></i>

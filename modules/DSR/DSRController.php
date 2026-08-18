@@ -319,7 +319,12 @@ class DSRController extends Controller
         $totDel = (int)($rowAvg['tot_del'] ?? 0);
         $stats['avg_rate'] = $totAll > 0 ? round(($totDel / $totAll) * 100, 1) : 0;
 
-        $this->render('dashboard', compact('stats'), 'dsr_app');
+        // Most recent active dispatch date (for delivery link)
+        $aq = $this->db->prepare("SELECT dispatch_date FROM dispatches WHERE dsr_id=? AND status != 'pending' ORDER BY dispatch_date DESC LIMIT 1");
+        $aq->execute([$dsrId]);
+        $activeDeliveryDate = $aq->fetchColumn() ?: date('Y-m-d');
+
+        $this->render('dashboard', compact('stats', 'activeDeliveryDate'), 'dsr_app');
     }
 
     public function scanner(): void
@@ -586,7 +591,19 @@ class DSRController extends Controller
     public function delivery(): void
     {
         $dsrId = Auth::id();
-        $selectedDate = $_GET['date'] ?? date('Y-m-d');
+        $selectedDate = $_GET['date'] ?? null;
+
+        // If no date provided, auto-find the most recent date with active dispatches
+        if ($selectedDate === null) {
+            $latestQ = $this->db->prepare("
+                SELECT dispatch_date FROM dispatches
+                WHERE dsr_id = ? AND status != 'pending'
+                ORDER BY dispatch_date DESC LIMIT 1
+            ");
+            $latestQ->execute([$dsrId]);
+            $latestDate = $latestQ->fetchColumn();
+            $selectedDate = $latestDate ?: date('Y-m-d');
+        }
 
         // Fetch only dispatches that are physically on the van (in_transit, partial) or delivered today
         $q = $this->db->prepare("
