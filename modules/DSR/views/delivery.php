@@ -1840,8 +1840,22 @@ async function redoCancelledOrder(orderIndex) {
 
         // Update local object
         order.status = 'in_transit';
+        order.paid_amount = 0;
         order.notes = '';
-        
+
+        // Restore vanStockMap with the quantities that were reset on the server
+        // so client-side validation allows subsequent delivery attempts
+        if (order.products) {
+            order.products.forEach(p => {
+                const pid = String(p.product_id);
+                const prevDelivered = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) || 0 : 0;
+                // Server restored prevDelivered back to van_stock; update local map too
+                vanStockMap[pid] = (parseInt(vanStockMap[pid]) || 0) + prevDelivered;
+                // Reset local delivered_quantity to 0
+                p.delivered_quantity = 0;
+            });
+        }
+
         showToast('🔄 Order restored to pending!');
         
         // Re-render and refresh sheet
@@ -2022,8 +2036,19 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                             const pid = bInp.getAttribute('data-pid');
                             
                             const prod = o.products.find(pr => String(pr.product_id) === String(pid));
+                            const prevDelivered = prod && prod.delivered_quantity !== null ? parseInt(prod.delivered_quantity) || 0 : 0;
+
                             if (prod) {
-                                prod.delivered_quantity = tQty;
+                                if (status === 'cancelled') {
+                                    // Restore van stock for whatever was previously delivered
+                                    vanStockMap[pid] = (parseInt(vanStockMap[pid]) || 0) + prevDelivered;
+                                    prod.delivered_quantity = 0;
+                                } else {
+                                    // Deduct the newly delivered qty delta from vanStockMap
+                                    const diff = tQty - prevDelivered;
+                                    vanStockMap[pid] = Math.max(0, (parseInt(vanStockMap[pid]) || 0) - diff);
+                                    prod.delivered_quantity = tQty;
+                                }
                             }
                         }
                     });
