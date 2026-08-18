@@ -141,3 +141,129 @@
     </table>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Danger Zone — Clear Dispatch Data
+════════════════════════════════════════════════════════ -->
+<div class="mt-8 card bg-white shadow-sm rounded-lg overflow-hidden border border-rose-200">
+  <div class="card-header bg-rose-50 border-b border-rose-200 px-6 py-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+      <i class="fas fa-radiation-alt"></i>
+    </div>
+    <div>
+      <h2 class="font-bold text-rose-800 text-base">Danger Zone — Clear Dispatch Data</h2>
+      <p class="text-xs text-rose-600 mt-0.5">Permanently removes all dispatch-cycle transactional records. Master data is untouched.</p>
+    </div>
+  </div>
+  <div class="px-6 py-5">
+    <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+      <div class="flex-1 text-sm text-slate-600 space-y-2">
+        <p><strong class="text-slate-800">What will be deleted:</strong></p>
+        <ul class="list-disc list-inside space-y-1 text-slate-500 text-xs">
+          <li>Dispatch records &amp; dispatch items</li>
+          <li>Dispatch schedules, schedule SRs &amp; dispatch extras</li>
+          <li>Van stock (DSR loaded stock)</li>
+          <li>SR order cutoffs (date completion flags)</li>
+          <li>Ready sales</li>
+        </ul>
+        <p class="mt-2"><strong class="text-slate-800">What is kept:</strong></p>
+        <ul class="list-disc list-inside space-y-1 text-slate-500 text-xs">
+          <li>Products, categories, inventory &amp; lots</li>
+          <li>Users, companies, dealers, warehouses</li>
+          <li>Orders, expenses, attendance &amp; all other master data</li>
+        </ul>
+        <p class="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 flex items-start gap-2">
+          <i class="fas fa-exclamation-triangle mt-0.5 shrink-0"></i>
+          <span>After clearing, you can assign SRs to DSRs/delivery men for any date and start a completely fresh dispatch cycle. This action <strong>cannot be undone</strong>.</span>
+        </p>
+      </div>
+      <div class="shrink-0">
+        <button type="button" id="btn-open-dispatch-clear"
+          class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-semibold px-5 py-2.5 rounded-lg shadow-sm transition-all duration-150 text-sm">
+          <i class="fas fa-trash-alt"></i>
+          Clear Dispatch Data
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="dispatch-clear-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
+    <div class="bg-rose-600 text-white rounded-t-2xl px-6 py-4 flex items-center gap-3">
+      <i class="fas fa-exclamation-triangle text-2xl"></i>
+      <div>
+        <h3 class="font-bold text-lg leading-tight">Confirm Dispatch Clear</h3>
+        <p class="text-rose-100 text-xs">This action cannot be undone.</p>
+      </div>
+    </div>
+    <div class="px-6 py-5 space-y-4">
+      <p class="text-slate-700 text-sm">You are about to <strong class="text-rose-700">permanently delete all dispatch data</strong> for the current cycle. All dispatch records, schedules, SR assignments, van stock, order cutoffs, and ready sales will be removed.</p>
+      <p class="text-slate-700 text-sm">Products, users, companies, dealers, warehouses, inventory, lots, and all other master data will remain intact.</p>
+      <div class="bg-rose-50 border border-rose-200 rounded-lg px-4 py-3 text-sm text-rose-800 font-medium flex items-center gap-2">
+        <i class="fas fa-lock text-rose-500"></i>
+        Type <code class="bg-rose-100 px-1.5 py-0.5 rounded font-mono text-rose-900">CLEAR DISPATCH</code> to confirm
+      </div>
+      <input type="text" id="dispatch-clear-confirm-input"
+        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono tracking-wide focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+        placeholder="Type CLEAR DISPATCH here" autocomplete="off">
+    </div>
+    <div class="px-6 pb-5 flex items-center justify-end gap-3">
+      <button type="button" id="btn-cancel-dispatch-clear"
+        class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+        Cancel
+      </button>
+      <form method="POST" action="<?= url('admin/database-sync/clear-dispatch') ?>" id="dispatch-clear-form">
+        <?= Helpers::csrfField() ?>
+        <button type="submit" id="btn-confirm-dispatch-clear" disabled
+          class="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white bg-rose-400 cursor-not-allowed transition-all duration-150"
+          data-enabled-class="bg-rose-600 hover:bg-rose-700 cursor-pointer"
+          data-disabled-class="bg-rose-400 cursor-not-allowed">
+          <i class="fas fa-trash-alt"></i> Yes, Clear Dispatch Data
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const openBtn    = document.getElementById('btn-open-dispatch-clear');
+  const cancelBtn  = document.getElementById('btn-cancel-dispatch-clear');
+  const modal      = document.getElementById('dispatch-clear-modal');
+  const input      = document.getElementById('dispatch-clear-confirm-input');
+  const confirmBtn = document.getElementById('btn-confirm-dispatch-clear');
+  const KEYWORD    = 'CLEAR DISPATCH';
+
+  function openModal() {
+    input.value = '';
+    confirmBtn.disabled = true;
+    confirmBtn.className = 'inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white ' + confirmBtn.dataset.disabledClass + ' transition-all duration-150';
+    modal.classList.remove('hidden');
+    setTimeout(() => input.focus(), 100);
+  }
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    input.value = '';
+  }
+
+  openBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) closeModal();
+  });
+
+  input.addEventListener('input', function () {
+    const match = input.value.trim() === KEYWORD;
+    confirmBtn.disabled = !match;
+    confirmBtn.className = 'inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-150 ' +
+      (match ? confirmBtn.dataset.enabledClass : confirmBtn.dataset.disabledClass);
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+  });
+})();
+</script>

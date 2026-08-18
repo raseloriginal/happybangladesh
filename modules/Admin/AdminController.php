@@ -1000,6 +1000,61 @@ class AdminController extends Controller
         $this->redirect('admin/database-sync');
     }
 
+    // ══════════════════════════════════════════════════════════
+    //  Clear Dispatch Data (keep all master data intact)
+    // ══════════════════════════════════════════════════════════
+    public function dispatchClear(): void
+    {
+        $this->verifyCsrf();
+
+        try {
+            $this->db->beginTransaction();
+
+            // Disable FK checks inside the transaction for safe ordered deletes
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 0;");
+
+            // 1. Child records of dispatch_items (none currently, but future-proof)
+            // 2. dispatch_items → child of dispatches
+            $this->db->exec("DELETE FROM `dispatch_items`");
+
+            // 3. dispatch_extras → child of dispatch_schedules
+            $this->db->exec("DELETE FROM `dispatch_extras`");
+
+            // 4. dispatch_schedule_srs → child of dispatch_schedules
+            $this->db->exec("DELETE FROM `dispatch_schedule_srs`");
+
+            // 5. dispatch_schedules (now safe, all children removed)
+            $this->db->exec("DELETE FROM `dispatch_schedules`");
+
+            // 6. dispatches (now safe)
+            $this->db->exec("DELETE FROM `dispatches`");
+
+            // 7. van_stock — DSR/SR loaded stock from dispatches
+            $this->db->exec("DELETE FROM `van_stock`");
+
+            // 8. sr_order_cutoffs — date-based SR order completion flags tied to dispatch cycle
+            $this->db->exec("DELETE FROM `sr_order_cutoffs`");
+
+            // 9. readysales — ready/direct sales created during dispatch
+            $this->db->exec("DELETE FROM `readysales`");
+
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
+
+            $this->db->commit();
+
+            $this->flash('success', 'Dispatch data cleared successfully. You can now start a fresh dispatch cycle.');
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            try { $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;"); } catch (\Throwable $ex) {}
+            $this->flash('error', 'Failed to clear dispatch data: ' . $e->getMessage());
+        }
+
+        $this->redirect('admin/database-sync');
+    }
+
+
     private function parseSchemaSql(): array
     {
         $filePath = ROOT_PATH . '/database/migrations/schema.sql';
