@@ -238,7 +238,7 @@ $hasDeliveries = !empty($retailers);
       </div>
 
       <!-- Body Grid (Modern Excel Card Grid) -->
-      <div class="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 pb-24 content-start">
+      <div id="retailerListGrid" class="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 pb-24 content-start">
           <?php foreach ($retailers as $idx => $r): 
               $hasDelivered = false;
               $hasPending = false;
@@ -983,12 +983,29 @@ function handleDuePaymentAction() {
             
             showToast('✅ All dues marked as complete!');
             
-            if (document.getElementById('retailerSheet').classList.contains('active')) {
-                openRetailerSheet(currentRetailerObj);
-                selectCompanyOrder(currentOrderIndex);
+            if (currentRetailerObj) {
+                const globalRetIdx = orderedRetailers.findIndex(r => (r.id && r.id === currentRetailerObj.id) || (r.retailer_name === currentRetailerObj.retailer_name));
+                if (globalRetIdx !== -1) {
+                    orderedRetailers[globalRetIdx] = currentRetailerObj;
+                }
             }
-            if (typeof initMap === 'function') {
+
+            if (document.getElementById('retailerSheet').classList.contains('active')) {
+                let nextPendingIdx = -1;
+                if (currentRetailerObj && currentRetailerObj.orders) {
+                    nextPendingIdx = currentRetailerObj.orders.findIndex(o => o.status === 'in_transit');
+                }
+                if (nextPendingIdx !== -1) {
+                    openRetailerSheet(currentRetailerObj, nextPendingIdx);
+                } else {
+                    closeBottomSheet();
+                }
+            }
+            if (typeof redrawMapPins === 'function') {
                 redrawMapPins();
+            }
+            if (typeof renderRetailerListGrid === 'function') {
+                renderRetailerListGrid();
             }
         } finally {
             btns.forEach(b => { b.disabled = false; });
@@ -1263,7 +1280,7 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
 
     const tabsContainer = document.getElementById('bsCompanyTabs');
     tabsContainer.innerHTML = '';
-    tabsContainer.className = "flex gap-6 overflow-x-auto pb-0 no-scrollbar border-b border-gray-100 px-4 pt-2 mb-4";
+    tabsContainer.className = "flex gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-gray-100 px-4 pt-2 mb-3";
     
     const list = document.getElementById('bsProductsList');
     list.innerHTML = '';
@@ -1271,20 +1288,24 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
     if (retailer.orders && retailer.orders.length > 1) {
         tabsContainer.classList.remove('hidden');
         retailer.orders.forEach((order, idx) => {
-            const isSelected = idx === 0;
             const count = order.products ? order.products.length : 0;
-            const isCancelled = order.status === 'cancelled';
-            let tabClass = 'text-gray-500 pb-2 border-b-2 border-transparent transition hover:text-gray-700';
-            if (isCancelled) {
-                tabClass = isSelected ? 'text-red-600 pb-2 border-b-2 border-red-600 font-extrabold' : 'text-red-400 pb-2 border-b-2 border-transparent transition hover:text-red-500';
-            } else if (isSelected) {
-                tabClass = 'text-[#217346] pb-2 border-b-2 border-[#217346] font-extrabold';
-            }
+            const status = order.status || 'in_transit';
             
+            let statusIcon = '<i class="fa-regular fa-clock text-blue-500 text-[10px]"></i>';
+            if (status === 'delivered') {
+                statusIcon = '<i class="fa-solid fa-circle-check text-emerald-600 text-[10px]"></i>';
+            } else if (status === 'cancelled') {
+                statusIcon = '<i class="fa-solid fa-circle-xmark text-rose-500 text-[10px]"></i>';
+            } else if (status === 'partial') {
+                statusIcon = '<i class="fa-solid fa-circle-half-stroke text-amber-500 text-[10px]"></i>';
+            }
+
             tabsContainer.insertAdjacentHTML('beforeend', `
-                <button onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
-                        class="whitespace-nowrap px-1 text-xs font-semibold ${tabClass}">
-                    ${order.company_name} <span class="text-gray-400 ml-1 text-[10px]">(${count})</span>
+                <button type="button" onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
+                        class="whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 transition active:scale-95">
+                    ${statusIcon}
+                    <span>${order.company_name || 'কোম্পানি'}</span>
+                    <span class="text-[10px] opacity-70">(${count})</span>
                 </button>
             `);
         });
@@ -1431,19 +1452,28 @@ function selectCompanyOrder(orderIndex) {
     if (currentRetailerObj.orders.length > 1) {
         document.querySelectorAll('[id^="tab-order-"]').forEach((btn, idx) => {
             const ord = currentRetailerObj.orders[idx];
-            const count = ord.products ? ord.products.length : 0;
-            const isCancelled = ord.status === 'cancelled';
-            if (idx === orderIndex) {
-                if (isCancelled) {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-bold bg-white text-red-655 border-t-2 border-t-red-600 border-x border-x-gray-300 rounded-t-md relative z-10 -mb-[1px]';
+            const isSelected = (idx === orderIndex);
+            const status = ord ? (ord.status || 'in_transit') : 'in_transit';
+            
+            if (isSelected) {
+                if (status === 'delivered') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-300';
+                } else if (status === 'cancelled') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-rose-600 text-white border-rose-700 ring-2 ring-rose-300';
+                } else if (status === 'partial') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-amber-500 text-white border-amber-600 ring-2 ring-amber-300';
                 } else {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-bold bg-white text-[#217346] border-t-2 border-t-[#217346] border-x border-x-gray-300 rounded-t-md relative z-10 -mb-[1px]';
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-blue-600 text-white border-blue-700 ring-2 ring-blue-300';
                 }
             } else {
-                if (isCancelled) {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-semibold bg-[#f3f2f1] text-red-500 border-b border-b-gray-300 border-x border-x-gray-200 rounded-t-md opacity-80';
+                if (status === 'delivered') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100';
+                } else if (status === 'cancelled') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 opacity-80';
+                } else if (status === 'partial') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100';
                 } else {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-semibold bg-[#f3f2f1] text-gray-600 border-b border-b-gray-300 border-x border-x-gray-200 rounded-t-md hover:bg-gray-100';
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200';
                 }
             }
         });
@@ -1456,11 +1486,16 @@ function selectCompanyOrder(orderIndex) {
     document.getElementById('bsTotalQty').innerText = totalQty;
 
     const statusLabel = { 'in_transit': 'অপেক্ষমান', 'delivered': 'পরিশোধিত', 'partial': 'আংশিক/বাকি', 'cancelled': 'বাতিল' };
-    const statusColor = { 'in_transit': '#3b82f6', 'delivered': '#16a34a', 'partial': '#f97316', 'cancelled': '#dc2626' };
+    const statusColor = { 'in_transit': '#2563eb', 'delivered': '#16a34a', 'partial': '#d97706', 'cancelled': '#dc2626' };
+    const statusBg = { 'in_transit': '#eff6ff', 'delivered': '#f0fdf4', 'partial': '#fffbeb', 'cancelled': '#fef2f2' };
+    const statusBorder = { 'in_transit': '#bfdbfe', 'delivered': '#bbf7d0', 'partial': '#fde68a', 'cancelled': '#fecaca' };
+
     const bsStatus = document.getElementById('bsStatus');
     if (bsStatus) {
         bsStatus.innerText = statusLabel[order.status] || 'অপেক্ষমান';
-        bsStatus.style.color = statusColor[order.status] || '#3b82f6';
+        bsStatus.style.color = statusColor[order.status] || '#2563eb';
+        bsStatus.style.backgroundColor = statusBg[order.status] || '#eff6ff';
+        bsStatus.style.borderColor = statusBorder[order.status] || '#bfdbfe';
     }
 
     const bsPartialInfo = document.getElementById('bsPartialInfo');
@@ -1844,13 +1879,26 @@ async function redoCancelledOrder(orderIndex) {
         
         showToast('🔄 Order restored to pending!');
         
+        // Sync orderedRetailers
+        if (currentRetailerObj) {
+            const globalRetIdx = orderedRetailers.findIndex(r => (r.id && r.id === currentRetailerObj.id) || (r.retailer_name === currentRetailerObj.retailer_name));
+            if (globalRetIdx !== -1) {
+                orderedRetailers[globalRetIdx] = currentRetailerObj;
+            }
+        }
+
         // Re-render and refresh sheet
-        openRetailerSheet(currentRetailerObj);
+        openRetailerSheet(currentRetailerObj, orderIndex);
         selectCompanyOrder(orderIndex);
 
         // Redraw map pins
-        if (typeof initMap === 'function' && map) {
+        if (typeof redrawMapPins === 'function') {
             redrawMapPins();
+        }
+
+        // Update Retailer List Modal cards
+        if (typeof renderRetailerListGrid === 'function') {
+            renderRetailerListGrid();
         }
 
     } catch (err) {
@@ -1904,6 +1952,99 @@ function redrawMapPins() {
             handleRetailerClick(ret, shouldWarn);
         });
         markers.push(marker);
+    });
+}
+
+function renderRetailerListGrid() {
+    const grid = document.getElementById('retailerListGrid');
+    if (!grid || !orderedRetailers || orderedRetailers.length === 0) return;
+
+    grid.innerHTML = '';
+    orderedRetailers.forEach((r, idx) => {
+        let hasDelivered = false;
+        let hasPending = false;
+        let hasPartial = false;
+        let hasCancelled = false;
+        let actionedCount = 0;
+        let totalVal = 0;
+
+        (r.orders || []).forEach(o => {
+            totalVal += parseFloat(o.total_amount || 0);
+            if (o.status === 'in_transit') {
+                hasPending = true;
+            } else {
+                actionedCount++;
+            }
+            if (o.status === 'partial') hasPartial = true;
+            if (o.status === 'delivered') hasDelivered = true;
+            if (o.status === 'cancelled') hasCancelled = true;
+        });
+
+        let statusBadge = '';
+        let cardBorder = 'border-slate-200/90';
+        let cardBg = 'bg-white';
+
+        if (hasPending && actionedCount > 0) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-800 text-white border border-slate-700"><i class="fa-solid fa-circle-exclamation mr-1"></i>আংশিক বাকি</span>';
+            cardBorder = 'border-slate-400';
+        } else if (hasPending) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200"><i class="fa-regular fa-clock mr-1"></i>অপেক্ষমাণ</span>';
+            cardBorder = 'border-blue-200';
+        } else if (hasDelivered && !$hasPartial && !$hasCancelled) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>ডেলিভারড</span>';
+            cardBorder = 'border-emerald-300';
+            cardBg = 'bg-emerald-50/20';
+        } else if (hasCancelled && !$hasDelivered && !$hasPartial) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-xmark mr-1"></i>বাতিল</span>';
+            cardBorder = 'border-rose-300';
+            cardBg = 'bg-rose-50/20';
+        } else if (hasPartial && !$hasDelivered && !$hasCancelled) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-circle-half-stroke mr-1"></i>পার্শিয়াল</span>';
+            cardBorder = 'border-amber-300';
+            cardBg = 'bg-amber-50/20';
+        } else {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200"><i class="fa-solid fa-shuffle mr-1"></i>মিশ্রিত</span>';
+            cardBorder = 'border-purple-300';
+            cardBg = 'bg-purple-50/20';
+        }
+
+        const name = r.retailer_name || r.dealer_name || r.name || 'Unknown Retailer';
+        const address = r.address || 'No Address';
+        const orderCount = (r.orders || []).length;
+
+        grid.insertAdjacentHTML('beforeend', `
+            <div id="retailer-card-${idx}" class="${cardBg} rounded-2xl p-3.5 shadow-2xs hover:shadow-md active:scale-[0.99] transition cursor-pointer border ${cardBorder} flex flex-col justify-between space-y-3 group" onclick="handleRetailerListClick(${idx})">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black border border-blue-100">
+                            <i class="fa-solid fa-store"></i>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <span class="font-mono font-black text-xs text-slate-900 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                        ৳${Math.round(totalVal).toLocaleString()}
+                    </span>
+                </div>
+
+                <div>
+                    <div class="text-xs sm:text-sm font-black text-slate-900 leading-snug line-clamp-2 group-hover:text-blue-600 transition">
+                        ${name}
+                    </div>
+                    <div class="text-[10.5px] text-slate-400 font-medium line-clamp-1 mt-0.5">
+                        <i class="fa-solid fa-location-dot mr-1 text-slate-300"></i>${address}
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                    <span class="font-bold text-slate-500">
+                        ${orderCount} টি অর্ডার
+                    </span>
+                    <span class="w-7 h-7 rounded-xl bg-slate-100 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-slate-400 text-xs transition duration-200">
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </span>
+                </div>
+            </div>
+        `);
     });
 }
 
@@ -2029,22 +2170,39 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                     });
                 }
             });
+
+            // Sync orderedRetailers global array
+            if (currentRetailerObj) {
+                const globalRetIdx = orderedRetailers.findIndex(r => (r.id && r.id === currentRetailerObj.id) || (r.retailer_name === currentRetailerObj.retailer_name));
+                if (globalRetIdx !== -1) {
+                    orderedRetailers[globalRetIdx] = currentRetailerObj;
+                }
+            }
+
+            // Check if there are other pending orders for this retailer
             if (document.getElementById('retailerSheet').classList.contains('active')) {
-                let hasPending = false;
+                let nextPendingIdx = -1;
                 if (currentRetailerObj && currentRetailerObj.orders) {
-                    hasPending = currentRetailerObj.orders.some(o => o.status === 'in_transit');
+                    nextPendingIdx = currentRetailerObj.orders.findIndex(o => o.status === 'in_transit');
                 }
                 
-                if (hasPending) {
-                    openRetailerSheet(currentRetailerObj);
-                    selectCompanyOrder(currentOrderIndex);
+                if (nextPendingIdx !== -1) {
+                    // Other company orders are still pending: stay open and auto-switch to next pending tab
+                    openRetailerSheet(currentRetailerObj, nextPendingIdx);
                 } else {
+                    // All company orders for this retailer are completed: close sheet
                     closeBottomSheet();
                 }
             }
             
-            if (typeof initMap === 'function') {
+            // Redraw map pins with updated statuses and colors
+            if (typeof redrawMapPins === 'function') {
                 redrawMapPins();
+            }
+
+            // Update Retailer List Modal cards with updated statuses and colors
+            if (typeof renderRetailerListGrid === 'function') {
+                renderRetailerListGrid();
             }
         } else {
             setTimeout(() => location.reload(), 900);
