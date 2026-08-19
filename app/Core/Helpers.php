@@ -94,8 +94,8 @@ class Helpers
 
     public static function verifyCsrf(): bool
     {
-        // Accept both field names: _csrf_token (form) and csrf_token (AJAX/FormData)
-        $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? '';
+        // Accept both field names: _csrf_token (form) and csrf_token (AJAX/FormData/GET)
+        $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_GET['_csrf_token'] ?? $_GET['csrf_token'] ?? '';
         if (empty($token)) {
             // Fall back to JSON body
             $rawInput = file_get_contents('php://input');
