@@ -1008,11 +1008,10 @@ class DSRController extends Controller
         // Total Delivery O/C
         $qOc = $this->db->prepare("
             SELECT 
-                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.base_selling_price)), 0) as delivery_oc
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (di.unit_price - di.base_selling_price)), 0) as delivery_oc
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
-            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
             WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
         ");
         $qOc->execute([$dsrId, $selectedDate]);
@@ -1134,13 +1133,12 @@ class DSRController extends Controller
         $q = $this->db->prepare("
             SELECT 
                 u.name AS sr_name,
-                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.base_selling_price)), 0) as sr_oc
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (di.unit_price - di.base_selling_price)), 0) as sr_oc
             FROM dispatches d
             JOIN orders o ON o.id = d.order_id
             JOIN users u ON u.id = o.sr_id
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
-            LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
             WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial')
             GROUP BY o.sr_id, u.name
         ");
