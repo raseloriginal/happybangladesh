@@ -300,6 +300,21 @@ class ManagerController extends Controller
                         $buyingPrice,
                         $imagePath
                     ]);
+                $newProdId = (int)$this->db->lastInsertId();
+                if ($buyingPrice > 0) {
+                    $dp = (float)($p['dealer_percentage'] ?: 0);
+                    $initSellingPrice = round($buyingPrice * (1 + $dp / 100) / $piecesPerBox, 2);
+                    \Helpers::logProductPriceChange(
+                        $newProdId,
+                        null,
+                        $buyingPrice,
+                        null,
+                        $initSellingPrice,
+                        \Auth::id(),
+                        'initial_creation',
+                        'Initial product creation'
+                    );
+                }
             }
             $this->db->commit();
             echo json_encode(['success' => true]);
@@ -392,7 +407,7 @@ class ManagerController extends Controller
         }
 
         try {
-            $stmt = $this->db->prepare("SELECT name, pieces_per_box, dealer_percentage FROM products WHERE id=?");
+            $stmt = $this->db->prepare("SELECT name, buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
             $stmt->execute([$pid]);
             $p = $stmt->fetch();
 
@@ -417,7 +432,62 @@ class ManagerController extends Controller
                 $pid
             );
 
+            if ($new_buying_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                \Helpers::logProductPriceChange(
+                    $pid,
+                    (float)$p['buying_price'],
+                    $new_buying_price,
+                    (float)$p['price'],
+                    $selling_price,
+                    \Auth::id(),
+                    'manual_adjust',
+                    $input['reason'] ?? 'Manual price adjustment by Manager'
+                );
+            }
+
             echo json_encode(['success' => true, 'new_buying_price' => $new_buying_price, 'new_selling_price' => $selling_price]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiProductPriceHistory(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verifyCsrf();
+        $productId = (int)($_GET['product_id'] ?? 0);
+        if ($productId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Product ID is required']);
+            exit;
+        }
+
+        try {
+            $stmtProd = $this->db->prepare("SELECT id, name, sku, buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id = ?");
+            $stmtProd->execute([$productId]);
+            $product = $stmtProd->fetch();
+
+            if (!$product) {
+                echo json_encode(['success' => false, 'message' => 'Product not found']);
+                exit;
+            }
+
+            $stmt = $this->db->prepare("
+                SELECT h.*, u.name as user_name, r.name as role_name
+                FROM product_price_history h
+                LEFT JOIN users u ON u.id = h.changed_by
+                LEFT JOIN roles r ON r.id = u.role_id
+                WHERE h.product_id = ?
+                ORDER BY h.created_at DESC, h.id DESC
+            ");
+            $stmt->execute([$productId]);
+            $history = $stmt->fetchAll();
+
+            echo json_encode([
+                'success' => true,
+                'product' => $product,
+                'history' => $history
+            ]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
@@ -637,7 +707,7 @@ class ManagerController extends Controller
                 )->execute([$wid, $product_id, $lot_id, $qty_pieces]);
 
                 // 3. Auto-update product buying_price and calculate selling price
-                $prod = $this->db->prepare("SELECT pieces_per_box, dealer_percentage FROM products WHERE id=?");
+                $prod = $this->db->prepare("SELECT buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
                 $prod->execute([$product_id]);
                 $p = $prod->fetch();
 
@@ -650,6 +720,19 @@ class ManagerController extends Controller
                     $this->db->prepare(
                         "UPDATE products SET buying_price=?, price=? WHERE id=?"
                     )->execute([$buying_price, $selling_price, $product_id]);
+
+                    if ($buying_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                        \Helpers::logProductPriceChange(
+                            $product_id,
+                            (float)$p['buying_price'],
+                            $buying_price,
+                            (float)$p['price'],
+                            $selling_price,
+                            \Auth::id(),
+                            'lot_entry',
+                            "Updated via Lot Entry (Date: {$lot_date})"
+                        );
+                    }
                 }
             }
 
@@ -712,7 +795,7 @@ class ManagerController extends Controller
             )->execute([$wid, $pid, $input['id'], $new_qty]);
 
             // 4. Recalculate selling price
-            $prod = $this->db->prepare("SELECT pieces_per_box, dealer_percentage FROM products WHERE id=?");
+            $prod = $this->db->prepare("SELECT buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
             $prod->execute([$pid]);
             $p = $prod->fetch();
             if ($p) {
@@ -721,6 +804,19 @@ class ManagerController extends Controller
                 $selling_price = round($new_price * (1 + $dp / 100) / $ppb, 2);
                 $this->db->prepare("UPDATE products SET buying_price=?, price=? WHERE id=?")
                          ->execute([$new_price, $selling_price, $pid]);
+
+                if ($new_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                    \Helpers::logProductPriceChange(
+                        $pid,
+                        (float)$p['buying_price'],
+                        $new_price,
+                        (float)$p['price'],
+                        $selling_price,
+                        \Auth::id(),
+                        'lot_edit',
+                        "Updated via Lot Edit (Lot ID: {$input['id']})"
+                    );
+                }
             }
 
             $this->db->commit();

@@ -199,6 +199,7 @@ $router->get( '/manager/products',            ['ManagerController', 'products'])
 $router->post('/manager/api/products',        ['ManagerController', 'apiProductStore']);
 $router->post('/manager/api/products/update', ['ManagerController', 'apiProductUpdate']);
 $router->post('/manager/api/products/adjust-buying-price', ['ManagerController', 'apiAdjustBuyingPrice']);
+$router->get( '/manager/api/products/price-history',       ['ManagerController', 'apiProductPriceHistory']);
 $router->post('/manager/api/products/delete', ['ManagerController', 'apiProductDelete']);
 $router->post('/manager/api/stock/adjust',    ['ManagerController', 'apiStockAdjust']);
 
