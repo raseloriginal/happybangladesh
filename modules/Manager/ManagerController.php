@@ -1772,6 +1772,12 @@ class ManagerController extends Controller
                 $ordersList = $orders->fetchAll();
                 
                 foreach ($ordersList as $o) {
+                    $checkEx = $this->db->prepare("SELECT id FROM dispatches WHERE order_id=?");
+                    $checkEx->execute([$o['id']]);
+                    if ($checkEx->fetch()) {
+                        continue; // Skip if already dispatched
+                    }
+
                     $this->db->prepare("INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status) VALUES (?, ?, ?, ?, 'pending')")
                              ->execute([$o['id'], $dsrId, $o['warehouse_id'], $deliv_date]);
                     $dispatchId = $this->db->lastInsertId();

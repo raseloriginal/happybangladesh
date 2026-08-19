@@ -790,8 +790,9 @@ class DSRController extends Controller
             }
         }
 
+        $dbStatus = $status === 'cancelled' ? 'returned' : $status;
         $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
-                 ->execute([$status, $paidAmount, $notes, $id, $dsrId]);
+                 ->execute([$dbStatus, $paidAmount, $notes, $id, $dsrId]);
         
         foreach($items as $item) {
             $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
