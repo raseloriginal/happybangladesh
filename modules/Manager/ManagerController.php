@@ -2026,7 +2026,6 @@ class ManagerController extends Controller
                 FROM dispatches d
                 JOIN dispatch_items di ON d.id = di.dispatch_id
                 JOIN products p ON p.id = di.product_id
-                LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
                 WHERE d.dsr_id = s.dsr_id AND d.dispatch_date = s.date AND d.status IN ('delivered', 'partial')
             ) AS live_delivery_oc
             FROM settlements s
