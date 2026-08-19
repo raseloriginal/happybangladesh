@@ -455,7 +455,6 @@ class ManagerController extends Controller
     public function apiProductPriceHistory(): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $this->verifyCsrf();
         $productId = (int)($_GET['product_id'] ?? 0);
         if ($productId <= 0) {
             echo json_encode(['success' => false, 'message' => 'Product ID is required']);
