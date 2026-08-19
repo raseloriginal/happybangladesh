@@ -1460,7 +1460,7 @@ class ManagerController extends Controller
             $companyCondition = $cId > 0 ? "p.company_id = {$cId}" : "(p.company_id IS NULL OR p.company_id = 0)";
 
             $orderedVal = $this->db->query("
-                SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)
+                SELECT COALESCE(SUM(oi.quantity * p.price), 0)
                 FROM dispatch_schedule_srs dss
                 JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
                 JOIN order_items oi ON oi.order_id = o.id

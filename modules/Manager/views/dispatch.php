@@ -438,7 +438,7 @@ async function toggleSrRow(schId) {
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>Company Name</th>
-        <th class="text-right">Total Ordered Value</th>
+        <th class="text-right">Total Base Selling Value</th>
         <th class="text-right">Dispatch Items Value</th>
         <th class="text-right">Returned Value</th>
         <th class="text-right">Damage Value</th>
