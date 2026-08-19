@@ -1542,6 +1542,13 @@ class ManagerController extends Controller
             $srs = $this->db->query("
                 SELECT u.id, u.name,
                        (
+                           SELECT COALESCE(SUM(oi.quantity * p.price), 0)
+                           FROM orders o
+                           JOIN order_items oi ON oi.order_id = o.id
+                           JOIN products p ON p.id = oi.product_id
+                           WHERE o.sr_id = u.id AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
+                       ) as base_order_value,
+                       (
                            SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)
                            FROM orders o
                            JOIN order_items oi ON oi.order_id = o.id
@@ -1549,12 +1556,14 @@ class ManagerController extends Controller
                            WHERE o.sr_id = u.id AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
                        ) as order_value,
                        (
-                           SELECT COALESCE(SUM((oi.unit_price - oi.buying_price) * oi.quantity), 0)
-                           FROM orders o
-                           JOIN order_items oi ON oi.order_id = o.id
-                           JOIN products p ON p.id = oi.product_id
-                           WHERE o.sr_id = u.id AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
-                       ) as total_oc,
+                           SELECT COALESCE(SUM(di.delivered_quantity * p.price), 0)
+                           FROM dispatch_items di
+                           JOIN products p ON p.id = di.product_id
+                           JOIN dispatches d ON d.id = di.dispatch_id
+                           LEFT JOIN orders o ON o.id = d.order_id
+                           LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+                           WHERE d.dispatch_date = '{$deliveryDate}' AND o.sr_id = u.id AND {$companyCondition}
+                       ) as base_sale_value,
                        (
                            SELECT COALESCE(SUM(di.delivered_quantity * IFNULL(oi.unit_price, p.price)), 0)
                            FROM dispatch_items di
@@ -1567,7 +1576,7 @@ class ManagerController extends Controller
                 FROM dispatch_schedule_srs dss
                 JOIN users u ON u.id = dss.sr_id
                 WHERE dss.schedule_id = {$scheduleId}
-                HAVING order_value > 0 OR sale_value > 0 OR total_oc > 0
+                HAVING order_value > 0 OR sale_value > 0 OR base_order_value > 0
                 ORDER BY u.name ASC
             ")->fetchAll();
 
