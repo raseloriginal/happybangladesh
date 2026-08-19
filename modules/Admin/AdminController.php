@@ -601,9 +601,21 @@ class AdminController extends Controller
         if ($approval && $approval['status'] === 'pending') {
             if ($approval['module'] === 'products_price' && $approval['action'] === 'edit') {
                 $newData = json_decode($approval['new_data'], true);
+                $oldData = json_decode($approval['old_data'] ?? '{}', true);
                 if ($newData) {
                     $updateStmt = $this->db->prepare("UPDATE products SET buying_price = ?, price = ? WHERE id = ?");
                     $updateStmt->execute([$newData['buying_price'], $newData['price'], $approval['record_id']]);
+
+                    \Helpers::logProductPriceChange(
+                        (int)$approval['record_id'],
+                        isset($oldData['buying_price']) ? (float)$oldData['buying_price'] : null,
+                        (float)$newData['buying_price'],
+                        isset($oldData['price']) ? (float)$oldData['price'] : null,
+                        (float)$newData['price'],
+                        \Auth::id(),
+                        'admin_approval',
+                        'Approved price correction requested by user #' . $approval['requested_by']
+                    );
                 }
             }
 
@@ -653,7 +665,7 @@ class AdminController extends Controller
                                  ON DUPLICATE KEY UPDATE qty_pieces = qty_pieces + VALUES(qty_pieces)"
                             )->execute([$wid, $product_id, $lot_id, $qty_pieces]);
 
-                            $prod = $this->db->prepare("SELECT pieces_per_box, dealer_percentage FROM products WHERE id=?");
+                            $prod = $this->db->prepare("SELECT buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
                             $prod->execute([$product_id]);
                             $p = $prod->fetch();
                             if ($p) {
@@ -662,6 +674,19 @@ class AdminController extends Controller
                                 $selling_price = round($buying_price * (1 + $dp / 100) / $ppb, 2);
                                 $this->db->prepare("UPDATE products SET buying_price=?, price=? WHERE id=?")
                                          ->execute([$buying_price, $selling_price, $product_id]);
+
+                                if ($buying_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                                    \Helpers::logProductPriceChange(
+                                        $product_id,
+                                        (float)$p['buying_price'],
+                                        $buying_price,
+                                        (float)$p['price'],
+                                        $selling_price,
+                                        \Auth::id(),
+                                        'admin_approval',
+                                        'Approved lot batch update by Admin'
+                                    );
+                                }
                             }
                         }
                         $this->db->commit();
