@@ -284,7 +284,7 @@ class SRController extends Controller
             }
 
             $iq = $this->db->prepare("
-                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, p.price AS base_price, c.name AS company_name
+                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
                 FROM order_items oi
                 JOIN products p ON p.id = oi.product_id
                 LEFT JOIN companies c ON c.id = p.company_id
@@ -750,7 +750,7 @@ class SRController extends Controller
         $stmt->execute([Auth::id(), $dealerId, $retailerId, $warehouseId, $total, $notes, $retName, $retPhone, $retAddress]);
         $orderId = $this->db->lastInsertId();
 
-        $insStmt = $this->db->prepare("INSERT INTO order_items (order_id,product_id,quantity,unit_price,total_price,product_name,box_type,pieces_per_box,buying_price) VALUES (?,?,?,?,?,?,?,?,?)");
+        $insStmt = $this->db->prepare("INSERT INTO order_items (order_id,product_id,quantity,unit_price,base_selling_price,total_price,product_name,box_type,pieces_per_box,buying_price) VALUES (?,?,?,?,?,?,?,?,?,?)");
         foreach ($productIds as $k => $pid) {
             $qty   = intval($quantities[$k] ?? 0);
             $price = floatval($prices[$k] ?? 0);
@@ -761,8 +761,9 @@ class SRController extends Controller
             $pBoxType = $pd['box_type'] ?? null;
             $pPcs = $pd['pieces_per_box'] ?? 1;
             $pBuying = $pd['buying_price'] ?? 0;
+            $pBasePrice = (float)($pd['price'] ?? 0); // snapshot: base selling price at order time
 
-            $insStmt->execute([$orderId, $pid, $qty, $price, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
+            $insStmt->execute([$orderId, $pid, $qty, $price, $pBasePrice, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
         }
 
         $this->flash('success', "Order #$orderId placed successfully!");
@@ -841,7 +842,7 @@ class SRController extends Controller
             $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$orderId]);
 
             // Insert updated items
-            $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price, product_name, box_type, pieces_per_box, buying_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, base_selling_price, total_price, product_name, box_type, pieces_per_box, buying_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             foreach ($productIds as $k => $pid) {
                 $qty   = intval($quantities[$k] ?? 0);
                 $price = floatval($prices[$k] ?? 0);
@@ -852,8 +853,9 @@ class SRController extends Controller
                 $pBoxType = $pd['box_type'] ?? null;
                 $pPcs = $pd['pieces_per_box'] ?? 1;
                 $pBuying = $pd['buying_price'] ?? 0;
+                $pBasePrice = (float)($pd['price'] ?? 0); // snapshot: base selling price at order time
 
-                $insStmt->execute([$orderId, $pid, $qty, $price, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
+                $insStmt->execute([$orderId, $pid, $qty, $price, $pBasePrice, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
             }
 
             // Update order total amount
@@ -863,7 +865,7 @@ class SRController extends Controller
 
             // Fetch refreshed products for invoice and UI sync
             $iq = $this->db->prepare("
-                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, p.price AS base_price, c.name AS company_name
+                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
                 FROM order_items oi
                 JOIN products p ON p.id = oi.product_id
                 LEFT JOIN companies c ON c.id = p.company_id

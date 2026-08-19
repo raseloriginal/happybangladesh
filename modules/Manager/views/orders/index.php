@@ -277,7 +277,7 @@ async function toggleSr(dateStr, companyId, srId) {
                         orderQtyDisplay = `${orderBoxes} ${boxLabel} - ${orderPieces} পিস`;
                     }
 
-                    const oc = parseFloat(prod.total_base_value) - parseFloat(prod.total_sr_value);
+                    const oc = parseFloat(prod.total_sr_value) - parseFloat(prod.total_base_value);
                     const ocClass = oc > 0 ? 'text-emerald-600' : (oc < 0 ? 'text-rose-600' : 'text-slate-500');
                     const ocSign = oc > 0 ? '+' : (oc < 0 ? '-' : '');
                     const unitPrice = parseFloat(prod.total_base_value) / Math.max(1, parseFloat(prod.total_qty));

@@ -251,14 +251,17 @@ class DSRController extends Controller
 
                 // Insert return_items
                 $itemStmt = $this->db->prepare("
-                    INSERT INTO return_items (return_id, product_id, quantity, reason)
-                    VALUES (?, ?, ?, 'Damage')
+                    INSERT INTO return_items (return_id, product_id, quantity, reason, product_name, box_type, pieces_per_box, unit_price, base_selling_price, buying_price)
+                    VALUES (?, ?, ?, 'Damage', ?, ?, ?, ?, ?, ?)
                 ");
                 foreach ($products as $p) {
                     $pid = (int)($p['product_id'] ?? 0);
                     $qty = (int)($p['qty'] ?? 0);
                     if ($pid > 0 && $qty > 0) {
-                        $itemStmt->execute([$returnId, $pid, $qty]);
+                        $pdQ = $this->db->prepare("SELECT name, box_type, pieces_per_box, price, buying_price FROM products WHERE id=?");
+                        $pdQ->execute([$pid]);
+                        $pd = $pdQ->fetch(PDO::FETCH_ASSOC) ?: [];
+                        $itemStmt->execute([$returnId, $pid, $qty, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1, $pd['price'] ?? 0, $pd['price'] ?? 0, $pd['buying_price'] ?? 0]);
                     }
                 }
             }
@@ -413,7 +416,7 @@ class DSRController extends Controller
         $saleQ = $this->db->prepare("
             SELECT di.product_id, 
                    SUM(COALESCE(di.delivered_quantity, 0)) as qty,
-                   SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)) as oc_val
+                   SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.base_selling_price)) as oc_val
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
@@ -451,7 +454,7 @@ class DSRController extends Controller
         $readySaleQ = $this->db->prepare("
             SELECT di.product_id, 
                    SUM(COALESCE(di.delivered_quantity, di.quantity, 0)) as qty,
-                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * (oi.unit_price - oi.buying_price)) as oc_val
+                   SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * (oi.unit_price - oi.base_selling_price)) as oc_val
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
@@ -620,7 +623,7 @@ class DSRController extends Controller
             $iq = $this->db->query("
                 SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
                        p.name, p.image, p.pieces_per_box, p.box_type,
-                       di.buying_price as base_price,
+                       di.base_selling_price as base_price,
                        di.unit_price as price
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
@@ -1004,7 +1007,7 @@ class DSRController extends Controller
         // Total Delivery O/C
         $qOc = $this->db->prepare("
             SELECT 
-                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)), 0) as delivery_oc
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.base_selling_price)), 0) as delivery_oc
             FROM dispatches d
             JOIN dispatch_items di ON d.id = di.dispatch_id
             JOIN products p ON p.id = di.product_id
@@ -1130,7 +1133,7 @@ class DSRController extends Controller
         $q = $this->db->prepare("
             SELECT 
                 u.name AS sr_name,
-                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.buying_price)), 0) as sr_oc
+                COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (oi.unit_price - oi.base_selling_price)), 0) as sr_oc
             FROM dispatches d
             JOIN orders o ON o.id = d.order_id
             JOIN users u ON u.id = o.sr_id
@@ -1395,15 +1398,16 @@ class DSRController extends Controller
                 $totalAmount += $lineTotal;
 
                 $orderItemsToInsert[] = [
-                    'product_id'  => $pid,
-                    'lot_id'      => $lotId,
-                    'quantity'    => $qty,
-                    'unit_price'  => $unitPrice,
-                    'total_price' => $lineTotal,
-                    'product_name'=> $pData['name'] ?? null,
-                    'box_type'    => $pData['box_type'] ?? null,
-                    'pieces_per_box' => $pData['pieces_per_box'] ?? 1,
-                    'buying_price' => $pData['buying_price'] ?? 0
+                    'product_id'       => $pid,
+                    'lot_id'           => $lotId,
+                    'quantity'         => $qty,
+                    'unit_price'       => $unitPrice,
+                    'base_selling_price' => (float)($pData['price'] ?? 0), // snapshot at sale time
+                    'total_price'      => $lineTotal,
+                    'product_name'     => $pData['name'] ?? null,
+                    'box_type'         => $pData['box_type'] ?? null,
+                    'pieces_per_box'   => $pData['pieces_per_box'] ?? 1,
+                    'buying_price'     => $pData['buying_price'] ?? 0
                 ];
             }
 
@@ -1437,11 +1441,11 @@ class DSRController extends Controller
 
             // 2. Insert Order Items
             $itemStmt = $this->db->prepare("
-                INSERT INTO order_items (order_id, product_id, lot_id, quantity, unit_price, total_price, product_name, box_type, pieces_per_box, buying_price)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO order_items (order_id, product_id, lot_id, quantity, unit_price, base_selling_price, total_price, product_name, box_type, pieces_per_box, buying_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             foreach ($orderItemsToInsert as $oi) {
-                $itemStmt->execute([$orderId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['unit_price'], $oi['total_price'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['buying_price']]);
+                $itemStmt->execute([$orderId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['unit_price'], $oi['base_selling_price'], $oi['total_price'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['buying_price']]);
             }
 
             // 3. Insert Dispatch
@@ -1454,11 +1458,11 @@ class DSRController extends Controller
 
             // 4. Insert Dispatch Items & update existing delivered_quantity
             $dItemStmt = $this->db->prepare("
-                INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, delivered_quantity, product_name, box_type, pieces_per_box, unit_price, total_price)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, delivered_quantity, product_name, box_type, pieces_per_box, unit_price, base_selling_price, total_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             foreach ($orderItemsToInsert as $oi) {
-                $dItemStmt->execute([$dispatchId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['quantity'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['unit_price'], $oi['total_price']]);
+                $dItemStmt->execute([$dispatchId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['quantity'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['unit_price'], $oi['base_selling_price'], $oi['total_price']]);
 
                 // Allocate delivered_quantity to earlier active dispatch_items
                 $activeDiStmt = $this->db->prepare("
