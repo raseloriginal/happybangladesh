@@ -251,7 +251,7 @@ async function toggleSr(dateStr, companyId, srId) {
                                 <th class="py-2 px-3 text-center font-semibold">Total Order Qty</th>
                                 <th class="py-2 px-3 text-right font-semibold">Total Base Value</th>
                                 <th class="py-2 px-3 text-right font-semibold">Total SR Sale Value</th>
-                                <th class="py-2 px-3 text-right font-semibold">Current Warehouse Stock</th>
+                                <th class="py-2 px-3 text-right font-semibold">Total O/C</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -259,28 +259,12 @@ async function toggleSr(dateStr, companyId, srId) {
 
                 data.forEach(prod => {
                     const ppb = parseInt(prod.pieces_per_box) || 1;
-                    const stockBoxesRaw = parseInt(prod.stock_boxes) || 0;
-                    const stockPiecesRaw = parseInt(prod.stock_pieces) || 0;
-                    const totalPieces = (stockBoxesRaw * ppb) + stockPiecesRaw;
                     
                     const orderQty = parseInt(prod.total_qty) || 0;
-                    const orderQtyText = ppb > 1 && orderQty > 0 ? `${orderQty} pcs <br><span class="text-[10px] text-slate-400">(${Math.floor(orderQty/ppb)} b, ${orderQty%ppb} p)</span>` : `${orderQty} pcs`;
 
                     const boxType = (prod.box_type || '').trim();
                     const boxTypeLower = boxType.toLowerCase();
                     
-                    let stockDisplay = '';
-                    if (boxTypeLower === 'pcs') {
-                        stockDisplay = `${totalPieces} পিস`;
-                    } else if (boxType === 'পিস' || boxType === 'পলি' || boxType === 'জার') {
-                        stockDisplay = `${totalPieces} ${boxType}`;
-                    } else {
-                        const boxLabel = boxType ? boxType : 'Box';
-                        const displayBoxes = Math.floor(totalPieces / ppb);
-                        const displayPieces = totalPieces % ppb;
-                        stockDisplay = `${displayBoxes} ${boxLabel} - ${displayPieces} পিস`;
-                    }
-
                     let orderQtyDisplay = '';
                     if (boxTypeLower === 'pcs') {
                         orderQtyDisplay = `${orderQty} পিস`;
@@ -293,19 +277,19 @@ async function toggleSr(dateStr, companyId, srId) {
                         orderQtyDisplay = `${orderBoxes} ${boxLabel} - ${orderPieces} পিস`;
                     }
 
-                    const isLowStock = totalPieces < orderQty;
-                    const stockClass = isLowStock ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+                    const oc = parseFloat(prod.total_sr_value) - parseFloat(prod.total_base_value);
+                    const ocClass = oc > 0 ? 'text-emerald-600' : (oc < 0 ? 'text-rose-600' : 'text-slate-500');
+                    const ocSign = oc > 0 ? '+' : (oc < 0 ? '-' : '');
+                    const unitPrice = parseFloat(prod.total_base_value) / Math.max(1, parseFloat(prod.total_qty));
 
                     html += `
                         <tr class="hover:bg-amber-50/30 transition-colors">
-                            <td class="py-2 px-3 font-medium text-amber-800">${prod.product_name}</td>
+                            <td class="py-2 px-3 font-medium text-amber-800">${prod.product_name} (${unitPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})} tk)</td>
                             <td class="py-2 px-3 text-center font-mono">${orderQtyDisplay}</td>
                             <td class="py-2 px-3 text-right font-mono">৳${parseFloat(prod.total_base_value).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                             <td class="py-2 px-3 text-right font-mono">৳${parseFloat(prod.total_sr_value).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-                            <td class="py-2 px-3 text-right">
-                                <div class="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-lg text-xs font-medium ${stockClass}">
-                                    <div>${stockDisplay}</div>
-                                </div>
+                            <td class="py-2 px-3 text-right font-mono font-bold ${ocClass}">
+                                ${ocSign}৳${Math.abs(oc).toLocaleString('en-IN', {minimumFractionDigits: 2})}
                             </td>
                         </tr>
                     `;

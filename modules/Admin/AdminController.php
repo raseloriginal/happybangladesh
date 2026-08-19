@@ -601,9 +601,101 @@ class AdminController extends Controller
         if ($approval && $approval['status'] === 'pending') {
             if ($approval['module'] === 'products_price' && $approval['action'] === 'edit') {
                 $newData = json_decode($approval['new_data'], true);
+                $oldData = json_decode($approval['old_data'] ?? '{}', true);
                 if ($newData) {
                     $updateStmt = $this->db->prepare("UPDATE products SET buying_price = ?, price = ? WHERE id = ?");
                     $updateStmt->execute([$newData['buying_price'], $newData['price'], $approval['record_id']]);
+
+                    \Helpers::logProductPriceChange(
+                        (int)$approval['record_id'],
+                        isset($oldData['buying_price']) ? (float)$oldData['buying_price'] : null,
+                        (float)$newData['buying_price'],
+                        isset($oldData['price']) ? (float)$oldData['price'] : null,
+                        (float)$newData['price'],
+                        \Auth::id(),
+                        'admin_approval',
+                        'Approved price correction requested by user #' . $approval['requested_by']
+                    );
+                }
+            }
+
+            // Handle lot batch edit approval
+            if ($approval['module'] === 'lots_batch' && $approval['action'] === 'edit') {
+                $newData = json_decode($approval['new_data'], true);
+                if ($newData) {
+                    $wid = $this->db->query("SELECT id FROM warehouses LIMIT 1")->fetchColumn() ?: 1;
+                    $orig_company_id = (int)$newData['original_company_id'];
+                    $orig_lot_date   = $newData['original_lot_date'];
+                    $new_company_id  = (int)($newData['company_id'] ?? $orig_company_id);
+                    $new_lot_date    = $newData['lot_date'] ?? $orig_lot_date;
+
+                    $this->db->beginTransaction();
+                    try {
+                        // Revert old lots inventory and delete them
+                        $oldLots = $this->db->prepare("
+                            SELECT l.id, l.product_id, l.qty_pieces
+                            FROM lots l JOIN products p ON p.id = l.product_id
+                            WHERE p.company_id = ? AND (l.lot_date = ? OR (l.lot_date IS NULL AND DATE(l.created_at) = ?))
+                        ");
+                        $oldLots->execute([$orig_company_id, $orig_lot_date, $orig_lot_date]);
+                        foreach ($oldLots->fetchAll() as $o) {
+                            $this->db->prepare(
+                                "UPDATE inventory SET qty_pieces = GREATEST(0, qty_pieces - ?) WHERE product_id=? AND warehouse_id=? AND lot_id=?"
+                            )->execute([$o['qty_pieces'], $o['product_id'], $wid, $o['id']]);
+                            $this->db->prepare("DELETE FROM lots WHERE id=?")->execute([$o['id']]);
+                        }
+
+                        // Insert new lots
+                        $lotStmt = $this->db->prepare(
+                            "INSERT INTO lots (product_id, lot_date, expiry_date, qty_boxes, buying_price, lot_number, qty_pieces) VALUES (?,?,?,0,?,NULL,?)"
+                        );
+                        foreach ($newData['lots'] as $lot) {
+                            $product_id   = (int)($lot['product_id'] ?? 0);
+                            $qty_pieces   = (int)($lot['qty_pieces'] ?? 0);
+                            $buying_price = (float)($lot['buying_price'] ?? 0);
+                            $expiry_date  = $lot['expiry_date'] ?: null;
+                            if (!$product_id) continue;
+
+                            $lotStmt->execute([$product_id, $new_lot_date, $expiry_date, $buying_price, $qty_pieces]);
+                            $lot_id = $this->db->lastInsertId();
+
+                            $this->db->prepare(
+                                "INSERT INTO inventory (warehouse_id, product_id, lot_id, qty_boxes, qty_pieces)
+                                 VALUES (?,?,?,0,?)
+                                 ON DUPLICATE KEY UPDATE qty_pieces = qty_pieces + VALUES(qty_pieces)"
+                            )->execute([$wid, $product_id, $lot_id, $qty_pieces]);
+
+                            $prod = $this->db->prepare("SELECT buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
+                            $prod->execute([$product_id]);
+                            $p = $prod->fetch();
+                            if ($p) {
+                                $ppb = max(1, (float)$p['pieces_per_box']);
+                                $dp  = (float)$p['dealer_percentage'];
+                                $selling_price = round($buying_price * (1 + $dp / 100) / $ppb, 2);
+                                $this->db->prepare("UPDATE products SET buying_price=?, price=? WHERE id=?")
+                                         ->execute([$buying_price, $selling_price, $product_id]);
+
+                                if ($buying_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                                    \Helpers::logProductPriceChange(
+                                        $product_id,
+                                        (float)$p['buying_price'],
+                                        $buying_price,
+                                        (float)$p['price'],
+                                        $selling_price,
+                                        \Auth::id(),
+                                        'admin_approval',
+                                        'Approved lot batch update by Admin'
+                                    );
+                                }
+                            }
+                        }
+                        $this->db->commit();
+                    } catch (\Exception $e) {
+                        $this->db->rollBack();
+                        $this->flash('error', 'Lot batch update failed: ' . $e->getMessage());
+                        $this->redirect('admin/approvals');
+                        return;
+                    }
                 }
             }
 
@@ -932,6 +1024,64 @@ class AdminController extends Controller
 
         $this->redirect('admin/database-sync');
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Clear Dispatch Data (keep all master data intact)
+    // ══════════════════════════════════════════════════════════
+    public function dispatchClear(): void
+    {
+        $this->verifyCsrf();
+
+        try {
+            $this->db->beginTransaction();
+
+            // Disable FK checks inside the transaction for safe ordered deletes
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 0;");
+
+            // 1. Child records of dispatch_items (none currently, but future-proof)
+            // 2. dispatch_items → child of dispatches
+            $this->db->exec("DELETE FROM `dispatch_items`");
+
+            // 3. dispatch_extras → child of dispatch_schedules
+            $this->db->exec("DELETE FROM `dispatch_extras`");
+
+            // 4. dispatch_schedule_srs → child of dispatch_schedules
+            $this->db->exec("DELETE FROM `dispatch_schedule_srs`");
+
+            // 5. dispatch_schedules (now safe, all children removed)
+            $this->db->exec("DELETE FROM `dispatch_schedules`");
+
+            // 6. dispatches (now safe)
+            $this->db->exec("DELETE FROM `dispatches`");
+
+            // 7. van_stock — DSR/SR loaded stock from dispatches
+            $this->db->exec("DELETE FROM `van_stock`");
+
+            // 8. sr_order_cutoffs — date-based SR order completion flags tied to dispatch cycle
+            $this->db->exec("DELETE FROM `sr_order_cutoffs`");
+
+            // 9. readysales — ready/direct sales created during dispatch
+            $this->db->exec("DELETE FROM `readysales`");
+
+            // 10. Reset orders that were dispatched back to 'confirmed' so organize can re-process them
+            $this->db->exec("UPDATE `orders` SET status = 'confirmed' WHERE status = 'dispatched'");
+
+            $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
+
+            $this->db->commit();
+
+            $this->flash('success', 'Dispatch data cleared successfully. You can now start a fresh dispatch cycle.');
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            try { $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;"); } catch (\Throwable $ex) {}
+            $this->flash('error', 'Failed to clear dispatch data: ' . $e->getMessage());
+        }
+
+        $this->redirect('admin/database-sync');
+    }
+
 
     private function parseSchemaSql(): array
     {

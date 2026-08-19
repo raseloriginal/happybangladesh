@@ -73,7 +73,7 @@
             </span>
           </td>
           <td>
-            <?php if ($a['module'] === 'products_price' && $a['action'] === 'edit'): ?>
+          <?php if ($a['module'] === 'products_price' && $a['action'] === 'edit'): ?>
               <?php 
                 $old = json_decode($a['old_data'], true);
                 $new = json_decode($a['new_data'], true);
@@ -81,6 +81,17 @@
               <div class="text-xs">
                 <div><span class="text-gray-500">BP:</span> <span class="line-through text-red-500"><?= $old['buying_price'] ?? '-' ?></span> &rarr; <span class="text-emerald-600 font-bold"><?= $new['buying_price'] ?? '-' ?></span></div>
                 <div><span class="text-gray-500">SP:</span> <span class="line-through text-red-500"><?= $old['price'] ?? '-' ?></span> &rarr; <span class="text-emerald-600 font-bold"><?= $new['price'] ?? '-' ?></span></div>
+              </div>
+            <?php elseif ($a['module'] === 'lots_batch' && $a['action'] === 'edit'): ?>
+              <?php
+                $old = json_decode($a['old_data'], true);
+                $new = json_decode($a['new_data'], true);
+                $oldCompany = $old['lots'][0]['company_name'] ?? 'N/A';
+              ?>
+              <div class="text-xs">
+                <div><span class="text-gray-500">Company:</span> <span class="font-semibold text-gray-800"><?= h($oldCompany) ?></span></div>
+                <div><span class="text-gray-500">Date:</span> <span class="line-through text-red-500"><?= h($old['lot_date'] ?? '-') ?></span> &rarr; <span class="text-emerald-600 font-bold"><?= h($new['lot_date'] ?? '-') ?></span></div>
+                <div><span class="text-gray-500">Items:</span> <span class="font-semibold"><?= count($new['lots'] ?? []) ?> product(s)</span></div>
               </div>
             <?php else: ?>
               <span class="text-xs text-gray-400">N/A</span>

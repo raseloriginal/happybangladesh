@@ -1,0 +1,1361 @@
+
+
+<div class="h-full flex flex-col relative bg-gray-100">
+
+  <!-- ══════════════════════════════════════════════════════
+       EMPTY STATE — No dispatches loaded on van yet
+  ═══════════════════════════════════════════════════════ -->
+    <div class="fixed inset-0 z-20 flex flex-col items-center justify-between p-4 sm:p-6 bg-slate-50 text-center font-siliguri overflow-y-auto">
+    
+    <!-- Top Date Bar Selector -->
+    <div class="pt-2 pb-4">
+      <div class="inline-flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-full shadow-2xs">
+        <i class="fa-regular fa-calendar-days text-blue-600 text-sm"></i>
+        <input type="date" value="2026-08-16" class="bg-transparent border-none text-slate-900 text-xs sm:text-sm font-black font-mono outline-none cursor-pointer" onchange="window.location.href='http://localhost/dsr/delivery?date='+this.value">
+      </div>
+    </div>
+
+    <!-- Centered Card -->
+    <div class="w-full max-w-sm bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80 my-auto space-y-5">
+      <!-- Icon Container -->
+      <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-2xl mx-auto shadow-inner border border-blue-100">
+        <i class="fa-solid fa-truck-ramp-box"></i>
+      </div>
+
+      <!-- Text Header -->
+      <div class="space-y-1.5">
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">ভ্যান খালি রয়েছে (Van is Empty)</h2>
+                  <p class="text-xs text-slate-500 leading-relaxed font-medium">
+            আজকের চালানে আপনার ভ্যানে কোনো পণ্য লোড করা হয়নি। ম্যানেজারের চালানের জন্য অপেক্ষা করুন।
+          </p>
+              </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-2.5 pt-1">
+                  <a href="http://localhost/dsr/van-stock" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-boxes-stacked"></i>
+            <span>Go to Inventory (ইনভেন্টরি)</span>
+          </a>
+        
+        <button onclick="openReadySaleModal()" class="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2" >
+          <i class="fa-solid fa-bolt"></i>
+          <span>Ready Sale by DSR (রেডি সেল)</span>
+        </button>
+      </div>
+
+      <!-- Back Link -->
+      <div class="pt-2">
+        <a href="http://localhost/dsr/dashboard" class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 font-bold transition">
+          <i class="fa-solid fa-arrow-left text-[10px]"></i>
+          <span>Back to Dashboard</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Bottom Spacing for Nav Bar -->
+    <div class="pb-16"></div>
+
+  </div>
+  
+  <!-- ══════════════════════════════════════════════════════
+       MAP — shown only when there are deliveries
+  ═══════════════════════════════════════════════════════ -->
+  <div id="dsrMap" class="absolute inset-0 z-0 hidden"></div>
+
+  
+  <!-- ══════════════════════════════════════════════════════
+       CUSTOM MODALS
+  ═══════════════════════════════════════════════════════ -->
+
+  <!-- Retailer List Modal (Modern Excel Grid Style) -->
+  <div id="retailerListModal" class="fixed inset-0 z-[500] hidden flex flex-col bg-slate-50 font-siliguri">
+      <!-- Header -->
+      <div class="bg-white px-4 py-3.5 sm:px-6 sm:py-4 shadow-sm border-b border-slate-200/80 flex items-center justify-between sticky top-0 z-10">
+          <div class="flex items-center gap-3">
+              <button type="button" onclick="closeRetailerListModal()" class="w-9 h-9 sm:w-10 sm:h-10 bg-slate-100 hover:bg-slate-900 hover:text-white rounded-xl flex items-center justify-center text-slate-700 active:scale-95 transition shadow-2xs cursor-pointer" title="ফিরে যান">
+                  <i class="fa-solid fa-arrow-left text-sm"></i>
+              </button>
+              <div>
+                  <h2 class="text-base sm:text-lg font-black text-slate-900 leading-tight">ভ্যানের খুচরা বিক্রেতা তালিকা</h2>
+                  <div class="text-xs text-slate-500 font-medium">মোট 0 জন রিটেইলার অর্ডার</div>
+              </div>
+          </div>
+
+          <button type="button" onclick="closeRetailerListModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition text-xs">
+              <i class="fa-solid fa-xmark"></i>
+          </button>
+      </div>
+
+      <!-- Body Grid (Modern Excel Card Grid) -->
+      <div class="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 pb-24 content-start">
+                </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="customConfirmModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="customConfirmContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-question"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-2">Confirmation</h3>
+              <p class="text-sm text-gray-500 mb-6" id="confirmMessage">Are you sure?</p>
+              <div class="flex gap-3">
+                  <button id="confirmCancelBtn" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button id="confirmOkBtn" class="flex-1 py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/30 transition">Yes, Proceed</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Single Cancel Reason Modal -->
+  <div id="singleCancelModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="singleCancelContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-xmark"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-2">Cancel Order</h3>
+              <p class="text-sm text-gray-500 mb-4">Please select a reason for cancellation:</p>
+              
+              <select id="cancelReasonSelect" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 mb-6 transition font-semibold text-gray-700">
+                  <option value="Retailer Refused">Retailer Refused</option>
+                  <option value="Shop Closed">Shop Closed</option>
+                  <option value="Out of Stock / Mismatch">Out of Stock / Mismatch</option>
+                  <option value="Payment Issue">Payment Issue</option>
+                  <option value="Price Mismatch">Price Mismatch</option>
+                  <option value="Other">Other</option>
+              </select>
+              
+              <div class="flex gap-3">
+                  <button onclick="closeSingleCancelModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button onclick="submitSingleCancel()" class="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-red-500/30 transition">Submit</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Paid Payment Modal -->
+  <div id="paidPaymentModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/60 transition-opacity">
+      <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200 overflow-hidden" id="paidPaymentContent">
+          <!-- Pop Header -->
+          <div class="px-5 py-3.5 text-white flex items-center justify-between" style="background-color: #1e73be;">
+              <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-money-bill-wave text-base"></i>
+                  <span class="text-xs font-black uppercase tracking-wider">পেমেন্ট নিশ্চিত করুন</span>
+              </div>
+              <button onclick="closePaidPaymentModal()" class="w-6 h-6 flex items-center justify-center text-white/80 hover:text-white transition active:scale-90">
+                  <i class="fa-solid fa-xmark text-base"></i>
+              </button>
+          </div>
+
+          <!-- Pop Body -->
+          <div class="p-5">
+              <!-- Retailer Info -->
+              <div class="mb-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <div class="text-[9px] text-gray-400 font-bold uppercase">খুচরা বিক্রেতা</div>
+                  <div class="text-xs font-black text-gray-805 mt-0.5" id="paidRetailerName">খুচরা বিক্রেতার নাম</div>
+              </div>
+
+              <!-- Payment Summary Table -->
+              <div class="border border-gray-200 rounded-xl overflow-hidden mb-3 bg-white text-xs">
+                  <div class="grid grid-cols-2 divide-x divide-gray-150 border-b border-gray-150 bg-gray-50/50 p-2 font-bold text-gray-500 text-[10px] uppercase tracking-wider">
+                      <div>বিবরণ</div>
+                      <div class="text-right">টাকা</div>
+                  </div>
+                  <div class="divide-y divide-gray-150">
+                      <div class="grid grid-cols-2 p-2.5">
+                          <div class="text-gray-500 font-bold">মোট পরিশোধযোগ্য</div>
+                          <div class="font-black text-gray-800 text-right" id="paidTotalPayable">৳০</div>
+                      </div>
+                      <div class="grid grid-cols-2 p-2.5">
+                          <div class="text-gray-500 font-bold">ইতিমধ্যে পরিশোধিত</div>
+                          <div class="font-black text-amber-600 text-right" id="paidAlreadyPaid">৳০</div>
+                      </div>
+                      <div class="grid grid-cols-2 p-2.5 bg-blue-50/10">
+                          <div class="text-[#1e73be] font-black">বাকি পাওনা</div>
+                          <div class="font-black text-[#1e73be] text-right" id="paidRemainingDue">৳০</div>
+                      </div>
+                  </div>
+              </div>
+
+              <!-- Input Amount -->
+              <div class="mb-4">
+                  <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">প্রাপ্ত টাকা লিখুন (৳)</label>
+                  <div class="relative flex items-center">
+                      <span class="absolute left-4 text-gray-400 font-bold text-lg">৳</span>
+                      <input type="number" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-lg font-black text-gray-800 outline-none focus:border-[#1e73be] focus:ring-4 focus:ring-blue-500/10 transition">
+                  </div>
+              </div>
+
+              <!-- Info status text -->
+              <div id="paymentDueInfo" class="text-xs font-bold text-center text-gray-500 mb-4 h-5">
+                  সম্পূর্ণ পরিশোধিত
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex gap-3">
+                  <button onclick="closePaidPaymentModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-lg active:bg-gray-200 transition text-sm">বাতিল</button>
+                  <button onclick="submitPaidPayment()" class="flex-1 py-2.5 text-white font-bold rounded-lg active:scale-[0.98] shadow-md shadow-blue-500/20 transition text-sm" style="background-color: #1e73be;">পেইড নিশ্চিত করুন</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Prompt Modal -->
+  <div id="customPromptModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="customPromptContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-hand-holding-dollar"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-2">Partial Payment</h3>
+              <p class="text-sm text-gray-500 mb-4" id="promptMessage">Enter the amount the retailer has paid:</p>
+              <input type="number" id="promptInput" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-center text-lg font-bold text-gray-700 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 mb-6 transition" placeholder="৳0.00">
+              <div class="flex gap-3">
+                  <button id="promptCancelBtn" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button id="promptOkBtn" class="flex-1 py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/30 transition">Submit</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Cancel Multi-Order Modal -->
+  <div id="customCancelModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="customCancelContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-xmark"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-2">Cancel Company Orders</h3>
+              <p class="text-sm text-gray-500 mb-4">Select which company orders you want to cancel:</p>
+              
+              <div id="cancelCheckboxesContainer" class="text-left space-y-2 mb-6 max-h-[20vh] overflow-y-auto px-2">
+                  <!-- Dynamic check lists -->
+              </div>
+              
+              <div class="flex gap-3">
+                  <button id="cancelModalCloseBtn" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button id="cancelModalOkBtn" class="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-red-500/30 transition">Confirm Cancel</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Complete Multi-Order Modal -->
+  <div id="customCompleteModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="customCompleteContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-2">Complete Company Orders</h3>
+              <p class="text-sm text-gray-500 mb-4">Select which company orders you want to complete:</p>
+              
+              <div id="completeCheckboxesContainer" class="text-left space-y-2 mb-6 max-h-[20vh] overflow-y-auto px-2">
+                  <!-- Dynamic check lists -->
+              </div>
+              
+              <div class="flex gap-3">
+                  <button id="completeModalCloseBtn" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button id="completeModalOkBtn" class="flex-1 py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/30 transition">Confirm Complete</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Partial Multi-Order Modal -->
+  <div id="customPartialModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="customPartialContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-half-stroke"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-2">Partial/Due Delivery</h3>
+              <p class="text-sm text-gray-500 mb-4">Select which company orders are partial and input paid amount:</p>
+              
+              <div id="partialInputsContainer" class="text-left space-y-3 mb-6 max-h-[25vh] overflow-y-auto px-2">
+                  <!-- Dynamic check lists with inputs -->
+              </div>
+              
+              <div class="flex gap-3">
+                  <button id="partialModalCloseBtn" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">Cancel</button>
+                  <button id="partialModalOkBtn" class="flex-1 py-3 bg-orange-500 text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-orange-500/30 transition">Confirm Partial</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Partial Due Options Modal -->
+  <div id="partialDueModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="partialDueContent">
+          <div class="text-center">
+              <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  <i class="fa-solid fa-circle-exclamation"></i>
+              </div>
+              <h3 class="text-lg font-black text-gray-800 mb-1" id="partialDueTitle">Due Payment</h3>
+              <p class="text-sm text-gray-500 mb-6" id="partialDueMessage">Remaining Due: ৳0.00</p>
+              
+              <div class="flex flex-col gap-3">
+                  <button onclick="handleDuePaymentAction()" class="w-full py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Due Complete</button>
+                  <button onclick="handleDueDetailsAction()" class="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">View Details</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       DAMAGE MODAL
+  ═══════════════════════════════════════════════════════ -->
+  <div id="damageModal" class="fixed inset-0 z-[300] hidden flex items-end justify-center bg-black/50 transition-opacity">
+    <div class="bg-white rounded-t-3xl w-full max-w-[480px] shadow-2xl transform transition-transform translate-y-full duration-300" id="damageModalContent">
+      <!-- Handle -->
+      <div class="flex justify-center pt-3 pb-1">
+        <div class="w-10 h-1 bg-gray-200 rounded-full"></div>
+      </div>
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 pt-2 pb-4 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-red-100 rounded-full flex items-center justify-center">
+            <i class="fa-solid fa-ban text-red-500"></i>
+          </div>
+          <div>
+            <div class="text-base font-black text-gray-800">Report Damage</div>
+            <div class="text-xs text-gray-400 font-medium" id="dmgRetailerLabel">Select retailer damage</div>
+          </div>
+        </div>
+        <button onclick="closeDamageModal()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <!-- Body -->
+      <div class="px-5 pt-4 pb-2 max-h-[55vh] overflow-y-auto">
+        <!-- Add Row Button -->
+        <button type="button" onclick="addDamageRow()" class="w-full mb-4 py-2.5 px-4 rounded-xl border border-dashed border-red-300 hover:border-red-500 text-red-600 font-bold text-xs flex items-center justify-center gap-2 bg-red-50/20 transition active:scale-[0.98]">
+          <i class="fa-solid fa-plus"></i> Add Row
+        </button>
+
+        <!-- Rows Container -->
+        <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Damage Entries</div>
+        <div id="dmgRowsContainer" class="space-y-2.5 mb-4">
+          <!-- Rows dynamically populated by JS -->
+        </div>
+
+        <!-- Total Delivery Value (Current Tab) -->
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Delivered Value</div>
+            <div id="dmgDeliveredValue" class="text-sm font-black text-blue-600">৳0.00</div>
+        </div>
+
+        <!-- Total Damage Amount -->
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Damage Amount</div>
+        </div>
+        <input type="number" id="dmgTotalAmount" min="0" step="0.01" placeholder="0.00" oninput="onManualDamageAmountChange()"
+          class="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-center text-xl font-black text-red-500 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20 transition mb-4">
+
+        <!-- Net Payable -->
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Net Payable</div>
+            <div id="dmgNetPayable" class="text-lg font-black text-gray-800">৳0.00</div>
+        </div>
+
+        <!-- Receipt Amount -->
+        <div class="flex justify-between items-center mb-2 mt-4 border-t border-gray-100 pt-4">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider">Receipt Amount (৳)</div>
+        </div>
+        <input type="number" id="dmgReceiptAmount" placeholder="Enter amount..."
+          class="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-center text-xl font-black text-gray-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition mb-4">
+      </div>
+      <!-- Footer -->
+      <div class="px-5 pb-6 pt-3 border-t border-gray-100 flex gap-3">
+        <button onclick="closeDamageModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-2xl active:bg-gray-200 transition">Cancel</button>
+        <button onclick="submitDamage()" class="flex-1 py-3 bg-red-500 text-white font-bold rounded-2xl shadow-lg shadow-red-500/30 active:scale-[0.98] transition">Submit Damage</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ── Data from PHP ────────────────────────────────────────────
+const orderedRetailers = [];
+const vanStockMap = {};
+
+let map, userMarker, radiusCircle = null;
+let currentDispatchId = null;
+let markers = [];
+
+let currentPartialDueRetailer = null;
+let currentPartialDueOrders = [];
+
+function handleRetailerClick(ret, shouldWarn) {
+    // If the retailer has a pending order (in_transit), bypass modals and open directly to it
+    const pendingIndex = ret.orders.findIndex(o => o.status === 'in_transit');
+    if (pendingIndex !== -1) {
+        openRetailerSheet(ret, pendingIndex);
+        return;
+    }
+
+    const partialOrders = ret.orders.filter(o => o.status === 'partial');
+    if (partialOrders.length > 0) {
+        showPartialDuePopup(ret, partialOrders);
+    } else if (shouldWarn) {
+        showConfirmPopup("This delivery was already processed. Do you want to redo/modify it?", () => {
+            openRetailerSheet(ret);
+        });
+    } else {
+        openRetailerSheet(ret);
+    }
+}
+
+function showPartialDuePopup(ret, partialOrders) {
+    currentPartialDueRetailer = ret;
+    currentPartialDueOrders = partialOrders;
+    
+    let totalDue = 0;
+    partialOrders.forEach(o => {
+        let actualTotal = 0;
+        if (o.products && o.products.length > 0) {
+            o.products.forEach(p => {
+                const qty = parseInt(p.quantity);
+                let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+                actualTotal += (deliveredQty * parseFloat(p.price || 0));
+            });
+        } else {
+            actualTotal = parseFloat(o.total_amount || 0);
+        }
+        totalDue += (actualTotal - parseFloat(o.paid_amount || 0));
+    });
+    
+    document.getElementById('partialDueTitle').innerText = ret.name;
+    document.getElementById('partialDueMessage').innerHTML = `This retailer has a pending due of <span class="text-amber-600 font-black">৳${totalDue.toFixed(0)}</span>.`;
+    
+    const modal = document.getElementById('partialDueModal');
+    const content = document.getElementById('partialDueContent');
+    
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+    }, 10);
+}
+
+function closePartialDueModal() {
+    const modal = document.getElementById('partialDueModal');
+    const content = document.getElementById('partialDueContent');
+    
+    content.classList.remove('scale-100', 'opacity-100');
+    content.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 200);
+}
+
+// ── Damage Modal ──────────────────────────────────────────────
+const activeSrsList = [];
+let damageRows = [];
+
+function openDamageModal() {
+    if (!currentRetailerObj) return;
+
+    // Reset rows
+    damageRows = [];
+
+    // Set retailer label
+    const name = currentRetailerObj.retailer_name || currentRetailerObj.dealer_name || currentRetailerObj.name || 'Retailer';
+    document.getElementById('dmgRetailerLabel').innerText = name;
+
+    // Add initial row by default
+    addDamageRow();
+
+    const modal = document.getElementById('damageModal');
+    const content = document.getElementById('damageModalContent');
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        content.classList.remove('translate-y-full');
+        content.classList.add('translate-y-0');
+    });
+}
+
+function addDamageRow() {
+    damageRows.push({
+        id: Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        sr_id: '',
+        amount: ''
+    });
+    renderDamageRows();
+    calcDamageSummary();
+}
+
+function removeDamageRow(rowId) {
+    damageRows = damageRows.filter(r => r.id !== rowId);
+    if (damageRows.length === 0) {
+        addDamageRow();
+    } else {
+        renderDamageRows();
+        calcDamageSummary();
+    }
+}
+
+function updateDamageRowSr(rowId, srId) {
+    const row = damageRows.find(r => r.id === rowId);
+    if (row) {
+        row.sr_id = srId;
+    }
+}
+
+function updateDamageRowAmount(rowId, amount) {
+    const row = damageRows.find(r => r.id === rowId);
+    if (row) {
+        row.amount = amount;
+        calcDamageSummary();
+    }
+}
+
+function renderDamageRows() {
+    const container = document.getElementById('dmgRowsContainer');
+    if (!container) return;
+
+    container.innerHTML = damageRows.map(r => `
+        <div class="flex items-center gap-2 bg-gray-50 rounded-2xl p-2.5 border border-gray-200 shadow-sm">
+            <!-- SR Dropdown -->
+            <div class="flex-1 min-w-0">
+                <select onchange="updateDamageRowSr('${r.id}', this.value)"
+                        class="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-2 text-xs font-bold text-gray-700 outline-none focus:border-red-400 transition">
+                    <option value="">-- Select SR --</option>
+                    ${activeSrsList.map(sr => `<option value="${sr.id}" ${sr.id == r.sr_id ? 'selected' : ''}>${sr.name} (${sr.company_name})</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Damage Amount Input -->
+            <div class="w-32 min-w-0">
+                <input type="number" min="0" step="0.01" value="${r.amount}" placeholder="Amount (৳)"
+                       oninput="updateDamageRowAmount('${r.id}', this.value)"
+                       class="w-full text-center text-xs font-black text-red-500 bg-white border border-gray-200 rounded-xl px-2 py-2 outline-none focus:border-red-400 transition">
+            </div>
+
+            <!-- Delete Row Button -->
+            <button type="button" onclick="removeDamageRow('${r.id}')" 
+                    class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition">
+                <i class="fa-solid fa-trash-can text-sm"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function calcDamageSummary() {
+    let totalDamage = 0;
+    damageRows.forEach(r => {
+        const val = parseFloat(r.amount);
+        if (!isNaN(val) && val > 0) {
+            totalDamage += val;
+        }
+    });
+
+    const dmgTotalAmountInput = document.getElementById('dmgTotalAmount');
+    dmgTotalAmountInput.value = totalDamage > 0 ? totalDamage.toFixed(2) : '';
+
+    const deliveredValue = typeof getSelectedOrderGettingTotal === 'function' ? getSelectedOrderGettingTotal() : 0;
+    document.getElementById('dmgDeliveredValue').innerText = '৳' + deliveredValue.toFixed(0);
+
+    let netPayable = deliveredValue - totalDamage;
+    if (netPayable < 0) netPayable = 0;
+
+    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(0);
+    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(0) : '';
+}
+
+function onManualDamageAmountChange() {
+    const totalDamage = parseFloat(document.getElementById('dmgTotalAmount').value) || 0;
+    const deliveredValue = typeof getSelectedOrderGettingTotal === 'function' ? getSelectedOrderGettingTotal() : 0;
+    
+    let netPayable = deliveredValue - totalDamage;
+    if (netPayable < 0) netPayable = 0;
+
+    document.getElementById('dmgNetPayable').innerText = '৳' + netPayable.toFixed(0);
+    document.getElementById('dmgReceiptAmount').value = netPayable >= 0 ? netPayable.toFixed(0) : '';
+}
+
+function closeDamageModal() {
+    const modal = document.getElementById('damageModal');
+    const content = document.getElementById('damageModalContent');
+    content.classList.remove('translate-y-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => { modal.classList.add('hidden'); }, 300);
+}
+
+function updateDamageBtnState(hasDamage) {
+    const btn = document.getElementById('damageBtn');
+    if (!btn) return;
+    if (hasDamage) {
+        btn.className = 'px-2.5 py-1 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold gap-1 shadow-sm active:scale-95 transition';
+        btn.innerHTML = '<i class="fa-solid fa-[#ffffff] fa-check text-xs"></i><span>Damage Recorded</span>';
+        btn.title = 'Damage Recorded';
+    } else {
+        btn.className = 'w-8 h-8 bg-red-50 text-red-400 rounded-full flex items-center justify-center text-sm shadow-sm active:scale-95 transition';
+        btn.innerHTML = '<i class="fa-solid fa-ban text-sm"></i>';
+        btn.title = 'Report Damage';
+    }
+}
+
+async function submitDamage() {
+    const totalAmount = parseFloat(document.getElementById('dmgTotalAmount').value || 0);
+    if (totalAmount <= 0) {
+        showToast('⚠️ Please enter a valid damage amount.');
+        return;
+    }
+
+    const validRows = damageRows.filter(r => parseFloat(r.amount) > 0);
+    if (validRows.length === 0) {
+        showToast('⚠️ Please enter damage amount for at least one row.');
+        return;
+    }
+
+    const payloadRows = validRows.map(r => ({
+        sr_id: parseInt(r.sr_id) || 0,
+        amount: parseFloat(r.amount) || 0
+    }));
+
+    const retailerId = currentRetailerObj.retailer_id || currentRetailerObj.dealer_id || 0;
+    const date = document.querySelector('input[type="date"]')?.value || new Date().toISOString().split('T')[0];
+
+    const submitBtn = document.querySelector('#damageModal button[onclick="submitDamage()"]');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Saving...';
+
+    try {
+        const res = await fetch('http://localhost/dsr/damage/store', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `csrf_token=token&retailer_id=${retailerId}&date=${date}&total_amount=${totalAmount}&rows=${encodeURIComponent(JSON.stringify(payloadRows))}`
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (currentRetailerObj) {
+                currentRetailerObj.has_damage = true;
+            }
+            updateDamageBtnState(true);
+            closeDamageModal();
+            showToast('✅ Damage report saved successfully!');
+        } else {
+            showToast('❌ ' + (data.message || 'Failed to save damage report.'));
+        }
+    } catch(err) {
+        showToast('❌ Network error. Please try again.');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Submit Damage';
+    }
+}
+
+function handleDueDetailsAction() {
+    closePartialDueModal();
+    openRetailerSheet(currentPartialDueRetailer);
+}
+
+function handleDueCancelAction() {
+    closePartialDueModal();
+    currentRetailerObj = currentPartialDueRetailer;
+    if (currentPartialDueOrders.length === 1) {
+        currentDispatchId = currentPartialDueOrders[0].dispatch_id;
+        openSingleCancelModal();
+    } else {
+        showMultiCancelPopup(currentPartialDueOrders);
+    }
+}
+
+async function submitDuePayment(dispatchId, newStatus, newPaidAmount, deliveredItems) {
+    try {
+        const res = await fetch('http://localhost/dsr/delivery/update/' + dispatchId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `csrf_token=token&status=${newStatus}&paid_amount=${newPaidAmount}&notes=&items=${encodeURIComponent(JSON.stringify(deliveredItems))}`
+        });
+        const data = await res.json();
+        if(!data.success) {
+            throw new Error(data.message || 'Error updating delivery');
+        }
+        return true;
+    } catch (err) {
+        showToast('❌ ' + (err.message || 'An error occurred.'));
+        return false;
+    }
+}
+
+function handleDuePaymentAction() {
+    closePartialDueModal();
+    currentRetailerObj = currentPartialDueRetailer;
+    
+    let totalDue = 0;
+    currentPartialDueOrders.forEach(o => {
+        let actualTotal = 0;
+        if (o.products && o.products.length > 0) {
+            o.products.forEach(p => {
+                const qty = parseInt(p.quantity);
+                let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+                actualTotal += (deliveredQty * parseFloat(p.price || 0));
+            });
+        } else {
+            actualTotal = parseFloat(o.total_amount || 0);
+        }
+        totalDue += (actualTotal - parseFloat(o.paid_amount || 0));
+    });
+    
+    showConfirmPopup(`Mark all due orders as fully paid? (Total Due: ৳${totalDue.toFixed(0)})`, async () => {
+        const btns = document.querySelectorAll('button');
+        btns.forEach(b => { b.disabled = true; });
+        
+        try {
+            for (let i = 0; i < currentPartialDueOrders.length; i++) {
+                const order = currentPartialDueOrders[i];
+                
+                let actualTotal = 0;
+                if (order.products && order.products.length > 0) {
+                    order.products.forEach(p => {
+                        const qty = parseInt(p.quantity);
+                        let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+                        actualTotal += (deliveredQty * parseFloat(p.price || 0));
+                    });
+                } else {
+                    actualTotal = parseFloat(order.total_amount || 0);
+                }
+                
+                // Set paid_amount = actualTotal (fully paid)
+                const fullPaid = actualTotal;
+                
+                let deliveredItems = {};
+                if (order.products) {
+                    order.products.forEach(p => {
+                        deliveredItems[p.product_id] = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
+                    });
+                }
+                
+                const success = await submitDuePayment(order.dispatch_id, 'delivered', fullPaid, deliveredItems);
+                if (success) {
+                    order.status = 'delivered';
+                    order.paid_amount = fullPaid;
+                }
+            }
+            
+            showToast('✅ All dues marked as complete!');
+            
+            if (document.getElementById('retailerSheet').classList.contains('active')) {
+                openRetailerSheet(currentRetailerObj);
+                selectCompanyOrder(currentOrderIndex);
+            }
+            if (typeof initMap === 'function') {
+                redrawMapPins();
+            }
+        } finally {
+            btns.forEach(b => { b.disabled = false; });
+        }
+    });
+}
+
+
+<script>
+// ── Ready Sale by DSR Global Logic ───────────────────────────
+let vanStockProducts = [];
+
+async function openReadySaleModal() {
+    const modal = document.getElementById('readySaleModal');
+    const container = document.getElementById('rs_products_container');
+    container.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400 text-xs font-medium"><i class="fa-solid fa-circle-notch fa-spin mr-2 text-blue-600"></i>ভ্যান স্টক থেকে প্রোডাক্ট লোড হচ্ছে...</td></tr>';
+    
+    modal.classList.remove('hidden');
+
+    try {
+        const date = document.getElementById('rs_date').value || '2026-08-16';
+        const res = await fetch('http://localhost/dsr/api/van-stock?date=' + date);
+        const data = await res.json();
+        
+        if (data.success && data.items) {
+            vanStockProducts = data.items;
+        } else {
+            vanStockProducts = [];
+        }
+
+        container.innerHTML = '';
+        if (vanStockProducts.length === 0) {
+            container.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-xs font-bold" style="background:rgba(127,29,29,0.25);color:#fda4af;"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>আপনার ভ্যানে বর্তমানে কোনো অবশিষ্টাংশ প্রোডাক্ট নেই।</td></tr>';
+        } else {
+            addReadySaleRow();
+        }
+        calculateRSTotals();
+    } catch (err) {
+        container.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-xs font-bold" style="background:rgba(127,29,29,0.25);color:#fda4af;">ভ্যান স্টক লোড করতে ব্যর্থ হয়েছে।</td></tr>';
+    }
+}
+
+function closeReadySaleModal() {
+    document.getElementById('readySaleModal').classList.add('hidden');
+}
+
+function addReadySaleRow() {
+    const container = document.getElementById('rs_products_container');
+    const rowId = 'rs_row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+    let productOptionsHtml = '<option value="">-- প্রোডাক্ট নির্বাচন করুন --</option>';
+    vanStockProducts.forEach(p => {
+        productOptionsHtml += `<option value="${p.product_id}" data-baseprice="${p.base_price}" data-avail="${p.available_qty}" data-ppb="${p.pieces_per_box}" data-name="${p.product_name}" data-lotid="${p.lot_id || ''}">${p.product_name} (Avail: ${p.available_qty} Pcs | Base: ৳${p.base_price})</option>`;
+    });
+
+    const rowHtml = `
+        <tr id="${rowId}" class="rs-product-row transition-colors" style="border-bottom:1px solid #1e293b;">
+          <!-- Product Selector Cell -->
+          <td class="p-2.5 align-middle" style="border-right:1px solid #334155;">
+            <div class="relative">
+              <select class="rs-prod-select w-full rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none transition appearance-none" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;" onchange="onRSProductChange(this)">
+                ${productOptionsHtml}
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2" style="color:#64748b;">
+                <i class="fa-solid fa-chevron-down text-[9px]"></i>
+              </div>
+            </div>
+            <div class="mt-1 flex items-center justify-between px-0.5">
+              <span class="rs-avail-badge text-[9.5px] font-bold" style="color:#64748b;">Avail: -</span>
+              <span class="rs-oc-badge font-mono text-[10px] font-bold" style="color:#64748b;">O/C: ৳0.00</span>
+            </div>
+          </td>
+
+          <!-- Quantity Cell -->
+          <td class="p-2.5 align-middle text-center" style="border-right:1px solid #334155;">
+            <input type="number" min="1" value="1" class="rs-qty w-full max-w-[70px] rounded-lg px-2 py-1 text-center font-bold outline-none transition" style="background:#0f172a;border:1px solid #475569;color:#e2e8f0;" oninput="calculateRSTotals()">
+          </td>
+
+          <!-- Base Trade Price Cell -->
+          <td class="p-2.5 align-middle text-right font-mono font-bold" style="border-right:1px solid #334155;color:#94a3b8;background:rgba(15,23,42,0.5);">
+            <span class="rs-base-price-label">৳0.00</span>
+          </td>
+
+          <!-- Unit Selling Price Cell -->
+          <td class="p-2.5 align-middle text-right" style="border-right:1px solid #334155;">
+            <input type="number" step="0.01" min="0" value="0.00" class="rs-unit-price w-full max-w-[85px] rounded-lg px-2 py-1 text-right font-mono font-bold outline-none transition" style="background:#172554;border:1px solid #1d4ed8;color:#93c5fd;" oninput="calculateRSTotals()">
+            <div class="text-[10px] font-sans mt-0.5" style="color:#64748b;">টোটাল: <span class="rs-line-total font-mono font-bold" style="color:#60a5fa;">৳0.00</span></div>
+          </td>
+
+          <!-- Action Cell -->
+          <td class="p-2.5 align-middle text-center">
+            <button type="button" onclick="removeRSRow('${rowId}')" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs active:scale-95 transition mx-auto" style="background:rgba(159,18,57,0.25);color:#fb7185;border:1px solid rgba(244,63,94,0.3);" title="রো মুছে ফেলুন">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </td>
+        </tr>
+    `;
+
+    container.insertAdjacentHTML('beforeend', rowHtml);
+}
+
+function removeRSRow(rowId) {
+    const el = document.getElementById(rowId);
+    if (el) el.remove();
+    calculateRSTotals();
+}
+
+function onRSProductChange(selectEl) {
+    const row = selectEl.closest('.rs-product-row');
+    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+    const availBadge = row.querySelector('.rs-avail-badge');
+    
+    if (!selectedOpt || !selectedOpt.value) {
+        row.querySelector('.rs-base-price-label').innerText = '৳0.00';
+        row.querySelector('.rs-base-price-label').dataset.val = '0';
+        row.querySelector('.rs-unit-price').value = '0.00';
+        row.querySelector('.rs-qty').max = '';
+        if (availBadge) {
+            availBadge.innerText = 'Avail: -';
+            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold'; availBadge.style.color = '#64748b';
+        }
+        calculateRSTotals();
+        return;
+    }
+
+    const basePrice = parseFloat(selectedOpt.dataset.baseprice || 0);
+    const availQty = parseInt(selectedOpt.dataset.avail || 0);
+
+    row.querySelector('.rs-base-price-label').innerText = '৳' + basePrice.toFixed(2);
+    row.querySelector('.rs-base-price-label').dataset.val = basePrice;
+    row.querySelector('.rs-unit-price').value = basePrice.toFixed(2);
+    row.querySelector('.rs-qty').max = availQty;
+    
+    if (availBadge) {
+        availBadge.innerText = `Avail: ${availQty} Pcs`;
+        if (availQty <= 5) {
+            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold'; availBadge.style.color = '#fbbf24';
+        } else {
+            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold'; availBadge.style.color = '#34d399';
+        }
+    }
+
+    if (parseInt(row.querySelector('.rs-qty').value) > availQty) {
+        row.querySelector('.rs-qty').value = availQty;
+    }
+
+    calculateRSTotals();
+}
+
+function calculateRSTotals() {
+    const rows = document.querySelectorAll('.rs-product-row');
+    let grandTotal = 0;
+    let grandOC = 0;
+    let selectedItemCount = 0;
+
+    rows.forEach(row => {
+        const select = row.querySelector('.rs-prod-select');
+        const selectedOpt = select ? select.options[select.selectedIndex] : null;
+        if (!selectedOpt || !selectedOpt.value) return;
+
+        selectedItemCount++;
+        const qtyInput = row.querySelector('.rs-qty');
+        const maxAvail = parseInt(selectedOpt.dataset.avail || 99999);
+        let qty = parseInt(qtyInput.value) || 0;
+        if (qty > maxAvail) {
+            qty = maxAvail;
+            qtyInput.value = qty;
+        }
+
+        const basePrice = parseFloat(selectedOpt.dataset.baseprice || 0);
+        const unitPrice = parseFloat(row.querySelector('.rs-unit-price').value) || 0;
+
+        const lineTotal = qty * unitPrice;
+        const lineOC = (unitPrice - basePrice) * qty;
+
+        grandTotal += lineTotal;
+        grandOC += lineOC;
+
+        row.querySelector('.rs-line-total').innerText = '৳' + lineTotal.toFixed(2);
+        
+        const ocBadge = row.querySelector('.rs-oc-badge');
+        const sign = lineOC > 0 ? '+' : '';
+        ocBadge.innerText = `O/C: ${sign}৳` + lineOC.toFixed(2);
+
+        if (lineOC > 0) {
+            ocBadge.className = 'rs-oc-badge font-mono text-[10px] font-bold'; ocBadge.style.color = '#34d399';
+        } else if (lineOC < 0) {
+            ocBadge.className = 'rs-oc-badge font-mono text-[10px] font-bold'; ocBadge.style.color = '#fb7185';
+        } else {
+            ocBadge.className = 'rs-oc-badge font-mono text-[10px] font-bold'; ocBadge.style.color = '#64748b';
+        }
+    });
+
+    const itemsCountEl = document.getElementById('rs_summary_items_count');
+    if (itemsCountEl) itemsCountEl.innerText = selectedItemCount + ' টি';
+
+    document.getElementById('rs_summary_total').innerText = '৳' + grandTotal.toFixed(2);
+    
+    const ocSummaryEl = document.getElementById('rs_summary_oc');
+    const signSum = grandOC > 0 ? '+' : '';
+    ocSummaryEl.innerText = `O/C: ${signSum}৳` + grandOC.toFixed(2);
+
+    if (grandOC > 0) {
+        ocSummaryEl.className = 'font-bold px-1.5 py-0.5 rounded bg-emerald-900/80 text-emerald-300 text-[11px] inline-block font-mono border border-emerald-700';
+    } else if (grandOC < 0) {
+        ocSummaryEl.className = 'font-bold px-1.5 py-0.5 rounded bg-rose-900/80 text-rose-300 text-[11px] inline-block font-mono border border-rose-700';
+    } else {
+        ocSummaryEl.className = 'font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] inline-block font-mono';
+    }
+}
+
+async function submitReadySale() {
+    const retailerId = document.getElementById('rs_retailer_id').value;
+    if (!retailerId) {
+        showToast('⚠️ রিটেলার সিলেক্ট করুন!');
+        return;
+    }
+
+    const rows = document.querySelectorAll('.rs-product-row');
+    const items = [];
+
+    rows.forEach(row => {
+        const select = row.querySelector('.rs-prod-select');
+        const pid = select ? select.value : 0;
+        if (!pid) return;
+
+        const selectedOpt = select.options[select.selectedIndex];
+        const lotId = selectedOpt ? selectedOpt.dataset.lotid : null;
+        const qty = parseInt(row.querySelector('.rs-qty').value) || 0;
+        const unitPrice = parseFloat(row.querySelector('.rs-unit-price').value) || 0;
+
+        if (qty > 0 && unitPrice >= 0) {
+            items.push({
+                product_id: parseInt(pid),
+                lot_id: lotId ? parseInt(lotId) : null,
+                qty: qty,
+                unit_price: unitPrice
+            });
+        }
+    });
+
+    if (items.length === 0) {
+        showToast('⚠️ অন্তত একটি সঠিক প্রোডাক্ট সিলেক্ট করুন!');
+        return;
+    }
+
+    const submitBtn = document.getElementById('rs_submit_btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> প্রসেসিং হচ্ছে...';
+
+    try {
+        const csrfToken = document.getElementById('rs_csrf_token').value;
+        const date = document.getElementById('rs_date').value || '2026-08-16';
+
+        const formData = new URLSearchParams();
+        formData.append('csrf_token', csrfToken);
+        formData.append('date', date);
+        formData.append('retailer_id', retailerId);
+        formData.append('items', JSON.stringify(items));
+
+        const res = await fetch('http://localhost/dsr/ready-sale/store', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ ' + (data.message || 'রেডি সেল সফলভাবে সম্পন্ন হয়েছে!'));
+            closeReadySaleModal();
+            setTimeout(() => location.reload(), 900);
+        } else {
+            showToast('❌ ' + (data.message || 'রেডি সেল জমা দিতে ব্যর্থ হয়েছে!'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> সেভ করুন (Submit)';
+        }
+    } catch (err) {
+        showToast('❌ সার্ভিস কানেকশন সমস্যা।');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> সেভ করুন (Submit)';
+    }
+}
+
+// Quick Add Retailer Handlers
+function openQuickAddRetailerModal() {
+    document.getElementById('quickAddRetailerModal').classList.remove('hidden');
+    document.getElementById('qr_name').focus();
+}
+
+function closeQuickAddRetailerModal() {
+    document.getElementById('quickAddRetailerModal').classList.add('hidden');
+}
+
+async function submitQuickAddRetailer() {
+    const name = document.getElementById('qr_name').value.trim();
+    const phone = document.getElementById('qr_phone').value.trim();
+
+    if (!name) {
+        showToast('⚠️ রিটেলারের নাম দিন!');
+        return;
+    }
+
+    const saveBtn = document.getElementById('qr_save_btn');
+    saveBtn.disabled = true;
+    saveBtn.innerText = 'সেভ হচ্ছে...';
+
+    try {
+        const res = await fetch('http://localhost/dsr/api/retailers/store', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, phone: phone })
+        });
+        const data = await res.json();
+        if (data.success && data.id) {
+            showToast('✅ রিটেলার যুক্ত হয়েছে!');
+            const select = document.getElementById('rs_retailer_id');
+            const newOpt = document.createElement('option');
+            newOpt.value = data.id;
+            newOpt.text = name + (phone ? ` (${phone})` : '');
+            newOpt.selected = true;
+            select.appendChild(newOpt);
+            closeQuickAddRetailerModal();
+            document.getElementById('qr_name').value = '';
+            document.getElementById('qr_phone').value = '';
+        } else {
+            showToast('❌ ' + (data.message || 'রিটেলার যুক্ত করতে ব্যর্থ।'));
+        }
+    } catch (err) {
+        showToast('❌ সার্ভিস সমস্যা।');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerText = 'সেভ করুন';
+    }
+}
+
+// ── Nearby Retailer Map (20m Radius) ─────────────────────────
+const allRetailersList = [];
+let nearbyMap = null;
+let nearbyUserMarker = null;
+let nearbyCircle = null;
+let nearbyMarkers = [];
+let currentNearbyRadius = 20;
+let currentDsrLat = null;
+let currentDsrLng = null;
+
+function openNearbyRetailerMapModal(radius = 20) {
+    currentNearbyRadius = radius;
+    const modal = document.getElementById('nearbyRetailerMapModal');
+    const loader = document.getElementById('nearbyMapLoader');
+    loader.classList.remove('hidden');
+    modal.classList.remove('hidden');
+
+    updateRadiusButtonsUI(radius);
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                currentDsrLat = pos.coords.latitude;
+                currentDsrLng = pos.coords.longitude;
+                loader.classList.add('hidden');
+                initNearbyMap(currentDsrLat, currentDsrLng, currentNearbyRadius);
+            },
+            (err) => {
+                loader.classList.add('hidden');
+                currentDsrLat = 23.8103;
+                currentDsrLng = 90.4125;
+                if (allRetailersList.length > 0 && allRetailersList[0].lat && allRetailersList[0].lng) {
+                    currentDsrLat = parseFloat(allRetailersList[0].lat);
+                    currentDsrLng = parseFloat(allRetailersList[0].lng);
+                }
+                showToast('⚠️ আপনার লোকেশন অ্যাক্সেস করা যায়নি, ডিফল্ট লোকেশন ব্যবহার করা হচ্ছে।');
+                initNearbyMap(currentDsrLat, currentDsrLng, currentNearbyRadius);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    } else {
+        loader.classList.add('hidden');
+        showToast('⚠️ ব্রাউজারে Geolocation সাপোর্ট নেই।');
+    }
+}
+
+function closeNearbyRetailerMapModal() {
+    document.getElementById('nearbyRetailerMapModal').classList.add('hidden');
+}
+
+function updateRadiusButtonsUI(radius) {
+    const btns = { 20: 'radiusBtn20', 50: 'radiusBtn50', 100: 'radiusBtn100', 999999: 'radiusBtnAll' };
+    Object.keys(btns).forEach(r => {
+        const btn = document.getElementById(btns[r]);
+        if (btn) {
+            if (parseInt(r) === radius) {
+                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition'; btn.style.cssText = 'background:#1d4ed8;color:#fff;border:1px solid #3b82f6;';
+            } else {
+                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition'; btn.style.cssText = 'background:#1e293b;color:#94a3b8;border:1px solid #334155;';
+            }
+        }
+    });
+
+    const label = document.getElementById('nearbyRadiusLabel');
+    if (label) {
+        if (radius >= 999999) {
+            label.innerText = 'সকল নিবন্ধিত রিটেলার';
+        } else {
+            label.innerText = `আপনার অবস্থানের ${radius} মিটার ব্যাসার্ধের মধ্যে`;
+        }
+    }
+}
+
+function setNearbyRadius(radius) {
+    currentNearbyRadius = radius;
+    updateRadiusButtonsUI(radius);
+    if (currentDsrLat && currentDsrLng) {
+        renderNearbyMapItems(currentDsrLat, currentDsrLng, currentNearbyRadius);
+    }
+}
+
+function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function initNearbyMap(userLat, userLng, radius) {
+    const canvas = document.getElementById('nearbyMapCanvas');
+    if (!canvas) return;
+
+    if (!nearbyMap) {
+        nearbyMap = L.map(canvas, { zoomControl: false }).setView([userLat, userLng], 19);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 21,
+            attribution: 'Happy Bangladesh'
+        }).addTo(nearbyMap);
+    } else {
+        nearbyMap.setView([userLat, userLng], 19);
+        setTimeout(() => nearbyMap.invalidateSize(), 200);
+    }
+
+    renderNearbyMapItems(userLat, userLng, radius);
+}
+
+function renderNearbyMapItems(userLat, userLng, radius, searchQuery) {
+    if (!nearbyMap) return;
+
+    nearbyMarkers.forEach(m => nearbyMap.removeLayer(m));
+    nearbyMarkers = [];
+    if (nearbyUserMarker) nearbyMap.removeLayer(nearbyUserMarker);
+    if (nearbyCircle) nearbyMap.removeLayer(nearbyCircle);
+
+    const userIcon = L.divIcon({
+        className: 'nearby-user-pin',
+        html: `<div class="w-6 h-6 bg-blue-600 border-2 border-white rounded-full shadow-lg flex items-center justify-center text-white text-xs animate-pulse"><i class="fa-solid fa-person-walking"></i></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+    nearbyUserMarker = L.marker([userLat, userLng], { icon: userIcon }).addTo(nearbyMap);
+
+    if (radius < 999999) {
+        nearbyCircle = L.circle([userLat, userLng], {
+            radius: radius,
+            color: '#2563eb',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.15,
+            weight: 2,
+            dashArray: '4, 4'
+        }).addTo(nearbyMap);
+    }
+
+    const nearbyList = [];
+    allRetailersList.forEach(r => {
+        const rLat = parseFloat(r.lat);
+        const rLng = parseFloat(r.lng);
+        if (isNaN(rLat) || isNaN(rLng) || rLat === 0 || rLng === 0) return;
+        if (searchQuery) { const rN=(r.name||'').toLowerCase(), rP=(r.phone||'').toLowerCase(); if (!rN.includes(searchQuery)&&!rP.includes(searchQuery)) return; }
+
+        const dist = getDistanceInMeters(userLat, userLng, rLat, rLng);
+        if (dist <= radius) {
+            nearbyList.push({ ...r, distMeters: dist });
+
+            const pinIcon = L.divIcon({
+                className: 'nearby-ret-pin',
+                html: `<div class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] px-2 py-1 rounded-full shadow-md border border-white whitespace-nowrap flex items-center gap-1 cursor-pointer"><i class="fa-solid fa-store"></i> ${r.name} (${Math.round(dist)}m)</div>`,
+                iconSize: [100, 24],
+                iconAnchor: [50, 12]
+            });
+            const m = L.marker([rLat, rLng], { icon: pinIcon }).addTo(nearbyMap);
+            m.on('click', () => selectNearbyRetailer(r.id));
+            nearbyMarkers.push(m);
+        }
+    });
+
+    nearbyList.sort((a, b) => a.distMeters - b.distMeters);
+
+    const listContainer = document.getElementById('nearbyRetailersList');
+    if (nearbyList.length === 0) {
+        listContainer.innerHTML = `
+            <div class="text-center py-4 text-xs font-medium" style="color:#64748b;">
+                <i class="fa-solid fa-circle-info text-amber-500 mr-1"></i> 
+                ${radius < 999999 ? `${radius} মিটারের মধ্যে কোনো নিবন্ধিত রিটেলার পাওয়া যায়নি।` : 'কোনো রিটেলার পাওয়া যায়নি।'}
+                <button type="button" onclick="setNearbyRadius(50)" class="block mx-auto mt-2 text-blue-600 font-bold underline">৫০ মিটারে চেক করুন</button>
+            </div>
+        `;
+    } else {
+        let listHtml = `<div class="text-[11px] font-bold mb-2 uppercase tracking-wider" style="color:#475569;">পাওয়ার রিটেলারসমূহ (${nearbyList.length}):</div><div class="space-y-1.5">`;
+        nearbyList.forEach(r => {
+            listHtml += `
+                <div onclick="selectNearbyRetailer('${r.id}')" class="flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition" style="background:#1e293b;border:1px solid #334155;">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs flex-shrink-0" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;">
+                      <i class="fa-solid fa-store"></i>
+                    </div>
+                    <div class="truncate">
+                      <div class="text-xs font-bold truncate" style="color:#e2e8f0;">${r.name}</div>
+                      <div class="text-[10px] truncate" style="color:#64748b;">${r.phone || 'No Phone'} ${r.address ? '• ' + r.address : ''}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg" style="color:#60a5fa;background:#172554;border:1px solid #1d4ed8;">${Math.round(r.distMeters)}m দূরে</span>
+                    <i class="fa-solid fa-circle-check text-amber-500 text-sm"></i>
+                  </div>
+                </div>
+            `;
+        });
+        listHtml += `</div>`;
+        listContainer.innerHTML = listHtml;
+    }
+}
+
+function selectNearbyRetailer(retailerId) {
+    const select = document.getElementById('rs_retailer_id');
+    if (select) {
+        select.value = retailerId;
+    }
+    closeNearbyRetailerMapModal();
+    showToast('✅ রিটেলার সিলেক্ট করা হয়েছে!');
+}
+
+// ⚡ Filter retailer dropdown by name/phone
+function filterRetailerSelect(query) {
+    const select = document.getElementById('rs_retailer_id');
+    if (!select) return;
+    const q = (query || '').toLowerCase().trim();
+    Array.from(select.options).forEach(opt => {
+        if (!opt.value) { opt.style.display = ''; return; }
+        const name = opt.dataset.name || '';
+        const phone = opt.dataset.phone || '';
+        opt.style.display = (!q || name.includes(q) || phone.includes(q)) ? '' : 'none';
+    });
+}
+
+// ⚡ Filter nearby map by search text
+function nearbySearchFilter() {
+    const input = document.getElementById('nearbyMapSearchInput');
+    const query = input ? input.value.toLowerCase().trim() : '';
+    if (currentDsrLat && currentDsrLng) {
+        renderNearbyMapItems(currentDsrLat, currentDsrLng, currentNearbyRadius, query);
+    }
+}
+
+// ⚡ Search retailer on map from Ready Sale modal
+function searchRetailerOnMap() {
+    const searchInput = document.getElementById('rs_retailer_search');
+    const query = searchInput ? searchInput.value.trim() : '';
+    if (!query) {
+        showToast('⚠️ অনুগ্রহ করে রিটেইলার নাম বা ফোন লিখুন!');
+        return;
+    }
+    currentNearbyRadius = 999999;
+    const modal = document.getElementById('nearbyRetailerMapModal');
+    const loader = document.getElementById('nearbyMapLoader');
+    if (loader) loader.classList.remove('hidden');
+    modal.classList.remove('hidden');
+    const mapSearch = document.getElementById('nearbyMapSearchInput');
+    if (mapSearch) mapSearch.value = query;
+    updateRadiusButtonsUI(999999);
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                currentDsrLat = pos.coords.latitude;
+                currentDsrLng = pos.coords.longitude;
+                if (loader) loader.classList.add('hidden');
+                initNearbyMap(currentDsrLat, currentDsrLng, 999999);
+                renderNearbyMapItems(currentDsrLat, currentDsrLng, 999999, query.toLowerCase());
+            },
+            (err) => {
+                if (loader) loader.classList.add('hidden');
+                currentDsrLat = 23.8103; currentDsrLng = 90.4125;
+                if (allRetailersList.length > 0 && allRetailersList[0].lat && allRetailersList[0].lng) {
+                    currentDsrLat = parseFloat(allRetailersList[0].lat);
+                    currentDsrLng = parseFloat(allRetailersList[0].lng);
+                }
+                initNearbyMap(currentDsrLat, currentDsrLng, 999999);
+                renderNearbyMapItems(currentDsrLat, currentDsrLng, 999999, query.toLowerCase());
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    } else {
+        if (loader) loader.classList.add('hidden');
+        showToast('❌ ব্রাউজারে Geolocation সাপোর্ট নেই');
+    }
+}
+</script>
+
+<style>
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translate(-50%, 12px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+</style>
+

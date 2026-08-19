@@ -154,7 +154,8 @@ $router->get( '/admin/reports',               ['AdminController', 'reports']);
 // Database Sync
 $router->get( '/admin/database-sync',         ['AdminController', 'databaseSync']);
 $router->post('/admin/database-sync/run',     ['AdminController', 'databaseSyncRun']);
-$router->post('/admin/database-sync/clear',   ['AdminController', 'databaseClear']);
+$router->post('/admin/database-sync/clear',          ['AdminController', 'databaseClear']);
+$router->post('/admin/database-sync/clear-dispatch', ['AdminController', 'dispatchClear']);
 
 // Retailers
 $router->get( '/admin/retailers',             ['AdminController', 'retailers']);
@@ -198,6 +199,7 @@ $router->get( '/manager/products',            ['ManagerController', 'products'])
 $router->post('/manager/api/products',        ['ManagerController', 'apiProductStore']);
 $router->post('/manager/api/products/update', ['ManagerController', 'apiProductUpdate']);
 $router->post('/manager/api/products/adjust-buying-price', ['ManagerController', 'apiAdjustBuyingPrice']);
+$router->get( '/manager/api/products/price-history',       ['ManagerController', 'apiProductPriceHistory']);
 $router->post('/manager/api/products/delete', ['ManagerController', 'apiProductDelete']);
 $router->post('/manager/api/stock/adjust',    ['ManagerController', 'apiStockAdjust']);
 
@@ -213,6 +215,7 @@ $router->post('/manager/api/lots/update',     ['ManagerController', 'apiLotUpdat
 $router->post('/manager/api/lots/delete',     ['ManagerController', 'apiLotDelete']);
 $router->post('/manager/api/lots/delete-batch',['ManagerController', 'apiLotBatchDelete']);
 $router->post('/manager/api/lots/update-batch',['ManagerController', 'apiLotBatchUpdate']);
+$router->post('/manager/api/lots/request-edit', ['ManagerController', 'apiLotBatchEditRequest']);
 
 // Manager Orders
 $router->get( '/manager/orders',                             ['ManagerController', 'orders']);

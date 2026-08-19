@@ -42,6 +42,10 @@
               <button type="button" onclick='viewBatchInvoice(<?= json_encode($b, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' class="w-8 h-8 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors shadow-xs" title="View Invoice">
                 <i class="fa-solid fa-file-invoice text-xs"></i>
               </button>
+              <!-- Edit Batch Button -->
+              <button type="button" onclick='editBatchLots(<?= json_encode($b, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)' class="w-8 h-8 rounded bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center transition-colors shadow-xs" title="Edit Lot Batch (requires admin approval)">
+                <i class="fa-solid fa-pen text-xs"></i>
+              </button>
               <!-- Delete Batch Button -->
               <button type="button" onclick="deleteBatchLots(<?= (int)$b['company_id'] ?>, '<?= h($b['lot_date']) ?>', '<?= addslashes(h($b['company_name'])) ?>')" class="w-8 h-8 rounded bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors shadow-xs" title="Delete Lot Batch">
                 <i class="fa-solid fa-trash text-xs"></i>
@@ -208,6 +212,7 @@
                 </div>
                 <div>
                     <button type="submit" id="btn-save-lot" class="btn btn-primary bg-indigo-600 hover:bg-indigo-700 border-none px-8 py-3 rounded-lg font-bold text-white shadow-sm">Save Lot</button>
+                <p id="edit-approval-note" class="hidden text-xs text-amber-600 mt-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Edit will be sent for admin approval before applying.</p>
                 </div>
             </div>
         </form>
@@ -334,6 +339,7 @@ function openNewLotModal() {
     document.getElementById('modal-add-title').textContent = 'Add New Lot';
     document.getElementById('modal-add-subtitle').textContent = 'Record a new product batch received from company';
     document.getElementById('btn-save-lot').textContent = 'Save Lot';
+    document.getElementById('edit-approval-note').classList.add('hidden');
     document.getElementById('bulk-company').value = '';
     document.getElementById('bulk-lot-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('bulk-rows').innerHTML = '';
@@ -352,7 +358,8 @@ function editBatchLots(batch) {
     
     document.getElementById('modal-add-title').textContent = 'Edit Lot Batch';
     document.getElementById('modal-add-subtitle').textContent = `Editing batch for ${batch.company_name} on ${batch.lot_date}`;
-    document.getElementById('btn-save-lot').textContent = 'Update Lot Batch';
+    document.getElementById('btn-save-lot').textContent = 'Submit Edit Request';
+    document.getElementById('edit-approval-note').classList.remove('hidden');
     
     document.getElementById('bulk-company').value = batch.company_id || '';
     document.getElementById('bulk-lot-date').value = batch.lot_date || '';
@@ -630,7 +637,7 @@ function addBulkRow(data = null) {
         labelClass = 'selected-product-name text-amber-700 font-medium';
     }
     
-    const qty = data && data.qty !== undefined ? data.qty : 1;
+    const qty = data && data.qty !== undefined ? data.qty : 0;
     const expiry = data && data.expiry ? data.expiry : '';
     const price = data && data.price !== undefined ? data.price : 0;
     
@@ -645,7 +652,7 @@ function addBulkRow(data = null) {
             </div>
         </td>
         <td class="p-3 border-b border-gray-100">
-            <input type="number" class="form-input text-sm w-full row-qty" value="${qty}" min="1" required oninput="calculateTotals(); updatePiecesHelper(this)">
+            <input type="number" class="form-input text-sm w-full row-qty" value="${qty}" min="0" required oninput="calculateTotals(); updatePiecesHelper(this)">
             <div class="text-[10px] text-gray-500 mt-1 row-qty-helper font-medium"></div>
         </td>
         <td class="p-3 border-b border-gray-100"><input type="date" class="form-input text-sm w-full row-expiry" value="${expiry}"></td>
@@ -926,7 +933,7 @@ document.getElementById('bulk-add-form').addEventListener('submit', async functi
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     
     const endpoint = (isBatchEdit && originalBatchInfo)
-        ? '<?= url('manager/api/lots/update-batch') ?>'
+        ? '<?= url('manager/api/lots/request-edit') ?>'
         : '<?= url('manager/api/lots/store') ?>';
     
     const payload = {

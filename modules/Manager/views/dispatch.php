@@ -438,7 +438,7 @@ async function toggleSrRow(schId) {
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>Company Name</th>
-        <th class="text-right">Total Ordered Value</th>
+        <th class="text-right">Total Base Selling Value</th>
         <th class="text-right">Dispatch Items Value</th>
         <th class="text-right">Returned Value</th>
         <th class="text-right">Damage Value</th>
@@ -544,24 +544,45 @@ function toggleProductRow(schId, compId) {
       return;
     }
     
-    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+    let html = `<div class="excel-container shadow-none border border-slate-200 overflow-x-auto"><table class="excel-table text-xs whitespace-nowrap">
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>Product Name</th>
+        <th class="text-right">Base Price</th>
         <th class="text-center">Ordered Qty</th>
+        <th class="text-right">Ordered Value</th>
         <th class="text-center">Dispatched Qty</th>
+        <th class="text-right">Dispatched Value</th>
         <th class="text-center">Sale Qty</th>
+        <th class="text-right">Sale Value</th>
         <th class="text-center">Return Qty</th>
+        <th class="text-right">Return Value</th>
       </tr></thead><tbody>`;
       
     products.forEach((p, pIdx) => {
+      const basePrice = parseFloat(p.base_price || 0);
+      const orderedQty = parseInt(p.ordered_qty || 0);
+      const dispatchedQty = parseInt(p.dispatched_qty || 0);
+      const saleQty = parseInt(p.sale_qty || 0);
+      const returnedQty = parseInt(p.returned_qty || 0);
+      
+      const orderedVal = orderedQty * basePrice;
+      const dispatchedVal = dispatchedQty * basePrice;
+      const saleVal = saleQty * basePrice;
+      const returnedVal = returnedQty * basePrice;
+      
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
         <td class="font-bold text-gray-800">${p.name}</td>
-        <td class="excel-qty text-center">${p.ordered_qty || 0}</td>
-        <td class="excel-qty text-center">${p.dispatched_qty || 0}</td>
-        <td class="excel-qty text-center font-bold text-emerald-700">${p.sale_qty || 0}</td>
-        <td class="excel-qty text-center text-rose-600">${p.returned_qty || 0}</td>
+        <td class="excel-money text-right text-amber-600">৳ ${basePrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center">${orderedQty}</td>
+        <td class="excel-money text-right text-gray-600">৳ ${orderedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center">${dispatchedQty}</td>
+        <td class="excel-money text-right text-blue-600">৳ ${dispatchedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center font-bold text-emerald-700">${saleQty}</td>
+        <td class="excel-money text-right font-bold text-emerald-700">৳ ${saleVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center text-rose-600">${returnedQty}</td>
+        <td class="excel-money text-right text-rose-600">৳ ${returnedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;
@@ -586,34 +607,44 @@ function toggleCompanySrRow(schId, compId) {
       return;
     }
     
-    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+    let html = `<div class="excel-container shadow-none border border-slate-200 w-full overflow-x-auto"><table class="excel-table text-xs whitespace-nowrap">
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>SR Name</th>
-        <th class="text-right">Order Value</th>
-        <th class="text-right">Sale Value</th>
+        <th class="text-right">Total Base Selling Value</th>
+        <th class="text-right">Total SR Ordered Value</th>
+        <th class="text-right">Total Sales Value (Base)</th>
+        <th class="text-right">Total Sale Value Ordered</th>
         <th class="text-right">Total O/C</th>
         <th class="text-center no-print">Action</th>
       </tr></thead><tbody>`;
       
     srs.forEach((sr, srIdx) => {
+      const baseOrderVal = parseFloat(sr.base_order_value || 0);
       const orderVal = parseFloat(sr.order_value || 0);
+      const baseSaleVal = parseFloat(sr.base_sale_value || 0);
       const saleVal = parseFloat(sr.sale_value || 0);
-      const totalOc = parseFloat(sr.total_oc || 0);
+      const totalOc = baseOrderVal - orderVal;
       
       html += `<tr>
         <td class="excel-row-num">${srIdx + 1}</td>
         <td class="font-bold text-gray-800 text-xs">
           <i class="fa-solid fa-user text-purple-600 mr-1 text-[11px]"></i>${sr.name}
         </td>
-        <td class="excel-money">
-          ৳ ${orderVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+        <td class="excel-money text-right text-gray-600">
+          ৳ ${baseOrderVal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}
         </td>
-        <td class="excel-money text-emerald-600 font-bold">
-          ${showValues ? '৳ ' + saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}
+        <td class="excel-money text-right text-blue-600">
+          ৳ ${orderVal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}
         </td>
-        <td class="excel-money text-indigo-600 font-semibold">
-          ৳ ${totalOc.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+        <td class="excel-money text-right text-emerald-600 font-bold">
+          ${showValues ? '৳ ' + baseSaleVal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}
+        </td>
+        <td class="excel-money text-right text-teal-600 font-bold">
+          ${showValues ? '৳ ' + saleVal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}
+        </td>
+        <td class="excel-money text-right text-indigo-600 font-semibold">
+          ৳ ${totalOc.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}
         </td>
         <td class="text-center no-print">
           <button onclick="toggleSrProductRow(${schId}, ${compId}, ${sr.id})" class="text-xs text-gray-700 hover:text-blue-700 px-2 py-0.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-semibold transition">
@@ -621,7 +652,7 @@ function toggleCompanySrRow(schId, compId) {
           </button>
         </td>
       </tr>
-      <tr id="exp-sr-prod-${schId}-${compId}-${sr.id}" class="hidden bg-white"><td colspan="6" class="p-0 border-b border-gray-300">
+      <tr id="exp-sr-prod-${schId}-${compId}-${sr.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
         <div id="sr-prod-container-${schId}-${compId}-${sr.id}" class="p-2"></div>
       </td></tr>`;
       

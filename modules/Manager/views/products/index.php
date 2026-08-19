@@ -115,6 +115,9 @@
                                         </td>
                                         <td class="py-4 px-6 text-right">
                                              <div class="flex justify-end gap-2">
+                                                 <button onclick='openPriceHistoryModal(<?= (int)$p['id'] ?>, <?= htmlspecialchars(json_encode($p['name']), ENT_QUOTES, 'UTF-8') ?>)' class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium" title="Price Change History">
+                                                     <i class="fas fa-history"></i>
+                                                 </button>
                                                  <button onclick='openAdjustPriceModal(<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>)' class="bg-amber-50 text-amber-600 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium" title="Adjust Buying Price">
                                                      <i class="fas fa-tag"></i>
                                                  </button>
@@ -375,6 +378,67 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Product Price History Modal -->
+<div id="price-history-modal" class="modal-overlay hidden">
+    <div class="modal-box p-6 max-w-2xl w-full">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b">
+            <div>
+                <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-history text-blue-600"></i> Product Price History
+                </h3>
+                <p id="history-product-name" class="text-xs text-gray-500 font-medium mt-0.5"></p>
+            </div>
+            <button onclick="closeModal('price-history-modal')" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div id="history-loading" class="py-12 text-center text-gray-500">
+            <i class="fas fa-circle-notch fa-spin text-3xl text-blue-500 mb-2"></i>
+            <p class="text-sm">Loading price history...</p>
+        </div>
+
+        <div id="history-content" class="hidden space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs">
+                    <div class="text-gray-500 font-medium">Current Buying Price</div>
+                    <div id="history-curr-buy" class="text-base font-bold text-gray-900 mt-0.5">৳0.00</div>
+                </div>
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs">
+                    <div class="text-emerald-700 font-medium">Current Selling Price (Pcs)</div>
+                    <div id="history-curr-sell" class="text-base font-bold text-emerald-800 mt-0.5">৳0.00</div>
+                </div>
+            </div>
+
+            <div class="overflow-hidden border border-gray-200 rounded-xl">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-gray-100/75 text-gray-600 uppercase font-semibold text-[10px] tracking-wider border-b border-gray-200">
+                        <tr>
+                            <th class="py-2.5 px-3">Date & Time</th>
+                            <th class="py-2.5 px-3">Type / By</th>
+                            <th class="py-2.5 px-3 text-right">Buying Price</th>
+                            <th class="py-2.5 px-3 text-right">Selling Price</th>
+                            <th class="py-2.5 px-3">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body" class="divide-y divide-gray-100 bg-white">
+                        <!-- Dynamic rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="history-empty" class="hidden py-8 text-center text-gray-400">
+                <i class="fas fa-file-invoice-dollar text-3xl mb-2 block text-gray-300"></i>
+                No price history records found for this product.
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-3 border-t mt-4">
+            <button type="button" onclick="closeModal('price-history-modal')" class="btn btn-secondary px-5">Close</button>
+        </div>
     </div>
 </div>
 
@@ -945,6 +1009,85 @@ document.getElementById('adjust-price-form').addEventListener('submit', async fu
         btn.innerHTML = originalText;
     }
 });
+
+// Price History Handler
+async function openPriceHistoryModal(productId, productName) {
+    document.getElementById('history-product-name').textContent = productName || '';
+    document.getElementById('history-loading').classList.remove('hidden');
+    document.getElementById('history-content').classList.add('hidden');
+    openModal('price-history-modal');
+
+    const csrf = document.getElementById('csrf') ? document.getElementById('csrf').value : '';
+
+    try {
+        const res = await fetch(`<?= BASE_URL ?>/manager/api/products/price-history?product_id=${productId}&csrf_token=${csrf}`);
+        const data = await res.json();
+
+        document.getElementById('history-loading').classList.add('hidden');
+        document.getElementById('history-content').classList.remove('hidden');
+
+        if (data.success && data.product) {
+            document.getElementById('history-curr-buy').textContent = '৳' + parseFloat(data.product.buying_price || 0).toFixed(2);
+            document.getElementById('history-curr-sell').textContent = '৳' + parseFloat(data.product.price || 0).toFixed(2);
+
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+
+            const typeBadges = {
+                'manual_adjust': '<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">Adjust</span>',
+                'lot_entry': '<span class="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">Lot Entry</span>',
+                'lot_edit': '<span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">Lot Edit</span>',
+                'admin_approval': '<span class="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">Admin</span>',
+                'initial_creation': '<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-semibold">Created</span>'
+            };
+
+            if (data.history && data.history.length > 0) {
+                document.getElementById('history-empty').classList.add('hidden');
+                data.history.forEach(h => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50/50';
+
+                    const oldBuy = h.old_buying_price !== null ? '৳' + parseFloat(h.old_buying_price).toFixed(2) : '-';
+                    const newBuy = '৳' + parseFloat(h.new_buying_price).toFixed(2);
+                    const oldSell = h.old_selling_price !== null ? '৳' + parseFloat(h.old_selling_price).toFixed(2) : '-';
+                    const newSell = '৳' + parseFloat(h.new_selling_price).toFixed(2);
+
+                    const typeBadge = typeBadges[h.change_type] || `<span class="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-[10px]">${h.change_type}</span>`;
+                    const userText = h.user_name ? `${h.user_name} <span class="text-gray-400 text-[10px]">(${h.role_name || 'User'})</span>` : '<span class="text-gray-400">System</span>';
+
+                    tr.innerHTML = `
+                        <td class="py-2.5 px-3 whitespace-nowrap text-gray-600 font-medium">
+                            ${h.created_at}
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <div class="flex items-center gap-1.5">${typeBadge}</div>
+                            <div class="text-[11px] text-gray-700 mt-0.5">${userText}</div>
+                        </td>
+                        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                            <span class="text-gray-400 line-through text-[11px]">${oldBuy}</span>
+                            <span class="font-bold text-gray-900 ml-1">${newBuy}</span>
+                        </td>
+                        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                            <span class="text-gray-400 line-through text-[11px]">${oldSell}</span>
+                            <span class="font-bold text-emerald-700 ml-1">${newSell}</span>
+                        </td>
+                        <td class="py-2.5 px-3 text-gray-500 text-[11px]">
+                            ${h.reason || '-'}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                document.getElementById('history-empty').classList.remove('hidden');
+            }
+        } else {
+            alert('Failed to load history: ' + (data.message || 'Unknown error'));
+        }
+    } catch (err) {
+        document.getElementById('history-loading').classList.add('hidden');
+        alert('Network error: ' + err.message);
+    }
+}
 
 </script>
 

@@ -94,8 +94,8 @@ class Helpers
 
     public static function verifyCsrf(): bool
     {
-        // Accept both field names: _csrf_token (form) and csrf_token (AJAX/FormData)
-        $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? '';
+        // Accept both field names: _csrf_token (form) and csrf_token (AJAX/FormData/GET)
+        $token = $_POST['_csrf_token'] ?? $_POST['csrf_token'] ?? $_GET['_csrf_token'] ?? $_GET['csrf_token'] ?? '';
         if (empty($token)) {
             // Fall back to JSON body
             $rawInput = file_get_contents('php://input');
@@ -164,6 +164,42 @@ class Helpers
         $managerId = $managerId ?: 0;
         $stmt = $db->prepare("INSERT INTO manager_activities (manager_id, action_type, description, target_id, ip_address) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$managerId, $actionType, $description, $targetId, $ip]);
+    }
+
+    /**
+     * Log a product's price change history.
+     */
+    public static function logProductPriceChange(
+        int $productId,
+        ?float $oldBuyingPrice,
+        float $newBuyingPrice,
+        ?float $oldSellingPrice,
+        float $newSellingPrice,
+        ?int $userId = null,
+        string $changeType = 'manual_adjust',
+        ?string $reason = null
+    ): void {
+        try {
+            $db = Database::getInstance();
+            $userId = $userId ?: (class_exists('Auth') ? \Auth::id() : null);
+            $stmt = $db->prepare("
+                INSERT INTO product_price_history 
+                (product_id, old_buying_price, new_buying_price, old_selling_price, new_selling_price, changed_by, change_type, reason, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $productId,
+                $oldBuyingPrice !== null ? round($oldBuyingPrice, 2) : null,
+                round($newBuyingPrice, 2),
+                $oldSellingPrice !== null ? round($oldSellingPrice, 2) : null,
+                round($newSellingPrice, 2),
+                $userId ?: null,
+                $changeType,
+                $reason
+            ]);
+        } catch (\Exception $e) {
+            error_log("Failed to log product price history: " . $e->getMessage());
+        }
     }
 }
 

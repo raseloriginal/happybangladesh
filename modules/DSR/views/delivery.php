@@ -238,7 +238,7 @@ $hasDeliveries = !empty($retailers);
       </div>
 
       <!-- Body Grid (Modern Excel Card Grid) -->
-      <div class="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 pb-24 content-start">
+      <div id="retailerListGrid" class="flex-1 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 pb-24 content-start">
           <?php foreach ($retailers as $idx => $r): 
               $hasDelivered = false;
               $hasPending = false;
@@ -608,6 +608,30 @@ let markers = [];
 let currentPartialDueRetailer = null;
 let currentPartialDueOrders = [];
 
+function openRetailerListModal() {
+    const modal = document.getElementById('retailerListModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeRetailerListModal() {
+    const modal = document.getElementById('retailerListModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function handleRetailerListClick(idx) {
+    closeRetailerListModal();
+    if (orderedRetailers && orderedRetailers[idx]) {
+        const ret = orderedRetailers[idx];
+        handleRetailerClick(ret, false);
+        
+        const lat = parseFloat(ret.lat);
+        const lng = parseFloat(ret.lng);
+        if (map && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+            map.flyTo([lat, lng], 17, { animate: true, duration: 1 });
+        }
+    }
+}
+
 function handleRetailerClick(ret, shouldWarn) {
     // If the retailer has a pending order (in_transit), bypass modals and open directly to it
     const pendingIndex = ret.orders.findIndex(o => o.status === 'in_transit');
@@ -959,12 +983,29 @@ function handleDuePaymentAction() {
             
             showToast('✅ All dues marked as complete!');
             
-            if (document.getElementById('retailerSheet').classList.contains('active')) {
-                openRetailerSheet(currentRetailerObj);
-                selectCompanyOrder(currentOrderIndex);
+            if (currentRetailerObj) {
+                const globalRetIdx = orderedRetailers.findIndex(r => (r.id && r.id === currentRetailerObj.id) || (r.retailer_name === currentRetailerObj.retailer_name));
+                if (globalRetIdx !== -1) {
+                    orderedRetailers[globalRetIdx] = currentRetailerObj;
+                }
             }
-            if (typeof initMap === 'function') {
+
+            if (document.getElementById('retailerSheet').classList.contains('active')) {
+                let nextPendingIdx = -1;
+                if (currentRetailerObj && currentRetailerObj.orders) {
+                    nextPendingIdx = currentRetailerObj.orders.findIndex(o => o.status === 'in_transit');
+                }
+                if (nextPendingIdx !== -1) {
+                    openRetailerSheet(currentRetailerObj, nextPendingIdx);
+                } else {
+                    closeBottomSheet();
+                }
+            }
+            if (typeof redrawMapPins === 'function') {
                 redrawMapPins();
+            }
+            if (typeof renderRetailerListGrid === 'function') {
+                renderRetailerListGrid();
             }
         } finally {
             btns.forEach(b => { b.disabled = false; });
@@ -1239,7 +1280,7 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
 
     const tabsContainer = document.getElementById('bsCompanyTabs');
     tabsContainer.innerHTML = '';
-    tabsContainer.className = "flex gap-6 overflow-x-auto pb-0 no-scrollbar border-b border-gray-100 px-4 pt-2 mb-4";
+    tabsContainer.className = "flex gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-gray-100 px-4 pt-2 mb-3";
     
     const list = document.getElementById('bsProductsList');
     list.innerHTML = '';
@@ -1247,20 +1288,24 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
     if (retailer.orders && retailer.orders.length > 1) {
         tabsContainer.classList.remove('hidden');
         retailer.orders.forEach((order, idx) => {
-            const isSelected = idx === 0;
             const count = order.products ? order.products.length : 0;
-            const isCancelled = order.status === 'cancelled';
-            let tabClass = 'text-gray-500 pb-2 border-b-2 border-transparent transition hover:text-gray-700';
-            if (isCancelled) {
-                tabClass = isSelected ? 'text-red-600 pb-2 border-b-2 border-red-600 font-extrabold' : 'text-red-400 pb-2 border-b-2 border-transparent transition hover:text-red-500';
-            } else if (isSelected) {
-                tabClass = 'text-[#217346] pb-2 border-b-2 border-[#217346] font-extrabold';
-            }
+            const status = order.status || 'in_transit';
             
+            let statusIcon = '<i class="fa-regular fa-clock text-blue-500 text-[10px]"></i>';
+            if (status === 'delivered') {
+                statusIcon = '<i class="fa-solid fa-circle-check text-emerald-600 text-[10px]"></i>';
+            } else if (status === 'cancelled') {
+                statusIcon = '<i class="fa-solid fa-circle-xmark text-rose-500 text-[10px]"></i>';
+            } else if (status === 'partial') {
+                statusIcon = '<i class="fa-solid fa-circle-half-stroke text-amber-500 text-[10px]"></i>';
+            }
+
             tabsContainer.insertAdjacentHTML('beforeend', `
-                <button onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
-                        class="whitespace-nowrap px-1 text-xs font-semibold ${tabClass}">
-                    ${order.company_name} <span class="text-gray-400 ml-1 text-[10px]">(${count})</span>
+                <button type="button" onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
+                        class="whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 transition active:scale-95">
+                    ${statusIcon}
+                    <span>${order.company_name || 'কোম্পানি'}</span>
+                    <span class="text-[10px] opacity-70">(${count})</span>
                 </button>
             `);
         });
@@ -1407,19 +1452,28 @@ function selectCompanyOrder(orderIndex) {
     if (currentRetailerObj.orders.length > 1) {
         document.querySelectorAll('[id^="tab-order-"]').forEach((btn, idx) => {
             const ord = currentRetailerObj.orders[idx];
-            const count = ord.products ? ord.products.length : 0;
-            const isCancelled = ord.status === 'cancelled';
-            if (idx === orderIndex) {
-                if (isCancelled) {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-bold bg-white text-red-655 border-t-2 border-t-red-600 border-x border-x-gray-300 rounded-t-md relative z-10 -mb-[1px]';
+            const isSelected = (idx === orderIndex);
+            const status = ord ? (ord.status || 'in_transit') : 'in_transit';
+            
+            if (isSelected) {
+                if (status === 'delivered') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-300';
+                } else if (status === 'cancelled') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-rose-600 text-white border-rose-700 ring-2 ring-rose-300';
+                } else if (status === 'partial') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-amber-500 text-white border-amber-600 ring-2 ring-amber-300';
                 } else {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-bold bg-white text-[#217346] border-t-2 border-t-[#217346] border-x border-x-gray-300 rounded-t-md relative z-10 -mb-[1px]';
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-black rounded-lg border flex items-center gap-1.5 shadow-sm bg-blue-600 text-white border-blue-700 ring-2 ring-blue-300';
                 }
             } else {
-                if (isCancelled) {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-semibold bg-[#f3f2f1] text-red-500 border-b border-b-gray-300 border-x border-x-gray-200 rounded-t-md opacity-80';
+                if (status === 'delivered') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100';
+                } else if (status === 'cancelled') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100 opacity-80';
+                } else if (status === 'partial') {
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100';
                 } else {
-                    btn.className = 'whitespace-nowrap px-4 py-2 text-xs font-semibold bg-[#f3f2f1] text-gray-600 border-b border-b-gray-300 border-x border-x-gray-200 rounded-t-md hover:bg-gray-100';
+                    btn.className = 'whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200';
                 }
             }
         });
@@ -1432,11 +1486,16 @@ function selectCompanyOrder(orderIndex) {
     document.getElementById('bsTotalQty').innerText = totalQty;
 
     const statusLabel = { 'in_transit': 'অপেক্ষমান', 'delivered': 'পরিশোধিত', 'partial': 'আংশিক/বাকি', 'cancelled': 'বাতিল' };
-    const statusColor = { 'in_transit': '#3b82f6', 'delivered': '#16a34a', 'partial': '#f97316', 'cancelled': '#dc2626' };
+    const statusColor = { 'in_transit': '#2563eb', 'delivered': '#16a34a', 'partial': '#d97706', 'cancelled': '#dc2626' };
+    const statusBg = { 'in_transit': '#eff6ff', 'delivered': '#f0fdf4', 'partial': '#fffbeb', 'cancelled': '#fef2f2' };
+    const statusBorder = { 'in_transit': '#bfdbfe', 'delivered': '#bbf7d0', 'partial': '#fde68a', 'cancelled': '#fecaca' };
+
     const bsStatus = document.getElementById('bsStatus');
     if (bsStatus) {
         bsStatus.innerText = statusLabel[order.status] || 'অপেক্ষমান';
-        bsStatus.style.color = statusColor[order.status] || '#3b82f6';
+        bsStatus.style.color = statusColor[order.status] || '#2563eb';
+        bsStatus.style.backgroundColor = statusBg[order.status] || '#eff6ff';
+        bsStatus.style.borderColor = statusBorder[order.status] || '#bfdbfe';
     }
 
     const bsPartialInfo = document.getElementById('bsPartialInfo');
@@ -1820,13 +1879,26 @@ async function redoCancelledOrder(orderIndex) {
         
         showToast('🔄 Order restored to pending!');
         
+        // Sync orderedRetailers
+        if (currentRetailerObj) {
+            const globalRetIdx = orderedRetailers.findIndex(r => (r.id && r.id === currentRetailerObj.id) || (r.retailer_name === currentRetailerObj.retailer_name));
+            if (globalRetIdx !== -1) {
+                orderedRetailers[globalRetIdx] = currentRetailerObj;
+            }
+        }
+
         // Re-render and refresh sheet
-        openRetailerSheet(currentRetailerObj);
+        openRetailerSheet(currentRetailerObj, orderIndex);
         selectCompanyOrder(orderIndex);
 
         // Redraw map pins
-        if (typeof initMap === 'function' && map) {
+        if (typeof redrawMapPins === 'function') {
             redrawMapPins();
+        }
+
+        // Update Retailer List Modal cards
+        if (typeof renderRetailerListGrid === 'function') {
+            renderRetailerListGrid();
         }
 
     } catch (err) {
@@ -1880,6 +1952,99 @@ function redrawMapPins() {
             handleRetailerClick(ret, shouldWarn);
         });
         markers.push(marker);
+    });
+}
+
+function renderRetailerListGrid() {
+    const grid = document.getElementById('retailerListGrid');
+    if (!grid || !orderedRetailers || orderedRetailers.length === 0) return;
+
+    grid.innerHTML = '';
+    orderedRetailers.forEach((r, idx) => {
+        let hasDelivered = false;
+        let hasPending = false;
+        let hasPartial = false;
+        let hasCancelled = false;
+        let actionedCount = 0;
+        let totalVal = 0;
+
+        (r.orders || []).forEach(o => {
+            totalVal += parseFloat(o.total_amount || 0);
+            if (o.status === 'in_transit') {
+                hasPending = true;
+            } else {
+                actionedCount++;
+            }
+            if (o.status === 'partial') hasPartial = true;
+            if (o.status === 'delivered') hasDelivered = true;
+            if (o.status === 'cancelled') hasCancelled = true;
+        });
+
+        let statusBadge = '';
+        let cardBorder = 'border-slate-200/90';
+        let cardBg = 'bg-white';
+
+        if (hasPending && actionedCount > 0) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-800 text-white border border-slate-700"><i class="fa-solid fa-circle-exclamation mr-1"></i>আংশিক বাকি</span>';
+            cardBorder = 'border-slate-400';
+        } else if (hasPending) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200"><i class="fa-regular fa-clock mr-1"></i>অপেক্ষমাণ</span>';
+            cardBorder = 'border-blue-200';
+        } else if (hasDelivered && !$hasPartial && !$hasCancelled) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>ডেলিভারড</span>';
+            cardBorder = 'border-emerald-300';
+            cardBg = 'bg-emerald-50/20';
+        } else if (hasCancelled && !$hasDelivered && !$hasPartial) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-xmark mr-1"></i>বাতিল</span>';
+            cardBorder = 'border-rose-300';
+            cardBg = 'bg-rose-50/20';
+        } else if (hasPartial && !$hasDelivered && !$hasCancelled) {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-circle-half-stroke mr-1"></i>পার্শিয়াল</span>';
+            cardBorder = 'border-amber-300';
+            cardBg = 'bg-amber-50/20';
+        } else {
+            statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200"><i class="fa-solid fa-shuffle mr-1"></i>মিশ্রিত</span>';
+            cardBorder = 'border-purple-300';
+            cardBg = 'bg-purple-50/20';
+        }
+
+        const name = r.retailer_name || r.dealer_name || r.name || 'Unknown Retailer';
+        const address = r.address || 'No Address';
+        const orderCount = (r.orders || []).length;
+
+        grid.insertAdjacentHTML('beforeend', `
+            <div id="retailer-card-${idx}" class="${cardBg} rounded-2xl p-3.5 shadow-2xs hover:shadow-md active:scale-[0.99] transition cursor-pointer border ${cardBorder} flex flex-col justify-between space-y-3 group" onclick="handleRetailerListClick(${idx})">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black border border-blue-100">
+                            <i class="fa-solid fa-store"></i>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    <span class="font-mono font-black text-xs text-slate-900 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                        ৳${Math.round(totalVal).toLocaleString()}
+                    </span>
+                </div>
+
+                <div>
+                    <div class="text-xs sm:text-sm font-black text-slate-900 leading-snug line-clamp-2 group-hover:text-blue-600 transition">
+                        ${name}
+                    </div>
+                    <div class="text-[10.5px] text-slate-400 font-medium line-clamp-1 mt-0.5">
+                        <i class="fa-solid fa-location-dot mr-1 text-slate-300"></i>${address}
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                    <span class="font-bold text-slate-500">
+                        ${orderCount} টি অর্ডার
+                    </span>
+                    <span class="w-7 h-7 rounded-xl bg-slate-100 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-slate-400 text-xs transition duration-200">
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </span>
+                </div>
+            </div>
+        `);
     });
 }
 
@@ -2005,22 +2170,39 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                     });
                 }
             });
+
+            // Sync orderedRetailers global array
+            if (currentRetailerObj) {
+                const globalRetIdx = orderedRetailers.findIndex(r => (r.id && r.id === currentRetailerObj.id) || (r.retailer_name === currentRetailerObj.retailer_name));
+                if (globalRetIdx !== -1) {
+                    orderedRetailers[globalRetIdx] = currentRetailerObj;
+                }
+            }
+
+            // Check if there are other pending orders for this retailer
             if (document.getElementById('retailerSheet').classList.contains('active')) {
-                let hasPending = false;
+                let nextPendingIdx = -1;
                 if (currentRetailerObj && currentRetailerObj.orders) {
-                    hasPending = currentRetailerObj.orders.some(o => o.status === 'in_transit');
+                    nextPendingIdx = currentRetailerObj.orders.findIndex(o => o.status === 'in_transit');
                 }
                 
-                if (hasPending) {
-                    openRetailerSheet(currentRetailerObj);
-                    selectCompanyOrder(currentOrderIndex);
+                if (nextPendingIdx !== -1) {
+                    // Other company orders are still pending: stay open and auto-switch to next pending tab
+                    openRetailerSheet(currentRetailerObj, nextPendingIdx);
                 } else {
+                    // All company orders for this retailer are completed: close sheet
                     closeBottomSheet();
                 }
             }
             
-            if (typeof initMap === 'function') {
+            // Redraw map pins with updated statuses and colors
+            if (typeof redrawMapPins === 'function') {
                 redrawMapPins();
+            }
+
+            // Update Retailer List Modal cards with updated statuses and colors
+            if (typeof renderRetailerListGrid === 'function') {
+                renderRetailerListGrid();
             }
         } else {
             setTimeout(() => location.reload(), 900);
@@ -2285,127 +2467,121 @@ function showConfirmPopup(message, onConfirm) {
     // Clean previous events
     const newCloseBtn = closeBtn.cloneNode(true);
     closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-    const newOkBtn = okBtn.cloneNo<!-- Ready Sale Modal (Premium Redesign) -->
-<div id="readySaleModal" class="fixed inset-0 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md hidden" style="z-index: 99980 !important;">
-  <div class="w-full max-w-2xl flex flex-col max-h-[94vh] rounded-2xl overflow-hidden shadow-2xl border border-slate-700/60" style="background:#0f172a;">
+    const newOkBtn = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+
+    const close = () => {
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => modal.classList.add('hidden'), 200);
+    };
+
+    newCloseBtn.addEventListener('click', close);
+    newOkBtn.addEventListener('click', () => {
+        close();
+        if (typeof onConfirm === 'function') onConfirm();
+    });
+}
+</script>
+
+<!-- Ready Sale Modal (Premium Redesign) -->
+<div id="readySaleModal" class="fixed inset-0 flex flex-col bg-white hidden" style="z-index: 99980 !important;">
+  <div class="w-full flex-1 flex flex-col overflow-hidden bg-white">
 
     <!-- Header -->
-    <div class="relative flex items-center justify-between px-5 py-4 overflow-hidden" style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 50%,#4338ca 100%);">
-      <div class="absolute inset-0 opacity-20" style="background:radial-gradient(circle at 80% 50%,#818cf8 0%,transparent 60%);"></div>
+    <div class="relative flex items-center justify-between px-5 py-4 overflow-hidden bg-white border-b border-gray-200">
       <div class="flex items-center gap-3 relative z-10">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg border border-white/25 shadow-inner" style="background:rgba(255,255,255,0.12);backdrop-filter:blur(6px);">
-          <i class="fa-solid fa-bolt" style="color:#bfdbfe;"></i>
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg bg-blue-50 text-blue-600 border border-blue-100">
+          <i class="fa-solid fa-bolt"></i>
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h3 class="font-extrabold text-base tracking-tight text-white font-siliguri">Ready Sale Order</h3>
-            <span class="text-[9px] uppercase font-black px-2 py-0.5 rounded-full border" style="background:rgba(59,130,246,0.25);color:#bfdbfe;border-color:rgba(147,197,253,0.3);">Van Stock</span>
+            <h3 class="font-extrabold text-base tracking-tight text-gray-800 font-siliguri">Ready Sale Order</h3>
+            <span class="text-[9px] uppercase font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">Van Stock</span>
           </div>
-          <p class="text-[11px] font-medium mt-0.5 font-siliguri" style="color:rgba(191,219,254,0.85);">সরাসরি ভ্যান স্টক থেকে অন-দ্য-স্পট বিক্রয়</p>
+          <p class="text-[11px] font-medium mt-0.5 font-siliguri text-gray-500">সরাসরি ভ্যান স্টক থেকে অন-দ্য-স্পট বিক্রয়</p>
         </div>
       </div>
-      <button onclick="closeReadySaleModal()" class="relative z-10 w-9 h-9 rounded-xl flex items-center justify-center text-white transition active:scale-90 border" style="background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2);" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+      <button onclick="closeReadySaleModal()" class="relative z-10 w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition active:scale-90 border border-gray-200">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
 
     <!-- Body -->
-    <div class="flex-1 overflow-y-auto font-siliguri" style="background:#0f172a;">
+    <div class="flex-1 overflow-y-auto font-siliguri bg-gray-50">
       <input type="hidden" id="rs_csrf_token" value="<?= Helpers::csrfToken() ?>">
       <input type="hidden" id="rs_date" value="<?= $selectedDate ?? date('Y-m-d') ?>">
 
       <div class="p-4 space-y-4">
 
         <!-- Retailer Section -->
-        <div class="rounded-xl border overflow-hidden" style="background:#1e293b;border-color:#334155;">
-          <div class="flex items-center justify-between px-4 py-2.5 border-b" style="background:#162032;border-color:#334155;">
-            <span class="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5" style="color:#94a3b8;">
-              <i class="fa-solid fa-store" style="color:#60a5fa;"></i> রিটেলার নির্বাচন <span style="color:#f87171;">*</span>
+        <div class="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
+          <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+            <span class="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 text-gray-600">
+              <i class="fa-solid fa-store" style="color:#60a5fa;"></i> রিটেলার নির্বাচন <span class="text-red-500">*</span>
             </span>
-            <button type="button" onclick="openQuickAddRetailerModal()" class="text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 border transition active:scale-95" style="background:#064e3b;color:#34d399;border-color:#065f46;" onmouseover="this.style.background='#065f46'" onmouseout="this.style.background='#064e3b'">
+            <button type="button" onclick="openQuickAddRetailerModal()" class="text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 border border-green-200 bg-green-50 text-green-700 transition active:scale-95 hover:bg-green-100">
               <i class="fa-solid fa-plus"></i> নতুন
             </button>
           </div>
 
           <div class="p-3 space-y-2">
             <!-- Retailer Search Row -->
-            <div class="flex gap-2">
+            <div class="flex gap-2 relative">
               <div class="relative flex-1">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3" style="color:#64748b;">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                   <i class="fa-solid fa-magnifying-glass text-xs"></i>
                 </div>
-                <input type="text" id="rs_retailer_search" placeholder="রিটেলার খুঁজুন (নাম / ফোন)..." class="w-full pl-8 pr-3 py-2.5 text-xs font-semibold rounded-xl border outline-none transition" style="background:#0f172a;border-color:#334155;color:#e2e8f0;" onfocus="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)'" onblur="this.style.borderColor='#334155';this.style.boxShadow='none'" oninput="filterRetailerSelect(this.value)">
+                <input type="text" id="rs_retailer_search" autocomplete="off" placeholder="রিটেলার খুঁজুন (নাম / ফোন)..." class="w-full pl-8 pr-3 py-2.5 text-xs font-semibold rounded-xl border border-gray-200 outline-none transition bg-white text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" oninput="filterRetailerSelect(this.value)">
+                
+                <!-- Autocomplete Dropdown List -->
+                <div id="rs_retailer_autocomplete" class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 hidden max-h-60 overflow-y-auto"></div>
+                <input type="hidden" id="rs_retailer_id" value="">
               </div>
-              <button type="button" onclick="searchRetailerOnMap()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);color:#fff;border:1px solid #3b82f6;box-shadow:0 2px 10px rgba(59,130,246,0.3);" title="ম্যাপে রিটেইলার খুঁজুন">
+              <button type="button" onclick="searchRetailerOnMap()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap bg-blue-600 text-white border border-blue-700 shadow-sm hover:bg-blue-700" title="ম্যাপে রিটেইলার খুঁজুন">
                 <i class="fa-solid fa-magnifying-glass-location"></i> ম্যাপে খুঁজুন
               </button>
-              <button type="button" onclick="openNearbyRetailerMapModal(20)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition active:scale-95 whitespace-nowrap" style="background:#1e3a8a;color:#93c5fd;border-color:#1d4ed8;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#1e3a8a'" title="ম্যাপে রিটেলার খুঁজুন">
+              <button type="button" onclick="openNearbyRetailerMapModal(999999)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-blue-200 bg-blue-50 text-blue-700 transition active:scale-95 whitespace-nowrap hover:bg-blue-100" title="ম্যাপে রিটেলার খুঁজুন">
                 <i class="fa-solid fa-map-location-dot"></i> ম্যাপে খুঁজুন
               </button>
-            </div>
-
-            <!-- Retailer Dropdown -->
-            <div class="relative">
-              <select id="rs_retailer_id" class="w-full pl-3 pr-8 py-2.5 text-xs font-bold rounded-xl border outline-none appearance-none transition" style="background:#0f172a;border-color:#334155;color:#e2e8f0;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#334155'">
-                <option value="">-- রিটেলার পছন্দ করুন --</option>
-                <?php foreach ($allRetailers ?? [] as $ret): ?>
-                  <option value="<?= $ret['id'] ?>" data-lat="<?= $ret['lat'] ?? '' ?>" data-lng="<?= $ret['lng'] ?? '' ?>" data-name="<?= strtolower(htmlspecialchars($ret['name'])) ?>" data-phone="<?= htmlspecialchars($ret['phone'] ?? '') ?>"><?= htmlspecialchars($ret['name']) ?> (<?= htmlspecialchars($ret['phone'] ?? 'No Phone') ?>)</option>
-                <?php endforeach; ?>
-              </select>
-              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3" style="color:#64748b;">
-                <i class="fa-solid fa-chevron-down text-xs"></i>
-              </div>
             </div>
           </div>
         </div>
 
         <!-- Items Grid -->
-        <div class="rounded-xl border overflow-hidden" style="background:#1e293b;border-color:#334155;">
-          <div class="flex items-center justify-between px-4 py-2.5 border-b" style="background:#162032;border-color:#334155;">
-            <span class="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5" style="color:#94a3b8;">
+        <div class="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
+          <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+            <span class="text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 text-gray-600">
               <i class="fa-solid fa-table-cells" style="color:#60a5fa;"></i> আইটেম গ্রিড
             </span>
-            <button type="button" onclick="addReadySaleRow()" class="text-xs font-bold px-3 py-1 rounded-lg flex items-center gap-1.5 border transition active:scale-95" style="background:#1e3a8a;color:#93c5fd;border-color:#1d4ed8;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#1e3a8a'">
+            <button type="button" onclick="addReadySaleRow()" class="text-xs font-bold px-3 py-1 rounded-lg flex items-center gap-1.5 border border-blue-200 bg-blue-50 text-blue-700 transition active:scale-95 hover:bg-blue-100">
               <i class="fa-solid fa-plus text-xs"></i> রো যোগ করুন
             </button>
           </div>
-          <div class="overflow-x-auto" style="max-height:300px;">
-            <table class="w-full text-left border-collapse" style="min-width:520px;" id="rs_excel_table">
-              <thead>
-                <tr class="text-[10px] font-black uppercase tracking-wider border-b" style="background:#0f172a;border-color:#334155;color:#64748b;">
-                  <th class="px-3 py-2.5 border-r" style="border-color:#334155;width:42%;">পণ্য</th>
-                  <th class="px-3 py-2.5 border-r text-center" style="border-color:#334155;width:14%;">পরিমাণ</th>
-                  <th class="px-3 py-2.5 border-r text-right" style="border-color:#334155;width:15%;">ট্রেড রেট</th>
-                  <th class="px-3 py-2.5 border-r text-right" style="border-color:#334155;width:19%;">বিক্রি মূল্য</th>
-                  <th class="px-3 py-2.5 text-center" style="width:10%;">&#x2715;</th>
-                </tr>
-              </thead>
-              <tbody id="rs_products_container" style="">
-                <!-- rows -->
-              </tbody>
-            </table>
+          <div class="overflow-y-auto p-3 space-y-3 bg-gray-50/30" style="max-height:300px;" id="rs_products_container">
+            <!-- Product cards will be injected here -->
           </div>
         </div>
 
         <!-- Totals Bar -->
-        <div class="rounded-xl border p-4" style="background:#020617;border-color:#1e3a8a;">
-          <div class="grid grid-cols-3 gap-3 text-center border-b pb-3 mb-3" style="border-color:#1e3a8a;">
+        <div class="rounded-xl border border-blue-100 p-4 bg-blue-50/30">
+          <div class="grid grid-cols-3 gap-3 text-center border-b border-blue-100 pb-3 mb-3">
             <div>
-              <div class="text-[10px] uppercase font-bold mb-1" style="color:#64748b;">আইটেম সংখ্যা</div>
-              <div class="font-black text-sm" style="color:#e2e8f0;" id="rs_summary_items_count">0 টি</div>
+              <div class="text-[10px] uppercase font-bold mb-1 text-gray-500">আইটেম সংখ্যা</div>
+              <div class="font-black text-sm text-gray-800" id="rs_summary_items_count">0 টি</div>
             </div>
             <div>
-              <div class="text-[10px] uppercase font-bold mb-1" style="color:#64748b;">O/C মুনাফা</div>
-              <div class="font-black text-sm font-mono" id="rs_summary_oc" style="color:#94a3b8;">৳0.00</div>
+              <div class="text-[10px] uppercase font-bold mb-1 text-gray-500">O/C মুনাফা</div>
+              <div class="font-black text-sm font-mono text-gray-700" id="rs_summary_oc">৳0.00</div>
             </div>
             <div>
-              <div class="text-[10px] uppercase font-bold mb-1" style="color:#64748b;">পেমেন্ট</div>
-              <div class="font-black text-sm" style="color:#34d399;">ক্যাশ ✓</div>
+              <div class="text-[10px] uppercase font-bold mb-1 text-gray-500">পেমেন্ট</div>
+              <div class="font-black text-sm text-green-600">ক্যাশ ✓</div>
             </div>
           </div>
           <div class="flex items-center justify-between">
-            <span class="font-bold text-sm" style="color:#94a3b8;">সর্বমোট (Grand Total)</span>
-            <span class="font-black text-2xl font-mono" style="color:#60a5fa;" id="rs_summary_total">৳0.00</span>
+            <span class="font-bold text-sm text-gray-600">সর্বমোট (Grand Total)</span>
+            <span class="font-black text-2xl font-mono text-blue-600" id="rs_summary_total">৳0.00</span>
           </div>
         </div>
 
@@ -2413,9 +2589,9 @@ function showConfirmPopup(message, onConfirm) {
     </div>
 
     <!-- Footer -->
-    <div class="flex items-center justify-end gap-2 px-5 py-3 border-t" style="background:#0f172a;border-color:#1e3a8a;">
-      <button type="button" onclick="closeReadySaleModal()" class="px-4 py-2 text-xs font-bold rounded-xl border transition" style="background:#1e293b;color:#94a3b8;border-color:#334155;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">বাতিল</button>
-      <button type="button" id="rs_submit_btn" onclick="submitReadySale()" class="px-6 py-2 text-xs sm:text-sm font-extrabold rounded-xl flex items-center gap-2 active:scale-95 transition border shadow-lg" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);color:#fff;border-color:#3b82f6;box-shadow:0 4px 20px rgba(59,130,246,0.35);" onmouseover="this.style.background='linear-gradient(135deg,#1e40af,#3730a3)'" onmouseout="this.style.background='linear-gradient(135deg,#1d4ed8,#4338ca)'">
+    <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-white">
+      <button type="button" onclick="closeReadySaleModal()" class="px-4 py-2 text-xs font-bold rounded-xl border border-gray-300 text-gray-600 bg-white hover:bg-gray-50 transition active:scale-95">বাতিল</button>
+      <button type="button" id="rs_submit_btn" onclick="submitReadySale()" class="px-6 py-2 text-xs sm:text-sm font-extrabold rounded-xl flex items-center gap-2 active:scale-95 transition shadow-md bg-blue-600 text-white border border-blue-700 hover:bg-blue-700">
         <i class="fa-solid fa-check-circle"></i> অর্ডার কনফার্ম
       </button>
     </div>
@@ -2423,54 +2599,45 @@ function showConfirmPopup(message, onConfirm) {
   </div>
 </div>
 
-<!-- Nearby Retailer Map Modal (Premium Dark) -->
-<div id="nearbyRetailerMapModal" class="fixed inset-0 flex items-center justify-center p-3 sm:p-4 hidden" style="z-index: 99999 !important; background:rgba(2,6,23,0.88); backdrop-filter:blur(12px);">
-  <div class="w-full max-w-lg flex flex-col rounded-2xl overflow-hidden shadow-2xl font-siliguri" style="height:85vh;max-height:650px;background:#0f172a;border:1px solid #1e3a8a;box-shadow:0 0 80px rgba(59,130,246,0.12),0 25px 50px rgba(0,0,0,0.5);">
-    <div class="relative flex items-center justify-between px-4 py-3.5 overflow-hidden" style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 50%,#4338ca 100%);">
-      <div class="absolute inset-0 opacity-20" style="background:radial-gradient(circle at 80% 50%,#818cf8 0%,transparent 60%);"></div>
+<!-- Nearby Retailer Map Modal (Premium Light) -->
+<div id="nearbyRetailerMapModal" class="fixed inset-0 flex flex-col bg-white hidden" style="z-index: 99999 !important;">
+  <div class="w-full h-full flex flex-col overflow-hidden font-siliguri bg-white">
+    <div class="relative flex items-center justify-between px-4 py-3.5 overflow-hidden bg-white border-b border-gray-200">
       <div class="flex items-center gap-2.5 relative z-10">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-base shadow-inner" style="background:rgba(255,255,255,0.15);color:#bfdbfe;border:1px solid rgba(255,255,255,0.25);backdrop-filter:blur(6px);">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-base shadow-inner bg-blue-50 text-blue-600 border border-blue-100">
           <i class="fa-solid fa-map-location-dot"></i>
         </div>
         <div>
-          <h4 class="font-extrabold text-sm text-white tracking-tight">রিটেইলার ম্যাপ</h4>
-          <p class="text-[11px] font-medium mt-0.5" style="color:rgba(191,219,254,0.8);" id="nearbyRadiusLabel">আশেপাশে ২০ মিটারের রিটেইলার</p>
+          <h4 class="font-extrabold text-sm text-gray-800 tracking-tight">রিটেইলার ম্যাপ</h4>
         </div>
       </div>
-      <button onclick="closeNearbyRetailerMapModal()" class="relative z-10 w-9 h-9 rounded-xl flex items-center justify-center transition active:scale-90" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2);" onmouseover="this.style.background='rgba(255,255,255,0.22)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+      <button onclick="closeNearbyRetailerMapModal()" class="relative z-10 w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition active:scale-90 border border-gray-200">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
-    <div class="px-3 py-2.5 space-y-2" style="background:#162032;border-bottom:1px solid #1e3a8a;">
+    <div class="px-3 py-2.5 space-y-2 bg-gray-50 border-b border-gray-200">
       <div class="flex gap-2">
         <div class="relative flex-1">
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3" style="color:#64748b;">
+          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
             <i class="fa-solid fa-magnifying-glass text-xs"></i>
           </div>
-          <input type="text" id="nearbyMapSearchInput" placeholder="নাম বা ফোন দিয়ে খুঁজুন..." class="w-full pl-8 pr-3 py-2 text-xs font-semibold rounded-xl outline-none transition" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;" onfocus="this.style.borderColor='#3b82f6';this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.15)'" onblur="this.style.borderColor='#334155';this.style.boxShadow='none'">
+          <input type="text" id="nearbyMapSearchInput" placeholder="নাম বা ফোন দিয়ে খুঁজুন..." class="w-full pl-8 pr-3 py-2 text-xs font-semibold rounded-xl outline-none transition bg-white border border-gray-200 text-gray-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-100">
         </div>
-        <button type="button" onclick="nearbySearchFilter()" class="px-4 py-2 rounded-xl text-xs font-bold transition active:scale-95" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);color:#fff;border:1px solid #3b82f6;">
+        <button type="button" onclick="nearbySearchFilter()" class="px-4 py-2 rounded-xl text-xs font-bold transition active:scale-95 bg-blue-600 text-white border border-blue-700 shadow-sm hover:bg-blue-700">
           <i class="fa-solid fa-search mr-1"></i> খুঁজুন
         </button>
       </div>
-      <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="text-[10px] font-bold uppercase mr-1" style="color:#475569;">দূরত্ব:</span>
-        <button type="button" onclick="setNearbyRadius(20)" id="radiusBtn20" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition" style="background:#1d4ed8;color:#fff;border:1px solid #3b82f6;">২০মি</button>
-        <button type="button" onclick="setNearbyRadius(50)" id="radiusBtn50" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;">৫০মি</button>
-        <button type="button" onclick="setNearbyRadius(100)" id="radiusBtn100" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;">১০০মি</button>
-        <button type="button" onclick="setNearbyRadius(999999)" id="radiusBtnAll" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;">সব</button>
-      </div>
     </div>
-    <div class="relative flex-1" style="min-height:220px;background:#1e293b;">
+    <div class="relative flex-1 bg-gray-100">
       <div id="nearbyMapCanvas" class="w-full h-full"></div>
-      <div id="nearbyMapLoader" class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-xs font-bold" style="background:rgba(15,23,42,0.92);backdrop-filter:blur(4px);color:#94a3b8;z-index:10;">
-        <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:#1e3a8a;border:1px solid #1d4ed8;">
-          <i class="fa-solid fa-circle-notch fa-spin text-xl" style="color:#60a5fa;"></i>
+      <div id="nearbyMapLoader" class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-xs font-bold bg-white/90 backdrop-blur-sm text-gray-600 z-10">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-blue-50 border border-blue-200">
+          <i class="fa-solid fa-circle-notch fa-spin text-xl text-blue-600"></i>
         </div>
         <span>ম্যাপ লোড হচ্ছে...</span>
       </div>
     </div>
-    <div class="overflow-y-auto" style="max-height:200px;background:#0f172a;border-top:1px solid #1e3a8a;" id="nearbyRetailersList"></div>
+    <div class="overflow-y-auto bg-gray-50 border-t border-gray-200 p-2" style="max-height:300px;" id="nearbyRetailersList"></div>
   </div>
 </div>
 
@@ -2561,46 +2728,58 @@ function addReadySaleRow() {
     });
 
     const rowHtml = `
-        <tr id="${rowId}" class="rs-product-row transition-colors" style="border-bottom:1px solid #1e293b;">
-          <!-- Product Selector Cell -->
-          <td class="p-2.5 align-middle" style="border-right:1px solid #334155;">
-            <div class="relative">
-              <select class="rs-prod-select w-full rounded-lg px-2.5 py-1.5 text-xs font-bold outline-none transition appearance-none" style="background:#1e293b;border:1px solid #475569;color:#e2e8f0;" onchange="onRSProductChange(this)">
+        <div id="${rowId}" class="rs-product-row bg-white border border-gray-200 rounded-xl shadow-sm mb-3 relative flex flex-col gap-3 p-3.5">
+          
+          <!-- Top Row: Select Product & Delete -->
+          <div class="flex items-start gap-2">
+            <div class="flex-1 relative">
+              <select class="rs-prod-select w-full rounded-xl px-3 py-2 text-xs font-bold outline-none transition appearance-none border border-gray-200 bg-gray-50 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" onchange="onRSProductChange(this)">
                 ${productOptionsHtml}
               </select>
-              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2" style="color:#64748b;">
-                <i class="fa-solid fa-chevron-down text-[9px]"></i>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                <i class="fa-solid fa-chevron-down text-[10px]"></i>
               </div>
             </div>
-            <div class="mt-1 flex items-center justify-between px-0.5">
-              <span class="rs-avail-badge text-[9.5px] font-bold" style="color:#64748b;">Avail: -</span>
-              <span class="rs-oc-badge font-mono text-[10px] font-bold" style="color:#64748b;">O/C: ৳0.00</span>
-            </div>
-          </td>
-
-          <!-- Quantity Cell -->
-          <td class="p-2.5 align-middle text-center" style="border-right:1px solid #334155;">
-            <input type="number" min="1" value="1" class="rs-qty w-full max-w-[70px] rounded-lg px-2 py-1 text-center font-bold outline-none transition" style="background:#0f172a;border:1px solid #475569;color:#e2e8f0;" oninput="calculateRSTotals()">
-          </td>
-
-          <!-- Base Trade Price Cell -->
-          <td class="p-2.5 align-middle text-right font-mono font-bold" style="border-right:1px solid #334155;color:#94a3b8;background:rgba(15,23,42,0.5);">
-            <span class="rs-base-price-label">৳0.00</span>
-          </td>
-
-          <!-- Unit Selling Price Cell -->
-          <td class="p-2.5 align-middle text-right" style="border-right:1px solid #334155;">
-            <input type="number" step="0.01" min="0" value="0.00" class="rs-unit-price w-full max-w-[85px] rounded-lg px-2 py-1 text-right font-mono font-bold outline-none transition" style="background:#172554;border:1px solid #1d4ed8;color:#93c5fd;" oninput="calculateRSTotals()">
-            <div class="text-[10px] font-sans mt-0.5" style="color:#64748b;">টোটাল: <span class="rs-line-total font-mono font-bold" style="color:#60a5fa;">৳0.00</span></div>
-          </td>
-
-          <!-- Action Cell -->
-          <td class="p-2.5 align-middle text-center">
-            <button type="button" onclick="removeRSRow('${rowId}')" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs active:scale-95 transition mx-auto" style="background:rgba(159,18,57,0.25);color:#fb7185;border:1px solid rgba(244,63,94,0.3);" title="রো মুছে ফেলুন">
+            
+            <button type="button" onclick="removeRSRow('${rowId}')" class="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center text-sm active:scale-95 transition text-red-500 bg-red-50 border border-red-100 hover:bg-red-100" title="রো মুছে ফেলুন">
               <i class="fa-solid fa-trash-can"></i>
             </button>
-          </td>
-        </tr>
+          </div>
+
+          <!-- Middle Row: Stock & Base Price (Info only) -->
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-2">
+              <span class="rs-avail-badge text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">Avail: -</span>
+              <span class="rs-base-price-label text-[10px] font-mono font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">Base: ৳0.00</span>
+            </div>
+            <span class="rs-oc-badge font-mono text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">O/C: ৳0.00</span>
+          </div>
+
+          <!-- Bottom Row: Price Input, Qty Controls, Subtotal -->
+          <div class="flex items-center gap-2">
+            
+            <!-- Unit Price -->
+            <div class="flex-1">
+              <label class="block text-[9px] font-extrabold text-gray-400 uppercase mb-1 tracking-wider ml-1">বিক্রি মূল্য (৳)</label>
+              <input type="number" step="0.01" min="0" value="0.00" class="rs-unit-price w-full rounded-xl px-3 py-2 text-sm font-mono font-black outline-none transition border border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-center" oninput="calculateRSTotals()">
+            </div>
+
+            <!-- Qty Input -->
+            <div class="w-[85px]">
+              <label class="block text-[9px] font-extrabold text-gray-400 uppercase mb-1 tracking-wider text-center">পরিমাণ</label>
+              <input type="number" min="1" value="1" class="rs-qty w-full rounded-xl px-2 py-2 text-center text-sm font-black outline-none transition border border-gray-200 bg-white text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" oninput="calculateRSTotals()">
+            </div>
+
+            <!-- Line Total -->
+            <div class="flex-1 text-right">
+               <label class="block text-[9px] font-extrabold text-gray-400 uppercase mb-1 tracking-wider mr-1">মোট (৳)</label>
+               <div class="h-9 flex items-center justify-end pr-1">
+                 <span class="rs-line-total font-mono text-base font-black text-gray-800">৳0.00</span>
+               </div>
+            </div>
+            
+          </div>
+        </div>
     `;
 
     container.insertAdjacentHTML('beforeend', rowHtml);
@@ -2618,13 +2797,13 @@ function onRSProductChange(selectEl) {
     const availBadge = row.querySelector('.rs-avail-badge');
     
     if (!selectedOpt || !selectedOpt.value) {
-        row.querySelector('.rs-base-price-label').innerText = '৳0.00';
+        row.querySelector('.rs-base-price-label').innerText = 'Base: ৳0.00';
         row.querySelector('.rs-base-price-label').dataset.val = '0';
         row.querySelector('.rs-unit-price').value = '0.00';
         row.querySelector('.rs-qty').max = '';
         if (availBadge) {
             availBadge.innerText = 'Avail: -';
-            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold'; availBadge.style.color = '#64748b';
+            availBadge.className = 'rs-avail-badge text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100';
         }
         calculateRSTotals();
         return;
@@ -2633,7 +2812,7 @@ function onRSProductChange(selectEl) {
     const basePrice = parseFloat(selectedOpt.dataset.baseprice || 0);
     const availQty = parseInt(selectedOpt.dataset.avail || 0);
 
-    row.querySelector('.rs-base-price-label').innerText = '৳' + basePrice.toFixed(2);
+    row.querySelector('.rs-base-price-label').innerText = 'Base: ৳' + basePrice.toFixed(2);
     row.querySelector('.rs-base-price-label').dataset.val = basePrice;
     row.querySelector('.rs-unit-price').value = basePrice.toFixed(2);
     row.querySelector('.rs-qty').max = availQty;
@@ -2641,9 +2820,9 @@ function onRSProductChange(selectEl) {
     if (availBadge) {
         availBadge.innerText = `Avail: ${availQty} Pcs`;
         if (availQty <= 5) {
-            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold'; availBadge.style.color = '#fbbf24';
+            availBadge.className = 'rs-avail-badge text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200';
         } else {
-            availBadge.className = 'rs-avail-badge text-[9.5px] font-bold'; availBadge.style.color = '#34d399';
+            availBadge.className = 'rs-avail-badge text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200';
         }
     }
 
@@ -2896,9 +3075,9 @@ function updateRadiusButtonsUI(radius) {
         const btn = document.getElementById(btns[r]);
         if (btn) {
             if (parseInt(r) === radius) {
-                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition'; btn.style.cssText = 'background:#1d4ed8;color:#fff;border:1px solid #3b82f6;';
+                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition bg-blue-600 text-white border border-blue-700'; btn.style.cssText = '';
             } else {
-                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition'; btn.style.cssText = 'background:#1e293b;color:#94a3b8;border:1px solid #334155;';
+                btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold transition bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'; btn.style.cssText = '';
             }
         }
     });
@@ -3006,28 +3185,28 @@ function renderNearbyMapItems(userLat, userLng, radius, searchQuery) {
     const listContainer = document.getElementById('nearbyRetailersList');
     if (nearbyList.length === 0) {
         listContainer.innerHTML = `
-            <div class="text-center py-4 text-xs font-medium" style="color:#64748b;">
+            <div class="text-center py-4 text-xs font-medium text-gray-500">
                 <i class="fa-solid fa-circle-info text-amber-500 mr-1"></i> 
                 ${radius < 999999 ? `${radius} মিটারের মধ্যে কোনো নিবন্ধিত রিটেলার পাওয়া যায়নি।` : 'কোনো রিটেলার পাওয়া যায়নি।'}
                 <button type="button" onclick="setNearbyRadius(50)" class="block mx-auto mt-2 text-blue-600 font-bold underline">৫০ মিটারে চেক করুন</button>
             </div>
         `;
     } else {
-        let listHtml = `<div class="text-[11px] font-bold mb-2 uppercase tracking-wider" style="color:#475569;">পাওয়ার রিটেলারসমূহ (${nearbyList.length}):</div><div class="space-y-1.5">`;
+        let listHtml = `<div class="text-[11px] font-bold mb-2 uppercase tracking-wider text-gray-500">পাওয়ার রিটেলারসমূহ (${nearbyList.length}):</div><div class="space-y-1.5">`;
         nearbyList.forEach(r => {
             listHtml += `
-                <div onclick="selectNearbyRetailer('${r.id}')" class="flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition" style="background:#1e293b;border:1px solid #334155;">
+                <div onclick="selectNearbyRetailer('${r.id}')" class="flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-200 shadow-sm">
                   <div class="flex items-center gap-2 min-w-0">
-                    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs flex-shrink-0" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff;">
+                    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs flex-shrink-0 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm">
                       <i class="fa-solid fa-store"></i>
                     </div>
                     <div class="truncate">
-                      <div class="text-xs font-bold truncate" style="color:#e2e8f0;">${r.name}</div>
-                      <div class="text-[10px] truncate" style="color:#64748b;">${r.phone || 'No Phone'} ${r.address ? '• ' + r.address : ''}</div>
+                      <div class="text-xs font-bold truncate text-gray-800">${r.name}</div>
+                      <div class="text-[10px] truncate text-gray-500">${r.phone || 'No Phone'} ${r.address ? '• ' + r.address : ''}</div>
                     </div>
                   </div>
                   <div class="flex items-center gap-2 flex-shrink-0">
-                    <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg" style="color:#60a5fa;background:#172554;border:1px solid #1d4ed8;">${Math.round(r.distMeters)}m দূরে</span>
+                    <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200">${Math.round(r.distMeters)}m দূরে</span>
                     <i class="fa-solid fa-circle-check text-amber-500 text-sm"></i>
                   </div>
                 </div>
@@ -3039,26 +3218,74 @@ function renderNearbyMapItems(userLat, userLng, radius, searchQuery) {
 }
 
 function selectNearbyRetailer(retailerId) {
-    const select = document.getElementById('rs_retailer_id');
-    if (select) {
-        select.value = retailerId;
+    const input = document.getElementById('rs_retailer_id');
+    const searchInput = document.getElementById('rs_retailer_search');
+    const list = document.getElementById('rs_retailer_autocomplete');
+    
+    if (input) input.value = retailerId;
+    
+    // Find name to display
+    const retailer = allRetailersList.find(r => r.id == retailerId);
+    if (retailer && searchInput) {
+        searchInput.value = retailer.name;
     }
+    
+    if (list) list.classList.add('hidden');
+    
     closeNearbyRetailerMapModal();
     showToast('✅ রিটেলার সিলেক্ট করা হয়েছে!');
 }
 
 // ⚡ Filter retailer dropdown by name/phone
 function filterRetailerSelect(query) {
-    const select = document.getElementById('rs_retailer_id');
-    if (!select) return;
+    const list = document.getElementById('rs_retailer_autocomplete');
+    const hiddenId = document.getElementById('rs_retailer_id');
+    if (!list) return;
+    
     const q = (query || '').toLowerCase().trim();
-    Array.from(select.options).forEach(opt => {
-        if (!opt.value) { opt.style.display = ''; return; }
-        const name = opt.dataset.name || '';
-        const phone = opt.dataset.phone || '';
-        opt.style.display = (!q || name.includes(q) || phone.includes(q)) ? '' : 'none';
+    if (!q) {
+        list.classList.add('hidden');
+        if (hiddenId) hiddenId.value = '';
+        return;
+    }
+    
+    let html = '';
+    let count = 0;
+    
+    allRetailersList.forEach(r => {
+        if (count > 20) return; // limit to 20 results
+        const name = (r.name || '').toLowerCase();
+        const phone = (r.phone || '').toLowerCase();
+        
+        if (name.includes(q) || phone.includes(q)) {
+            html += `
+                <div onclick="selectNearbyRetailer('${r.id}')" class="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition">
+                    <div class="text-xs font-bold text-gray-800">${r.name}</div>
+                    <div class="text-[10px] text-gray-500">${r.phone || 'No Phone'}</div>
+                </div>
+            `;
+            count++;
+        }
     });
+    
+    if (count === 0) {
+        html = `<div class="px-4 py-3 text-xs text-gray-500 text-center">কোনো রিটেলার পাওয়া যায়নি</div>`;
+    }
+    
+    list.innerHTML = html;
+    list.classList.remove('hidden');
 }
+
+// Hide autocomplete when clicking outside
+document.addEventListener('click', function(e) {
+    const list = document.getElementById('rs_retailer_autocomplete');
+    const searchInput = document.getElementById('rs_retailer_search');
+    if (list && !list.classList.contains('hidden')) {
+        if (e.target !== list && e.target !== searchInput && !list.contains(e.target)) {
+            list.classList.add('hidden');
+        }
+    }
+});
 
 // ⚡ Filter nearby map by search text
 function nearbySearchFilter() {

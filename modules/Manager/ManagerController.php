@@ -65,7 +65,7 @@ class ManagerController extends Controller
 
         $q = $this->db->prepare("
             SELECT DATE(o.created_at) as order_date,
-                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
+                   SUM(oi.quantity * oi.base_selling_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -90,7 +90,7 @@ class ManagerController extends Controller
         $q = $this->db->prepare("
             SELECT c.id as company_id,
                    c.name as company_name,
-                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
+                   SUM(oi.quantity * oi.base_selling_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -114,10 +114,10 @@ class ManagerController extends Controller
 
         $q = $this->db->prepare("
             SELECT u.id as sr_id,
-                   IF(r.slug = 'dsr', CONCAT(u.name, ' (Ready Sale)'), u.name) as sr_name,
-                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
+                   u.name as sr_name,
+                   SUM(oi.quantity * oi.base_selling_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value,
-                   SUM(oi.total_price - (oi.quantity * p.price)) as total_oc
+                   SUM(oi.quantity * (oi.unit_price - oi.base_selling_price)) as total_oc
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
             JOIN products p ON p.id = oi.product_id
@@ -148,7 +148,7 @@ class ManagerController extends Controller
                    p.pieces_per_box,
                    p.box_type,
                    SUM(oi.quantity) as total_qty,
-                   SUM(oi.quantity * (oi.buying_price * (1 + COALESCE(p.dealer_percentage, 0) / 100))) as total_base_value,
+                   SUM(oi.quantity * oi.base_selling_price) as total_base_value,
                    SUM(oi.total_price) as total_sr_value
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
@@ -173,8 +173,6 @@ class ManagerController extends Controller
                            COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                            +
                            COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
-                           -
-                           COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                        ) as stock_pieces, 
                        0 as stock_boxes
                 FROM products p 
@@ -211,8 +209,6 @@ class ManagerController extends Controller
                        COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
-                       -
-                       COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                    ) AS stock_pieces,
                    0 AS stock_boxes
             FROM products p
@@ -304,6 +300,21 @@ class ManagerController extends Controller
                         $buyingPrice,
                         $imagePath
                     ]);
+                $newProdId = (int)$this->db->lastInsertId();
+                if ($buyingPrice > 0) {
+                    $dp = (float)($p['dealer_percentage'] ?: 0);
+                    $initSellingPrice = round($buyingPrice * (1 + $dp / 100) / $piecesPerBox, 2);
+                    \Helpers::logProductPriceChange(
+                        $newProdId,
+                        null,
+                        $buyingPrice,
+                        null,
+                        $initSellingPrice,
+                        \Auth::id(),
+                        'initial_creation',
+                        'Initial product creation'
+                    );
+                }
             }
             $this->db->commit();
             echo json_encode(['success' => true]);
@@ -396,7 +407,7 @@ class ManagerController extends Controller
         }
 
         try {
-            $stmt = $this->db->prepare("SELECT name, pieces_per_box, dealer_percentage FROM products WHERE id=?");
+            $stmt = $this->db->prepare("SELECT name, buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
             $stmt->execute([$pid]);
             $p = $stmt->fetch();
 
@@ -421,7 +432,61 @@ class ManagerController extends Controller
                 $pid
             );
 
+            if ($new_buying_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                \Helpers::logProductPriceChange(
+                    $pid,
+                    (float)$p['buying_price'],
+                    $new_buying_price,
+                    (float)$p['price'],
+                    $selling_price,
+                    \Auth::id(),
+                    'manual_adjust',
+                    $input['reason'] ?? 'Manual price adjustment by Manager'
+                );
+            }
+
             echo json_encode(['success' => true, 'new_buying_price' => $new_buying_price, 'new_selling_price' => $selling_price]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiProductPriceHistory(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $productId = (int)($_GET['product_id'] ?? 0);
+        if ($productId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Product ID is required']);
+            exit;
+        }
+
+        try {
+            $stmtProd = $this->db->prepare("SELECT id, name, sku, buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id = ?");
+            $stmtProd->execute([$productId]);
+            $product = $stmtProd->fetch();
+
+            if (!$product) {
+                echo json_encode(['success' => false, 'message' => 'Product not found']);
+                exit;
+            }
+
+            $stmt = $this->db->prepare("
+                SELECT h.*, u.name as user_name, r.name as role_name
+                FROM product_price_history h
+                LEFT JOIN users u ON u.id = h.changed_by
+                LEFT JOIN roles r ON r.id = u.role_id
+                WHERE h.product_id = ?
+                ORDER BY h.created_at DESC, h.id DESC
+            ");
+            $stmt->execute([$productId]);
+            $history = $stmt->fetchAll();
+
+            echo json_encode([
+                'success' => true,
+                'product' => $product,
+                'history' => $history
+            ]);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
@@ -627,7 +692,7 @@ class ManagerController extends Controller
                 $buying_price = (float)($lot['buying_price'] ?? 0);
                 $expiry_date  = $lot['expiry_date'] ?: null;
 
-                if (!$product_id || !$qty_pieces) continue;
+                if (!$product_id) continue;
 
                 // 1. Insert lot row
                 $lotStmt->execute([$product_id, $lot_date, $expiry_date, $buying_price, $qty_pieces]);
@@ -641,7 +706,7 @@ class ManagerController extends Controller
                 )->execute([$wid, $product_id, $lot_id, $qty_pieces]);
 
                 // 3. Auto-update product buying_price and calculate selling price
-                $prod = $this->db->prepare("SELECT pieces_per_box, dealer_percentage FROM products WHERE id=?");
+                $prod = $this->db->prepare("SELECT buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
                 $prod->execute([$product_id]);
                 $p = $prod->fetch();
 
@@ -654,6 +719,19 @@ class ManagerController extends Controller
                     $this->db->prepare(
                         "UPDATE products SET buying_price=?, price=? WHERE id=?"
                     )->execute([$buying_price, $selling_price, $product_id]);
+
+                    if ($buying_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                        \Helpers::logProductPriceChange(
+                            $product_id,
+                            (float)$p['buying_price'],
+                            $buying_price,
+                            (float)$p['price'],
+                            $selling_price,
+                            \Auth::id(),
+                            'lot_entry',
+                            "Updated via Lot Entry (Date: {$lot_date})"
+                        );
+                    }
                 }
             }
 
@@ -716,7 +794,7 @@ class ManagerController extends Controller
             )->execute([$wid, $pid, $input['id'], $new_qty]);
 
             // 4. Recalculate selling price
-            $prod = $this->db->prepare("SELECT pieces_per_box, dealer_percentage FROM products WHERE id=?");
+            $prod = $this->db->prepare("SELECT buying_price, price, pieces_per_box, dealer_percentage FROM products WHERE id=?");
             $prod->execute([$pid]);
             $p = $prod->fetch();
             if ($p) {
@@ -725,6 +803,19 @@ class ManagerController extends Controller
                 $selling_price = round($new_price * (1 + $dp / 100) / $ppb, 2);
                 $this->db->prepare("UPDATE products SET buying_price=?, price=? WHERE id=?")
                          ->execute([$new_price, $selling_price, $pid]);
+
+                if ($new_price != (float)$p['buying_price'] || $selling_price != (float)$p['price']) {
+                    \Helpers::logProductPriceChange(
+                        $pid,
+                        (float)$p['buying_price'],
+                        $new_price,
+                        (float)$p['price'],
+                        $selling_price,
+                        \Auth::id(),
+                        'lot_edit',
+                        "Updated via Lot Edit (Lot ID: {$input['id']})"
+                    );
+                }
             }
 
             $this->db->commit();
@@ -862,7 +953,7 @@ class ManagerController extends Controller
                 $buying_price = (float)($lot['buying_price'] ?? 0);
                 $expiry_date  = $lot['expiry_date'] ?: null;
 
-                if (!$product_id || !$qty_pieces) continue;
+                if (!$product_id) continue;
 
                 $lotStmt->execute([$product_id, $new_lot_date, $expiry_date, $buying_price, $qty_pieces]);
                 $lot_id = $this->db->lastInsertId();
@@ -898,6 +989,67 @@ class ManagerController extends Controller
         exit;
     }
 
+    /**
+     * Submit a lot-batch edit request for admin approval.
+     * The actual DB update happens when admin approves via AdminController::approvalApprove().
+     */
+    public function apiLotBatchEditRequest(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verifyCsrf();
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
+
+        if (!$input || empty($input['lots'])) {
+            echo json_encode(['success' => false, 'message' => 'No lots provided']); exit;
+        }
+
+        $orig_company_id = !empty($input['original_company_id']) ? (int)$input['original_company_id'] : (int)($input['company_id'] ?? 0);
+        $orig_lot_date   = !empty($input['original_lot_date'])   ? $input['original_lot_date']   : ($input['lot_date'] ?? date('Y-m-d'));
+        $new_company_id  = (int)($input['company_id'] ?? $orig_company_id);
+        $new_lot_date    = !empty($input['lot_date']) ? $input['lot_date'] : $orig_lot_date;
+
+        // Fetch old lot data for the approval record
+        $oldLots = $this->db->prepare("
+            SELECT l.id, l.product_id, l.qty_pieces, l.buying_price, l.expiry_date, l.lot_date,
+                   p.name AS product_name, c.name AS company_name
+            FROM lots l
+            JOIN products p ON p.id = l.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
+            WHERE p.company_id = ? AND (l.lot_date = ? OR (l.lot_date IS NULL AND DATE(l.created_at) = ?))
+        ");
+        $oldLots->execute([$orig_company_id, $orig_lot_date, $orig_lot_date]);
+        $oldData = $oldLots->fetchAll();
+
+        if (empty($oldData)) {
+            echo json_encode(['success' => false, 'message' => 'Original lot batch not found']); exit;
+        }
+
+        // Store approval request — record_id is the original company_id (batch key)
+        $this->db->prepare("
+            INSERT INTO approvals (requested_by, module, action, record_id, old_data, new_data, status)
+            VALUES (?, 'lots_batch', 'edit', ?, ?, ?, 'pending')
+        ")->execute([
+            \Auth::id(),
+            $orig_company_id,
+            json_encode([
+                'company_id'  => $orig_company_id,
+                'lot_date'    => $orig_lot_date,
+                'lots'        => $oldData,
+            ]),
+            json_encode([
+                'original_company_id' => $orig_company_id,
+                'original_lot_date'   => $orig_lot_date,
+                'company_id'          => $new_company_id,
+                'lot_date'            => $new_lot_date,
+                'lots'                => $input['lots'],
+            ]),
+        ]);
+
+        \Helpers::logManagerActivity(\Auth::id(), 'request_lot_edit', "Requested edit approval for lot batch: company_id={$orig_company_id}, date={$orig_lot_date}", $orig_company_id);
+        echo json_encode(['success' => true, 'message' => 'Edit request submitted. Waiting for admin approval.']);
+        exit;
+    }
+
     // ══════════════════════════════════════════════════════════
     //  Inventory (view only)
     // ══════════════════════════════════════════════════════════
@@ -914,8 +1066,6 @@ class ManagerController extends Controller
                        COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
-                       -
-                       COALESCE((SELECT SUM(quantity) FROM readysales rs WHERE rs.product_id = p.id AND rs.status = 1), 0)
                    ) AS qty_pieces
             FROM products p
             WHERE p.status=1
@@ -956,7 +1106,7 @@ class ManagerController extends Controller
             $sch['total_order_value'] = (float)$orderVal;
 
             $orderOC = $this->db->query("
-                SELECT COALESCE(SUM((oi.unit_price - oi.buying_price) * oi.quantity), 0)
+                SELECT COALESCE(SUM(oi.quantity * (oi.unit_price - oi.base_selling_price)), 0)
                 FROM dispatch_schedule_srs dss
                 JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$sch['dispatch_date']}'
                 JOIN order_items oi ON oi.order_id = o.id
@@ -975,7 +1125,7 @@ class ManagerController extends Controller
             $sch['total_dispatch_value'] = (float)$dispatchValStmt->fetchColumn();
 
             $dispatchOC = $this->db->query("
-                SELECT COALESCE(SUM(di.quantity * (di.unit_price - di.buying_price)), 0)
+                SELECT COALESCE(SUM(di.quantity * (di.unit_price - di.base_selling_price)), 0)
                 FROM dispatches d
                 JOIN dispatch_items di ON di.dispatch_id = d.id
                 WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
@@ -1405,7 +1555,7 @@ class ManagerController extends Controller
             $companyCondition = $cId > 0 ? "p.company_id = {$cId}" : "(p.company_id IS NULL OR p.company_id = 0)";
 
             $orderedVal = $this->db->query("
-                SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)
+                SELECT COALESCE(SUM(oi.quantity * oi.base_selling_price), 0)
                 FROM dispatch_schedule_srs dss
                 JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
                 JOIN order_items oi ON oi.order_id = o.id
@@ -1451,7 +1601,7 @@ class ManagerController extends Controller
             $company['sale_value'] = (float)$saleVal;
 
             $products = $this->db->query("
-                SELECT p.id, p.name,
+                SELECT p.id, p.name, p.price AS base_price,
                        (
                            SELECT COALESCE(SUM(oi.quantity), 0)
                            FROM dispatch_schedule_srs dss
@@ -1487,6 +1637,13 @@ class ManagerController extends Controller
             $srs = $this->db->query("
                 SELECT u.id, u.name,
                        (
+                           SELECT COALESCE(SUM(oi.quantity * oi.base_selling_price), 0)
+                           FROM orders o
+                           JOIN order_items oi ON oi.order_id = o.id
+                           JOIN products p ON p.id = oi.product_id
+                           WHERE o.sr_id = u.id AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
+                       ) as base_order_value,
+                       (
                            SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)
                            FROM orders o
                            JOIN order_items oi ON oi.order_id = o.id
@@ -1494,12 +1651,14 @@ class ManagerController extends Controller
                            WHERE o.sr_id = u.id AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
                        ) as order_value,
                        (
-                           SELECT COALESCE(SUM((oi.unit_price - oi.buying_price) * oi.quantity), 0)
-                           FROM orders o
-                           JOIN order_items oi ON oi.order_id = o.id
-                           JOIN products p ON p.id = oi.product_id
-                           WHERE o.sr_id = u.id AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
-                       ) as total_oc,
+                           SELECT COALESCE(SUM(di.delivered_quantity * di.base_selling_price), 0)
+                           FROM dispatch_items di
+                           JOIN products p ON p.id = di.product_id
+                           JOIN dispatches d ON d.id = di.dispatch_id
+                           LEFT JOIN orders o ON o.id = d.order_id
+                           LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
+                           WHERE d.dispatch_date = '{$deliveryDate}' AND o.sr_id = u.id AND {$companyCondition}
+                       ) as base_sale_value,
                        (
                            SELECT COALESCE(SUM(di.delivered_quantity * IFNULL(oi.unit_price, p.price)), 0)
                            FROM dispatch_items di
@@ -1512,7 +1671,7 @@ class ManagerController extends Controller
                 FROM dispatch_schedule_srs dss
                 JOIN users u ON u.id = dss.sr_id
                 WHERE dss.schedule_id = {$scheduleId}
-                HAVING order_value > 0 OR sale_value > 0 OR total_oc > 0
+                HAVING order_value > 0 OR sale_value > 0 OR base_order_value > 0
                 ORDER BY u.name ASC
             ")->fetchAll();
 
@@ -1602,16 +1761,23 @@ class ManagerController extends Controller
                 $deliv_date = $sch['delivery_date'] ?: $date;
                 
                 // 1. Convert Orders into Dispatches
+                // Also include 'dispatched' orders to support re-dispatch after a dispatch-clear or re-organize
                 $orders = $this->db->prepare("
                     SELECT o.id, o.warehouse_id 
                     FROM orders o 
                     JOIN dispatch_schedule_srs dss ON dss.sr_id = o.sr_id
-                    WHERE dss.schedule_id = ? AND DATE(o.created_at) = ? AND o.status IN ('pending', 'confirmed')
+                    WHERE dss.schedule_id = ? AND DATE(o.created_at) = ? AND o.status IN ('pending', 'confirmed', 'dispatched')
                 ");
                 $orders->execute([$id, $date]);
                 $ordersList = $orders->fetchAll();
                 
                 foreach ($ordersList as $o) {
+                    $checkEx = $this->db->prepare("SELECT id FROM dispatches WHERE order_id=?");
+                    $checkEx->execute([$o['id']]);
+                    if ($checkEx->fetch()) {
+                        continue; // Skip if already dispatched
+                    }
+
                     $this->db->prepare("INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status) VALUES (?, ?, ?, ?, 'pending')")
                              ->execute([$o['id'], $dsrId, $o['warehouse_id'], $deliv_date]);
                     $dispatchId = $this->db->lastInsertId();
@@ -1619,8 +1785,8 @@ class ManagerController extends Controller
                     $items = $this->db->prepare("SELECT * FROM order_items WHERE order_id=?");
                     $items->execute([$o['id']]);
                     foreach($items->fetchAll() as $item) {
-                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, buying_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                                 ->execute([$dispatchId, $item['product_id'], $item['lot_id'], $item['quantity'], $item['product_name'], $item['box_type'], $item['pieces_per_box'], $item['unit_price'], $item['buying_price'] ?? $item['unit_price'], $item['total_price']]);
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, base_selling_price, buying_price, total_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                                 ->execute([$dispatchId, $item['product_id'], $item['lot_id'], $item['quantity'], $item['product_name'], $item['box_type'], $item['pieces_per_box'], $item['unit_price'], $item['base_selling_price'] ?? $item['unit_price'], $item['buying_price'] ?? $item['unit_price'], $item['total_price']]);
                     }
                     
                     // Update order status so they don't get dispatched twice
@@ -1683,8 +1849,8 @@ class ManagerController extends Controller
                         $pQuery->execute([$ex['product_id']]);
                         $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
                         
-                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, buying_price, total_price) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)")
-                                 ->execute([$extraDispatchId, $ex['product_id'], $qty, $pd['name'], $pd['box_type'], $pd['pieces_per_box'], $pd['price'], $pd['price'], $qty * $pd['price']]);
+                        $this->db->prepare("INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, base_selling_price, buying_price, total_price) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)")
+                                 ->execute([$extraDispatchId, $ex['product_id'], $qty, $pd['name'], $pd['box_type'], $pd['pieces_per_box'], $pd['price'], $pd['price'], $pd['buying_price'] ?? $pd['price'], $qty * $pd['price']]);
                     }
                 }
             }
@@ -1856,11 +2022,10 @@ class ManagerController extends Controller
                 WHERE dsr_id=s.dsr_id AND date=s.date
             ) AS live_expense,
             (
-                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(di.unit_price, p.price) - di.buying_price)), 0)
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * (COALESCE(di.unit_price, p.price) - di.base_selling_price)), 0)
                 FROM dispatches d
                 JOIN dispatch_items di ON d.id = di.dispatch_id
                 JOIN products p ON p.id = di.product_id
-                LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
                 WHERE d.dsr_id = s.dsr_id AND d.dispatch_date = s.date AND d.status IN ('delivered', 'partial')
             ) AS live_delivery_oc
             FROM settlements s
@@ -1999,12 +2164,12 @@ class ManagerController extends Controller
     {
         $this->verifyCsrf();
         $pId = $this->post('product_id');
-        $pQuery = $this->db->prepare("SELECT name, box_type, pieces_per_box FROM products WHERE id=?");
+        $pQuery = $this->db->prepare("SELECT name, box_type, pieces_per_box, price, buying_price FROM products WHERE id=?");
         $pQuery->execute([$pId]);
         $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
 
-        $this->db->prepare("INSERT INTO readysales (warehouse_id,product_id,lot_id,quantity,price,buying_price,product_name,box_type,pieces_per_box) VALUES (?,?,?,?,?,?,?,?,?)")
-                 ->execute([$this->post('warehouse_id'), $pId, $this->post('lot_id') ?: null, $this->post('quantity',0), $this->post('price',0), $pd['price'] ?? 0, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1]);
+        $this->db->prepare("INSERT INTO readysales (warehouse_id,product_id,lot_id,quantity,price,base_selling_price,buying_price,product_name,box_type,pieces_per_box) VALUES (?,?,?,?,?,?,?,?,?,?)")
+                 ->execute([$this->post('warehouse_id'), $pId, $this->post('lot_id') ?: null, $this->post('quantity',0), $this->post('price',0), $pd['price'] ?? 0, $pd['buying_price'] ?? 0, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1]);
         $this->flash('success', 'Ready sale record added.'); $this->redirect('manager/readysale');
     }
 
@@ -2268,8 +2433,8 @@ class ManagerController extends Controller
                     $pQuery->execute([$pid]);
                     $pd = $pQuery->fetch(PDO::FETCH_ASSOC);
 
-                    $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason, product_name, box_type, pieces_per_box, unit_price, buying_price) VALUES (?, ?, ?, 'good', ?, ?, ?, ?, ?)")
-                             ->execute([$returnId, $pid, $qty, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1, $pd['price'] ?? 0, $pd['price'] ?? 0]);
+                    $this->db->prepare("INSERT INTO return_items (return_id, product_id, quantity, reason, product_name, box_type, pieces_per_box, unit_price, base_selling_price, buying_price) VALUES (?, ?, ?, 'good', ?, ?, ?, ?, ?, ?)")
+                             ->execute([$returnId, $pid, $qty, $pd['name'] ?? null, $pd['box_type'] ?? null, $pd['pieces_per_box'] ?? 1, $pd['price'] ?? 0, $pd['price'] ?? 0, $pd['buying_price'] ?? $pd['price'] ?? 0]);
                              
                     // Restore to warehouse inventory
                     $invQuery = $this->db->prepare("
