@@ -405,7 +405,7 @@ $hasDeliveries = !empty($retailers);
                   <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">প্রাপ্ত টাকা লিখুন (৳)</label>
                   <div class="relative flex items-center">
                       <span class="absolute left-4 text-gray-400 font-bold text-lg">৳</span>
-                      <input type="number" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-lg font-black text-gray-800 outline-none focus:border-[#1e73be] focus:ring-4 focus:ring-blue-500/10 transition">
+                      <input type="number" min="0" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-lg font-black text-gray-800 outline-none focus:border-[#1e73be] focus:ring-4 focus:ring-blue-500/10 transition">
                   </div>
               </div>
 
@@ -1776,6 +1776,10 @@ function closePaidPaymentModal() {
 
 function onPaidPaymentInput(el) {
     let entered = parseFloat(el.value) || 0;
+    if (entered < 0) {
+        entered = 0;
+        el.value = '';
+    }
     const total = getSelectedOrderGettingTotal();
     
     let existingPaid = 0;
@@ -1863,10 +1867,11 @@ async function redoCancelledOrder(orderIndex) {
     btns.forEach(b => { b.disabled = true; });
 
     try {
+        const paidAmount = order.paid_amount || 0;
         const res = await fetch('<?= url("dsr/delivery/update/") ?>' + dispatchId, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `csrf_token=<?= Helpers::csrfToken() ?>&status=in_transit&paid_amount=0&notes=&items=${encodeURIComponent(JSON.stringify({}))}`
+            body: `csrf_token=<?= Helpers::csrfToken() ?>&status=in_transit&paid_amount=${paidAmount}&notes=&items=${encodeURIComponent(JSON.stringify({}))}`
         });
         const data = await res.json();
         if(!data.success) {
@@ -2107,7 +2112,7 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
             let deliveredItems = {};
             const origIdx = currentRetailerObj.orders.findIndex(orig => orig.dispatch_id === dispatchId);
             const orderGroup = document.getElementById(`order-group-${origIdx}`);
-            if (orderGroup) {
+            if (orderGroup && status !== 'cancelled') {
                 orderGroup.querySelectorAll('.product-item').forEach(pItem => {
                     const bInp = pItem.querySelector('.delivery-input-box');
                     const pInp = pItem.querySelector('.delivery-input-pcs');
@@ -2122,7 +2127,7 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                         }
                     }
                 });
-            } else if (o.products) {
+            } else if (o.products && status !== 'cancelled') {
                 o.products.forEach(p => {
                     deliveredItems[p.product_id] = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
                 });
@@ -2168,6 +2173,18 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                             }
                         }
                     });
+                }
+                
+                if (status === 'delivered' || status === 'partial') {
+                    if (o.products) {
+                        o.products.forEach(p => {
+                            const pid = p.product_id;
+                            const tQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
+                            if (vanStockMap[pid] !== undefined) {
+                                vanStockMap[pid] = Math.max(0, parseInt(vanStockMap[pid]) - tQty);
+                            }
+                        });
+                    }
                 }
             });
 
@@ -2685,6 +2702,11 @@ function showConfirmPopup(message, onConfirm) {
 let vanStockProducts = [];
 
 async function openReadySaleModal() {
+    const isReturned = <?= isset($isReturned) && $isReturned ? 'true' : 'false' ?>;
+    if (isReturned) {
+        showToast('❌ DSR has already returned. Ready Sale is disabled.');
+        return;
+    }
     const modal = document.getElementById('readySaleModal');
     const container = document.getElementById('rs_products_container');
     container.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400 text-xs font-medium"><i class="fa-solid fa-circle-notch fa-spin mr-2 text-blue-600"></i>ভ্যান স্টক থেকে প্রোডাক্ট লোড হচ্ছে...</td></tr>';
