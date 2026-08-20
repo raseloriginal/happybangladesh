@@ -450,22 +450,35 @@ function renderTable() {
         const ocSign = orderOC > 0 ? '+' : '';
         const ocClass = orderOC > 0 ? 'text-emerald-500' : 'text-rose-500';
 
+        const rawDate = ord.created_at || '';
+        let displayDateTime = '';
+        if (rawDate) {
+            const d = new Date(rawDate);
+            if (!isNaN(d)) {
+                displayDateTime = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            } else {
+                displayDateTime = rawDate.substring(0, 16);
+            }
+        }
+
         const tr = document.createElement('tr');
         tr.className = "retailer-order-row hover:bg-slate-50/40 transition-colors";
         tr.id = `order-row-${ord.id}`;
         tr.innerHTML = `
           <td class="p-3 border-r border-slate-100 align-middle bg-white overflow-hidden">
             <div class="min-w-0">
+              <div class="flex items-center gap-1 text-blue-600 font-bold text-[10px] mb-1">
+                <i class="fa-solid fa-user-tie text-[9px]"></i>
+                <span>${escapeHtml(srName)}</span>
+              </div>
               ${nameHtml}
-              <div class="text-[10px] text-slate-400 font-medium mt-1 flex flex-col gap-0.5">
+              <div class="text-[10px] text-slate-400 font-medium mt-1 flex flex-wrap items-center gap-2">
                 <div class="flex items-center gap-1">
                   <i class="fa-solid fa-phone text-slate-300 text-[9px]"></i>
                   <span>${escapeHtml(rPhone)}</span>
                 </div>
-                <div class="flex items-center gap-1 text-blue-500/80 font-bold">
-                  <i class="fa-solid fa-user-tie text-[9px]"></i>
-                  <span>${escapeHtml(srName)}</span>
-                </div>
+                <span class="bg-slate-50 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wider">#ORD-${ord.id}</span>
+                <span class="bg-slate-50 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wider"><i class="fa-regular fa-clock mr-1"></i>${displayDateTime}</span>
               </div>
             </div>
           </td>
