@@ -2587,8 +2587,8 @@ class ManagerController extends Controller
             }
 
             // Get SRs for filter dropdown
-            $srStmt = $this->db->prepare("SELECT id, name FROM users WHERE role_id = (SELECT id FROM roles WHERE slug = 'sr' LIMIT 1) AND warehouse_id = ?");
-            $srStmt->execute([$wId]);
+            $srStmt = $this->db->prepare("SELECT id, name FROM users WHERE role_id = (SELECT id FROM roles WHERE slug = 'sr' LIMIT 1)");
+            $srStmt->execute();
             $srs = $srStmt->fetchAll(PDO::FETCH_ASSOC);
 
             // Get orders
