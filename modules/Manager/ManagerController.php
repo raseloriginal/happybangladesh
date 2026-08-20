@@ -2550,7 +2550,19 @@ class ManagerController extends Controller
     // ──────────────────────────────────────────────────────────────
     public function operations(): void
     {
-        $this->render('operations');
+        $wId = Auth::warehouseId();
+        
+        $q = $this->db->prepare("
+            SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton, p.pieces_per_box as ppb
+            FROM products p
+            LEFT JOIN companies c ON c.id=p.company_id
+            WHERE p.status=1
+            ORDER BY p.name
+        ");
+        $q->execute();
+        $allProducts = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->render('operations', ['allProducts' => $allProducts]);
     }
 
     public function apiOperationsOrders(): void
@@ -2558,26 +2570,56 @@ class ManagerController extends Controller
         header('Content-Type: application/json; charset=utf-8');
         try {
             $wId = Auth::warehouseId();
-            // Get orders from last 2 days
-            $sql = "SELECT o.*, u.name as sr_name, r.name as retailer_name, r.address as retailer_address 
+            
+            $dateFilter = $_GET['date'] ?? date('Y-m-d');
+            $srIdFilter = $_GET['sr_id'] ?? '';
+            
+            $whereSql = "WHERE o.warehouse_id = ?";
+            $params = [$wId];
+            
+            if (!empty($dateFilter)) {
+                $whereSql .= " AND DATE(o.created_at) = ?";
+                $params[] = $dateFilter;
+            }
+            if (!empty($srIdFilter)) {
+                $whereSql .= " AND o.sr_id = ?";
+                $params[] = $srIdFilter;
+            }
+
+            // Get SRs for filter dropdown
+            $srStmt = $this->db->prepare("SELECT id, name FROM users WHERE role_id = (SELECT id FROM roles WHERE slug = 'sr' LIMIT 1) AND warehouse_id = ?");
+            $srStmt->execute([$wId]);
+            $srs = $srStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Get orders
+            $sql = "SELECT o.*, u.name as sr_name, d.name AS dealer_name, r.name as retailer_name, r.phone as retailer_phone, r.address as retailer_address,
+                           (SELECT COUNT(*) FROM dispatch_schedules ds 
+                            JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
+                            WHERE dss.sr_id = o.sr_id AND ds.dispatch_date = DATE(o.created_at)) as is_assigned
                     FROM orders o
                     LEFT JOIN users u ON o.sr_id = u.id
+                    LEFT JOIN dealers d ON d.id = o.dealer_id
                     LEFT JOIN retailers r ON o.retailer_id = r.id
-                    WHERE o.warehouse_id = ? AND o.created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
-                    ORDER BY o.id DESC";
+                    $whereSql
+                    ORDER BY o.created_at DESC";
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$wId]);
+            $stmt->execute($params);
             $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            // Get products (exact same fields as SR panel)
             foreach ($orders as &$order) {
-                $stmt = $this->db->prepare("SELECT oi.*, p.name as product_name, p.pieces_per_box as pack_size 
-                                            FROM order_items oi 
-                                            JOIN products p ON oi.product_id = p.id 
-                                            WHERE oi.order_id = ?");
+                $stmt = $this->db->prepare("
+                    SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
+                    FROM order_items oi
+                    JOIN products p ON p.id = oi.product_id
+                    LEFT JOIN companies c ON c.id = p.company_id
+                    WHERE oi.order_id = ?
+                ");
                 $stmt->execute([$order['id']]);
-                $order['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $order['products'] = $stmt->fetchAll(PDO::FETCH_ASSOC); // SR panel uses 'products' key
             }
-            echo json_encode(['success' => true, 'data' => $orders]);
+            
+            echo json_encode(['success' => true, 'data' => $orders, 'srs' => $srs]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
@@ -2653,20 +2695,23 @@ class ManagerController extends Controller
 
             $originalDateStr = $orderDate->format('Y-m-d');
             $newDateStr = $orderDateInput ? date('Y-m-d', strtotime($orderDateInput)) : $originalDateStr;
+            // 1. Check if SR is assigned on the original date
+            $checkAssign = $this->db->prepare("
+                SELECT COUNT(*) 
+                FROM dispatch_schedules ds 
+                JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
+                WHERE dss.sr_id = ? AND ds.dispatch_date = ?
+            ");
+            $checkAssign->execute([$order['sr_id'], $originalDateStr]);
+            if ($checkAssign->fetchColumn() > 0) {
+                throw new \Exception("Cannot edit order. The SR is already assigned to a dispatch on this date.");
+            }
             
             if ($newDateStr !== $originalDateStr) {
-                // Check if SR is assigned on the original date OR the new date
-                $checkAssign = $this->db->prepare("
-                    SELECT COUNT(*) 
-                    FROM dispatch_schedules ds 
-                    JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
-                    WHERE dss.sr_id = ? AND (ds.dispatch_date = ? OR ds.dispatch_date = ?)
-                ");
-                $checkAssign->execute([$order['sr_id'], $originalDateStr, $newDateStr]);
-                $isAssigned = $checkAssign->fetchColumn();
-
-                if ($isAssigned > 0) {
-                    throw new \Exception("Cannot change date. The SR is already assigned to a dispatch on the original or new date.");
+                // 2. Check if the NEW date is assigned
+                $checkAssign->execute([$order['sr_id'], $newDateStr]);
+                if ($checkAssign->fetchColumn() > 0) {
+                    throw new \Exception("Cannot change date. The SR is already assigned to a dispatch on the new date.");
                 }
 
                 // Update created_at with new date but keep original time
@@ -2678,19 +2723,69 @@ class ManagerController extends Controller
             $oldTotal = (float)$order['total_amount'];
             $newTotal = 0;
 
+            // Delete old items
+            $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$id]);
+
+            // Insert updated items
+            $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, base_selling_price, total_price, product_name, box_type, pieces_per_box, buying_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
             foreach ($items as $item) {
-                $itemId = (int)$item['id'];
+                $pid = (int)($item['product_id'] ?? $item['id']);
                 $price = (float)$item['price'];
                 $qty = (int)$item['qty'];
                 
+                if ($qty <= 0) continue;
+
                 $newTotal += ($price * $qty);
                 
-                $this->db->prepare("UPDATE order_items SET quantity = ?, unit_price = ?, total_price = ? WHERE id = ? AND order_id = ?")
-                         ->execute([$qty, $price, $qty * $price, $itemId, $id]);
+                // Fetch product details for insertion
+                $pdStmt = $this->db->prepare("SELECT * FROM products WHERE id = ?");
+                $pdStmt->execute([$pid]);
+                $pd = $pdStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($pd) {
+                    $basePrice = (float)($pd['buying_price'] + ($pd['buying_price'] * ($pd['dealer_percentage'] / 100)));
+                    $insStmt->execute([
+                        $id,
+                        $pid,
+                        $qty,
+                        $price,
+                        $basePrice,
+                        $qty * $price,
+                        $pd['name'],
+                        $pd['box_type'] ?? 'Piece',
+                        $pd['pieces_per_box'] ?? 1,
+                        $pd['buying_price']
+                    ]);
+                }
             }
 
             // Update order total
             $this->db->prepare("UPDATE orders SET total_amount = ? WHERE id = ?")->execute([$newTotal, $id]);
+
+            // Refresh order data to return
+            $stmt = $this->db->prepare("
+                SELECT o.*, u.name as sr_name, d.name AS dealer_name, r.name as retailer_name, r.phone as retailer_phone, r.address as retailer_address 
+                FROM orders o
+                LEFT JOIN users u ON o.sr_id = u.id
+                LEFT JOIN dealers d ON d.id = o.dealer_id
+                LEFT JOIN retailers r ON o.retailer_id = r.id
+                WHERE o.id = ?
+            ");
+            $stmt->execute([$id]);
+            $updatedOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($updatedOrder) {
+                $stmt = $this->db->prepare("
+                    SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
+                    FROM order_items oi
+                    JOIN products p ON p.id = oi.product_id
+                    LEFT JOIN companies c ON c.id = p.company_id
+                    WHERE oi.order_id = ?
+                ");
+                $stmt->execute([$id]);
+                $updatedOrder['products'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
 
             $oldLogData = ['total_amount' => $oldTotal];
             $newLogData = ['total_amount' => $newTotal];
@@ -2713,7 +2808,7 @@ class ManagerController extends Controller
             \Helpers::logManagerActivity(\Auth::id(), 'edit_order', 'Edited operation order ID: ' . $id . ' for reason: ' . $reason, $id);
 
             $this->db->commit();
-            echo json_encode(['success' => true]);
+            echo json_encode(['success' => true, 'order' => $updatedOrder ?? null]);
         } catch (\Exception $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
