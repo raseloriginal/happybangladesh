@@ -2488,6 +2488,103 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiDispatchUndoReturn(string $scheduleId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $scheduleId = (int)$scheduleId;
+
+        $sch = $this->db->query("SELECT dsr_id, dispatch_date, delivery_date, status FROM dispatch_schedules WHERE id = " . $scheduleId)->fetch();
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found']);
+            exit;
+        }
+
+        if ($sch['status'] !== 'returned') {
+            echo json_encode(['success' => false, 'message' => 'Schedule is not in returned status']);
+            exit;
+        }
+
+        $dsrId = $sch['dsr_id'];
+        $deliv_date = $sch['delivery_date'] ?: $sch['dispatch_date'];
+
+        $wIdRow = $this->db->prepare("SELECT warehouse_id FROM dispatches WHERE dsr_id=? AND dispatch_date=? LIMIT 1");
+        $wIdRow->execute([$dsrId, $deliv_date]);
+        $wId = $wIdRow->fetchColumn() ?: (\App\Core\Auth::warehouseId() ?: 1);
+
+        $this->db->beginTransaction();
+        try {
+            // Find return record for this DSR on delivery date
+            $retQuery = $this->db->prepare("SELECT id FROM returns WHERE dsr_id = ? AND return_date = ? ORDER BY id DESC LIMIT 1");
+            $retQuery->execute([$dsrId, $deliv_date]);
+            $returnId = $retQuery->fetchColumn();
+
+            if ($returnId) {
+                // Fetch returned items
+                $itemsStmt = $this->db->prepare("SELECT product_id, quantity FROM return_items WHERE return_id = ?");
+                $itemsStmt->execute([$returnId]);
+                $returnItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($returnItems as $ri) {
+                    $pid = (int)$ri['product_id'];
+                    $qty = (int)$ri['quantity'];
+                    if ($qty <= 0) continue;
+
+                    // 1. Deduct from warehouse inventory (reverse inventory restore)
+                    $invQuery = $this->db->prepare("
+                        SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                        FROM inventory i 
+                        JOIN products p ON p.id = i.product_id 
+                        WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id IS NULL
+                    ");
+                    $invQuery->execute([$pid, $wId]);
+                    $invRow = $invQuery->fetch();
+
+                    if ($invRow) {
+                        $ppb = max(1, (int)$invRow['pieces_per_box']);
+                        $currTotalPcs = ((int)$invRow['qty_boxes'] * $ppb) + (int)$invRow['qty_pieces'];
+                        $newStockPcs = max(0, $currTotalPcs - $qty);
+
+                        $newBoxes = floor($newStockPcs / $ppb);
+                        $newPcs = $newStockPcs % $ppb;
+
+                        $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                                 ->execute([$newBoxes, $newPcs, $invRow['id']]);
+                    }
+
+                    // 2. Restore returned quantities to van_stock
+                    $vsCheck = $this->db->prepare("SELECT id FROM van_stock WHERE dsr_id = ? AND product_id = ? LIMIT 1");
+                    $vsCheck->execute([$dsrId, $pid]);
+                    $vsId = $vsCheck->fetchColumn();
+
+                    if ($vsId) {
+                        $this->db->prepare("UPDATE van_stock SET quantity = quantity + ? WHERE id = ?")
+                                 ->execute([$qty, $vsId]);
+                    }
+                }
+
+                // Delete return items and return record
+                $this->db->prepare("DELETE FROM return_items WHERE return_id = ?")->execute([$returnId]);
+                $this->db->prepare("DELETE FROM returns WHERE id = ?")->execute([$returnId]);
+            }
+
+            // 3. Update dispatch_schedules status back to 'dispatched'
+            $this->db->prepare("UPDATE dispatch_schedules SET status = 'dispatched' WHERE id = ?")->execute([$scheduleId]);
+
+            // 4. Update dispatches status back to 'in_transit'
+            $this->db->prepare("UPDATE dispatches SET status = 'in_transit', updated_at = NOW() WHERE dsr_id = ? AND dispatch_date = ? AND status = 'returned'")
+                     ->execute([$dsrId, $deliv_date]);
+
+            $this->db->commit();
+            echo json_encode(['success' => true, 'message' => 'রিটার্ন সফলভাবে রিভার্ট (Undo) করা হয়েছে।']);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     // ══════════════════════════════════════════════════════════
     //  Attendance QR API
     // ══════════════════════════════════════════════════════════
