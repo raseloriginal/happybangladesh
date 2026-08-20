@@ -2756,6 +2756,209 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiOperationsDsrDeliveries(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        try {
+            $wId = Auth::warehouseId();
+            $date = $_GET['date'] ?? date('Y-m-d');
+            $dsrId = $_GET['dsr_id'] ?? '';
+
+            // Get DSRs list
+            $dsrsStmt = $this->db->query("
+                SELECT u.id, u.name, u.phone 
+                FROM users u 
+                JOIN roles r ON r.id = u.role_id 
+                WHERE r.slug = 'dsr' AND u.status = 1 
+                ORDER BY u.name
+            ");
+            $dsrs = $dsrsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Build SQL
+            $whereSql = "WHERE d.warehouse_id = ? AND DATE(d.created_at) = ?";
+            $params = [$wId, $date];
+
+            if (!empty($dsrId)) {
+                $whereSql .= " AND d.dsr_id = ?";
+                $params[] = $dsrId;
+            }
+
+            $sql = "SELECT d.id as dispatch_id, d.order_id, d.dsr_id, d.status, d.paid_amount, d.is_ready_sale, d.created_at as dispatch_date,
+                           o.total_amount as order_total, o.is_ready_sale as order_ready_sale,
+                           r.id as retailer_id, r.name as retailer_name, r.phone as retailer_phone, r.address as retailer_address, r.lat as latitude, r.lng as longitude,
+                           u.name as dsr_name
+                    FROM dispatches d
+                    JOIN orders o ON o.id = d.order_id
+                    JOIN retailers r ON r.id = o.retailer_id
+                    LEFT JOIN users u ON u.id = d.dsr_id
+                    $whereSql
+                    ORDER BY d.id DESC";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $dispatches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($dispatches as &$del) {
+                // Determine display status and color code
+                $status = strtolower($del['status'] ?? 'pending');
+                $paid = (float)($del['paid_amount'] ?? 0);
+                $total = (float)($del['order_total'] ?? 0);
+
+                if ($status === 'canceled' || $status === 'cancelled') {
+                    $del['status_code'] = 'canceled';
+                    $del['status_label'] = 'Canceled';
+                    $del['color'] = 'red';
+                } elseif ($status === 'delivered' && $paid >= $total && $total > 0) {
+                    $del['status_code'] = 'delivered';
+                    $del['status_label'] = 'Delivered (Full)';
+                    $del['color'] = 'green';
+                } elseif ($status === 'partial' || ($status === 'delivered' && $paid < $total)) {
+                    $del['status_code'] = 'partial';
+                    $del['status_label'] = 'Partial / Due';
+                    $del['color'] = 'orange';
+                } else {
+                    $del['status_code'] = 'pending';
+                    $del['status_label'] = 'Pending';
+                    $del['color'] = 'blue';
+                }
+
+                // Fetch items
+                $itemsStmt = $this->db->prepare("
+                    SELECT di.*, p.name as product_name, p.buying_price, p.dealer_percentage, p.image as product_image,
+                           COALESCE(c.id, 0) as company_id, COALESCE(c.name, 'Uncategorized') as company_name
+                    FROM dispatch_items di
+                    JOIN products p ON p.id = di.product_id
+                    LEFT JOIN companies c ON c.id = p.company_id
+                    WHERE di.dispatch_id = ?
+                ");
+                $itemsStmt->execute([$del['dispatch_id']]);
+                $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($items as &$item) {
+                    $bp = (float)($item['buying_price'] ?? 0);
+                    $dp = (float)($item['dealer_percentage'] ?? 0);
+                    $basePrice = $bp + ($bp * ($dp / 100.0));
+                    $unitPrice = (float)($item['unit_price'] ?? 0);
+
+                    $item['base_price'] = $basePrice;
+                    $item['oc_per_unit'] = $unitPrice - $basePrice;
+                    $item['order_qty'] = (int)($item['quantity'] ?? 0);
+                    $item['delivered_qty'] = isset($item['delivered_quantity']) && $item['delivered_quantity'] !== null 
+                        ? (int)$item['delivered_quantity'] 
+                        : (int)($item['quantity'] ?? 0);
+
+                    // Fetch current van stock for product if DSR ID exists
+                    $vanStock = 0;
+                    if (!empty($del['dsr_id'])) {
+                        $stockStmt = $this->db->prepare("
+                            SELECT COALESCE(SUM(quantity), 0) FROM van_stock WHERE dsr_id = ? AND product_id = ?
+                        ");
+                        $stockStmt->execute([$del['dsr_id'], $item['product_id']]);
+                        $vanStock = (int)($stockStmt->fetchColumn() ?: 0);
+                    }
+                    $item['van_stock'] = $vanStock;
+                }
+
+                $del['items'] = $items;
+            }
+
+            echo json_encode(['success' => true, 'dsrs' => $dsrs, 'deliveries' => $dispatches]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsDsrDeliveryAction(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $dispatchId = (int)($_POST['dispatch_id'] ?? 0);
+            $action = trim($_POST['action'] ?? '');
+            $itemsJson = $_POST['items'] ?? '[]';
+            $paidAmountInput = isset($_POST['paid_amount']) ? (float)$_POST['paid_amount'] : null;
+
+            if ($dispatchId <= 0 || empty($action)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid dispatch ID or action.']);
+                exit;
+            }
+
+            $items = json_decode($itemsJson, true) ?: [];
+
+            $this->db->beginTransaction();
+
+            $dispStmt = $this->db->prepare("SELECT * FROM dispatches WHERE id = ?");
+            $dispStmt->execute([$dispatchId]);
+            $dispatch = $dispStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$dispatch) {
+                throw new \Exception("Dispatch record not found.");
+            }
+
+            $orderId = (int)$dispatch['order_id'];
+
+            // Calculate updated total based on items
+            $newTotalAmount = 0;
+            foreach ($items as $item) {
+                $itemId = (int)($item['id'] ?? 0);
+                $qty = (int)($item['qty'] ?? 0);
+                $unitPrice = (float)($item['unit_price'] ?? 0);
+
+                if ($itemId > 0) {
+                    $upItem = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ?");
+                    $upItem->execute([$qty, $itemId]);
+                    $newTotalAmount += ($qty * $unitPrice);
+                }
+            }
+
+            if (empty($items)) {
+                // If items not sent, fetch current total from orders
+                $ordRow = $this->db->query("SELECT total_amount FROM orders WHERE id = $orderId")->fetch();
+                $newTotalAmount = (float)($ordRow['total_amount'] ?? $dispatch['paid_amount']);
+            }
+
+            if ($action === 'complete') {
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = 'delivered', paid_amount = ? WHERE id = ?");
+                $upDisp->execute([$newTotalAmount, $dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = 'delivered', total_amount = ? WHERE id = ?")->execute([$newTotalAmount, $orderId]);
+            } elseif ($action === 'cancel') {
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = 'cancelled', paid_amount = 0 WHERE id = ?");
+                $upDisp->execute([$dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")->execute([$orderId]);
+            } elseif ($action === 'undo') {
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = 'pending', paid_amount = 0 WHERE id = ?");
+                $upDisp->execute([$dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = 'pending' WHERE id = ?")->execute([$orderId]);
+            } elseif ($action === 'continue_partial') {
+                $paid = $paidAmountInput !== null ? $paidAmountInput : 0.00;
+                $status = ($paid >= $newTotalAmount && $newTotalAmount > 0) ? 'delivered' : 'partial';
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = ?, paid_amount = ? WHERE id = ?");
+                $upDisp->execute([$status, $paid, $dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = ?, total_amount = ? WHERE id = ?")->execute([$status, $newTotalAmount, $orderId]);
+            } elseif ($action === 'modify') {
+                $paid = $paidAmountInput !== null ? $paidAmountInput : (float)$dispatch['paid_amount'];
+                $status = ($paid >= $newTotalAmount && $newTotalAmount > 0) ? 'delivered' : 'partial';
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = ?, paid_amount = ? WHERE id = ?");
+                $upDisp->execute([$status, $paid, $dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = ?, total_amount = ? WHERE id = ?")->execute([$status, $newTotalAmount, $orderId]);
+            } else {
+                throw new \Exception("Unsupported action.");
+            }
+
+            $this->db->commit();
+            echo json_encode(['success' => true, 'message' => 'Delivery action processed successfully.']);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function apiOperationsEditOrder(string $id): void
     {
         header('Content-Type: application/json; charset=utf-8');
