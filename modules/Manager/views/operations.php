@@ -5,6 +5,9 @@ $pageTitle = 'Operations: SR Orders';
 $allProducts = $allProducts ?? [];
 ?>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <style>
   .font-siliguri {
     font-family: 'Hind Siliguri', 'Inter', sans-serif;
@@ -17,6 +20,10 @@ $allProducts = $allProducts ?? [];
   input[type=number] {
     -moz-appearance: textfield;
   }
+  .marker-pin-blue { color: #2563eb; }
+  .marker-pin-green { color: #16a34a; }
+  .marker-pin-orange { color: #ea580c; }
+  .marker-pin-red { color: #dc2626; }
 </style>
 
 <div class="p-3 sm:p-5 space-y-4 pb-28 max-w-7xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none print:bg-white">
@@ -24,13 +31,31 @@ $allProducts = $allProducts ?? [];
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="fixed top-5 right-5 z-[100000] space-y-2 pointer-events-none"></div>
 
-  <!-- Premium Minimal Header Card -->
-  <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex flex-wrap items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
-    <div class="flex items-center gap-3">
-      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight tracking-tight">
-        Operations: SR Orders
-      </h1>
-    </div>
+  <!-- Top Tab Navigation Switcher -->
+  <div class="flex items-center gap-2 border-b border-slate-200/80 pb-2 mb-3 print:hidden">
+    <button type="button" id="tabBtnSrOrders" onclick="switchOperationsTab('sr_orders')" 
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-2xs bg-blue-600 text-white shadow-blue-500/20 active:scale-95">
+      <i class="fa-solid fa-cart-shopping text-sm"></i>
+      <span>SR Orders (অর্ডার সারণী)</span>
+    </button>
+    <button type="button" id="tabBtnDsrDelivery" onclick="switchOperationsTab('dsr_delivery')" 
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-slate-600 hover:text-slate-900 bg-white border border-slate-200 active:scale-95">
+      <i class="fa-solid fa-truck-ramp-box text-sm text-slate-500"></i>
+      <span>DSR Delivery (ডিএসআর ডেলিভারি প্যানেল)</span>
+    </button>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════
+       TAB 1: SR ORDERS VIEW
+  ══════════════════════════════════════════════════════════════ -->
+  <div id="viewSrOrders" class="space-y-4">
+    <!-- Premium Minimal Header Card -->
+    <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex flex-wrap items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight tracking-tight">
+          Operations: SR Orders
+        </h1>
+      </div>
     
     <!-- Filters (Date, SR, Search) -->
     <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto mt-3 sm:mt-0">
@@ -109,8 +134,84 @@ $allProducts = $allProducts ?? [];
       </tfoot>
     </table>
   </div>
+  </div> <!-- Close #viewSrOrders -->
 
-</div>
+  <!-- ═════════════════════════════════════════════════════════════
+       TAB 2: DSR DELIVERY VIEW
+  ══════════════════════════════════════════════════════════════ -->
+  <div id="viewDsrDelivery" class="hidden space-y-4">
+    <!-- Header Filter Card -->
+    <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight tracking-tight">
+          DSR Delivery Map & List
+        </h1>
+      </div>
+
+      <!-- Delivery Filters -->
+      <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto mt-3 sm:mt-0">
+        <!-- Date Picker -->
+        <div class="relative w-full sm:w-auto">
+          <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <i class="fa-regular fa-calendar text-slate-400 text-sm"></i>
+          </div>
+          <input type="date" id="dsrFilterDate" value="<?= date('Y-m-d') ?>" 
+                 onchange="loadDsrDeliveries()" 
+                 class="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 pr-3 py-2 cursor-pointer shadow-sm hover:border-slate-300 transition outline-none">
+        </div>
+
+        <!-- DSR Select Dropdown -->
+        <div class="relative w-full sm:w-auto">
+          <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <i class="fa-solid fa-truck text-slate-400 text-sm"></i>
+          </div>
+          <select id="dsrFilterDsr" onchange="loadDsrDeliveries()" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 pr-8 py-2 cursor-pointer shadow-sm hover:border-slate-300 transition outline-none appearance-none min-w-[140px]">
+            <option value="">সকল DSR</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <i class="fa-solid fa-chevron-down text-slate-400 text-xs"></i>
+          </div>
+        </div>
+
+        <!-- Retailer Search -->
+        <div class="relative w-full sm:w-64">
+          <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <i class="fa-solid fa-search text-slate-400 text-sm"></i>
+          </div>
+          <input type="text" id="dsrFilterSearch" onkeyup="filterDsrDeliveriesClientSide()" placeholder="দোকান খুঁজুন..." 
+                 class="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 pr-3 py-2 shadow-sm hover:border-slate-300 transition outline-none">
+        </div>
+      </div>
+    </div>
+
+    <!-- Map & Summary Container -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <!-- Leaflet Map Canvas -->
+      <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-3xs overflow-hidden relative min-h-[400px] lg:h-[520px]">
+        <div id="dsrLeafletMap" class="w-full h-full min-h-[400px] z-0"></div>
+        <!-- Status Color Legend Overlay -->
+        <div class="absolute bottom-3 left-3 z-[400] bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl shadow-md border border-slate-200 flex flex-wrap items-center gap-3 text-[11px] font-bold">
+          <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Pending</div>
+          <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> Delivered</div>
+          <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span> Partial/Due</div>
+          <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span> Canceled</div>
+        </div>
+      </div>
+
+      <!-- Retailers List Card Sidebar -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-3xs p-4 flex flex-col h-[520px]">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-3 shrink-0">
+          <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-store text-blue-600"></i>
+            <span>খুচরা বিক্রেতার তালিকা (<span id="dsrRetailerCount">0</span>)</span>
+          </h3>
+        </div>
+        <div id="dsrRetailerList" class="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
 
 <!-- ========================================================================= -->
 <!-- ULTRA-PREMIUM SLIDE-UP EDIT DRAWER FOR MOBILE (SAME LINE DOR & QTY)        -->
@@ -211,6 +312,91 @@ $allProducts = $allProducts ?? [];
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- DSR RETAILER DELIVERY DETAIL MODAL                                        -->
+<!-- ========================================================================= -->
+<div id="dsrDeliveryModal" class="fixed inset-0 hidden opacity-0 transition-opacity duration-300 pointer-events-none flex items-end sm:items-center justify-center" style="z-index: 99999 !important;">
+  <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300 pointer-events-auto" onclick="closeDsrDeliveryModal()"></div>
+
+  <div class="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden pointer-events-auto transform transition-all duration-300 flex flex-col max-h-[90vh] font-siliguri">
+    
+    <!-- Modal Header Banner -->
+    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
+      <div class="min-w-0 flex-1 pr-3">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <span id="dsrModalSaleType" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">Ordered</span>
+          <span id="dsrModalStatus" class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">Pending</span>
+        </div>
+        <h3 id="dsrModalRetailerName" class="text-base sm:text-lg font-black truncate leading-tight">খুচরা বিক্রেতা</h3>
+        <p id="dsrModalRetailerPhone" class="text-xs text-slate-300 mt-0.5"><i class="fa-solid fa-phone text-[10px] mr-1"></i> -</p>
+      </div>
+
+      <button type="button" onclick="closeDsrDeliveryModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition active:scale-95">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body: Company Grouped Products -->
+    <div id="dsrModalProductBody" class="p-4 sm:p-5 overflow-y-auto flex-1 space-y-5 bg-slate-50/50 custom-scrollbar">
+      <!-- Populated via JS -->
+    </div>
+
+    <!-- Modal Footer / Action Buttons -->
+    <div id="dsrModalFooter" class="p-4 sm:p-5 bg-white border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+      <!-- Action buttons populated dynamically via JS -->
+    </div>
+
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- DSR PARTIAL PAYMENT POPUP MODAL                                           -->
+<!-- ========================================================================= -->
+<div id="dsrPaymentModal" class="fixed inset-0 hidden opacity-0 transition-opacity duration-300 pointer-events-none flex items-center justify-center" style="z-index: 100000 !important;">
+  <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300 pointer-events-auto" onclick="closeDsrPaymentModal()"></div>
+
+  <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden pointer-events-auto p-5 sm:p-6 font-siliguri space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+        <i class="fa-solid fa-money-bill-wave text-emerald-600"></i>
+        <span>টাকা সংগ্রহের পরিমাণ (Collect Amount)</span>
+      </h3>
+      <button type="button" onclick="closeDsrPaymentModal()" class="text-slate-400 hover:text-slate-600">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+      <div class="flex justify-between items-center text-xs font-semibold text-slate-600">
+        <span>মোট চালান মূল্য (Total Amount):</span>
+        <span id="dsrPayModalTotal" class="font-mono font-black text-slate-900 text-sm">৳0.00</span>
+      </div>
+      <div class="flex justify-between items-center text-xs font-semibold text-slate-600">
+        <span>সংগৃহীত টাকা (Paid):</span>
+        <div class="relative">
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
+          <input type="number" id="dsrPayInput" step="0.01" min="0" value="0" oninput="recalcDsrPaymentDue()"
+                 class="bg-white border border-slate-300 rounded-xl pl-6 pr-3 py-1.5 text-right font-mono font-bold text-slate-900 w-36 focus:border-blue-500 focus:outline-none">
+        </div>
+      </div>
+      <div class="flex justify-between items-center text-xs font-bold border-t border-slate-200 pt-2 text-rose-600">
+        <span>অবশিষ্ট বকেয়া (Due Amount):</span>
+        <span id="dsrPayModalDue" class="font-mono font-black text-sm">৳0.00</span>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-2 pt-2">
+      <button type="button" onclick="closeDsrPaymentModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition">
+        বাতিল
+      </button>
+      <button type="button" onclick="submitDsrPaymentAction()" class="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition active:scale-95 flex items-center gap-2">
+        <i class="fa-solid fa-check"></i>
+        <span>সংরক্ষণ ও নিশ্চিত করুন</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -337,9 +523,537 @@ const ALL_SR_PRODUCTS = <?= json_encode($allProducts ?? []) ?>;
 const ORDERS_MAP = {};
 let editingOrder = null;
 
+// ── DSR Delivery State ───────────────────────────────────────────────────
+let currentTab = 'sr_orders';
+let dsrDeliveriesMap = {};
+let dsrMapInstance = null;
+let dsrMarkersGroup = null;
+let currentDsrDelivery = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     loadOrders();
 });
+
+function switchOperationsTab(tabName) {
+    currentTab = tabName;
+    const btnSr = document.getElementById('tabBtnSrOrders');
+    const btnDsr = document.getElementById('tabBtnDsrDelivery');
+    const viewSr = document.getElementById('viewSrOrders');
+    const viewDsr = document.getElementById('viewDsrDelivery');
+
+    if (tabName === 'sr_orders') {
+        btnSr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-2xs bg-blue-600 text-white shadow-blue-500/20 active:scale-95";
+        btnDsr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-slate-600 hover:text-slate-900 bg-white border border-slate-200 active:scale-95";
+        viewSr.classList.remove('hidden');
+        viewDsr.classList.add('hidden');
+    } else {
+        btnDsr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-2xs bg-blue-600 text-white shadow-blue-500/20 active:scale-95";
+        btnSr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all text-slate-600 hover:text-slate-900 bg-white border border-slate-200 active:scale-95";
+        viewSr.classList.add('hidden');
+        viewDsr.classList.remove('hidden');
+
+        initDsrMapIfNeeded();
+        loadDsrDeliveries();
+    }
+}
+
+function initDsrMapIfNeeded() {
+    if (!dsrMapInstance && typeof L !== 'undefined') {
+        dsrMapInstance = L.map('dsrLeafletMap').setView([23.8103, 90.4125], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(dsrMapInstance);
+        dsrMarkersGroup = L.layerGroup().addTo(dsrMapInstance);
+    }
+    if (dsrMapInstance) {
+        setTimeout(() => dsrMapInstance.invalidateSize(), 200);
+    }
+}
+
+async function loadDsrDeliveries() {
+    const date = document.getElementById('dsrFilterDate').value;
+    const dsrId = document.getElementById('dsrFilterDsr').value;
+    const listContainer = document.getElementById('dsrRetailerList');
+
+    listContainer.innerHTML = `
+        <div class="p-8 text-center text-slate-400 font-siliguri">
+          <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-blue-600"></i>
+          <div class="text-xs font-medium">ডেলিভারি ডাটা লোড হচ্ছে...</div>
+        </div>`;
+
+    try {
+        const res = await fetch(`<?= url('manager/api/operations/dsr-deliveries') ?>?date=${date}&dsr_id=${dsrId}&_t=${Date.now()}`, { cache: 'no-cache' });
+        const data = await res.json();
+
+        if (data.success) {
+            // Populate DSR select dropdown if empty
+            const dsrSelect = document.getElementById('dsrFilterDsr');
+            if (dsrSelect.options.length <= 1) {
+                let optionsHtml = '<option value="">সকল DSR</option>';
+                (data.dsrs || []).forEach(dsr => {
+                    optionsHtml += `<option value="${dsr.id}" ${dsr.id == dsrId ? 'selected' : ''}>${escapeHtml(dsr.name)}</option>`;
+                });
+                dsrSelect.innerHTML = optionsHtml;
+            }
+
+            // Map deliveries to map object
+            dsrDeliveriesMap = {};
+            (data.deliveries || []).forEach(d => {
+                dsrDeliveriesMap[d.dispatch_id] = d;
+            });
+
+            renderDsrMapAndList();
+        } else {
+            showToast(data.message || 'Error loading DSR deliveries.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Network error loading DSR deliveries.', 'error');
+    }
+}
+
+function renderDsrMapAndList() {
+    const search = (document.getElementById('dsrFilterSearch').value || '').toLowerCase().trim();
+    const deliveries = Object.values(dsrDeliveriesMap);
+    const listContainer = document.getElementById('dsrRetailerList');
+    const countEl = document.getElementById('dsrRetailerCount');
+
+    if (dsrMarkersGroup) {
+        dsrMarkersGroup.clearLayers();
+    }
+
+    const filtered = deliveries.filter(del => {
+        const rName = (del.retailer_name || '').toLowerCase();
+        const rPhone = (del.retailer_phone || '').toLowerCase();
+        const dsrName = (del.dsr_name || '').toLowerCase();
+        return !search || rName.includes(search) || rPhone.includes(search) || dsrName.includes(search);
+    });
+
+    countEl.innerText = filtered.length;
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `
+            <div class="p-8 text-center text-slate-400 font-siliguri">
+              <i class="fa-solid fa-box-open text-2xl mb-2 text-slate-300"></i>
+              <div class="text-xs font-medium">কোনো ডেলিভারি রেকর্ড পাওয়া যায়নি</div>
+            </div>`;
+        return;
+    }
+
+    listContainer.innerHTML = '';
+    const bounds = [];
+
+    filtered.forEach((del, idx) => {
+        // Status Badge Style
+        let statusBadge = '';
+        if (del.status_code === 'canceled') {
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200">বাতিল</span>`;
+        } else if (del.status_code === 'delivered') {
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-emerald-50 text-emerald-600 border border-emerald-200">সম্পন্ন</span>`;
+        } else if (del.status_code === 'partial') {
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-50 text-amber-600 border border-amber-200">পার্শিয়াল / বকেয়া</span>`;
+        } else {
+            statusBadge = `<span class="px-2 py-0.5 rounded text-[9px] font-extrabold bg-blue-50 text-blue-600 border border-blue-200">অপেক্ষমান</span>`;
+        }
+
+        // Retailer List Card
+        const card = document.createElement('div');
+        card.className = "p-3 rounded-xl border border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/20 transition cursor-pointer shadow-2xs space-y-1.5 font-siliguri";
+        card.onclick = () => openDsrDeliveryModal(del.dispatch_id);
+        card.innerHTML = `
+            <div class="flex items-center justify-between min-w-0">
+              <h4 class="font-bold text-slate-900 text-xs sm:text-sm truncate">${escapeHtml(del.retailer_name)}</h4>
+              ${statusBadge}
+            </div>
+            <div class="text-[11px] text-slate-500 flex items-center justify-between">
+              <span><i class="fa-solid fa-phone text-slate-400 text-[9px] mr-1"></i>${escapeHtml(del.retailer_phone || '-')}</span>
+              <span class="font-mono font-black text-slate-900">৳${parseFloat(del.order_total || 0).toFixed(2)}</span>
+            </div>
+            <div class="text-[10px] text-blue-600 font-bold truncate">
+              <i class="fa-solid fa-truck text-[9px] mr-1"></i> DSR: ${escapeHtml(del.dsr_name || 'Assigned')}
+            </div>
+        `;
+        listContainer.appendChild(card);
+
+        // Add Marker to Leaflet Map
+        if (dsrMapInstance && dsrMarkersGroup) {
+            let lat = parseFloat(del.latitude);
+            let lng = parseFloat(del.longitude);
+
+            if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+                // Fallback offset around center for demo coordinates
+                lat = 23.8103 + (Math.sin(idx + 1) * 0.03);
+                lng = 90.4125 + (Math.cos(idx + 1) * 0.03);
+            }
+
+            bounds.push([lat, lng]);
+
+            const colorHex = del.color === 'green' ? '#16a34a' : (del.color === 'orange' ? '#ea580c' : (del.color === 'red' ? '#dc2626' : '#2563eb'));
+
+            const customIcon = L.divIcon({
+                className: 'custom-map-pin',
+                html: `<div style="background-color: ${colorHex}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3); display: flex; items-center; justify-center; color: #fff; font-size: 10px; font-weight: bold;">
+                        ${idx + 1}
+                       </div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
+            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(dsrMarkersGroup);
+            marker.bindPopup(`
+                <div class="font-siliguri text-xs space-y-1">
+                  <div class="font-bold text-slate-900">${escapeHtml(del.retailer_name)}</div>
+                  <div class="text-slate-500">${escapeHtml(del.retailer_phone || '')}</div>
+                  <div class="font-mono font-black text-blue-600">৳${parseFloat(del.order_total || 0).toFixed(2)}</div>
+                  <button onclick="openDsrDeliveryModal(${del.dispatch_id})" class="mt-1 px-3 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold w-full">অর্ডার বিবরণী</button>
+                </div>
+            `);
+        }
+    });
+
+    if (dsrMapInstance && bounds.length > 0) {
+        dsrMapInstance.fitBounds(bounds, { padding: [30, 30] });
+    }
+}
+
+function filterDsrDeliveriesClientSide() {
+    renderDsrMapAndList();
+}
+
+// ── DSR Retailer Delivery Modal Logic ────────────────────────────────────
+function openDsrDeliveryModal(dispatchId) {
+    const del = dsrDeliveriesMap[dispatchId];
+    if (!del) return;
+
+    currentDsrDelivery = JSON.parse(JSON.stringify(del)); // Deep clone
+
+    // Set Header Info
+    document.getElementById('dsrModalRetailerName').innerText = del.retailer_name || 'খুচরা বিক্রেতা';
+    document.getElementById('dsrModalRetailerPhone').innerHTML = `<i class="fa-solid fa-phone text-[10px] mr-1"></i>${escapeHtml(del.retailer_phone || '-')}`;
+
+    // Sale Type Badge
+    const saleTypeEl = document.getElementById('dsrModalSaleType');
+    if (parseInt(del.is_ready_sale || del.order_ready_sale || 0) === 1) {
+        saleTypeEl.innerText = 'Ready Sale';
+        saleTypeEl.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+    } else {
+        saleTypeEl.innerText = 'Ordered';
+        saleTypeEl.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30";
+    }
+
+    // Status Badge
+    const statusEl = document.getElementById('dsrModalStatus');
+    statusEl.innerText = del.status_label || 'Pending';
+    if (del.status_code === 'delivered') {
+        statusEl.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+    } else if (del.status_code === 'partial') {
+        statusEl.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+    } else if (del.status_code === 'canceled') {
+        statusEl.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30";
+    } else {
+        statusEl.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30";
+    }
+
+    renderDsrModalProducts();
+    renderDsrModalFooter();
+
+    const modal = document.getElementById('dsrDeliveryModal');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+function closeDsrDeliveryModal() {
+    const modal = document.getElementById('dsrDeliveryModal');
+    modal.classList.add('opacity-0');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+function renderDsrModalProducts() {
+    const body = document.getElementById('dsrModalProductBody');
+    if (!currentDsrDelivery || !currentDsrDelivery.items) {
+        body.innerHTML = '<div class="text-center py-6 text-slate-400">No products found.</div>';
+        return;
+    }
+
+    // Group items by company_name
+    const groups = {};
+    currentDsrDelivery.items.forEach(item => {
+        const cName = item.company_name || 'সাধারণ কোম্পানি (Company)';
+        if (!groups[cName]) groups[cName] = [];
+        groups[cName].push(item);
+    });
+
+    const isEditable = (currentDsrDelivery.status_code !== 'canceled');
+
+    let html = '';
+    Object.keys(groups).forEach(cName => {
+        html += `
+            <div class="space-y-3">
+              <div class="flex items-center gap-2 font-bold text-slate-700 text-xs sm:text-sm border-b border-slate-200 pb-1.5">
+                <i class="fa-solid fa-building text-blue-600 text-xs"></i>
+                <span class="tracking-wide uppercase">${escapeHtml(cName)}</span>
+              </div>
+              <div class="space-y-3">
+        `;
+
+        groups[cName].forEach(p => {
+            const currentQty = (p.delivered_qty !== undefined ? p.delivered_qty : p.order_qty);
+            const totalAmt = currentQty * parseFloat(p.unit_price || 0);
+
+            html += `
+                <div class="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-2.5 font-siliguri">
+                  <div class="font-bold text-slate-900 text-xs sm:text-sm leading-tight flex items-center justify-between">
+                    <span>${escapeHtml(p.product_name)}</span>
+                  </div>
+
+                  <!-- Product Rates & Stock Grid -->
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <div>
+                      <span class="text-slate-400 block text-[9px] font-semibold">মূল কেনা দর (Base)</span>
+                      <span class="font-bold text-slate-700">৳${parseFloat(p.base_price || 0).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span class="text-slate-400 block text-[9px] font-semibold">O/C (পিস প্রতি)</span>
+                      <span class="font-bold ${p.oc_per_unit >= 0 ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${p.oc_per_unit >= 0 ? '+' : ''}${parseFloat(p.oc_per_unit || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      <span class="text-slate-400 block text-[9px] font-semibold">অর্ডার পরিমাণ</span>
+                      <span class="font-bold text-slate-800">${p.order_qty} পিস</span>
+                    </div>
+                    <div>
+                      <span class="text-slate-400 block text-[9px] font-semibold">ভ্যান স্টক (Van Stock)</span>
+                      <span class="font-bold text-blue-600">${p.van_stock} পিস</span>
+                    </div>
+                  </div>
+
+                  <!-- Editable Quantity & Line Total -->
+                  <div class="flex items-center justify-between gap-3 pt-1">
+                    <div>
+                      <span class="text-[9px] text-slate-400 font-semibold block">বিক্রয় মূল্য ও মোট</span>
+                      <span class="text-xs font-black text-slate-900">
+                        ৳${parseFloat(p.unit_price || 0).toFixed(2)} × 
+                        <span id="dsrItemLineTotal_${p.id}" class="text-blue-600 font-mono">৳${totalAmt.toFixed(2)}</span>
+                      </span>
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
+                      <button type="button" onclick="adjustDsrItemQty(${p.id}, -1)" ${isEditable ? '' : 'disabled'}
+                              class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-base flex items-center justify-center transition active:scale-95 disabled:opacity-40">
+                        -
+                      </button>
+                      <input type="number" id="dsrItemQtyInput_${p.id}" value="${currentQty}" min="0" oninput="updateDsrItemQtyInput(${p.id}, this.value)" ${isEditable ? '' : 'disabled'}
+                             class="w-16 text-center font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded-xl py-1 focus:border-blue-500 focus:outline-none disabled:bg-slate-100">
+                      <button type="button" onclick="adjustDsrItemQty(${p.id}, 1)" ${isEditable ? '' : 'disabled'}
+                              class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-base flex items-center justify-center transition active:scale-95 disabled:opacity-40">
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+            `;
+        });
+
+        html += `
+              </div>
+            </div>
+        `;
+    });
+
+    body.innerHTML = html;
+}
+
+function adjustDsrItemQty(itemId, delta) {
+    if (!currentDsrDelivery) return;
+    const item = currentDsrDelivery.items.find(i => i.id == itemId);
+    if (!item) return;
+
+    let currentQty = (item.delivered_qty !== undefined ? item.delivered_qty : item.order_qty);
+    currentQty = Math.max(0, currentQty + delta);
+    item.delivered_qty = currentQty;
+
+    const input = document.getElementById(`dsrItemQtyInput_${itemId}`);
+    if (input) input.value = currentQty;
+
+    const lineTotal = currentQty * parseFloat(item.unit_price || 0);
+    const lineTotalEl = document.getElementById(`dsrItemLineTotal_${itemId}`);
+    if (lineTotalEl) lineTotalEl.innerText = `৳${lineTotal.toFixed(2)}`;
+
+    recalcDsrModalGrandTotal();
+}
+
+function updateDsrItemQtyInput(itemId, val) {
+    if (!currentDsrDelivery) return;
+    const item = currentDsrDelivery.items.find(i => i.id == itemId);
+    if (!item) return;
+
+    let currentQty = parseInt(val) || 0;
+    if (currentQty < 0) currentQty = 0;
+    item.delivered_qty = currentQty;
+
+    const lineTotal = currentQty * parseFloat(item.unit_price || 0);
+    const lineTotalEl = document.getElementById(`dsrItemLineTotal_${itemId}`);
+    if (lineTotalEl) lineTotalEl.innerText = `৳${lineTotal.toFixed(2)}`;
+
+    recalcDsrModalGrandTotal();
+}
+
+function recalcDsrModalGrandTotal() {
+    if (!currentDsrDelivery || !currentDsrDelivery.items) return 0;
+    let grandTotal = 0;
+    currentDsrDelivery.items.forEach(p => {
+        const qty = p.delivered_qty !== undefined ? p.delivered_qty : p.order_qty;
+        grandTotal += (qty * parseFloat(p.unit_price || 0));
+    });
+    return grandTotal;
+}
+
+function renderDsrModalFooter() {
+    const footer = document.getElementById('dsrModalFooter');
+    if (!currentDsrDelivery) return;
+
+    const statusCode = currentDsrDelivery.status_code;
+    const grandTotal = recalcDsrModalGrandTotal();
+
+    let buttonsHtml = '';
+
+    if (statusCode === 'pending') {
+        // Untouched / Pending: Cancel | Complete
+        buttonsHtml = `
+            <div class="font-mono font-bold text-xs text-slate-700">
+              মোট: <span class="text-sm font-black text-slate-900">৳${grandTotal.toFixed(2)}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="submitDsrActionDirect('cancel')" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition active:scale-95">
+                <i class="fa-solid fa-ban mr-1"></i> Cancel (বাতিল)
+              </button>
+              <button type="button" onclick="submitDsrActionDirect('complete')" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition active:scale-95">
+                <i class="fa-solid fa-check mr-1"></i> Complete (সম্পন্ন)
+              </button>
+            </div>
+        `;
+    } else if (statusCode === 'canceled') {
+        // Canceled: Undo
+        buttonsHtml = `
+            <div class="font-mono font-bold text-xs text-slate-400 line-through">
+              মোট: ৳${grandTotal.toFixed(2)}
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="submitDsrActionDirect('undo')" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition active:scale-95">
+                <i class="fa-solid fa-rotate-left mr-1"></i> Undo (পুনরায় চালু করুন)
+              </button>
+            </div>
+        `;
+    } else if (statusCode === 'partial') {
+        // Partial / Due: Cancel | Continue
+        buttonsHtml = `
+            <div class="font-mono font-bold text-xs text-slate-700">
+              মোট: <span class="text-sm font-black text-amber-600">৳${grandTotal.toFixed(2)}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="submitDsrActionDirect('cancel')" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition active:scale-95">
+                <i class="fa-solid fa-ban mr-1"></i> Cancel (বাতিল)
+              </button>
+              <button type="button" onclick="openDsrPaymentModal()" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition active:scale-95">
+                Continue (চালিয়ে যান) <i class="fa-solid fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+        `;
+    } else {
+        // Delivered (Full): Modify | Cancel
+        buttonsHtml = `
+            <div class="font-mono font-bold text-xs text-slate-700">
+              মোট: <span class="text-sm font-black text-emerald-600">৳${grandTotal.toFixed(2)}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="submitDsrActionDirect('cancel')" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition active:scale-95">
+                <i class="fa-solid fa-ban mr-1"></i> Cancel (বাতিল)
+              </button>
+              <button type="button" onclick="submitDsrActionDirect('modify')" class="px-5 py-2 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition active:scale-95">
+                <i class="fa-solid fa-pen-to-square mr-1"></i> Modify (পরিবর্তন করুন)
+              </button>
+            </div>
+        `;
+    }
+
+    footer.innerHTML = buttonsHtml;
+}
+
+// ── Partial Payment Modal Handlers ───────────────────────────────────────
+function openDsrPaymentModal() {
+    if (!currentDsrDelivery) return;
+    const total = recalcDsrModalGrandTotal();
+    const paid = parseFloat(currentDsrDelivery.paid_amount || 0);
+
+    document.getElementById('dsrPayModalTotal').innerText = `৳${total.toFixed(2)}`;
+    document.getElementById('dsrPayInput').value = paid > 0 ? paid : total;
+    recalcDsrPaymentDue();
+
+    const modal = document.getElementById('dsrPaymentModal');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+function closeDsrPaymentModal() {
+    const modal = document.getElementById('dsrPaymentModal');
+    modal.classList.add('opacity-0');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+function recalcDsrPaymentDue() {
+    const total = recalcDsrModalGrandTotal();
+    const paidVal = parseFloat(document.getElementById('dsrPayInput').value) || 0;
+    const due = Math.max(0, total - paidVal);
+    document.getElementById('dsrPayModalDue').innerText = `৳${due.toFixed(2)}`;
+}
+
+function submitDsrPaymentAction() {
+    const paidVal = parseFloat(document.getElementById('dsrPayInput').value) || 0;
+    closeDsrPaymentModal();
+    submitDsrActionDirect('continue_partial', paidVal);
+}
+
+// ── Execute Action to Backend ────────────────────────────────────────────
+async function submitDsrActionDirect(actionType, paidAmount = null) {
+    if (!currentDsrDelivery) return;
+
+    const payloadItems = (currentDsrDelivery.items || []).map(p => ({
+        id: p.id,
+        product_id: p.product_id,
+        qty: p.delivered_qty !== undefined ? p.delivered_qty : p.order_qty,
+        unit_price: p.unit_price
+    }));
+
+    const formData = new FormData();
+    formData.append('dispatch_id', currentDsrDelivery.dispatch_id);
+    formData.append('action', actionType);
+    formData.append('items', JSON.stringify(payloadItems));
+    if (paidAmount !== null) {
+        formData.append('paid_amount', paidAmount);
+    }
+
+    try {
+        const res = await fetch(`<?= url("manager/api/operations/dsr-delivery-action") ?>`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || 'Action executed successfully.', 'success');
+            closeDsrDeliveryModal();
+            await loadDsrDeliveries();
+            if (typeof loadOrders === 'function') loadOrders();
+        } else {
+            showToast(data.message || 'Error processing action.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('Network error executing delivery action.', 'error');
+    }
+}
 
 function truncateName(name) {
     const words = (name || '').trim().split(/\s+/);

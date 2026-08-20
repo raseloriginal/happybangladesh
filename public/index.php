@@ -257,6 +257,8 @@ $router->post('/manager/api/order-cutoff/undo/{srId}',      ['ManagerController'
 $router->get( '/manager/operations',                          ['ManagerController', 'operations']);
 $router->get( '/manager/api/operations/orders',               ['ManagerController', 'apiOperationsOrders']);
 $router->get( '/manager/api/operations/deliveries',           ['ManagerController', 'apiOperationsDeliveries']);
+$router->get( '/manager/api/operations/dsr-deliveries',       ['ManagerController', 'apiOperationsDsrDeliveries']);
+$router->post('/manager/api/operations/dsr-delivery-action',  ['ManagerController', 'apiOperationsDsrDeliveryAction']);
 $router->post('/manager/api/operations/edit-order/{id}',      ['ManagerController', 'apiOperationsEditOrder']);
 $router->post('/manager/api/operations/bulk-change-order-date', ['ManagerController', 'apiOperationsBulkChangeOrderDate']);
 $router->post('/manager/api/operations/delete-order/{id}',    ['ManagerController', 'apiOperationsDeleteOrder']);
