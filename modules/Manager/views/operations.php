@@ -33,33 +33,40 @@ $allProducts = $allProducts ?? [];
     </div>
     
     <!-- Filters (Date, SR, Search) -->
-    <div class="flex flex-wrap items-center gap-2 print:hidden w-full sm:w-auto">
+    <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto mt-3 sm:mt-0">
       
       <!-- Date Picker -->
-      <div class="relative flex items-center">
-        <label for="filterDate" class="cursor-pointer font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-150 transition flex items-center justify-center bg-slate-100 rounded-xl w-9 h-9">
-          <i class="fa-regular fa-calendar text-slate-600 text-sm"></i>
-        </label>
+      <div class="relative w-full sm:w-auto">
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <i class="fa-regular fa-calendar text-slate-400 text-sm"></i>
+        </div>
         <input type="date" id="filterDate" value="<?= date('Y-m-d') ?>" 
                onchange="loadOrders()" 
-               class="absolute opacity-0 pointer-events-auto inset-0 w-full h-full cursor-pointer">
+               class="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 pr-3 py-2 cursor-pointer shadow-sm hover:border-slate-300 transition outline-none">
       </div>
 
       <!-- SR Filter Dropdown -->
-      <select id="filterSr" onchange="loadOrders()" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 min-w-[120px]">
-        <option value="">All SRs</option>
-        <!-- Populated via JS -->
-      </select>
-
-      <!-- Search Input -->
-      <div class="relative w-full sm:w-48">
-        <input type="text" id="filterSearch" onkeyup="filterOrdersClientSide()" placeholder="দোকান খুঁজুন..." class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500">
-        <i class="fa-solid fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+      <div class="relative w-full sm:w-auto">
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <i class="fa-solid fa-user-tie text-slate-400 text-sm"></i>
+        </div>
+        <select id="filterSr" onchange="loadOrders()" class="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 pr-8 py-2 cursor-pointer shadow-sm hover:border-slate-300 transition outline-none appearance-none">
+          <option value="">সকল SR</option>
+          <!-- Populated via JS -->
+        </select>
+        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+          <i class="fa-solid fa-chevron-down text-slate-400 text-xs"></i>
+        </div>
       </div>
 
-      <button type="button" onclick="window.print()" class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center hover:bg-slate-800 transition active:scale-95 shadow-sm" title="প্রিন্ট করুন">
-        <i class="fa-solid fa-print text-sm"></i>
-      </button>
+      <!-- Search Input -->
+      <div class="relative w-full sm:w-64">
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <i class="fa-solid fa-search text-slate-400 text-sm"></i>
+        </div>
+        <input type="text" id="filterSearch" onkeyup="filterOrdersClientSide()" placeholder="দোকান/SR খুঁজুন..." 
+               class="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl focus:ring-blue-500 focus:border-blue-500 block w-full pl-9 pr-3 py-2 shadow-sm hover:border-slate-300 transition outline-none">
+      </div>
     </div>
   </div>
 
@@ -364,15 +371,13 @@ async function loadOrders() {
         const data = await res.json();
         
         if (data.success) {
-            // Update SR Dropdown options if needed
+            // Update SR Dropdown options
             const srSelect = document.getElementById('filterSr');
-            if (srSelect.options.length <= 1) { // Only populate once to not lose selection
-                let optionsHtml = '<option value="">All SRs</option>';
-                (data.srs || []).forEach(sr => {
-                    optionsHtml += `<option value="${sr.id}" ${sr.id == srId ? 'selected' : ''}>${escapeHtml(sr.name)}</option>`;
-                });
-                srSelect.innerHTML = optionsHtml;
-            }
+            let optionsHtml = '<option value="">সকল SR</option>';
+            (data.srs || []).forEach(sr => {
+                optionsHtml += `<option value="${sr.id}" ${sr.id == srId ? 'selected' : ''}>${escapeHtml(sr.name)}</option>`;
+            });
+            srSelect.innerHTML = optionsHtml;
             
             // Map orders to ORDERS_MAP
             Object.keys(ORDERS_MAP).forEach(k => delete ORDERS_MAP[k]);
