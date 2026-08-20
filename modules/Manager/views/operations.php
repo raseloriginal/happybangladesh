@@ -442,10 +442,18 @@ function renderTable() {
         grandTotalAmount += parseFloat(ord.total_amount || 0);
         grandTotalOC += orderOC;
         
-        const nameInfo = truncateName(rName);
-        const nameHtml = nameInfo.is_truncated 
-            ? `<div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug cursor-pointer select-none break-words font-siliguri" onclick="toggleRetailerName(this, '${escapeHtml(nameInfo.full)}', '${escapeHtml(nameInfo.short)}')">${escapeHtml(nameInfo.short)}</div>`
-            : `<div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug break-words font-siliguri">${escapeHtml(rName)}</div>`;
+        const nameHtml = `<div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug break-words font-siliguri">${escapeHtml(rName)}</div>`;
+
+        const rAddress = ord.retailer_address || '';
+        let addressHtml = '';
+        if (rAddress) {
+            addressHtml = `
+                <a href="https://maps.google.com/?q=${encodeURIComponent(rAddress)}" target="_blank" onclick="event.stopPropagation()" class="flex items-center gap-1 text-[9px] text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded-md border border-blue-100 transition shrink-0 max-w-[120px] sm:max-w-[150px]" title="${escapeHtml(rAddress)}">
+                    <i class="fa-solid fa-location-dot shrink-0"></i>
+                    <span class="truncate">${escapeHtml(rAddress)}</span>
+                </a>
+            `;
+        }
 
         const ocSign = orderOC > 0 ? '+' : '';
         const ocClass = orderOC > 0 ? 'text-emerald-500' : 'text-rose-500';
@@ -473,12 +481,13 @@ function renderTable() {
               </div>
               ${nameHtml}
               <div class="text-[10px] text-slate-400 font-medium mt-1 flex flex-wrap items-center gap-2">
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1 shrink-0">
                   <i class="fa-solid fa-phone text-slate-300 text-[9px]"></i>
                   <span>${escapeHtml(rPhone)}</span>
                 </div>
-                <span class="bg-slate-50 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wider">#ORD-${ord.id}</span>
-                <span class="bg-slate-50 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wider"><i class="fa-regular fa-clock mr-1"></i>${displayDateTime}</span>
+                ${addressHtml}
+                <span class="bg-slate-50 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wider shrink-0">#ORD-${ord.id}</span>
+                <span class="bg-slate-50 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wider shrink-0"><i class="fa-regular fa-clock mr-1"></i>${displayDateTime}</span>
               </div>
             </div>
           </td>
