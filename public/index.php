@@ -236,6 +236,7 @@ $router->post('/manager/api/dispatch/organize-save/{id}',    ['ManagerController
 $router->post('/manager/api/dispatch/status-update/{id}',    ['ManagerController', 'apiDispatchStatusUpdate']);
 $router->get('/manager/api/dispatch/van-stock/{dsrId}',      ['ManagerController', 'apiDispatchVanStock']);
 $router->post('/manager/api/dispatch/return-save/{scheduleId}',   ['ManagerController', 'apiDispatchReturnSave']);
+$router->post('/manager/api/dispatch/undo-return/{scheduleId}',   ['ManagerController', 'apiDispatchUndoReturn']);
 $router->post('/manager/api/dispatch/update-dsr',            ['ManagerController', 'apiDispatchUpdateDsr']);
 $router->post('/manager/api/dispatch/update-delivery-date',     ['ManagerController', 'apiDispatchUpdateDeliveryDate']);
 $router->post('/manager/api/dispatch/delete/{id}',            ['ManagerController', 'apiDispatchDelete']);

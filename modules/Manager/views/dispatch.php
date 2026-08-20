@@ -361,6 +361,8 @@ function renderSchedules() {
       actionBtn = `<button onclick="updateStatus(${sch.id}, 'dispatched')" class="text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded text-xs font-bold border border-emerald-300 transition"><i class="fa-solid fa-truck-fast mr-1"></i> Dispatch</button>`;
     } else if (sch.status === 'dispatched') {
       actionBtn = `<button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded text-xs font-bold border border-gray-300 transition"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>`;
+    } else if (sch.status === 'returned') {
+      actionBtn = `<button type="button" onclick="undoReturn(${sch.id})" class="text-rose-700 hover:bg-rose-100 px-2.5 py-1 rounded text-xs font-bold border border-rose-300 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Undo Return</button>`;
     }
 
     const tr = document.createElement('tr');
@@ -1374,6 +1376,33 @@ window.submitReturn = async function() {
     }
   } catch(e) {
     alert('Network error processing returns');
+  }
+};
+
+window.undoReturn = async function(scheduleId) {
+  if (!confirm('আপনি কি নিশ্চিত যে এই রিটার্নটি Undo করতে চান? এটি রিটার্নকৃত প্রোডাক্ট স্টক DSR Van Stock-এ ফেরত পাঠাবে এবং রিটার্ন রেকর্ড রিভার্ট করবে।')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`<?= url("manager/api/dispatch/undo-return/") ?>${scheduleId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showToast === 'function') {
+        showToast(data.message || 'রিটার্ন সফলভাবে রিভার্ট করা হয়েছে।', 'success');
+      } else {
+        alert(data.message || 'রিটার্ন সফলভাবে রিভার্ট করা হয়েছে।');
+      }
+      if (typeof loadSchedules === 'function') loadSchedules();
+    } else {
+      alert(data.message || 'রিটার্ন রিভার্ট করতে সমস্যা হয়েছে।');
+    }
+  } catch (e) {
+    console.error('Undo Return error:', e);
+    alert('নেটওয়ার্ক এরর: রিটার্ন রিভার্ট করা সম্ভব হয়নি।');
   }
 };
 </script>
