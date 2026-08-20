@@ -187,8 +187,8 @@ $allProducts = $allProducts ?? [];
     <!-- Map & Summary Container -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <!-- Leaflet Map Canvas -->
-      <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-3xs overflow-hidden relative min-h-[400px] lg:h-[520px]">
-        <div id="dsrLeafletMap" class="w-full h-full min-h-[400px] z-0"></div>
+      <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-3xs overflow-hidden relative h-[520px]" style="height: 520px;">
+        <div id="dsrLeafletMap" class="w-full h-full z-0" style="height: 100%;"></div>
         <!-- Status Color Legend Overlay -->
         <div class="absolute bottom-3 left-3 z-[400] bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl shadow-md border border-slate-200 flex flex-wrap items-center gap-3 text-[11px] font-bold">
           <div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Pending</div>
