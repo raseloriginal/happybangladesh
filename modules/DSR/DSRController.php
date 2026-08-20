@@ -600,7 +600,25 @@ class DSRController extends Controller
                    COALESCE(dl.lat, r.lat) as lat, 
                    COALESCE(dl.lng, r.lng) as lng,
                    o.total_amount, d.status, d.paid_amount,
-                   c.name as company_name
+                   COALESCE(
+                       c.name,
+                       (
+                           SELECT c2.name 
+                           FROM dispatch_items di2 
+                           JOIN products p2 ON p2.id = di2.product_id 
+                           JOIN companies c2 ON c2.id = p2.company_id 
+                           WHERE di2.dispatch_id = d.id 
+                           LIMIT 1
+                       ),
+                       (
+                           SELECT c3.name 
+                           FROM order_items oi3 
+                           JOIN products p3 ON p3.id = oi3.product_id 
+                           JOIN companies c3 ON c3.id = p3.company_id 
+                           WHERE oi3.order_id = o.id 
+                           LIMIT 1
+                       )
+                   ) as company_name
             FROM dispatches d
             JOIN orders o ON o.id = d.order_id
             JOIN users u ON u.id = o.sr_id
@@ -624,9 +642,11 @@ class DSRController extends Controller
                 SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
                        p.name, p.image, p.pieces_per_box, p.box_type,
                        di.base_selling_price as base_price,
-                       di.unit_price as price
+                       di.unit_price as price,
+                       c.name as company_name
                 FROM dispatch_items di
                 JOIN products p ON p.id = di.product_id
+                LEFT JOIN companies c ON c.id = p.company_id
                 JOIN dispatches d ON d.id = di.dispatch_id
                 LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
                 WHERE di.dispatch_id IN ($inClause)
@@ -663,13 +683,23 @@ class DSRController extends Controller
             
             $products = $dispatchProducts[$ret['dispatch_id']] ?? [];
             
+            $compName = $ret['company_name'];
+            if (empty($compName) || $compName === 'Unknown Company') {
+                foreach ($products as $p) {
+                    if (!empty($p['company_name'])) {
+                        $compName = $p['company_name'];
+                        break;
+                    }
+                }
+            }
+            
             $grouped[$did]['orders'][] = [
                 'dispatch_id' => $ret['dispatch_id'],
                 'order_id' => $ret['order_id'],
                 'total_amount' => $ret['total_amount'],
                 'status' => $ret['status'],
                 'paid_amount' => $ret['paid_amount'],
-                'company_name' => $ret['company_name'] ?: 'Unknown Company',
+                'company_name' => $compName ?: 'Unknown Company',
                 'products' => $products
             ];
         }
@@ -1462,27 +1492,6 @@ class DSRController extends Controller
             ");
             foreach ($orderItemsToInsert as $oi) {
                 $dItemStmt->execute([$dispatchId, $oi['product_id'], $oi['lot_id'], $oi['quantity'], $oi['quantity'], $oi['product_name'], $oi['box_type'], $oi['pieces_per_box'], $oi['unit_price'], $oi['base_selling_price'], $oi['total_price']]);
-
-                // Allocate delivered_quantity to earlier active dispatch_items
-                $activeDiStmt = $this->db->prepare("
-                    SELECT di.id, di.quantity, COALESCE(di.delivered_quantity, 0) as del_qty
-                    FROM dispatch_items di
-                    JOIN dispatches d ON d.id = di.dispatch_id
-                    WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND d.status != 'pending' AND d.id != ?
-                    ORDER BY di.id ASC
-                ");
-                $activeDiStmt->execute([$dsrId, $date, $oi['product_id'], $dispatchId]);
-                $remainingToAllocate = $oi['quantity'];
-                foreach ($activeDiStmt->fetchAll(PDO::FETCH_ASSOC) as $diRow) {
-                    if ($remainingToAllocate <= 0) break;
-                    $canAllocate = (int)$diRow['quantity'] - (int)$diRow['del_qty'];
-                    if ($canAllocate > 0) {
-                        $allocate = min($remainingToAllocate, $canAllocate);
-                        $updDi = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = COALESCE(delivered_quantity, 0) + ? WHERE id = ?");
-                        $updDi->execute([$allocate, $diRow['id']]);
-                        $remainingToAllocate -= $allocate;
-                    }
-                }
 
                 // Deduct from van_stock table
                 $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, quantity - ?) WHERE dsr_id = ? AND product_id = ?")
