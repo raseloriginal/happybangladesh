@@ -1114,14 +1114,23 @@ class ManagerController extends Controller
             ")->fetchColumn();
             $sch['total_order_oc'] = (float)$orderOC;
 
-            // Calculate dispatch value from van_stock loaded qty
+            // Calculate dispatch value (dispatch_items base value + negative dispatch_extras)
             $dispatchValStmt = $this->db->prepare("
-                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
-                FROM van_stock vs
-                JOIN products p ON p.id = vs.product_id
-                WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+                SELECT 
+                    (SELECT COALESCE(SUM(di.quantity * COALESCE(di.base_selling_price, p.price)), 0)
+                     FROM dispatches d
+                     JOIN dispatch_items di ON di.dispatch_id = d.id
+                     JOIN products p ON p.id = di.product_id
+                     WHERE d.dsr_id = ? AND d.dispatch_date = ?)
+                    + 
+                    (SELECT COALESCE(SUM(
+                         (CAST(de.qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p.price
+                     ), 0)
+                     FROM dispatch_extras de
+                     JOIN products p ON p.id = de.product_id
+                     WHERE de.schedule_id = ? AND (de.qty_boxes < 0 OR de.qty_pieces < 0))
             ");
-            $dispatchValStmt->execute([$sch['dsr_id'], $delivery_date]);
+            $dispatchValStmt->execute([$sch['dsr_id'], $delivery_date, $sid]);
             $sch['total_dispatch_value'] = (float)$dispatchValStmt->fetchColumn();
 
             $dispatchOC = $this->db->query("
@@ -1565,10 +1574,19 @@ class ManagerController extends Controller
             $company['ordered_value'] = (float)$orderedVal;
 
             $dispatchVal = $this->db->query("
-                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
-                FROM van_stock vs
-                JOIN products p ON p.id = vs.product_id
-                WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND {$companyCondition}
+                SELECT 
+                    (SELECT COALESCE(SUM(di.quantity * COALESCE(di.base_selling_price, p.price)), 0)
+                     FROM dispatches d
+                     JOIN dispatch_items di ON di.dispatch_id = d.id
+                     JOIN products p ON p.id = di.product_id
+                     WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND {$companyCondition})
+                    + 
+                    (SELECT COALESCE(SUM(
+                         (CAST(de.qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p.price
+                     ), 0)
+                     FROM dispatch_extras de
+                     JOIN products p ON p.id = de.product_id
+                     WHERE de.schedule_id = {$scheduleId} AND (de.qty_boxes < 0 OR de.qty_pieces < 0) AND {$companyCondition})
             ")->fetchColumn();
             $company['dispatch_items_value'] = (float)$dispatchVal;
 
@@ -1609,15 +1627,35 @@ class ManagerController extends Controller
                            WHERE dss.schedule_id = {$scheduleId} AND oi.product_id = p.id
                        ) as ordered_qty,
                        (
-                           SELECT COALESCE(SUM(vs.initial_qty), 0)
-                           FROM van_stock vs
-                           WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND vs.product_id = p.id
+                           COALESCE((
+                               SELECT SUM(di.quantity)
+                               FROM dispatches d
+                               JOIN dispatch_items di ON di.dispatch_id = d.id
+                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id
+                           ), 0)
+                           +
+                           COALESCE((
+                               SELECT SUM(CAST(de.qty_boxes AS SIGNED) * CAST(p2.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED))
+                               FROM dispatch_extras de
+                               JOIN products p2 ON p2.id = de.product_id
+                               WHERE de.schedule_id = {$scheduleId} AND de.product_id = p.id AND (de.qty_boxes < 0 OR de.qty_pieces < 0)
+                           ), 0)
                        ) as dispatched_qty,
                        (
-                           SELECT COALESCE(SUM(vs.initial_qty * p2.price), 0)
-                           FROM van_stock vs
-                           JOIN products p2 ON p2.id = vs.product_id
-                           WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND vs.product_id = p.id
+                           COALESCE((
+                               SELECT SUM(di.quantity * COALESCE(di.base_selling_price, p2.price))
+                               FROM dispatches d
+                               JOIN dispatch_items di ON di.dispatch_id = d.id
+                               JOIN products p2 ON p2.id = di.product_id
+                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id
+                           ), 0)
+                           +
+                           COALESCE((
+                               SELECT SUM((CAST(de.qty_boxes AS SIGNED) * CAST(p2.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p2.price)
+                               FROM dispatch_extras de
+                               JOIN products p2 ON p2.id = de.product_id
+                               WHERE de.schedule_id = {$scheduleId} AND de.product_id = p.id AND (de.qty_boxes < 0 OR de.qty_pieces < 0)
+                           ), 0)
                        ) as dispatched_value,
                        (
                            SELECT COALESCE(SUM(di.delivered_quantity), 0)
