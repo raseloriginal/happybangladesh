@@ -1114,12 +1114,12 @@ class ManagerController extends Controller
             ")->fetchColumn();
             $sch['total_order_oc'] = (float)$orderOC;
 
-            // Use dispatch_items as actual dispatched value
+            // Calculate dispatch value from van_stock loaded qty
             $dispatchValStmt = $this->db->prepare("
-                SELECT COALESCE(SUM(di.quantity * di.unit_price), 0)
-                FROM dispatches d
-                JOIN dispatch_items di ON di.dispatch_id = d.id
-                WHERE d.dsr_id = ? AND d.dispatch_date = ?
+                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
             ");
             $dispatchValStmt->execute([$sch['dsr_id'], $delivery_date]);
             $sch['total_dispatch_value'] = (float)$dispatchValStmt->fetchColumn();
@@ -1565,11 +1565,10 @@ class ManagerController extends Controller
             $company['ordered_value'] = (float)$orderedVal;
 
             $dispatchVal = $this->db->query("
-                SELECT COALESCE(SUM(di.quantity * di.unit_price), 0)
-                FROM dispatches d
-                JOIN dispatch_items di ON di.dispatch_id = d.id
-                JOIN products p ON p.id = di.product_id
-                WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND {$companyCondition}
+                SELECT COALESCE(SUM(vs.initial_qty * p.price), 0)
+                FROM van_stock vs
+                JOIN products p ON p.id = vs.product_id
+                WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND {$companyCondition}
             ")->fetchColumn();
             $company['dispatch_items_value'] = (float)$dispatchVal;
 
@@ -1614,6 +1613,12 @@ class ManagerController extends Controller
                            FROM van_stock vs
                            WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND vs.product_id = p.id
                        ) as dispatched_qty,
+                       (
+                           SELECT COALESCE(SUM(vs.initial_qty * p2.price), 0)
+                           FROM van_stock vs
+                           JOIN products p2 ON p2.id = vs.product_id
+                           WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND vs.product_id = p.id
+                       ) as dispatched_value,
                        (
                            SELECT COALESCE(SUM(di.delivered_quantity), 0)
                            FROM dispatch_items di
@@ -1679,7 +1684,10 @@ class ManagerController extends Controller
                 $srId = (int)$sr['id'];
                 $sr['products'] = $this->db->query("
                     SELECT p.name,
-                           SUM(oi.quantity) as ordered_qty
+                           MAX(COALESCE(oi.base_selling_price, p.price)) as base_price,
+                           SUM(oi.quantity) as ordered_qty,
+                           SUM(oi.quantity * COALESCE(oi.base_selling_price, p.price)) as total_base_order_value,
+                           SUM(oi.quantity * (oi.unit_price - COALESCE(oi.base_selling_price, p.price))) as total_oc
                     FROM orders o
                     JOIN order_items oi ON oi.order_id = o.id
                     JOIN products p ON p.id = oi.product_id
@@ -2900,7 +2908,7 @@ class ManagerController extends Controller
 
             $orderId = (int)$dispatch['order_id'];
 
-            // Calculate updated total based on items
+            // Calculate updated total based on items and adjust van_stock
             $newTotalAmount = 0;
             foreach ($items as $item) {
                 $itemId = (int)($item['id'] ?? 0);
@@ -2908,8 +2916,27 @@ class ManagerController extends Controller
                 $unitPrice = (float)($item['unit_price'] ?? 0);
 
                 if ($itemId > 0) {
-                    $upItem = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ?");
-                    $upItem->execute([$qty, $itemId]);
+                    $oldItem = $this->db->prepare("SELECT product_id, COALESCE(delivered_quantity, 0) as delivered_quantity FROM dispatch_items WHERE id = ? AND dispatch_id = ?");
+                    $oldItem->execute([$itemId, $dispatchId]);
+                    $oldItemData = $oldItem->fetch(PDO::FETCH_ASSOC);
+
+                    if ($oldItemData) {
+                        $oldQty = (int)$oldItemData['delivered_quantity'];
+                        $productId = (int)$oldItemData['product_id'];
+                        $diff = $qty - $oldQty;
+
+                        $upItem = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ? AND dispatch_id = ?");
+                        $upItem->execute([$qty, $itemId, $dispatchId]);
+
+                        if ($diff != 0) {
+                            $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, CAST(quantity AS SIGNED) - ?) WHERE dsr_id = ? AND product_id = ?")
+                                     ->execute([$diff, $dispatch['dsr_id'], $productId]);
+                        }
+                    } else {
+                        $upItem = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ? AND dispatch_id = ?");
+                        $upItem->execute([$qty, $itemId, $dispatchId]);
+                    }
+
                     $newTotalAmount += ($qty * $unitPrice);
                 }
             }
@@ -3271,11 +3298,23 @@ class ManagerController extends Controller
 
             \Helpers::logManagerActivity(\Auth::id(), 'delete_order', 'Deleted operation order ID: ' . $id . ' for reason: ' . $reason, $id);
 
-            // Delete dispatches & dispatch items if any
-            $dispatchesStmt = $this->db->prepare("SELECT id FROM dispatches WHERE order_id = ?");
+            // Delete dispatches & dispatch items if any, restoring van_stock if previously delivered
+            $dispatchesStmt = $this->db->prepare("SELECT id, dsr_id FROM dispatches WHERE order_id = ?");
             $dispatchesStmt->execute([$id]);
-            $dispatchIds = $dispatchesStmt->fetchAll(PDO::FETCH_COLUMN);
-            if (!empty($dispatchIds)) {
+            $dispatches = $dispatchesStmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($dispatches)) {
+                foreach ($dispatches as $disp) {
+                    $dispItems = $this->db->prepare("SELECT product_id, COALESCE(delivered_quantity, 0) as delivered_quantity FROM dispatch_items WHERE dispatch_id = ?");
+                    $dispItems->execute([$disp['id']]);
+                    foreach ($dispItems->fetchAll(PDO::FETCH_ASSOC) as $di) {
+                        $delQty = (int)$di['delivered_quantity'];
+                        if ($delQty > 0) {
+                            $this->db->prepare("UPDATE van_stock SET quantity = quantity + ? WHERE dsr_id = ? AND product_id = ?")
+                                     ->execute([$delQty, $disp['dsr_id'], $di['product_id']]);
+                        }
+                    }
+                }
+                $dispatchIds = array_column($dispatches, 'id');
                 $inQuery = implode(',', array_fill(0, count($dispatchIds), '?'));
                 $this->db->prepare("DELETE FROM dispatch_items WHERE dispatch_id IN ($inQuery)")->execute($dispatchIds);
                 $this->db->prepare("DELETE FROM dispatches WHERE order_id = ?")->execute([$id]);

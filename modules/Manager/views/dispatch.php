@@ -587,7 +587,7 @@ function toggleProductRow(schId, compId) {
       const returnedQty = parseInt(p.returned_qty || 0);
       
       const orderedVal = orderedQty * basePrice;
-      const dispatchedVal = dispatchedQty * basePrice;
+      const dispatchedVal = parseFloat(p.dispatched_value || 0);
       const saleVal = saleQty * basePrice;
       const returnedVal = returnedQty * basePrice;
       
@@ -644,8 +644,15 @@ function toggleCompanySrRow(schId, compId) {
       const orderVal = parseFloat(sr.order_value || 0);
       const baseSaleVal = parseFloat(sr.base_sale_value || 0);
       const saleVal = parseFloat(sr.sale_value || 0);
-      const totalOc = baseOrderVal - orderVal;
+      const totalOc = orderVal - baseOrderVal;
       
+      let ocClass = 'text-indigo-600';
+      if (totalOc < 0) {
+        ocClass = 'text-rose-600';
+      } else if (totalOc > 0) {
+        ocClass = 'text-emerald-600';
+      }
+
       html += `<tr>
         <td class="excel-row-num">${srIdx + 1}</td>
         <td class="font-bold text-gray-800 text-xs">
@@ -663,7 +670,7 @@ function toggleCompanySrRow(schId, compId) {
         <td class="excel-money text-right text-teal-600 font-bold">
           ${showValues ? '৳ ' + saleVal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}
         </td>
-        <td class="excel-money text-right text-indigo-600 font-semibold">
+        <td class="excel-money text-right ${ocClass} font-semibold">
           ৳ ${totalOc.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}
         </td>
         <td class="text-center no-print">
@@ -697,21 +704,66 @@ function toggleSrProductRow(schId, compId, srId) {
       return;
     }
     
-    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+    let html = `<div class="excel-container shadow-none border border-slate-200 w-full overflow-x-auto"><table class="excel-table sub-table text-xs whitespace-nowrap">
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>Product Name</th>
+        <th class="text-right">Base Price</th>
         <th class="text-center">Ordered Qty</th>
+        <th class="text-right">Total Order Value</th>
+        <th class="text-right">Total O/C</th>
       </tr></thead><tbody>`;
       
+    let totalQty = 0;
+    let totalVal = 0;
+    let totalOc = 0;
+
     products.forEach((p, pIdx) => {
+      const basePrice = parseFloat(p.base_price || 0);
+      const orderedQty = parseInt(p.ordered_qty || 0);
+      const rowVal = parseFloat(p.total_base_order_value || 0);
+      const rowOc = parseFloat(p.total_oc || 0);
+
+      totalQty += orderedQty;
+      totalVal += rowVal;
+      totalOc += rowOc;
+
+      let ocClass = 'text-indigo-600';
+      if (rowOc < 0) {
+        ocClass = 'text-rose-600';
+      } else if (rowOc > 0) {
+        ocClass = 'text-emerald-600';
+      }
+
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
         <td class="font-bold text-gray-800">${p.name}</td>
-        <td class="excel-qty text-center">${p.ordered_qty || 0}</td>
+        <td class="excel-money text-right text-amber-600">৳ ${basePrice.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center">${orderedQty}</td>
+        <td class="excel-money text-right text-gray-600">৳ ${rowVal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td class="excel-money text-right ${ocClass}">৳ ${rowOc.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
       </tr>`;
     });
-    html += `</tbody></table></div>`;
+    
+    let totalOcClass = 'text-indigo-600';
+    if (totalOc < 0) {
+      totalOcClass = 'text-rose-600';
+    } else if (totalOc > 0) {
+      totalOcClass = 'text-emerald-600';
+    }
+
+    html += `</tbody>
+      <tfoot>
+        <tr class="bg-slate-100 font-bold border-t-2 border-slate-300">
+          <td colspan="2" class="text-right py-2 px-3">Total:</td>
+          <td class="text-right py-2 px-3"></td>
+          <td class="excel-qty text-center py-2 px-3">${totalQty}</td>
+          <td class="excel-money text-right py-2 px-3">৳ ${totalVal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+          <td class="excel-money text-right ${totalOcClass} py-2 px-3">৳ ${totalOc.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        </tr>
+      </tfoot>
+    </table></div>`;
+    
     container.innerHTML = html;
   } else {
     row.classList.add('hidden');
