@@ -117,8 +117,8 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     </div>
   <?php endif; ?>
 
-  <!-- Summary KPI Overview Bar (3 Key Metrics) -->
-  <div class="grid grid-cols-3 gap-2.5">
+  <!-- Summary KPI Overview Bar (4 Key Metrics) -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
     <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
       <span class="text-[11px] font-bold text-slate-500 block">মোট লোড (Dispatch)</span>
       <span class="font-black text-sm sm:text-base text-slate-900 font-mono tracking-tight block">৳<?= number_format($dispatchedValue) ?></span>
@@ -127,6 +127,11 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
       <span class="text-[11px] font-bold text-slate-500 block">ফেরত মাল (Return)</span>
       <span class="font-black text-sm sm:text-base text-rose-600 font-mono tracking-tight block">৳<?= number_format($returnedValue) ?></span>
+    </div>
+
+    <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+      <span class="text-[11px] font-bold text-slate-500 block">মোট বিক্রি (Sales)</span>
+      <span class="font-black text-sm sm:text-base text-emerald-600 font-mono tracking-tight block">৳<?= number_format($salesAmount) ?></span>
     </div>
 
     <div class="bg-blue-600 text-white p-3 rounded-2xl border border-blue-700 shadow-xs space-y-1">
@@ -167,6 +172,17 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
             <span class="font-bold text-slate-800">মোট লোড করা মাল</span>
           </div>
           <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue) ?></span>
+        </div>
+
+        <!-- Row 1.5: Total Sales Amount -->
+        <div class="p-3.5 flex items-center justify-between hover:bg-emerald-50/40 transition">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-cart-shopping"></i>
+            </div>
+            <span class="font-bold text-slate-800">মোট বিক্রি (বিক্রয় মূল্য)</span>
+          </div>
+          <span class="font-black text-emerald-600 font-mono">৳ <?= number_format($salesAmount ?? 0) ?></span>
         </div>
 
         <!-- Row 2: Returned Goods -->
