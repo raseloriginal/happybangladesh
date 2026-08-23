@@ -986,12 +986,22 @@ class DSRController extends Controller
         // Calculate Dispatched Value
         $q = $this->db->prepare("
             SELECT 
-                COALESCE(SUM(vs.initial_qty * p.price), 0) as dispatched_value
-            FROM van_stock vs
-            JOIN products p ON p.id = vs.product_id
-            WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+                (SELECT COALESCE(SUM(di.quantity * COALESCE(di.base_selling_price, p.price)), 0)
+                 FROM dispatches d
+                 JOIN dispatch_items di ON di.dispatch_id = d.id
+                 JOIN products p ON p.id = di.product_id
+                 WHERE d.dsr_id = ? AND d.dispatch_date = ?)
+                +
+                (SELECT COALESCE(SUM(
+                     (CAST(de.qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p.price
+                 ), 0)
+                 FROM dispatch_extras de
+                 JOIN products p ON p.id = de.product_id
+                 JOIN dispatch_schedules ds ON ds.id = de.schedule_id
+                 WHERE ds.dsr_id = ? AND (ds.delivery_date = ? OR (ds.delivery_date IS NULL AND ds.dispatch_date = ?))
+                   AND (de.qty_boxes < 0 OR de.qty_pieces < 0)) as dispatched_value
         ");
-        $q->execute([$dsrId, $selectedDate]);
+        $q->execute([$dsrId, $selectedDate, $dsrId, $selectedDate, $selectedDate]);
         $res = $q->fetch();
         
         $dispatchedValue = (float)($res['dispatched_value'] ?: 0);
