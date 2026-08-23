@@ -117,21 +117,21 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     </div>
   <?php endif; ?>
 
-  <!-- Summary KPI Overview Bar (4 Key Metrics) -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+  <!-- Summary KPI Overview Bar (4 Key Metrics in 2 columns) -->
+  <div class="grid grid-cols-2 gap-2.5">
     <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
       <span class="text-[11px] font-bold text-slate-500 block">মোট লোড (Dispatch)</span>
-      <span class="font-black text-sm sm:text-base text-slate-900 font-mono tracking-tight block">৳<?= number_format($dispatchedValue) ?></span>
+      <span class="font-black text-sm sm:text-base text-slate-900 font-mono tracking-tight block">৳<?= number_format($dispatchedValue, 2) ?></span>
     </div>
 
     <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
       <span class="text-[11px] font-bold text-slate-500 block">ফেরত মাল (Return)</span>
-      <span class="font-black text-sm sm:text-base text-rose-600 font-mono tracking-tight block">৳<?= number_format($returnedValue) ?></span>
+      <span class="font-black text-sm sm:text-base text-rose-600 font-mono tracking-tight block">৳<?= number_format($returnedValue, 2) ?></span>
     </div>
 
     <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
       <span class="text-[11px] font-bold text-slate-500 block">মোট বিক্রি (Sales)</span>
-      <span class="font-black text-sm sm:text-base text-emerald-600 font-mono tracking-tight block">৳<?= number_format($salesAmount) ?></span>
+      <span class="font-black text-sm sm:text-base text-emerald-600 font-mono tracking-tight block">৳<?= number_format($salesAmount, 2) ?></span>
     </div>
 
     <div class="bg-blue-600 text-white p-3 rounded-2xl border border-blue-700 shadow-xs space-y-1">
@@ -171,7 +171,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
             </div>
             <span class="font-bold text-slate-800">মোট লোড করা মাল</span>
           </div>
-          <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue) ?></span>
+          <span class="font-black text-slate-900 font-mono">৳ <?= number_format($dispatchedValue, 2) ?></span>
         </div>
 
         <!-- Row 1.5: Total Sales Amount -->
@@ -180,9 +180,15 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
             <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs">
               <i class="fa-solid fa-cart-shopping"></i>
             </div>
-            <span class="font-bold text-slate-800">মোট বিক্রি (বিক্রয় মূল্য)</span>
+            <div>
+              <span class="font-bold text-slate-800 block leading-tight">মোট বিক্রি (বিক্রয় মূল্য)</span>
+              <span class="text-[10px] text-slate-500 font-medium">মূল রেট: ৳ <?= number_format($originalSalesAmount ?? 0, 2) ?> | SR রেট: ৳ <?= number_format($srSalesAmount ?? 0, 2) ?></span>
+            </div>
           </div>
-          <span class="font-black text-emerald-600 font-mono">৳ <?= number_format($salesAmount ?? 0) ?></span>
+          <div class="text-right">
+            <span class="font-black text-emerald-600 font-mono block">৳ <?= number_format($srSalesAmount ?? 0, 2) ?></span>
+            <span class="text-[10px] text-slate-400 font-mono block">(মূল: ৳ <?= number_format($originalSalesAmount ?? 0, 2) ?>)</span>
+          </div>
         </div>
 
         <!-- Row 2: Returned Goods -->
@@ -196,7 +202,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
               <span class="text-[10px] text-blue-600 font-bold underline">বিস্তারিত দেখুন</span>
             </div>
           </div>
-          <span class="font-black text-rose-600 font-mono">- ৳ <?= number_format($returnedValue) ?></span>
+          <span class="font-black text-rose-600 font-mono">- ৳ <?= number_format($returnedValue, 2) ?></span>
         </div>
 
         <!-- Row 3: Damage Items -->
@@ -207,7 +213,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
             </div>
             <span class="font-bold text-slate-800">ড্যামেজ পণ্য (-)</span>
           </div>
-          <span class="font-black text-amber-600 font-mono">- ৳ <?= number_format($savedDamage) ?></span>
+          <span class="font-black text-amber-600 font-mono">- ৳ <?= number_format($savedDamage, 2) ?></span>
         </div>
 
         <!-- Row 4: Daily Expenses -->
@@ -218,7 +224,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
             </div>
             <span class="font-bold text-slate-800">সারাদিনের খরচ (-)</span>
           </div>
-          <span class="font-black text-purple-600 font-mono">- ৳ <?= number_format($savedExpense) ?></span>
+          <span class="font-black text-purple-600 font-mono">- ৳ <?= number_format($savedExpense, 2) ?></span>
         </div>
 
         <!-- Row 5: Delivery OC -->
@@ -233,7 +239,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
             </div>
           </div>
           <span class="font-black <?= $savedDeliveryOc >= 0 ? 'text-emerald-600' : 'text-rose-600' ?> font-mono">
-            <?= $savedDeliveryOc >= 0 ? '+' : '' ?>৳ <?= number_format($savedDeliveryOc) ?>
+            <?= $savedDeliveryOc >= 0 ? '+' : '' ?>৳ <?= number_format($savedDeliveryOc, 2) ?>
           </span>
         </div>
 
@@ -541,8 +547,8 @@ function openReturnModal() {
                     <td class="excel-row-num">${idx + 1}</td>
                     <td class="font-bold text-slate-800 text-xs text-left">${item.product_name}</td>
                     <td class="text-center font-mono text-xs text-slate-700">${parseFloat(item.qty)}</td>
-                    <td class="excel-money text-slate-600 font-normal">৳ ${Math.round(parseFloat(item.price)).toLocaleString('en-US')}</td>
-                    <td class="excel-money text-rose-600 font-bold">৳ ${Math.round(t).toLocaleString('en-US')}</td>
+                    <td class="excel-money text-slate-600 font-normal">৳ ${parseFloat(item.price).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="excel-money text-rose-600 font-bold">৳ ${t.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                   </tr>`;
             });
 
@@ -562,7 +568,7 @@ function openReturnModal() {
                 </table>
               </div>`;
 
-            total.textContent = '৳ ' + Math.round(grandTotal).toLocaleString('en-US');
+            total.textContent = '৳ ' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         })
         .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-6 font-siliguri">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
 }
@@ -592,7 +598,7 @@ function openOcModal() {
         .then(data => {
             if (!data.success || !data.items || !data.items.length) {
                 body.innerHTML = '<p class="text-center text-slate-400 text-xs py-6 font-siliguri">এই তারিখে কোনো O/C নেই।</p>';
-                total.textContent = '৳ 0';
+                total.textContent = '৳ 0.00';
                 return;
             }
 
@@ -607,7 +613,7 @@ function openOcModal() {
                     <td class="excel-row-num">${idx + 1}</td>
                     <td class="font-bold text-slate-800 text-xs text-left">${item.sr_name}</td>
                     <td class="excel-money ${t >= 0 ? 'text-emerald-600' : 'text-rose-600'} font-bold">
-                      ${t >= 0 ? '+' : ''}৳ ${Math.round(t).toLocaleString('en-US')}
+                      ${t >= 0 ? '+' : ''}৳ ${t.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                   </tr>`;
             });
@@ -626,7 +632,7 @@ function openOcModal() {
                 </table>
               </div>`;
 
-            total.textContent = (grandTotal >= 0 ? '+' : '') + '৳ ' + Math.round(grandTotal).toLocaleString('en-US');
+            total.textContent = (grandTotal >= 0 ? '+' : '') + '৳ ' + grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         })
         .catch(() => { body.innerHTML = '<p class="text-center text-rose-500 text-xs py-6 font-siliguri">নেটওয়ার্ক সমস্যা হয়েছে।</p>'; });
 }
