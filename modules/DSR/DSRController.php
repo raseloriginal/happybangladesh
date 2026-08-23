@@ -1057,12 +1057,49 @@ class DSRController extends Controller
         $qOc->execute([$dsrId, $selectedDate]);
         $deliveryOc = (float)$qOc->fetchColumn();
 
+        // Calculate Original Selling Price Total (base dealer selling price)
+        $qOrigSales = $this->db->prepare("
+            SELECT (
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * p.price), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                JOIN products p ON p.id = di.product_id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
+            ) + (
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * p.price), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                JOIN products p ON p.id = di.product_id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND d.is_ready_sale = 1
+            ) AS orig_sales_amount
+        ");
+        $qOrigSales->execute([$dsrId, $selectedDate, $dsrId, $selectedDate]);
+        $originalSalesAmount = (float)$qOrigSales->fetchColumn();
+
+        // Calculate SR Order Price Total (SR actual unit_price)
+        $qSrSales = $this->db->prepare("
+            SELECT (
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * di.unit_price), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
+            ) + (
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * di.unit_price), 0)
+                FROM dispatches d
+                JOIN dispatch_items di ON di.dispatch_id = d.id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND d.is_ready_sale = 1
+            ) AS sr_sales_amount
+        ");
+        $qSrSales->execute([$dsrId, $selectedDate, $dsrId, $selectedDate]);
+        $srSalesAmount = (float)$qSrSales->fetchColumn();
+        $salesAmount = $srSalesAmount;
+
         // Check if settlement already submitted for this date
         $check = $this->db->prepare("SELECT * FROM settlements WHERE dsr_id=? AND date=?");
         $check->execute([$dsrId, $selectedDate]);
         $existingSettlement = $check->fetch() ?: null;
 
-        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'deliveryOc', 'selectedDate', 'existingSettlement', 'scheduleStatus'), 'dsr_app');
+        $this->render('settlement', compact('dispatchedValue', 'returnedValue', 'totalDamage', 'totalExpense', 'deliveryOc', 'selectedDate', 'existingSettlement', 'scheduleStatus', 'salesAmount', 'originalSalesAmount', 'srSalesAmount'), 'dsr_app');
     }
 
     public function settlementSubmit(): void
