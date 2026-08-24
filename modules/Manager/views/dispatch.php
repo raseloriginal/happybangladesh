@@ -214,30 +214,33 @@
 <!-- ========================================== -->
 <!-- 2. ORGANIZE MODAL                          -->
 <!-- ========================================== -->
-<!-- ========================================== -->
-<!-- 2. ORGANIZE MODAL                          -->
-<!-- ========================================== -->
-<div id="organize-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4">
-  <div class="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
-    <div class="p-3 sm:p-4 bg-amber-500 text-white flex justify-between items-center">
-      <div class="flex items-center gap-2">
-        <h2 class="text-base sm:text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-box-open"></i> Organize Dispatch Items</h2>
-        <span id="org-count-badge" class="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-semibold"></span>
+<div id="organize-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-1 sm:p-4 overflow-y-auto">
+  <div class="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl h-[94vh] sm:h-[88vh] flex flex-col overflow-hidden my-auto">
+    <!-- Modal Header (Fixed) -->
+    <div class="px-3 sm:px-5 py-3 sm:py-4 bg-amber-500 text-white flex justify-between items-center shrink-0 shadow-sm z-20">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <h2 class="text-sm sm:text-lg font-bold flex items-center gap-2">
+          <i class="fa-solid fa-box-open"></i> Organize Dispatch Items
+        </h2>
+        <span id="org-count-badge" class="bg-white/20 text-white text-[11px] sm:text-xs px-2 py-0.5 rounded-full font-semibold"></span>
       </div>
-      <button onclick="closeOrganizeModal()" class="text-white/80 hover:text-white p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+      <button onclick="closeOrganizeModal()" class="text-white/80 hover:text-white p-1 rounded-lg hover:bg-amber-600 transition" title="Close Modal">
+        <i class="fa-solid fa-xmark text-lg sm:text-xl"></i>
+      </button>
     </div>
     
-    <div class="flex-1 overflow-y-auto p-2 sm:p-4 bg-gray-50">
-      <div class="overflow-x-auto -mx-2 sm:mx-0 px-2 sm:px-0">
-        <table class="w-full text-left border-collapse min-w-[550px] sm:min-w-full bg-white rounded-lg overflow-hidden shadow-sm">
-          <thead>
-            <tr class="bg-amber-100/70 border-b border-amber-200 text-gray-700 text-xs font-bold uppercase">
-              <th class="py-2.5 px-2 text-center w-10 whitespace-nowrap">#</th>
-              <th class="py-2.5 px-3 whitespace-nowrap">Product</th>
-              <th class="py-2.5 px-3 whitespace-nowrap">Ordered Qty</th>
-              <th class="py-2.5 px-3 whitespace-nowrap">Dispatch Qty</th>
-              <th class="py-2.5 px-3 text-center whitespace-nowrap">Change (কম / বেশি)</th>
-              <th class="py-2.5 px-3 text-center whitespace-nowrap">
+    <!-- Modal Body (Scrollable Table with Sticky Header) -->
+    <div class="flex-1 overflow-y-auto overflow-x-auto p-2 sm:p-4 bg-gray-50/70 relative">
+      <div class="min-w-[620px] sm:min-w-full bg-white rounded-lg shadow-sm border border-gray-200">
+        <table class="w-full text-left border-collapse">
+          <thead class="sticky top-0 z-10 bg-amber-100 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+            <tr class="text-gray-800 text-[11px] sm:text-xs font-bold uppercase">
+              <th class="py-2.5 px-2 text-center w-10 whitespace-nowrap bg-amber-100">#</th>
+              <th class="py-2.5 px-3 whitespace-nowrap bg-amber-100">Product</th>
+              <th class="py-2.5 px-3 whitespace-nowrap bg-amber-100">Ordered Qty</th>
+              <th class="py-2.5 px-3 whitespace-nowrap bg-amber-100">Dispatch Qty</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap bg-amber-100">Change (কম / বেশি)</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap bg-amber-100">
                 <label class="inline-flex items-center gap-1 cursor-pointer select-none" title="Select / Deselect All">
                   <input type="checkbox" id="org-select-all" onchange="toggleSelectAllOrg(this)" class="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer">
                   <span class="text-[11px] font-semibold text-gray-700">All</span>
@@ -252,15 +255,21 @@
       </div>
     </div>
     
-    <div class="p-3 sm:p-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-between sm:justify-end items-center gap-2 sm:gap-3 bg-white">
-      <div class="w-full sm:w-auto text-xs text-gray-500 flex items-center justify-between sm:justify-start gap-2">
-        <button type="button" onclick="selectAllOrgCheckboxes(true)" class="text-amber-600 hover:underline text-xs font-medium">Check All</button>
-        <span>|</span>
-        <button type="button" onclick="selectAllOrgCheckboxes(false)" class="text-gray-500 hover:underline text-xs font-medium">Uncheck All</button>
+    <!-- Modal Footer (Fixed) -->
+    <div class="p-3 sm:p-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-2.5 sm:gap-3 bg-white shrink-0 shadow-[0_-2px_6px_rgba(0,0,0,0.03)] z-20">
+      <div class="w-full sm:w-auto text-xs text-gray-500 flex items-center justify-between sm:justify-start gap-3">
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="selectAllOrgCheckboxes(true)" class="text-amber-600 hover:text-amber-700 font-semibold text-xs py-1 px-1.5 rounded hover:bg-amber-50 transition">Check All</button>
+          <span class="text-gray-300">|</span>
+          <button type="button" onclick="selectAllOrgCheckboxes(false)" class="text-gray-600 hover:text-gray-800 font-semibold text-xs py-1 px-1.5 rounded hover:bg-gray-100 transition">Uncheck All</button>
+        </div>
+        <span class="text-[11px] text-gray-400 hidden sm:inline">(Checked items will be confirmed)</span>
       </div>
       <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-        <button onclick="closeOrganizeModal()" class="w-1/2 sm:w-auto px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium text-xs sm:text-sm">Cancel</button>
-        <button onclick="saveOrganize(event)" class="w-1/2 sm:w-auto px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md text-xs sm:text-sm">Save Organized</button>
+        <button type="button" onclick="closeOrganizeModal()" class="w-1/2 sm:w-auto px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium text-xs sm:text-sm transition">Cancel</button>
+        <button type="button" onclick="saveOrganize(event)" class="w-1/2 sm:w-auto px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+          <i class="fa-solid fa-floppy-disk"></i> Save Organized
+        </button>
       </div>
     </div>
   </div>
