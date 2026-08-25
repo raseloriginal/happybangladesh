@@ -90,6 +90,22 @@
             </div>
           </td>
         </tr>
+        <tr class="hover:bg-slate-50/50 transition">
+          <td class="p-3 font-sans font-semibold border-r border-slate-200 text-slate-700 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0 shadow-2xs"></span>
+            আজকের বিক্রয়
+          </td>
+          <td class="p-3 text-right font-black border-r border-slate-200 text-slate-900 text-sm">
+            ৳<?= number_format($stats['today_sales']) ?>
+          </td>
+          <td class="p-3 text-center font-sans">
+            <div class="flex flex-col items-center gap-1">
+              <span class="inline-block text-[10px] px-2 py-0.5 rounded bg-orange-50 text-orange-700 font-bold border border-orange-100">
+                <?= $stats['visited_today'] ?>টি দোকান
+              </span>
+            </div>
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>
