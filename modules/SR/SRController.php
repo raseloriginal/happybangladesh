@@ -1152,10 +1152,10 @@ class SRController extends Controller
             SELECT p.id as product_id, p.name as product_name, c.name as company_name, 
                    COALESCE(p.pieces_per_box, 1) as pieces_per_box,
                    MAX(oi.unit_price) as ordered_price,
-                   MAX(oi.base_selling_price) as base_price,
+                   MAX(COALESCE(NULLIF(oi.base_selling_price, 0), p.price, oi.unit_price)) as base_price,
                    SUM(oi.quantity) as ordered_qty,
                    SUM(oi.unit_price * oi.quantity) as ordered_val_exact,
-                   SUM((oi.unit_price - oi.base_selling_price) * oi.quantity) as ordered_oc
+                   SUM((oi.unit_price - COALESCE(NULLIF(oi.base_selling_price, 0), p.price, oi.unit_price)) * oi.quantity) as ordered_oc
             FROM order_items oi
             JOIN orders o ON o.id = oi.order_id
             JOIN products p ON p.id = oi.product_id
