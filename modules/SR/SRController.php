@@ -1203,6 +1203,7 @@ class SRController extends Controller
         }
 
         $transactions = [];
+        $totalOrderedVal    = 0;
         $totalDispatchedVal = 0;
         $totalSellVal       = 0;
         $totalReturnVal     = 0;
@@ -1214,6 +1215,7 @@ class SRController extends Controller
             $orderedQty   = (int)$row['ordered_qty'];
             $orderedPrice = (float)$row['ordered_price'];
             $orderedOC    = (float)($row['ordered_oc'] ?? 0);
+            $orderedVal   = (float)($row['ordered_val_exact'] ?? ($orderedQty * $orderedPrice));
 
             $dispatchedQty = (int)($dispatchMap[$pid]['dispatched_qty'] ?? 0);
             $sellQty       = (int)($dispatchMap[$pid]['sell_qty'] ?? 0);
@@ -1229,6 +1231,7 @@ class SRController extends Controller
             $ocPerUnit = $orderedQty > 0 ? ($orderedOC / $orderedQty) : 0;
             $sellOC    = $ocPerUnit * $sellQty;
 
+            $totalOrderedVal    += $orderedVal;
             $totalDispatchedVal += $dispatchedVal;
             $totalSellVal       += $sellVal;
             $totalReturnVal     += $returnVal;
@@ -1242,7 +1245,7 @@ class SRController extends Controller
                 'pieces_per_box' => (int)($row['pieces_per_box'] ?: 1),
                 'ordered_price'  => $orderedPrice,
                 'ordered_qty'    => $orderedQty,
-                'ordered_val'    => (float)($row['ordered_val_exact'] ?? ($orderedQty * $orderedPrice)),
+                'ordered_val'    => $orderedVal,
                 'ordered_oc'     => $orderedOC,
                 'dispatched_qty' => $dispatchedQty,
                 'dispatched_val' => $dispatchedVal,
@@ -1255,6 +1258,7 @@ class SRController extends Controller
         }
 
         $subtotal = [
+            'ordered_val'    => $totalOrderedVal,
             'dispatched_val' => $totalDispatchedVal,
             'sell_val'       => $totalSellVal,
             'return_val'     => $totalReturnVal,
