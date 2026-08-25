@@ -220,7 +220,14 @@ function updateAllPins() {}
 
 function openShop(id, name, address, hasOrderToday = false) {
   const ret = { id: id, name: name, address: address, has_order_today: hasOrderToday };
-  
+
+  // Log visit silently (fire-and-forget)
+  fetch(`${BASE_URL}/sr/api/log-visit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `retailer_id=${id}`
+  }).catch(() => {}); // silent fail — visit log never blocks the UI
+
   if (ret.has_order_today) {
     showConfirmModal(`"${ret.name}" দোকানে আজ একটি অর্ডার দেওয়া হয়েছে। আপনি কি এই অর্ডার পরিবর্তন করতে চান?`, () => {
       SRLoader.showOverlay('দোকানের পূর্বের অর্ডার লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন...');

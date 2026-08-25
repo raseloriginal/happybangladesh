@@ -1,5 +1,4 @@
 <?php $pageTitle = 'মূল্য সংশোধন'; ?>
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
     

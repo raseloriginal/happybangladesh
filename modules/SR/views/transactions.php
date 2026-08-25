@@ -120,6 +120,11 @@ $totalOrderedVal = 0;
                   <div class="text-[10px] text-blue-600 font-bold mt-0.5 font-mono">
                     ৳<?= number_format($t['ordered_val']) ?>
                   </div>
+                  <?php if ($t['ordered_oc'] > 0): ?>
+                  <div class="text-[9px] text-emerald-600 font-bold mt-0.5 font-mono">
+                    O/C: ৳<?= number_format($t['ordered_oc']) ?>
+                  </div>
+                  <?php endif; ?>
                 </td>
 
                 <!-- Load (Out) Cell (Amber tint) -->
@@ -140,6 +145,11 @@ $totalOrderedVal = 0;
                   <div class="text-[10px] text-emerald-600 font-bold mt-0.5 font-mono">
                     ৳<?= number_format($t['sell_val']) ?>
                   </div>
+                  <?php if (($t['sell_oc'] ?? 0) > 0): ?>
+                  <div class="text-[9px] text-emerald-700 font-bold mt-0.5 font-mono">
+                    O/C: ৳<?= number_format($t['sell_oc']) ?>
+                  </div>
+                  <?php endif; ?>
                 </td>
 
                 <!-- Remaining (In) Cell (Purple tint) -->
@@ -164,12 +174,22 @@ $totalOrderedVal = 0;
             </td>
             <td class="p-3 text-center border-r border-slate-200 bg-blue-50/60 text-blue-700 font-black font-mono">
               ৳<?= number_format($totalOrderedVal) ?>
+              <?php if (($subtotal['ordered_oc'] ?? 0) > 0): ?>
+              <div class="text-[9px] text-emerald-600 font-bold mt-0.5">
+                O/C: ৳<?= number_format($subtotal['ordered_oc']) ?>
+              </div>
+              <?php endif; ?>
             </td>
             <td class="p-3 text-center border-r border-slate-200 bg-amber-50/60 text-amber-700 font-black font-mono">
               ৳<?= number_format($subtotal['dispatched_val'] ?? 0) ?>
             </td>
             <td class="p-3 text-center border-r border-slate-200 bg-emerald-50/60 text-emerald-700 font-black font-mono">
               ৳<?= number_format($subtotal['sell_val'] ?? 0) ?>
+              <?php if (($subtotal['sell_oc'] ?? 0) > 0): ?>
+              <div class="text-[9px] text-emerald-700 font-bold mt-0.5">
+                O/C: ৳<?= number_format($subtotal['sell_oc']) ?>
+              </div>
+              <?php endif; ?>
             </td>
             <td class="p-3 text-center bg-purple-50/60 text-purple-700 font-black font-mono">
               ৳<?= number_format($subtotal['return_val'] ?? 0) ?>

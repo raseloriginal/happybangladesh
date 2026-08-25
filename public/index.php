@@ -286,6 +286,7 @@ $router->post('/sr/api/location/push',        ['SRController', 'apiPushLocation'
 $router->post('/sr/api/order-cutoff',         ['SRController', 'apiSetOrderCutoff']);
 $router->get( '/sr/price-correction',         ['SRController', 'priceCorrection']);
 $router->post('/sr/api/price-correction/modify', ['SRController', 'apiPriceCorrectionModify']);
+$router->post('/sr/api/log-visit',            ['SRController', 'apiLogVisit']);
 
 // ── DSR routes ────────────────────────────────────────────────
 $router->get( '/dsr/dashboard',               ['DSRController', 'dashboard']);
