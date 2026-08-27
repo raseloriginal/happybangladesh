@@ -170,7 +170,7 @@ class ManagerController extends Controller
                        (
                            COALESCE((SELECT SUM(qty_boxes * p.pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
                            -
-                           COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                           COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)), 0)
                            +
                            COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
                        ) as stock_pieces, 
@@ -206,7 +206,7 @@ class ManagerController extends Controller
                    (
                        COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
                        -
-                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
                    ) AS stock_pieces,
@@ -1063,7 +1063,7 @@ class ManagerController extends Controller
                    (
                        COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
                        -
-                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)), 0)
                        +
                        COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
                    ) AS qty_pieces
@@ -1121,7 +1121,7 @@ class ManagerController extends Controller
                      FROM dispatches d
                      JOIN dispatch_items di ON di.dispatch_id = d.id
                      JOIN products p ON p.id = di.product_id
-                     WHERE d.dsr_id = ? AND d.dispatch_date = ?)
+                     WHERE d.dsr_id = ? AND d.dispatch_date = ? AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL))
                     + 
                     (SELECT COALESCE(SUM(
                          (CAST(de.qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p.price
@@ -1137,7 +1137,7 @@ class ManagerController extends Controller
                 SELECT COALESCE(SUM(di.quantity * (di.unit_price - di.base_selling_price)), 0)
                 FROM dispatches d
                 JOIN dispatch_items di ON di.dispatch_id = d.id
-                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
             ")->fetchColumn();
             $sch['total_dispatch_oc'] = (float)$dispatchOC;
             $sch['total_return_value'] = (float)$this->db->query("
@@ -1631,7 +1631,7 @@ class ManagerController extends Controller
                                SELECT SUM(di.quantity)
                                FROM dispatches d
                                JOIN dispatch_items di ON di.dispatch_id = d.id
-                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id
+                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
                            ), 0)
                            +
                            COALESCE((
@@ -1647,7 +1647,7 @@ class ManagerController extends Controller
                                FROM dispatches d
                                JOIN dispatch_items di ON di.dispatch_id = d.id
                                JOIN products p2 ON p2.id = di.product_id
-                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id
+                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
                            ), 0)
                            +
                            COALESCE((

@@ -7,7 +7,7 @@
       <a href="<?= url('dsr/dashboard') ?>" class="w-8 h-8 flex items-center justify-center text-gray-500 active:text-brand transition">
         <i class="fa-solid fa-arrow-left"></i>
       </a>
-      <h1 class="text-xl font-bold text-gray-800">Dispatch Collection</h1>
+      <h1 class="text-xl font-bold text-gray-800">চালান কালেকশন</h1>
     </div>
     
     <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100 flex items-center gap-4">
@@ -16,9 +16,9 @@
       </div>
       <div class="flex-1">
         <div class="text-xs text-blue-500 font-bold tracking-wide uppercase mb-1 flex items-center gap-2">
-          Date: <input type="date" value="<?= htmlspecialchars($date) ?>" class="bg-transparent outline-none border-b border-blue-200 cursor-pointer text-blue-600" onchange="window.location.href='?date='+this.value">
+          তারিখ: <input type="date" value="<?= htmlspecialchars($date) ?>" class="bg-transparent outline-none border-b border-blue-200 cursor-pointer text-blue-600" onchange="window.location.href='?date='+this.value">
         </div>
-        <div class="text-gray-800 font-semibold text-sm">Collect from Warehouse</div>
+        <div class="text-gray-800 font-semibold text-sm">ওয়্যারহাউস থেকে সংগ্রহ করুন</div>
       </div>
     </div>
   </div>
@@ -28,18 +28,18 @@
       <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
         <i class="fa-solid fa-box-open text-3xl"></i>
       </div>
-      <h2 class="text-lg font-bold text-gray-800 mb-1">No Collections</h2>
-      <p class="text-sm text-gray-500">There are no pending dispatches assigned to you on this date.</p>
+      <h2 class="text-lg font-bold text-gray-800 mb-1">কোনো কালেকশন নেই</h2>
+      <p class="text-sm text-gray-500">এই তারিখে আপনার জন্য কোনো পেন্ডিং চালান নেই।</p>
     </div>
   <?php elseif(!empty($isCompleted)): ?>
     <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
       <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-500 mb-4">
         <i class="fa-solid fa-check-circle text-4xl"></i>
       </div>
-      <h2 class="text-lg font-bold text-gray-800 mb-1">Collection Completed</h2>
-      <p class="text-sm text-gray-500 mb-6">You have already checked and collected the items for this date.</p>
+      <h2 class="text-lg font-bold text-gray-800 mb-1">কালেকশন সম্পন্ন হয়েছে</h2>
+      <p class="text-sm text-gray-500 mb-6">আপনি ইতিমধ্যে এই তারিখের পণ্যগুলো চেক এবং সংগ্রহ করেছেন।</p>
       <a href="<?= url('dsr/delivery') ?>" class="px-6 py-3 bg-brand text-white font-bold rounded-xl shadow-lg shadow-blue-500/30">
-        Go to Delivery Map
+        ডেলিভারি ম্যাপে যান
       </a>
     </div>
   <?php else: ?>
@@ -47,8 +47,8 @@
     <!-- Progress Indicator -->
     <div class="px-4 py-4">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-bold text-gray-700">Collection Progress</span>
-        <span class="text-xs font-semibold text-brand bg-blue-50 px-2 py-1 rounded-lg" id="progressText">0 / <?= count($items) ?> Products</span>
+        <span class="text-sm font-bold text-gray-700">সংগ্রহের অগ্রগতি</span>
+        <span class="text-xs font-semibold text-brand bg-blue-50 px-2 py-1 rounded-lg" id="progressText">0 / <?= count($items) ?> পণ্য</span>
       </div>
       <div class="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
         <div id="progressBar" class="h-full bg-brand transition-all duration-300 w-0"></div>
@@ -72,7 +72,7 @@
             
             <div class="flex-1">
               <div class="font-semibold text-sm text-gray-800 line-clamp-2 leading-tight mb-1"><?= h($item['name']) ?></div>
-              <div class="text-xs text-brand font-bold bg-blue-50 inline-block px-2 py-0.5 rounded"><?= $item['total_qty'] ?> Units</div>
+              <div class="text-xs text-brand font-bold bg-blue-50 inline-block px-2 py-0.5 rounded"><?= $item['total_qty'] ?> টি</div>
             </div>
           </label>
         <?php endforeach; ?>
@@ -82,7 +82,7 @@
     <!-- Sticky Bottom Action -->
     <div class="fixed bottom-16 left-0 w-full p-4 bg-white border-t border-gray-100 z-30 pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <button id="completeBtn" onclick="completeCollection()" disabled class="w-full py-4 rounded-2xl font-bold text-white shadow-lg transition-all duration-300 bg-gray-300 text-gray-500 cursor-not-allowed">
-        Complete Collection
+        সংগ্রহ সম্পন্ন করুন
       </button>
     </div>
     
@@ -100,7 +100,7 @@ function updateProgress() {
   const percent = Math.round((checked / totalItems) * 100);
   
   document.getElementById('progressBar').style.width = percent + '%';
-  document.getElementById('progressText').innerText = `${checked} / ${totalItems} Products`;
+  document.getElementById('progressText').innerText = `${checked} / ${totalItems} পণ্য`;
   
   const btn = document.getElementById('completeBtn');
   if(checked === totalItems) {

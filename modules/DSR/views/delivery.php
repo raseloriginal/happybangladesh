@@ -2968,7 +2968,10 @@ async function submitReadySale() {
 
         const res = await fetch('<?= url('dsr/ready-sale/store') ?>', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            },
             body: formData.toString()
         });
 
