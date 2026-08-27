@@ -549,7 +549,8 @@ class DSRController extends Controller
             $iq = $this->db->prepare("
                 SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
                        p.name, p.image, p.pieces_per_box, p.box_type,
-                       di.base_selling_price as base_price,
+                       COALESCE(NULLIF(oi.base_selling_price, 0), NULLIF(di.base_selling_price, 0), p.price, di.unit_price) as original_selling_price,
+                       COALESCE(NULLIF(di.base_selling_price, 0), NULLIF(oi.base_selling_price, 0), p.price, di.unit_price) as base_price,
                        di.unit_price as price,
                        c.name as company_name
                 FROM dispatch_items di
@@ -760,6 +761,88 @@ class DSRController extends Controller
         }
         
         $this->json(['success' => true]);
+    }
+
+    public function deliveryUndo(string $id): void
+    {
+        $dsrId = Auth::id();
+        
+        // 1. Check if settlement is already submitted/approved for this dispatch's date
+        $dispatchInfo = $this->db->prepare("SELECT dispatch_date, status, paid_amount FROM dispatches WHERE id=? AND dsr_id=?");
+        $dispatchInfo->execute([$id, $dsrId]);
+        $dispatch = $dispatchInfo->fetch();
+        
+        if (!$dispatch) {
+            $this->json(['success' => false, 'message' => 'Delivery not found.']);
+            return;
+        }
+
+        $dispatchDate = $dispatch['dispatch_date'];
+
+        if ($dispatchDate) {
+            $check = $this->db->prepare("SELECT status FROM settlements WHERE dsr_id=? AND date=? AND status IN ('pending', 'approved')");
+            $check->execute([$dsrId, $dispatchDate]);
+            if ($check->fetch()) {
+                $this->json(['success' => false, 'message' => 'Settlement already submitted for this date. Cannot modify delivery.']);
+                return;
+            }
+
+            // Check if the dispatch is already returned
+            $schCheck = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
+            $schCheck->execute([$dsrId, $dispatchDate, $dispatchDate]);
+            $schStatus = $schCheck->fetchColumn();
+            
+            if ($schStatus === 'returned') {
+                $this->json(['success' => false, 'message' => 'ডেলিভারি রিটার্ন সম্পন্ন হয়েছে। আর কোনো পরিবর্তন সম্ভব নয়।']);
+                return;
+            }
+        }
+
+        if ($dispatch['status'] === 'in_transit' || $dispatch['status'] === 'pending') {
+            $this->json(['success' => false, 'message' => 'Delivery is already in pending state.']);
+            return;
+        }
+        
+        try {
+            $this->db->beginTransaction();
+
+            // 2. Fetch delivered items for log and stock restoration
+            $items = $this->db->prepare("SELECT product_id, lot_id, delivered_quantity FROM dispatch_items WHERE dispatch_id=? AND delivered_quantity > 0");
+            $items->execute([$id]);
+            $deliveredItems = $items->fetchAll();
+
+            // 3. Log the undo action (if table exists)
+            try {
+                $logStmt = $this->db->prepare("INSERT INTO dispatch_undo_logs (dsr_id, dispatch_id, previous_status, previous_paid_amount) VALUES (?, ?, ?, ?)");
+                $logStmt->execute([$dsrId, $id, $dispatch['status'], $dispatch['paid_amount']]);
+            } catch (\Throwable $logErr) {
+                // Keep moving if table hasn't been migrated yet to prevent blocking the rollback
+                error_log("Undo log error: " . $logErr->getMessage());
+            }
+
+            // 4. Restore Van Stock
+            foreach($deliveredItems as $item) {
+                $qtyToRestore = (int)$item['delivered_quantity'];
+                if ($qtyToRestore > 0) {
+                    $this->db->prepare("UPDATE van_stock SET quantity = quantity + ? WHERE dsr_id=? AND product_id=? AND (lot_id=? OR (? IS NULL AND lot_id IS NULL))")
+                             ->execute([$qtyToRestore, $dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+                }
+            }
+
+            // 5. Reset dispatch items
+            $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = NULL WHERE dispatch_id = ?")
+                     ->execute([$id]);
+
+            // 6. Reset dispatch status
+            $this->db->prepare("UPDATE dispatches SET status='in_transit', paid_amount=0, notes=NULL, updated_at=NOW() WHERE id=? AND dsr_id=?")
+                     ->execute([$id, $dsrId]);
+
+            $this->db->commit();
+            $this->json(['success' => true]);
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            $this->json(['success' => false, 'message' => 'Error undoing delivery: ' . $e->getMessage()]);
+        }
     }
 
     public function collection(): void

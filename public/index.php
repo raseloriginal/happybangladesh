@@ -297,6 +297,7 @@ $router->get( '/dsr/expenses',                ['DSRController', 'expenses']);
 $router->post('/dsr/expenses/store',          ['DSRController', 'expenseStore']);
 $router->get( '/dsr/delivery',                ['DSRController', 'delivery']);
 $router->post('/dsr/delivery/update/{id}',    ['DSRController', 'deliveryUpdate']);
+$router->post('/dsr/delivery/undo/{id}',      ['DSRController', 'deliveryUndo']);
 $router->get( '/dsr/collection',              ['DSRController', 'collection']);
 $router->post('/dsr/collection/complete',     ['DSRController', 'collectionComplete']);
 $router->get( '/dsr/settlement',              ['DSRController', 'settlement']);
