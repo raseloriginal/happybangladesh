@@ -1618,7 +1618,14 @@ class ManagerController extends Controller
             $company['sale_value'] = (float)$saleVal;
 
             $products = $this->db->query("
-                SELECT p.id, p.name, p.price AS base_price,
+                SELECT p.id, p.name, 
+                       COALESCE((
+                           SELECT MAX(COALESCE(oi.base_selling_price, p.price))
+                           FROM dispatch_schedule_srs dss
+                           JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
+                           JOIN order_items oi ON oi.order_id = o.id
+                           WHERE dss.schedule_id = {$scheduleId} AND oi.product_id = p.id
+                       ), p.price) AS base_price,
                        (
                            SELECT COALESCE(SUM(oi.quantity), 0)
                            FROM dispatch_schedule_srs dss

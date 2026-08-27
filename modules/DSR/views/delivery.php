@@ -157,12 +157,11 @@ $hasDeliveries = !empty($retailers);
 
       <!-- Stats Summary (Royal Blue minimal grid cells) -->
       <div class="grid grid-cols-3 border border-slate-200 rounded-xl bg-white text-[10px] font-bold text-slate-500 mb-3 overflow-hidden divide-x divide-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]">
-        <!-- Items -->
+        <!-- Status -->
         <div class="p-2 flex flex-col justify-between h-12 bg-white">
-          <div class="text-[9px] text-slate-400 uppercase tracking-wider">মোট পণ্য</div>
+          <div class="text-[9px] text-slate-400 uppercase tracking-wider">স্ট্যাটাস</div>
           <div class="text-slate-800 font-black text-xs flex items-center gap-1.5 flex-wrap">
-            <span id="bsTotalQty">0</span>
-            <span id="bsStatus" class="px-1 py-0.5 rounded text-[8px] border font-bold" style="color: #2563eb; border-color: #93c5fd; background-color: #eff6ff;">অপেক্ষমান</span>
+            <span id="bsStatus" class="px-1.5 py-0.5 rounded text-[9px] border font-bold" style="color: #2563eb; border-color: #93c5fd; background-color: #eff6ff;">অপেক্ষমান</span>
           </div>
         </div>
         <!-- Ordered Value -->
@@ -508,8 +507,13 @@ $hasDeliveries = !empty($retailers);
   </div>
 
   <!-- Partial Due Options Modal -->
-  <div id="partialDueModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
-      <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200" id="partialDueContent">
+  <div id="partialDueModal" onclick="if(event.target === this) closePartialDueModal()" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4 bg-black/50 transition-opacity">
+      <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95 opacity-0 duration-200 relative" id="partialDueContent">
+          <!-- Top Right Close Button -->
+          <button onclick="closePartialDueModal()" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition active:scale-90">
+              <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+
           <div class="text-center">
               <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
                   <i class="fa-solid fa-circle-exclamation"></i>
@@ -517,9 +521,10 @@ $hasDeliveries = !empty($retailers);
               <h3 class="text-lg font-black text-gray-800 mb-1" id="partialDueTitle">Due Payment</h3>
               <p class="text-sm text-gray-500 mb-6" id="partialDueMessage">Remaining Due: ৳0.00</p>
               
-              <div class="flex flex-col gap-3">
+              <div class="flex flex-col gap-2.5">
                   <button onclick="handleDuePaymentAction()" class="w-full py-3 bg-brand text-white font-bold rounded-xl active:scale-[0.98] shadow-lg shadow-blue-500/20 transition">Due Complete</button>
-                  <button onclick="handleDueDetailsAction()" class="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl active:bg-gray-200 transition">View Details</button>
+                  <button onclick="handleDueDetailsAction()" class="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl active:bg-gray-200 transition">View Details</button>
+                  <button onclick="closePartialDueModal()" class="w-full py-2.5 text-slate-400 hover:text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 transition">বন্ধ করুন (Close)</button>
               </div>
           </div>
       </div>
@@ -1343,27 +1348,35 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
 
                     const qty = parseInt(p.quantity); // pieces dispatched on van
 
-                    let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+                    let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : (order.status === 'cancelled' ? 0 : qty);
+                    const prevDelivered = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : 0;
 
                     const initialBoxes = Math.floor(initialDeliveredQty / ppb);
                     const initialPcs = initialDeliveredQty % ppb;
 
                     const vanStock = parseInt(vanStockMap[p.product_id]) || 0;
-                    const isStockOk = vanStock >= qty;
+                    const isStockOk = vanStock >= (qty - prevDelivered);
+
+                    const origPrice = parseFloat(p.original_selling_price || p.base_price || p.price || 0);
 
                     orderHtml += `
-                    <div class="product-item flex items-stretch divide-x divide-slate-100 text-xs hover:bg-slate-50/50 transition-colors" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}">
+                    <div class="product-item flex items-stretch divide-x divide-slate-100 text-xs hover:bg-slate-50/50 transition-colors" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}" data-prevdelivered="${prevDelivered}" data-pid="${p.product_id}">
                         <!-- Product & Stock Cell -->
                         <div class="flex-1 p-3 flex flex-col justify-center min-w-0 bg-white space-y-1.5">
-                            <div class="font-bold text-slate-800 text-[12px] leading-snug break-words" title="${p.name}">${p.name}</div>
+                            <div class="font-bold text-slate-800 text-[12px] leading-snug break-words" title="${p.name}">
+                                ${p.name} <span class="text-slate-500 font-bold text-[11px]">(৳${origPrice.toFixed(2)})</span>
+                            </div>
                             
                             <!-- Badges Row -->
                             <div class="text-[10px] flex flex-wrap gap-1.5 items-center">
-                                <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">৳${parseFloat(p.price || 0).toFixed(0)}</span>
-                                <span class="${isStockOk ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'} px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1">
-                                    <i class="fa-solid ${isStockOk ? 'fa-check text-[9px]' : 'fa-triangle-exclamation text-[9px]'}"></i> স্টক: ${vanStock}
+                                <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">৳${parseFloat(p.price || 0).toFixed(2)}</span>
+                                <span id="itemStockBadge-${orderIdx}-${idx}" class="${isStockOk ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'} px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1">
+                                    <i class="fa-solid ${isStockOk ? 'fa-check text-[9px]' : 'fa-triangle-exclamation text-[9px]'}"></i> স্টক: <span id="itemStockVal-${orderIdx}-${idx}">${vanStock}</span>
                                 </span>
-                                <span class="bg-blue-50 text-blue-700 font-extrabold px-1.5 py-0.5 rounded" id="itemPrice-${orderIdx}-${idx}">৳${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(0)}</span>
+                                <span class="bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1">
+                                    <i class="fa-solid fa-cart-shopping text-[9px]"></i> অর্ডার: ${qty}
+                                </span>
+                                <span class="bg-blue-50 text-blue-700 font-extrabold px-1.5 py-0.5 rounded" id="itemPrice-${orderIdx}-${idx}">৳${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(2)}</span>
                                 <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
                             </div>
                         </div>
@@ -1479,11 +1492,12 @@ function selectCompanyOrder(orderIndex) {
         });
     }
 
-    document.getElementById('bsOrderTotal').innerText = 'Tk ' + parseFloat(order.total_amount || 0).toFixed(0);
+    document.getElementById('bsOrderTotal').innerText = 'Tk ' + parseFloat(order.total_amount || 0).toFixed(2);
     
     // Update order quantity stats
     const totalQty = order.products ? order.products.reduce((acc, p) => acc + parseInt(p.quantity), 0) : 0;
-    document.getElementById('bsTotalQty').innerText = totalQty;
+    const bsTotalQtyEl = document.getElementById('bsTotalQty');
+    if (bsTotalQtyEl) bsTotalQtyEl.innerText = totalQty;
 
     const statusLabel = { 'in_transit': 'অপেক্ষমান', 'delivered': 'পরিশোধিত', 'partial': 'আংশিক/বাকি', 'cancelled': 'বাতিল' };
     const statusColor = { 'in_transit': '#2563eb', 'delivered': '#16a34a', 'partial': '#d97706', 'cancelled': '#dc2626' };
@@ -1517,8 +1531,8 @@ function selectCompanyOrder(orderIndex) {
             }
             
             const due = actualTotal - paid;
-            document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(0);
-            document.getElementById('bsDueAmount').innerText = '৳' + due.toFixed(0);
+            document.getElementById('bsPaidAmount').innerText = '৳' + paid.toFixed(2);
+            document.getElementById('bsDueAmount').innerText = '৳' + due.toFixed(2);
         } else {
             bsPartialInfo.classList.add('hidden');
         }
@@ -1544,19 +1558,26 @@ function selectCompanyOrder(orderIndex) {
     // Dynamic Action Buttons
     const actionContainer = document.getElementById('bsActionButtons');
     if (actionContainer) {
-        if (order.status === 'cancelled') {
-            actionContainer.innerHTML = `<button onclick="redoCancelledOrder(${orderIndex})" class="w-full py-2.5 rounded-lg font-bold bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Action disabled"' : '' ?>><i class="fa-solid fa-rotate-left"></i> আবার চেষ্টা করুন</button>`;
-        } else if (order.status === 'delivered') {
-            actionContainer.innerHTML = '';
+        const disableAttr = `<?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Action disabled"' : '' ?>`;
+        
+        // Base Undo button HTML - styled elegantly in slate grey
+        const undoBtnHtml = `<button onclick="undoOrder('${order.dispatch_id}', ${orderIndex})" class="w-full py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md flex items-center justify-center gap-2" style="background-color: #64748b;" ${disableAttr}><i class="fa-solid fa-rotate-left"></i> আনডু করুন (Undo)</button>`;
+
+        if (order.status === 'cancelled' || order.status === 'delivered') {
+            actionContainer.innerHTML = undoBtnHtml;
         } else if (order.status === 'partial') {
             actionContainer.innerHTML = `
-                <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
-                <button id="pay-btn" onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
+                <div class="flex flex-col gap-2 w-full">
+                    <button onclick="markDelivery('cancelled')" class="w-full py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
+                    ${undoBtnHtml}
+                </div>
             `;
         } else {
             actionContainer.innerHTML = `
-                <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
-                <button id="pay-btn" onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
+                <div class="flex gap-2 w-full">
+                    <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
+                    <button id="pay-btn" onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
+                </div>
             `;
         }
     }
@@ -1602,13 +1623,13 @@ function calcProgress(el, idx) {
     if (itemPriceEl) {
         const unitPrice = parseFloat(parent.getAttribute('data-price')) || 0;
         const basePrice = parseFloat(parent.getAttribute('data-baseprice')) || 0;
-        itemPriceEl.innerText = '৳' + (totalDelivered * unitPrice).toFixed(0);
+        itemPriceEl.innerText = '৳' + (totalDelivered * unitPrice).toFixed(2);
         
         if (itemOcEl) {
             const oc = (unitPrice - basePrice) * totalDelivered;
             if (Math.round(oc) !== 0 && totalDelivered > 0) {
                 itemOcEl.className = `text-[10px] font-bold px-1.5 py-0.5 rounded-md ${oc > 0 ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`;
-                itemOcEl.innerText = `${oc > 0 ? '+' : ''}${Math.round(oc)}`;
+                itemOcEl.innerText = `${oc > 0 ? '+' : ''}${oc.toFixed(2)}`;
                 itemOcEl.classList.remove('hidden');
             } else {
                 itemOcEl.classList.add('hidden');
@@ -1634,6 +1655,31 @@ function calcProgress(el, idx) {
         }
     }
     
+    // Dynamic Stock Badge Update for current item
+    const currentPItem = el.closest('.product-item');
+    if (currentPItem) {
+        const curPid = currentPItem.getAttribute('data-pid');
+        const curPrevDel = parseInt(currentPItem.getAttribute('data-prevdelivered')) || 0;
+        const curVanStock = (typeof vanStockMap !== 'undefined' && vanStockMap[curPid] !== undefined) ? parseInt(vanStockMap[curPid]) : 0;
+        const curDiff = totalDelivered - curPrevDel;
+        // User requested not to change stock qty dynamically on qty change
+        const curDynamicStock = curVanStock;
+        
+        const stockValEl = document.getElementById(`itemStockVal-${idx}`);
+        const stockBadgeEl = document.getElementById(`itemStockBadge-${idx}`);
+        if (stockValEl && curDynamicStock >= 0) {
+            stockValEl.innerText = curDynamicStock;
+        }
+        if (stockBadgeEl) {
+            const isOk = curDynamicStock >= 0;
+            stockBadgeEl.className = `${isOk ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'} px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-1`;
+            const icon = stockBadgeEl.querySelector('i');
+            if (icon) {
+                icon.className = `fa-solid ${isOk ? 'fa-check text-[9px]' : 'fa-triangle-exclamation text-[9px]'}`;
+            }
+        }
+    }
+
     // Recalculate getting total for the CURRENT active order group
     const orderGroup = el.closest('.order-group-container');
     let gettingTotal = 0;
@@ -1654,9 +1700,11 @@ function calcProgress(el, idx) {
             gettingTotal += (tQty * price);
             
             const pid = bInp.getAttribute('data-pid') || pInp.getAttribute('data-pid');
+            const prevDel = parseInt(pItem.getAttribute('data-prevdelivered')) || 0;
             if (pid) {
-                const vanStock = parseInt(vanStockMap[pid]) || 0;
-                if (tQty > vanStock) {
+                const vanStock = (typeof vanStockMap !== 'undefined' && vanStockMap[pid] !== undefined) ? parseInt(vanStockMap[pid]) : 0;
+                const diff = tQty - prevDel;
+                if (diff > vanStock) {
                     exceedsStock = true;
                 }
             }
@@ -1664,7 +1712,7 @@ function calcProgress(el, idx) {
     });
     
     const bsGettingTotal = document.getElementById('bsGettingTotal');
-    if (bsGettingTotal) bsGettingTotal.innerText = '৳' + gettingTotal.toFixed(0);
+    if (bsGettingTotal) bsGettingTotal.innerText = '৳' + gettingTotal.toFixed(2);
 
     const payBtn = document.getElementById('pay-btn');
     if (payBtn) {
@@ -1687,7 +1735,7 @@ function calcProgress(el, idx) {
             const paid = parseFloat(order.paid_amount || 0);
             let due = gettingTotal - paid;
             const bsDueAmount = document.getElementById('bsDueAmount');
-            if (bsDueAmount) bsDueAmount.innerText = '৳' + due.toFixed(0);
+            if (bsDueAmount) bsDueAmount.innerText = '৳' + due.toFixed(2);
         }
     }
 }
@@ -1913,6 +1961,122 @@ async function redoCancelledOrder(orderIndex) {
     }
 }
 
+async function undoOrder(dispatchId, orderIndex) {
+    if(!confirm("Are you sure you want to undo this transaction? This will reset status, inventory, and paid amount.")) return;
+
+    const order = currentRetailerObj.orders[orderIndex];
+    if (!order) return;
+
+    dispatchId = (dispatchId && dispatchId !== 'undefined') ? dispatchId : (order.dispatch_id || currentDispatchId);
+    if (!dispatchId) {
+        showToast('❌ Dispatch ID not found.');
+        return;
+    }
+
+    const btns = document.querySelectorAll('#retailerSheet button');
+    btns.forEach(b => { b.disabled = true; });
+
+    try {
+        if (!navigator.onLine) {
+            // Offline queueing
+            let queue = JSON.parse(localStorage.getItem('undoQueue') || '[]');
+            queue.push({ dispatchId, timestamp: Date.now() });
+            localStorage.setItem('undoQueue', JSON.stringify(queue));
+            showToast('Offline mode: Undo request queued.');
+        } else {
+            const res = await fetch('<?= url("dsr/delivery/undo/") ?>' + dispatchId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `csrf_token=<?= Helpers::csrfToken() ?>`
+            });
+            const data = await res.json();
+            if(!data.success) {
+                throw new Error(data.message || 'Error undoing delivery');
+            }
+        }
+
+        // 1. Stock Restoration in local state
+        const prevStatus = order.status;
+        if (order.products && (prevStatus === 'delivered' || prevStatus === 'partial')) {
+            order.products.forEach(p => {
+                const pid = p.product_id;
+                const previouslyDelivered = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : (prevStatus === 'delivered' ? parseInt(p.quantity) : 0);
+                if (previouslyDelivered > 0 && typeof vanStockMap !== 'undefined' && vanStockMap[pid] !== undefined) {
+                    vanStockMap[pid] = parseInt(vanStockMap[pid]) + previouslyDelivered;
+                }
+            });
+        }
+
+        // 2. Full Order State Reset
+        order.status = 'in_transit'; // Revert to pending
+        order.paid_amount = 0;
+        order.notes = '';
+        if (order.products) {
+            order.products.forEach(p => {
+                p.delivered_quantity = null;
+            });
+        }
+        
+        // 3. Sync orderedRetailers globally
+        if (currentRetailerObj) {
+            const globalRetIdx = orderedRetailers.findIndex(r => (r.id && r.id === currentRetailerObj.id) || (r.retailer_name === currentRetailerObj.retailer_name));
+            if (globalRetIdx !== -1) {
+                orderedRetailers[globalRetIdx] = currentRetailerObj;
+            }
+        }
+
+        // 4. Instantly Re-render Bottom Sheet UI
+        openRetailerSheet(currentRetailerObj, orderIndex);
+
+        // 5. Redraw Map Pins
+        if (typeof redrawMapPins === 'function') {
+            redrawMapPins();
+        }
+
+        // 6. Update Retailer List Modal Grid
+        if (typeof renderRetailerListGrid === 'function') {
+            renderRetailerListGrid();
+        }
+
+        showToast('✔️ অর্ডার সফলভাবে পূর্বাবস্থায় ফিরিয়ে আনা হয়েছে (Reset Successfully)!');
+    } catch (err) {
+        showToast('❌ ' + (err.message || 'An error occurred.'));
+    } finally {
+        btns.forEach(b => { b.disabled = false; });
+    }
+}
+
+async function syncUndoQueue() {
+    let queue = JSON.parse(localStorage.getItem('undoQueue') || '[]');
+    if (queue.length === 0) return;
+
+    let remainingQueue = [];
+    for (let req of queue) {
+        try {
+            const res = await fetch('<?= url("dsr/delivery/undo/") ?>' + req.dispatchId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `csrf_token=<?= Helpers::csrfToken() ?>`
+            });
+            const data = await res.json();
+            if (!data.success && data.message !== 'Delivery is already pending.') {
+                remainingQueue.push(req);
+            }
+        } catch (e) {
+            remainingQueue.push(req);
+        }
+    }
+    
+    if (remainingQueue.length === 0) {
+        localStorage.removeItem('undoQueue');
+    } else {
+        localStorage.setItem('undoQueue', JSON.stringify(remainingQueue));
+    }
+}
+
+window.addEventListener('online', syncUndoQueue);
+document.addEventListener('DOMContentLoaded', syncUndoQueue);
+
 function redrawMapPins() {
     if (!map) return;
     markers.forEach(m => map.removeLayer(m));
@@ -1995,15 +2159,15 @@ function renderRetailerListGrid() {
         } else if (hasPending) {
             statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200"><i class="fa-regular fa-clock mr-1"></i>অপেক্ষমাণ</span>';
             cardBorder = 'border-blue-200';
-        } else if (hasDelivered && !$hasPartial && !$hasCancelled) {
+        } else if (hasDelivered && !hasPartial && !hasCancelled) {
             statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>ডেলিভারড</span>';
             cardBorder = 'border-emerald-300';
             cardBg = 'bg-emerald-50/20';
-        } else if (hasCancelled && !$hasDelivered && !$hasPartial) {
+        } else if (hasCancelled && !hasDelivered && !hasPartial) {
             statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-xmark mr-1"></i>বাতিল</span>';
             cardBorder = 'border-rose-300';
             cardBg = 'bg-rose-50/20';
-        } else if (hasPartial && !$hasDelivered && !$hasCancelled) {
+        } else if (hasPartial && !hasDelivered && !hasCancelled) {
             statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-circle-half-stroke mr-1"></i>পার্শিয়াল</span>';
             cardBorder = 'border-amber-300';
             cardBg = 'bg-amber-50/20';
@@ -2088,11 +2252,13 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
 
             for (let pid in deliveredItems) {
                 const tQty = deliveredItems[pid];
-                const vanStock = parseInt(vanStockMap[pid]) || 0;
-                if (tQty > vanStock) {
-                    const prod = o.products.find(pr => String(pr.product_id) === String(pid));
+                const vanStock = (typeof vanStockMap !== 'undefined' && vanStockMap[pid] !== undefined) ? parseInt(vanStockMap[pid]) : 0;
+                const prod = o.products ? o.products.find(pr => String(pr.product_id) === String(pid)) : null;
+                const prevDel = prod && prod.delivered_quantity !== null ? parseInt(prod.delivered_quantity) : 0;
+                const diff = tQty - prevDel;
+                if (diff > vanStock) {
                     const prodName = prod ? prod.name : 'Product';
-                    alert(`⚠️ Delivery cannot be completed!\nVan stock for "${prodName}" is ${vanStock}, but the retailer ordered/requested quantity is ${tQty}.`);
+                    alert(`⚠️ Delivery cannot be completed!\nVan stock for "${prodName}" is ${vanStock}, but the additional requested quantity is ${diff}.`);
                     return;
                 }
             }
@@ -2151,38 +2317,51 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
         if (status === 'cancelled' || status === 'delivered' || status === 'partial') {
             orders.forEach(o => {
                 o.status = status;
-                o.paid_amount = paidAmounts[o.dispatch_id] || 0;
+                o.paid_amount = (status === 'cancelled') ? 0 : (paidAmounts[o.dispatch_id] || 0);
                 o.notes = reason;
                 
-                const origIdx = currentRetailerObj.orders.findIndex(orig => orig.dispatch_id === o.dispatch_id);
-                const orderGroup = document.getElementById(`order-group-${origIdx}`);
-                if (orderGroup) {
-                    orderGroup.querySelectorAll('.product-item').forEach(pItem => {
-                        const bInp = pItem.querySelector('.delivery-input-box');
-                        const pInp = pItem.querySelector('.delivery-input-pcs');
-                        if (bInp && pInp) {
-                            const b = parseInt(bInp.value) || 0;
-                            const p = parseInt(pInp.value) || 0;
-                            const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
-                            const tQty = (b * p_ppb) + p;
-                            const pid = bInp.getAttribute('data-pid');
-                            
-                            const prod = o.products.find(pr => String(pr.product_id) === String(pid));
-                            if (prod) {
-                                prod.delivered_quantity = tQty;
+                if (status === 'cancelled') {
+                    if (o.products) {
+                        o.products.forEach(prod => {
+                            prod.prev_delivered_snapshot = prod.delivered_quantity !== null ? parseInt(prod.delivered_quantity) : 0;
+                            prod.delivered_quantity = 0;
+                        });
+                    }
+                } else {
+                    const origIdx = currentRetailerObj.orders.findIndex(orig => orig.dispatch_id === o.dispatch_id);
+                    const orderGroup = document.getElementById(`order-group-${origIdx}`);
+                    if (orderGroup) {
+                        orderGroup.querySelectorAll('.product-item').forEach(pItem => {
+                            const bInp = pItem.querySelector('.delivery-input-box');
+                            const pInp = pItem.querySelector('.delivery-input-pcs');
+                            if (bInp && pInp) {
+                                const b = parseInt(bInp.value) || 0;
+                                const p = parseInt(pInp.value) || 0;
+                                const p_ppb = parseInt(bInp.getAttribute('data-ppb')) || 1;
+                                const tQty = (b * p_ppb) + p;
+                                const pid = bInp.getAttribute('data-pid');
+                                
+                                const prod = o.products.find(pr => String(pr.product_id) === String(pid));
+                                if (prod) {
+                                    prod.prev_delivered_snapshot = prod.delivered_quantity !== null ? parseInt(prod.delivered_quantity) : 0;
+                                    prod.delivered_quantity = tQty;
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
                 
-                if (status === 'delivered' || status === 'partial') {
+                if (status === 'cancelled' || status === 'delivered' || status === 'partial') {
                     if (o.products) {
                         o.products.forEach(p => {
                             const pid = p.product_id;
-                            const tQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
+                            const prevDel = p.prev_delivered_snapshot !== undefined ? p.prev_delivered_snapshot : 0;
+                            const tQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : (status === 'cancelled' ? 0 : parseInt(p.quantity));
+                            const diff = tQty - prevDel;
                             if (vanStockMap[pid] !== undefined) {
-                                vanStockMap[pid] = Math.max(0, parseInt(vanStockMap[pid]) - tQty);
+                                vanStockMap[pid] = Math.max(0, parseInt(vanStockMap[pid]) - diff);
                             }
+                            delete p.prev_delivered_snapshot;
                         });
                     }
                 }

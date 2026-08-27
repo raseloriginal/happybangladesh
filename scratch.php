@@ -1,0 +1,1 @@
+<?php $db = new PDO("mysql:host=localhost;dbname=happybangladesh_dms", "root", ""); $stmt = $db->query("SELECT * FROM approvals ORDER BY id DESC LIMIT 1"); print_r($stmt->fetchAll(PDO::FETCH_ASSOC)); ?>

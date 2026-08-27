@@ -1,0 +1,78 @@
+669:                const qty = parseInt(p.quantity);
+670:                let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+671:                actualTotal += (deliveredQty * parseFloat(p.price || 0));
+943:                const qty = parseInt(p.quantity);
+944:                let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+945:                actualTotal += (deliveredQty * parseFloat(p.price || 0));
+964:                        const qty = parseInt(p.quantity);
+965:                        let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+966:                        actualTotal += (deliveredQty * parseFloat(p.price || 0));
+1264:function changeQty(btn, amount, type, idx) {
+1349:                    const qty = parseInt(p.quantity); // pieces dispatched on van
+1351:                    let initialDeliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : (order.status === 'cancelled' ? 0 : qty);
+1354:                    const initialBoxes = Math.floor(initialDeliveredQty / ppb);
+1355:                    const initialPcs = initialDeliveredQty % ppb;
+1358:                    const isStockOk = vanStock >= (qty - prevDelivered);
+1377:                                    <i class="fa-solid fa-cart-shopping text-[9px]"></i> অর্ডার: ${qty}
+1379:                                <span class="bg-blue-50 text-blue-700 font-extrabold px-1.5 py-0.5 rounded" id="itemPrice-${orderIdx}-${idx}">৳${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(2)}</span>
+1388:                                    data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}">
+1392:                                        <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')"
+1394:                                        <input type="number" min="0" value="${initialDeliveredQty}"
+1396:                                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+1398:                                        <button type="button" onclick="changeQty(this, +1, 'pcs', '${orderIdx}-${idx}')"
+1406:                                        <button type="button" onclick="changeQty(this, -1, 'box', '${orderIdx}-${idx}')"
+1410:                                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+1412:                                        <button type="button" onclick="changeQty(this, +1, 'box', '${orderIdx}-${idx}')"
+1419:                                        <button type="button" onclick="changeQty(this, -1, 'pcs', '${orderIdx}-${idx}')"
+1423:                                            data-ppb="${ppb}" data-qty="${qty}" data-idx="${orderIdx}-${idx}" data-pid="${p.product_id}" data-price="${p.price || 0}"
+1425:                                        <button type="button" onclick="changeQty(this, +1, 'pcs', '${orderIdx}-${idx}')"
+1498:    const totalQty = order.products ? order.products.reduce((acc, p) => acc + parseInt(p.quantity), 0) : 0;
+1499:    const bsTotalQtyEl = document.getElementById('bsTotalQty');
+1500:    if (bsTotalQtyEl) bsTotalQtyEl.innerText = totalQty;
+1525:                    const qty = parseInt(p.quantity);
+1526:                    let deliveredQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : qty;
+1527:                    actualTotal += (deliveredQty * parseFloat(p.price || 0));
+1551:        activeDiv.querySelectorAll('button[onclick^="changeQty"]').forEach(btn => {
+1616:    const maxQty = parseInt(boxInput.getAttribute('data-qty')) || 1;
+1620:    const delQtyEl = document.getElementById(`delQty-${idx}`);
+1621:    if (delQtyEl) delQtyEl.innerText = totalDelivered;
+1623:    // Update item price display (total cost = qty * unit price)
+1643:    let percent = (totalDelivered / maxQty) * 100;
+1700:            const tQty = (b * p_ppb) + p;
+1702:            gettingTotal += (tQty * price);
+1708:                const diff = tQty - prevDel;
+1756:            const tQty = (b * p_ppb) + p;
+1758:            total += (tQty * price);
+2242:                        const tQty = (b * p_ppb) + p;
+2245:                            deliveredItems[pid] = tQty;
+2256:                const tQty = deliveredItems[pid];
+2260:                const diff = tQty - prevDel;
+2291:                        const tQty = (b * p_ppb) + p;
+2294:                            deliveredItems[pid] = tQty;
+2342:                                const tQty = (b * p_ppb) + p;
+2348:                                    prod.delivered_quantity = tQty;
+2360:                            const tQty = p.delivered_quantity !== null ? parseInt(p.delivered_quantity) : parseInt(p.quantity);
+2361:                            const diff = tQty - prevDel;
+2620:                        const tQty = (b * p_ppb) + p;
+2623:                            deliveredItems[pid] = tQty;
+2929:        productOptionsHtml += `<option value="${p.product_id}" data-baseprice="${p.base_price}" data-avail="${p.available_qty}" data-ppb="${p.pieces_per_box}" data-name="${p.product_name}" data-lotid="${p.lot_id || ''}">${p.product_name} (Avail: ${p.available_qty} Pcs | Base: ৳${p.base_price})</option>`;
+2960:          <!-- Bottom Row: Price Input, Qty Controls, Subtotal -->
+2969:            <!-- Qty Input -->
+2972:              <input type="number" min="1" value="1" class="rs-qty w-full rounded-xl px-2 py-2 text-center text-sm font-black outline-none transition border border-gray-200 bg-white text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" oninput="calculateRSTotals()">
+3005:        row.querySelector('.rs-qty').max = '';
+3015:    const availQty = parseInt(selectedOpt.dataset.avail || 0);
+3020:    row.querySelector('.rs-qty').max = availQty;
+3023:        availBadge.innerText = `Avail: ${availQty} Pcs`;
+3024:        if (availQty <= 5) {
+3031:    if (parseInt(row.querySelector('.rs-qty').value) > availQty) {
+3032:        row.querySelector('.rs-qty').value = availQty;
+3050:        const qtyInput = row.querySelector('.rs-qty');
+3052:        let qty = parseInt(qtyInput.value) || 0;
+3053:        if (qty > maxAvail) {
+3054:            qty = maxAvail;
+3055:            qtyInput.value = qty;
+3061:        const lineTotal = qty * unitPrice;
+3062:        const lineOC = (unitPrice - basePrice) * qty;
+3117:        const qty = parseInt(row.querySelector('.rs-qty').value) || 0;
+3120:        if (qty > 0 && unitPrice >= 0) {
+3124:                qty: qty,
