@@ -17,6 +17,7 @@ $isReturned = ($scheduleStatus === 'returned');
 $isNoDispatch = ($dispatchedValue <= 0);
 $isLocked = $isSubmitted || !$isReturned || $isNoDispatch;
 $readonlyAttr = $isLocked ? 'readonly' : '';
+$initialShouldPay = round($dispatchedValue - $returnedValue - $savedDamage - $savedExpense + $savedDeliveryOc - ($totalDue ?? 0));
 ?>
 
 <style>
@@ -136,7 +137,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
 
     <div class="bg-blue-600 text-white p-3 rounded-2xl border border-blue-700 shadow-xs space-y-1">
       <span class="text-[11px] font-bold text-blue-100 block">নিট জমা (Net Pay)</span>
-      <span id="fxShouldPay" class="font-black text-sm sm:text-base text-white font-mono tracking-tight block">৳0</span>
+      <span id="fxShouldPay" class="font-black text-sm sm:text-base text-white font-mono tracking-tight block">৳<?= number_format($initialShouldPay) ?></span>
     </div>
   </div>
 
@@ -147,6 +148,7 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
     <input type="hidden" name="damage_amount" value="<?= $savedDamage ?>">
     <input type="hidden" name="total_expense" value="<?= $savedExpense ?>">
     <input type="hidden" name="delivery_oc" id="formDeliveryOc" value="<?= $savedDeliveryOc ?>">
+    <input type="hidden" name="total_due" id="formTotalDue" value="<?= $totalDue ?? 0 ?>">
     <input type="hidden" name="should_pay" id="formShouldPay" value="0">
     <input type="hidden" name="counted_cash" id="formCountedCash" value="0">
     <input type="hidden" name="difference" id="formDifference" value="0">
@@ -241,6 +243,17 @@ $readonlyAttr = $isLocked ? 'readonly' : '';
           <span class="font-black <?= $savedDeliveryOc >= 0 ? 'text-emerald-600' : 'text-rose-600' ?> font-mono">
             <?= $savedDeliveryOc >= 0 ? '+' : '' ?>৳ <?= number_format($savedDeliveryOc, 2) ?>
           </span>
+        </div>
+
+        <!-- Row 6: Total Due -->
+        <div class="p-3.5 flex items-center justify-between hover:bg-slate-50/40 transition">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-hand-holding-dollar"></i>
+            </div>
+            <span class="font-bold text-slate-800">ডিলারের বকেয়া (Due) (-)</span>
+          </div>
+          <span class="font-black text-orange-600 font-mono">- ৳ <?= number_format($totalDue ?? 0, 2) ?></span>
         </div>
 
         <!-- Net Total Header -->
@@ -403,6 +416,7 @@ const returned = <?= (float)$returnedValue ?>;
 const damageVal = <?= (float)$savedDamage ?>;
 const expenseVal = <?= (float)$savedExpense ?>;
 const deliveryOcVal = <?= (float)$savedDeliveryOc ?>;
+const totalDueVal = <?= (float)($totalDue ?? 0) ?>;
 
 function stepDenom(denom, step) {
   const input = document.getElementById(`denom-input-${denom}`);
@@ -414,7 +428,7 @@ function stepDenom(denom, step) {
 }
 
 function autoFillCash() {
-  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal + deliveryOcVal);
+  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal + deliveryOcVal - totalDueVal);
   if (shouldPay <= 0) return;
   
   document.querySelectorAll('.denomination-input').forEach(inp => inp.value = '');
@@ -440,7 +454,7 @@ function clearCash() {
 }
 
 function calculate() {
-    const shouldPay = dispatched - returned - damageVal - expenseVal + deliveryOcVal;
+    const shouldPay = dispatched - returned - damageVal - expenseVal + deliveryOcVal - totalDueVal;
     const roundedShouldPay = Math.round(shouldPay);
     
     document.getElementById('displayShouldPay').innerText = '৳ ' + roundedShouldPay.toLocaleString('en-US');
