@@ -63,6 +63,36 @@ class SRController extends Controller
                 INDEX idx_cutoff_date (cutoff_date)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+
+        // Ensure order_archive table exists (audit trail for replaced orders)
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS order_archive (
+                id                   INT AUTO_INCREMENT PRIMARY KEY,
+                original_order_id    INT NOT NULL,
+                replaced_by_order_id INT DEFAULT NULL,
+                sr_id                INT NOT NULL,
+                retailer_id          INT DEFAULT NULL,
+                order_data           JSON,
+                items_data           JSON,
+                archived_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+                reason               VARCHAR(100) DEFAULT 'replaced_same_day',
+                INDEX idx_original (original_order_id),
+                INDEX idx_sr_id (sr_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Ensure sr_visits table exists (visit tracking)
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS sr_visits (
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                sr_id       INT NOT NULL,
+                retailer_id INT NOT NULL,
+                visited_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                had_order   TINYINT(1) DEFAULT 0,
+                INDEX idx_sr_date (sr_id, visited_at),
+                INDEX idx_sr_retailer (sr_id, retailer_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
     }
 
     // ── Check if today's order cutoff is active for SR ────────
@@ -108,11 +138,11 @@ class SRController extends Controller
             SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
                    p.buying_price, p.dealer_percentage,
                    (
-                       COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
-                       -
-                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
-                       +
-                       COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                        CAST(COALESCE((SELECT SUM(CAST(qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(qty_pieces AS SIGNED)) FROM lots WHERE product_id = p.id), 0) AS SIGNED)
+                        -
+                        CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0) AS SIGNED)
+                        +
+                        CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0) AS SIGNED)
                    ) AS stock,
                    (SELECT new_data FROM approvals WHERE module='products_price' AND record_id=p.id AND status='pending' ORDER BY id DESC LIMIT 1) AS pending_approval_data
             FROM products p
@@ -718,10 +748,24 @@ class SRController extends Controller
 
         // Clean up today's previous order if it exists for this retailer
         if ($retailerId) {
-            $stmtToday = $this->db->prepare("SELECT id FROM orders WHERE retailer_id=? AND sr_id=? AND DATE(created_at)=CURDATE() LIMIT 1");
+            $stmtToday = $this->db->prepare("SELECT * FROM orders WHERE retailer_id=? AND sr_id=? AND DATE(created_at)=CURDATE() LIMIT 1");
             $stmtToday->execute([$retailerId, Auth::id()]);
-            $oldOrderId = $stmtToday->fetchColumn();
-            if ($oldOrderId) {
+            $oldOrder = $stmtToday->fetch(PDO::FETCH_ASSOC);
+            if ($oldOrder) {
+                $oldOrderId = $oldOrder['id'];
+                // ── Archive before delete (audit trail) ──────────────────
+                $archiveItemsStmt = $this->db->prepare("SELECT * FROM order_items WHERE order_id=?");
+                $archiveItemsStmt->execute([$oldOrderId]);
+                $oldItems = $archiveItemsStmt->fetchAll(PDO::FETCH_ASSOC);
+                try {
+                    $this->db->prepare("
+                        INSERT INTO order_archive (original_order_id, sr_id, retailer_id, order_data, items_data, reason)
+                        VALUES (?, ?, ?, ?, ?, 'replaced_same_day')
+                    ")->execute([$oldOrderId, Auth::id(), $retailerId, json_encode($oldOrder), json_encode($oldItems)]);
+                } catch (\Exception $archEx) {
+                    // Archive failure should not block the update
+                }
+                // ── Now delete the old order ──────────────────────────────
                 $this->db->prepare("DELETE FROM order_items WHERE order_id=?")->execute([$oldOrderId]);
                 $this->db->prepare("DELETE FROM orders WHERE id=?")->execute([$oldOrderId]);
             }
@@ -767,6 +811,17 @@ class SRController extends Controller
         }
 
         $this->flash('success', "Order #$orderId placed successfully!");
+
+        // ── Mark visit as had_order in sr_visits ─────────────────────
+        if ($retailerId) {
+            try {
+                $this->db->prepare("
+                    UPDATE sr_visits SET had_order = 1
+                    WHERE sr_id = ? AND retailer_id = ? AND DATE(visited_at) = CURDATE()
+                ")->execute([Auth::id(), $retailerId]);
+            } catch (\Exception $e) { /* non-critical */ }
+        }
+
         if ($this->post('ajax')) {
             $this->json(['success' => true, 'message' => "Order #$orderId placed successfully!", 'order_id' => $orderId]);
         }
@@ -876,6 +931,16 @@ class SRController extends Controller
 
             $order['total_amount'] = $total;
             $order['products'] = $updatedProducts;
+
+            // Mark visit as had_order in sr_visits
+            if (!empty($order['retailer_id'])) {
+                try {
+                    $this->db->prepare("
+                        UPDATE sr_visits SET had_order = 1
+                        WHERE sr_id = ? AND retailer_id = ? AND DATE(visited_at) = CURDATE()
+                    ")->execute([Auth::id(), $order['retailer_id']]);
+                } catch (\Exception $e) { /* non-critical */ }
+            }
 
             $this->json([
                 'success' => true,
@@ -1082,12 +1147,15 @@ class SRController extends Controller
         $compQ->execute();
         $companies = $compQ->fetchAll(PDO::FETCH_ASSOC);
 
-        // 1. Fetch Ordered Products with Company & Packaging Info
+        // 1. Fetch Ordered Products with Company & Packaging Info (including OC)
         $qOrders = $this->db->prepare("
             SELECT p.id as product_id, p.name as product_name, c.name as company_name, 
                    COALESCE(p.pieces_per_box, 1) as pieces_per_box,
-                   MAX(oi.unit_price) as ordered_price, SUM(oi.quantity) as ordered_qty,
-                   SUM(oi.unit_price * oi.quantity) as ordered_val_exact
+                   MAX(oi.unit_price) as ordered_price,
+                   MAX(COALESCE(NULLIF(oi.base_selling_price, 0), p.price, oi.unit_price)) as base_price,
+                   SUM(oi.quantity) as ordered_qty,
+                   SUM(oi.unit_price * oi.quantity) as ordered_val_exact,
+                   SUM((oi.unit_price - COALESCE(NULLIF(oi.base_selling_price, 0), p.price, oi.unit_price)) * oi.quantity) as ordered_oc
             FROM order_items oi
             JOIN orders o ON o.id = oi.order_id
             JOIN products p ON p.id = oi.product_id
@@ -1135,18 +1203,23 @@ class SRController extends Controller
         }
 
         $transactions = [];
+        $totalOrderedVal    = 0;
         $totalDispatchedVal = 0;
-        $totalSellVal = 0;
-        $totalReturnVal = 0;
+        $totalSellVal       = 0;
+        $totalReturnVal     = 0;
+        $totalOrderedOC     = 0;
+        $totalSellOC        = 0;
 
         foreach ($ordersData as $row) {
-            $pid = $row['product_id'];
-            $orderedQty = (int)$row['ordered_qty'];
+            $pid          = $row['product_id'];
+            $orderedQty   = (int)$row['ordered_qty'];
             $orderedPrice = (float)$row['ordered_price'];
-            
+            $orderedOC    = (float)($row['ordered_oc'] ?? 0);
+            $orderedVal   = (float)($row['ordered_val_exact'] ?? ($orderedQty * $orderedPrice));
+
             $dispatchedQty = (int)($dispatchMap[$pid]['dispatched_qty'] ?? 0);
-            $sellQty = (int)($dispatchMap[$pid]['sell_qty'] ?? 0);
-            
+            $sellQty       = (int)($dispatchMap[$pid]['sell_qty'] ?? 0);
+
             // Return/Remaining quantity is whatever was dispatched but not sold
             $returnQty = max(0, $dispatchedQty - $sellQty);
 
@@ -1154,9 +1227,16 @@ class SRController extends Controller
             $sellVal       = $sellQty * $orderedPrice;
             $returnVal     = $returnQty * $orderedPrice;
 
+            // OC per sell: proportional to ordered OC
+            $ocPerUnit = $orderedQty > 0 ? ($orderedOC / $orderedQty) : 0;
+            $sellOC    = $ocPerUnit * $sellQty;
+
+            $totalOrderedVal    += $orderedVal;
             $totalDispatchedVal += $dispatchedVal;
             $totalSellVal       += $sellVal;
             $totalReturnVal     += $returnVal;
+            $totalOrderedOC     += $orderedOC;
+            $totalSellOC        += $sellOC;
 
             $transactions[] = [
                 'product_id'     => $pid,
@@ -1165,20 +1245,25 @@ class SRController extends Controller
                 'pieces_per_box' => (int)($row['pieces_per_box'] ?: 1),
                 'ordered_price'  => $orderedPrice,
                 'ordered_qty'    => $orderedQty,
-                'ordered_val'    => (float)($row['ordered_val_exact'] ?? ($orderedQty * $orderedPrice)),
+                'ordered_val'    => $orderedVal,
+                'ordered_oc'     => $orderedOC,
                 'dispatched_qty' => $dispatchedQty,
                 'dispatched_val' => $dispatchedVal,
                 'sell_qty'       => $sellQty,
                 'sell_val'       => $sellVal,
+                'sell_oc'        => $sellOC,
                 'return_qty'     => $returnQty,
                 'return_val'     => $returnVal,
             ];
         }
 
         $subtotal = [
+            'ordered_val'    => $totalOrderedVal,
             'dispatched_val' => $totalDispatchedVal,
             'sell_val'       => $totalSellVal,
             'return_val'     => $totalReturnVal,
+            'ordered_oc'     => $totalOrderedOC,
+            'sell_oc'        => $totalSellOC,
         ];
 
         $this->renderApp('transactions', compact('transactions', 'date', 'companies', 'subtotal'));
@@ -1302,5 +1387,51 @@ class SRController extends Controller
         } catch (\PDOException $e) {
             $this->json(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
         }
+    }
+
+    // ── API: Log SR visit to a retailer ──────────────────────────
+    /**
+     * POST /sr/api/log-visit
+     * Body: retailer_id
+     * Logs one visit per retailer per day. Updates had_order when order exists.
+     */
+    public function apiLogVisit(): void
+    {
+        $srId       = Auth::id();
+        $retailerId = intval($_POST['retailer_id'] ?? 0);
+
+        if (!$retailerId) {
+            $this->json(['success' => false, 'message' => 'retailer_id required']);
+            return;
+        }
+
+        // One visit log per retailer per day
+        $check = $this->db->prepare("
+            SELECT id FROM sr_visits
+            WHERE sr_id = ? AND retailer_id = ? AND DATE(visited_at) = CURDATE()
+            LIMIT 1
+        ");
+        $check->execute([$srId, $retailerId]);
+
+        if (!$check->fetchColumn()) {
+            $this->db->prepare("INSERT INTO sr_visits (sr_id, retailer_id) VALUES (?, ?)")
+                     ->execute([$srId, $retailerId]);
+        }
+
+        // Update had_order flag if an order exists today for this retailer
+        $hasOrder = $this->db->prepare("
+            SELECT id FROM orders
+            WHERE sr_id = ? AND retailer_id = ? AND DATE(created_at) = CURDATE()
+            LIMIT 1
+        ");
+        $hasOrder->execute([$srId, $retailerId]);
+        if ($hasOrder->fetchColumn()) {
+            $this->db->prepare("
+                UPDATE sr_visits SET had_order = 1
+                WHERE sr_id = ? AND retailer_id = ? AND DATE(visited_at) = CURDATE()
+            ")->execute([$srId, $retailerId]);
+        }
+
+        $this->json(['success' => true]);
     }
 }

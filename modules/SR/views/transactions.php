@@ -2,6 +2,31 @@
 $pageTitle = 'সমারি'; 
 $dateFormatted = date('d / m / Y', strtotime($date));
 $totalOrderedVal = 0;
+
+// Helper function to format O/C (+ Green, - Red)
+$formatOC = function($amount, $isCard = false) {
+    $val = (float)($amount ?? 0);
+    if ($val == 0) {
+        if ($isCard) {
+            return '<div class="text-[10px] font-semibold text-slate-400 mt-1 font-mono">O/C: ৳0</div>';
+        }
+        return '<div class="text-[10px] text-slate-400 font-bold mt-0.5 font-mono">O/C: ৳0</div>';
+    }
+    
+    if ($val > 0) {
+        // Positive (+) -> Green (Over)
+        if ($isCard) {
+            return '<div class="text-[10px] font-extrabold text-emerald-600 mt-1 inline-flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/80 w-max font-mono"><span>O/C:</span> <span>+৳' . number_format($val) . '</span></div>';
+        }
+        return '<div class="text-[10px] text-emerald-600 font-extrabold mt-0.5 font-mono">O/C: +৳' . number_format($val) . '</div>';
+    } else {
+        // Negative (-) -> Red (Commission / Discount)
+        if ($isCard) {
+            return '<div class="text-[10px] font-extrabold text-rose-600 mt-1 inline-flex items-center gap-1 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100/80 w-max font-mono"><span>O/C:</span> <span>-৳' . number_format(abs($val)) . '</span></div>';
+        }
+        return '<div class="text-[10px] text-rose-600 font-extrabold mt-0.5 font-mono">O/C: -৳' . number_format(abs($val)) . '</div>';
+    }
+};
 ?>
 
 <style>
@@ -43,6 +68,37 @@ $totalOrderedVal = 0;
       <button onclick="window.print()" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition active:scale-95 shadow-sm" title="প্রিন্ট রিপোর্ট">
         <i class="fa-solid fa-print text-xs sm:text-sm"></i>
       </button>
+    </div>
+  </div>
+
+  <!-- Top Summary Cards with O/C -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 print:gap-2 font-siliguri">
+    <!-- Total Order & Order O/C -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200/70 shadow-3xs flex flex-col justify-between">
+      <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wide">মোট অর্ডার</span>
+      <div class="text-sm sm:text-base font-black text-slate-900 mt-0.5 font-mono">৳<?= number_format($subtotal['ordered_val'] ?? 0) ?></div>
+      <?= $formatOC($subtotal['ordered_oc'] ?? 0, true) ?>
+    </div>
+
+    <!-- Total Sell & Sell O/C -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200/70 shadow-3xs flex flex-col justify-between">
+      <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">মোট বিক্রি</span>
+      <div class="text-sm sm:text-base font-black text-slate-900 mt-0.5 font-mono">৳<?= number_format($subtotal['sell_val'] ?? 0) ?></div>
+      <?= $formatOC($subtotal['sell_oc'] ?? 0, true) ?>
+    </div>
+
+    <!-- Total Load Out -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200/70 shadow-3xs flex flex-col justify-between">
+      <span class="text-[10px] font-bold text-amber-600 uppercase tracking-wide">মোট চালান (লোড)</span>
+      <div class="text-sm sm:text-base font-black text-slate-900 mt-0.5 font-mono">৳<?= number_format($subtotal['dispatched_val'] ?? 0) ?></div>
+      <div class="text-[10px] font-semibold text-slate-400 mt-1">আউট স্টক</div>
+    </div>
+
+    <!-- Total Remaining In -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200/70 shadow-3xs flex flex-col justify-between">
+      <span class="text-[10px] font-bold text-purple-600 uppercase tracking-wide">অবশিষ্ট মাল</span>
+      <div class="text-sm sm:text-base font-black text-slate-900 mt-0.5 font-mono">৳<?= number_format($subtotal['return_val'] ?? 0) ?></div>
+      <div class="text-[10px] font-semibold text-slate-400 mt-1">ভ্যান স্টক</div>
     </div>
   </div>
 
@@ -120,6 +176,9 @@ $totalOrderedVal = 0;
                   <div class="text-[10px] text-blue-600 font-bold mt-0.5 font-mono">
                     ৳<?= number_format($t['ordered_val']) ?>
                   </div>
+                  <?php if (($t['ordered_oc'] ?? 0) != 0): ?>
+                    <?= $formatOC($t['ordered_oc']) ?>
+                  <?php endif; ?>
                 </td>
 
                 <!-- Load (Out) Cell (Amber tint) -->
@@ -140,6 +199,9 @@ $totalOrderedVal = 0;
                   <div class="text-[10px] text-emerald-600 font-bold mt-0.5 font-mono">
                     ৳<?= number_format($t['sell_val']) ?>
                   </div>
+                  <?php if (($t['sell_oc'] ?? 0) != 0): ?>
+                    <?= $formatOC($t['sell_oc']) ?>
+                  <?php endif; ?>
                 </td>
 
                 <!-- Remaining (In) Cell (Purple tint) -->
@@ -163,13 +225,15 @@ $totalOrderedVal = 0;
               সর্বমোট:
             </td>
             <td class="p-3 text-center border-r border-slate-200 bg-blue-50/60 text-blue-700 font-black font-mono">
-              ৳<?= number_format($totalOrderedVal) ?>
+              <div>৳<?= number_format($totalOrderedVal) ?></div>
+              <?= $formatOC($subtotal['ordered_oc'] ?? 0) ?>
             </td>
             <td class="p-3 text-center border-r border-slate-200 bg-amber-50/60 text-amber-700 font-black font-mono">
               ৳<?= number_format($subtotal['dispatched_val'] ?? 0) ?>
             </td>
             <td class="p-3 text-center border-r border-slate-200 bg-emerald-50/60 text-emerald-700 font-black font-mono">
-              ৳<?= number_format($subtotal['sell_val'] ?? 0) ?>
+              <div>৳<?= number_format($subtotal['sell_val'] ?? 0) ?></div>
+              <?= $formatOC($subtotal['sell_oc'] ?? 0) ?>
             </td>
             <td class="p-3 text-center bg-purple-50/60 text-purple-700 font-black font-mono">
               ৳<?= number_format($subtotal['return_val'] ?? 0) ?>

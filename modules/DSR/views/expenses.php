@@ -15,7 +15,7 @@ $dateFormatted = date('d / m / Y', strtotime($selectedDate));
   <!-- 1. Premium Minimal Header Card -->
   <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
     <div class="flex items-center gap-3">
-      <a href="<?= url('dsr/profile') ?>" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-900 hover:text-white transition-all duration-200 flex items-center justify-center text-slate-600 shadow-2xs active:scale-95 print:hidden">
+      <a href="<?= url('dsr/dashboard') ?>" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-900 hover:text-white transition-all duration-200 flex items-center justify-center text-slate-600 shadow-2xs active:scale-95 print:hidden">
         <i class="fa-solid fa-arrow-left text-xs sm:text-sm"></i>
       </a>
       <div>

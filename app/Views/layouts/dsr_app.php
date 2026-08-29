@@ -52,39 +52,70 @@
     <main class="dsr-main flex-1 overflow-y-auto pb-20 relative scroll-smooth" id="dsrMain">
       
       <!-- Global Toast Notification Container -->
-      <div id="toastContainer" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[999999] w-11/12 max-w-[420px] pointer-events-none flex flex-col gap-2"></div>
+      <div id="toastContainer" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 w-11/12 max-w-[420px] pointer-events-none flex flex-col gap-3" style="z-index: 9999999;"></div>
       <script>
         function showToast(message, type = 'default') {
           let container = document.getElementById('toastContainer');
           if (!container) {
             container = document.createElement('div');
             container.id = 'toastContainer';
-            container.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 z-[999999] w-11/12 max-w-[420px] pointer-events-none flex flex-col gap-2';
+            container.className = 'fixed bottom-24 left-1/2 transform -translate-x-1/2 w-11/12 max-w-[420px] pointer-events-none flex flex-col gap-3';
+            container.style.zIndex = '9999999';
             document.body.appendChild(container);
           }
           const toast = document.createElement('div');
           
-          let bgClass = 'bg-slate-900 text-white border-slate-700';
+          let bgClass = 'bg-gray-900 text-white border-gray-700';
+          let icon = '<i class="fa-solid fa-bell text-gray-300"></i>';
+          
           if (type === 'error' || (typeof message === 'string' && (message.includes('❌') || message.includes('ত্রুটি') || message.includes('ব্যর্থ')))) {
             bgClass = 'bg-rose-600 text-white border-rose-500';
+            icon = '<i class="fa-solid fa-circle-xmark text-rose-100"></i>';
+            message = message.replace('❌', '').trim();
           } else if (type === 'warning' || (typeof message === 'string' && (message.includes('⚠️') || message.includes('সতর্কতা')))) {
             bgClass = 'bg-amber-600 text-white border-amber-500';
-          } else if (type === 'success' || (typeof message === 'string' && (message.includes('✅') || message.includes('সফল')))) {
+            icon = '<i class="fa-solid fa-triangle-exclamation text-amber-100"></i>';
+            message = message.replace('⚠️', '').trim();
+          } else if (type === 'success' || (typeof message === 'string' && (message.includes('✅') || message.includes('সফল') || message.includes('✔️')))) {
             bgClass = 'bg-emerald-600 text-white border-emerald-500';
+            icon = '<i class="fa-solid fa-circle-check text-emerald-100"></i>';
+            message = message.replace(/✅|✔️/g, '').trim();
           }
 
-          toast.className = `${bgClass} backdrop-blur-md px-4 py-3 rounded-2xl shadow-2xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-2 pointer-events-auto transform -translate-y-2 opacity-0 transition-all duration-300 text-center`;
-          toast.innerHTML = `<span>${message}</span>`;
+          toast.className = `${bgClass} shadow-xl px-4 py-3.5 rounded-2xl border text-sm font-medium flex items-center justify-between gap-3 pointer-events-auto transform translate-y-8 opacity-0 scale-95 transition-all duration-300 ease-out z-50`;
+          
+          toast.innerHTML = `
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="flex-shrink-0 text-lg flex items-center justify-center">${icon}</div>
+                <div class="flex-1 truncate whitespace-normal leading-tight text-left">${message}</div>
+            </div>
+            <button class="flex-shrink-0 text-white/70 hover:text-white transition-colors p-1.5 -mr-1.5 rounded-full hover:bg-white/10 focus:outline-none" onclick="this.parentElement.removeToast()">
+                <i class="fa-solid fa-xmark text-lg leading-none"></i>
+            </button>
+          `;
+          
           container.appendChild(toast);
 
+          // Custom remove function attached to the toast element
+          let isRemoving = false;
+          toast.removeToast = () => {
+            if (isRemoving) return;
+            isRemoving = true;
+            toast.classList.remove('translate-y-0', 'opacity-100', 'scale-100');
+            toast.classList.add('translate-y-8', 'opacity-0', 'scale-95');
+            setTimeout(() => toast.remove(), 300);
+          };
+
+          // Animate in
           setTimeout(() => {
-            toast.classList.remove('-translate-y-2', 'opacity-0');
+            toast.classList.remove('translate-y-8', 'opacity-0', 'scale-95');
+            toast.classList.add('translate-y-0', 'opacity-100', 'scale-100');
           }, 10);
 
+          // Auto remove after 1 seconds
           setTimeout(() => {
-            toast.classList.add('opacity-0', '-translate-y-2');
-            setTimeout(() => toast.remove(), 300);
-          }, 3500);
+            toast.removeToast();
+          }, 1000);
         }
       </script>
 

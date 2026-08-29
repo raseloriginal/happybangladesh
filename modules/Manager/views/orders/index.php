@@ -248,6 +248,7 @@ async function toggleSr(dateStr, companyId, srId) {
                         <thead class="bg-amber-50 text-amber-900">
                             <tr>
                                 <th class="py-2 px-3 text-left font-semibold">Product</th>
+                                <th class="py-2 px-3 text-center font-semibold">Stock</th>
                                 <th class="py-2 px-3 text-center font-semibold">Total Order Qty</th>
                                 <th class="py-2 px-3 text-right font-semibold">Total Base Value</th>
                                 <th class="py-2 px-3 text-right font-semibold">Total SR Sale Value</th>
@@ -261,21 +262,33 @@ async function toggleSr(dateStr, companyId, srId) {
                     const ppb = parseInt(prod.pieces_per_box) || 1;
                     
                     const orderQty = parseInt(prod.total_qty) || 0;
+                    const stockPcs = parseInt(prod.stock_pieces) || 0;
 
                     const boxType = (prod.box_type || '').trim();
                     const boxTypeLower = boxType.toLowerCase();
                     
                     let orderQtyDisplay = '';
+                    let stockQtyDisplay = '';
+
                     if (boxTypeLower === 'pcs') {
                         orderQtyDisplay = `${orderQty} পিস`;
+                        stockQtyDisplay = `${stockPcs} পিস`;
                     } else if (boxType === 'পিস' || boxType === 'পলি' || boxType === 'জার') {
                         orderQtyDisplay = `${orderQty} ${boxType}`;
+                        stockQtyDisplay = `${stockPcs} ${boxType}`;
                     } else {
                         const boxLabel = boxType ? boxType : 'Box';
                         const orderBoxes = Math.floor(orderQty / ppb);
                         const orderPieces = orderQty % ppb;
                         orderQtyDisplay = `${orderBoxes} ${boxLabel} - ${orderPieces} পিস`;
+
+                        const stockBoxes = Math.floor(stockPcs / ppb);
+                        const stockPieces = stockPcs % ppb;
+                        stockQtyDisplay = `${stockBoxes} ${boxLabel} - ${stockPieces} পিস`;
                     }
+
+                    const isShort = stockPcs < orderQty;
+                    const stockColorClass = isShort ? 'text-red-600 font-bold bg-red-50' : 'text-slate-600';
 
                     const oc = parseFloat(prod.total_sr_value) - parseFloat(prod.total_base_value);
                     const ocClass = oc > 0 ? 'text-emerald-600' : (oc < 0 ? 'text-rose-600' : 'text-slate-500');
@@ -285,6 +298,7 @@ async function toggleSr(dateStr, companyId, srId) {
                     html += `
                         <tr class="hover:bg-amber-50/30 transition-colors">
                             <td class="py-2 px-3 font-medium text-amber-800">${prod.product_name} (${unitPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})} tk)</td>
+                            <td class="py-2 px-3 text-center font-mono ${stockColorClass}">${stockQtyDisplay}</td>
                             <td class="py-2 px-3 text-center font-mono">${orderQtyDisplay}</td>
                             <td class="py-2 px-3 text-right font-mono">৳${parseFloat(prod.total_base_value).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
                             <td class="py-2 px-3 text-right font-mono">৳${parseFloat(prod.total_sr_value).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>

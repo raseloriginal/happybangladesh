@@ -33,8 +33,8 @@
               <?= $b['items_count'] ?> items
             </span>
           </td>
-          <td class="py-3.5 px-4 text-right font-bold text-gray-900 text-base">
-            <?= number_format($b['total_amount'], 2, '.', '') ?>
+          <td class="py-3.5 px-4 text-right font-bold text-base <?= $b['total_amount'] < 0 ? 'text-rose-600' : 'text-gray-900' ?>">
+            <?= ($b['total_amount'] < 0 ? '-' : '') . '৳' . number_format(abs($b['total_amount']), 2, '.', '') ?>
           </td>
           <td class="py-3.5 px-4">
             <div class="flex items-center justify-center gap-1.5">
@@ -286,16 +286,25 @@ function viewBatchInvoice(batch) {
         const rowTotal = (qty / ppb) * buyingPrice;
         totalAmt += rowTotal;
         
+        const rowTotalFormatted = rowTotal < 0 ? '-৳' + Math.abs(rowTotal).toFixed(2) : '৳' + rowTotal.toFixed(2);
+        
         tr.innerHTML = `
             <td class="py-2.5 px-2 font-medium text-gray-800">${escapeHtml(item.product_name)}</td>
-            <td class="py-2.5 px-2 text-center font-semibold text-gray-900">${qty}</td>
-            <td class="py-2.5 px-2 text-right text-gray-700">${unitPrice.toFixed(2)}</td>
-            <td class="py-2.5 px-2 text-right font-semibold text-gray-900">${rowTotal.toFixed(2)}</td>
+            <td class="py-2.5 px-2 text-center font-semibold ${qty < 0 ? 'text-rose-600' : 'text-gray-900'}">${qty}</td>
+            <td class="py-2.5 px-2 text-right text-gray-700">৳${unitPrice.toFixed(2)}</td>
+            <td class="py-2.5 px-2 text-right font-semibold ${rowTotal < 0 ? 'text-rose-600' : 'text-gray-900'}">${rowTotalFormatted}</td>
         `;
         tbody.appendChild(tr);
     });
     
-    document.getElementById('inv-grand-total').textContent = totalAmt.toFixed(2);
+    const grandFormatted = totalAmt < 0 ? '-৳' + Math.abs(totalAmt).toFixed(2) : '৳' + totalAmt.toFixed(2);
+    const grandEl = document.getElementById('inv-grand-total');
+    grandEl.textContent = grandFormatted;
+    if (totalAmt < 0) {
+        grandEl.classList.add('text-rose-600');
+    } else {
+        grandEl.classList.remove('text-rose-600');
+    }
     openModal('invoice-modal');
 }
 
@@ -552,27 +561,36 @@ function updatePiecesHelper(input) {
     const ppb = parseInt(product.pieces_per_box) || 1;
     const boxType = product.box_type || 'Box';
     
-    if (qty <= 0) {
+    if (qty === 0) {
         helper.textContent = '';
         return;
     }
     
-    const boxes = Math.floor(qty / ppb);
-    const pieces = qty % ppb;
+    const sign = qty < 0 ? '-' : '';
+    const absQty = Math.abs(qty);
+    const boxes = Math.floor(absQty / ppb);
+    const pieces = absQty % ppb;
     
     let text = '';
     if (boxes > 0) {
-        text += `${boxes} ${boxType}`;
+        text += `${sign}${boxes} ${boxType}`;
     }
     if (pieces > 0) {
         if (text) text += ' / ';
-        text += `${pieces} Pcs`;
+        text += `${sign}${pieces} Pcs`;
     }
-    if (!text && qty > 0) {
-        text = `0 ${boxType} / 0 Pcs`;
+    if (!text && absQty > 0) {
+        text = `${sign}0 ${boxType} / ${sign}0 Pcs`;
     }
     
     helper.textContent = text;
+    if (qty < 0) {
+        helper.classList.add('text-rose-500');
+        helper.classList.remove('text-gray-500');
+    } else {
+        helper.classList.remove('text-rose-500');
+        helper.classList.add('text-gray-500');
+    }
 }
 
 function updateProductDropdowns() {
@@ -612,10 +630,28 @@ function calculateTotals() {
         }
         
         const total = (qty / ppb) * price;
-        row.querySelector('.row-total').innerText = '৳' + total.toFixed(2);
+        const totalFormatted = total < 0 ? '-৳' + Math.abs(total).toFixed(2) : '৳' + total.toFixed(2);
+        const rowTotalEl = row.querySelector('.row-total');
+        rowTotalEl.innerText = totalFormatted;
+        if (total < 0) {
+            rowTotalEl.classList.add('text-rose-600');
+            rowTotalEl.classList.remove('text-gray-800');
+        } else {
+            rowTotalEl.classList.remove('text-rose-600');
+            rowTotalEl.classList.add('text-gray-800');
+        }
         grandTotal += total;
     });
-    document.getElementById('grand-total').innerText = '৳' + grandTotal.toFixed(2);
+    const grandFormatted = grandTotal < 0 ? '-৳' + Math.abs(grandTotal).toFixed(2) : '৳' + grandTotal.toFixed(2);
+    const grandEl = document.getElementById('grand-total');
+    grandEl.innerText = grandFormatted;
+    if (grandTotal < 0) {
+        grandEl.classList.add('text-rose-600');
+        grandEl.classList.remove('text-blue-600');
+    } else {
+        grandEl.classList.remove('text-rose-600');
+        grandEl.classList.add('text-blue-600');
+    }
 }
 
 function addBulkRow(data = null) {
@@ -652,7 +688,7 @@ function addBulkRow(data = null) {
             </div>
         </td>
         <td class="p-3 border-b border-gray-100">
-            <input type="number" class="form-input text-sm w-full row-qty" value="${qty}" min="0" required oninput="calculateTotals(); updatePiecesHelper(this)">
+            <input type="number" class="form-input text-sm w-full row-qty" value="${qty}" required oninput="calculateTotals(); updatePiecesHelper(this)">
             <div class="text-[10px] text-gray-500 mt-1 row-qty-helper font-medium"></div>
         </td>
         <td class="p-3 border-b border-gray-100"><input type="date" class="form-input text-sm w-full row-expiry" value="${expiry}"></td>
@@ -791,7 +827,7 @@ function handleLotCSVUpload(input) {
             if (rawProd) {
                 rowsToProcess.push({
                     rawProd,
-                    qty: parseInt(rawQty.replace(/[^0-9]/g, '')) || 1,
+                    qty: parseInt(rawQty.replace(/[^0-9-]/g, '')) || 0,
                     price: parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0,
                     expiry: formatDateString(rawExpiry)
                 });

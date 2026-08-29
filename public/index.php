@@ -234,8 +234,10 @@ $router->get( '/manager/api/dispatch/company-details/{id}',  ['ManagerController
 $router->get( '/manager/api/dispatch/organize-data/{id}',    ['ManagerController', 'apiDispatchOrganizeData']);
 $router->post('/manager/api/dispatch/organize-save/{id}',    ['ManagerController', 'apiDispatchOrganizeSave']);
 $router->post('/manager/api/dispatch/status-update/{id}',    ['ManagerController', 'apiDispatchStatusUpdate']);
+$router->post('/manager/api/dispatch/undo-dispatch/{id}',    ['ManagerController', 'apiDispatchUndoDispatch']);
 $router->get('/manager/api/dispatch/van-stock/{dsrId}',      ['ManagerController', 'apiDispatchVanStock']);
 $router->post('/manager/api/dispatch/return-save/{scheduleId}',   ['ManagerController', 'apiDispatchReturnSave']);
+$router->post('/manager/api/dispatch/undo-return/{scheduleId}',   ['ManagerController', 'apiDispatchUndoReturn']);
 $router->post('/manager/api/dispatch/update-dsr',            ['ManagerController', 'apiDispatchUpdateDsr']);
 $router->post('/manager/api/dispatch/update-delivery-date',     ['ManagerController', 'apiDispatchUpdateDeliveryDate']);
 $router->post('/manager/api/dispatch/delete/{id}',            ['ManagerController', 'apiDispatchDelete']);
@@ -256,6 +258,8 @@ $router->post('/manager/api/order-cutoff/undo/{srId}',      ['ManagerController'
 $router->get( '/manager/operations',                          ['ManagerController', 'operations']);
 $router->get( '/manager/api/operations/orders',               ['ManagerController', 'apiOperationsOrders']);
 $router->get( '/manager/api/operations/deliveries',           ['ManagerController', 'apiOperationsDeliveries']);
+$router->get( '/manager/api/operations/dsr-deliveries',       ['ManagerController', 'apiOperationsDsrDeliveries']);
+$router->post('/manager/api/operations/dsr-delivery-action',  ['ManagerController', 'apiOperationsDsrDeliveryAction']);
 $router->post('/manager/api/operations/edit-order/{id}',      ['ManagerController', 'apiOperationsEditOrder']);
 $router->post('/manager/api/operations/bulk-change-order-date', ['ManagerController', 'apiOperationsBulkChangeOrderDate']);
 $router->post('/manager/api/operations/delete-order/{id}',    ['ManagerController', 'apiOperationsDeleteOrder']);
@@ -283,6 +287,7 @@ $router->post('/sr/api/location/push',        ['SRController', 'apiPushLocation'
 $router->post('/sr/api/order-cutoff',         ['SRController', 'apiSetOrderCutoff']);
 $router->get( '/sr/price-correction',         ['SRController', 'priceCorrection']);
 $router->post('/sr/api/price-correction/modify', ['SRController', 'apiPriceCorrectionModify']);
+$router->post('/sr/api/log-visit',            ['SRController', 'apiLogVisit']);
 
 // ── DSR routes ────────────────────────────────────────────────
 $router->get( '/dsr/dashboard',               ['DSRController', 'dashboard']);
@@ -293,6 +298,7 @@ $router->get( '/dsr/expenses',                ['DSRController', 'expenses']);
 $router->post('/dsr/expenses/store',          ['DSRController', 'expenseStore']);
 $router->get( '/dsr/delivery',                ['DSRController', 'delivery']);
 $router->post('/dsr/delivery/update/{id}',    ['DSRController', 'deliveryUpdate']);
+$router->post('/dsr/delivery/undo/{id}',      ['DSRController', 'deliveryUndo']);
 $router->get( '/dsr/collection',              ['DSRController', 'collection']);
 $router->post('/dsr/collection/complete',     ['DSRController', 'collectionComplete']);
 $router->get( '/dsr/settlement',              ['DSRController', 'settlement']);

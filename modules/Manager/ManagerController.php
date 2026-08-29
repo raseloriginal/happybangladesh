@@ -168,11 +168,11 @@ class ManagerController extends Controller
             $qInv = $this->db->prepare("
                 SELECT p.id as product_id, 
                        (
-                           COALESCE((SELECT SUM(qty_boxes * p.pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
+                           CAST(COALESCE((SELECT SUM(CAST(qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(qty_pieces AS SIGNED)) FROM lots WHERE product_id = p.id), 0) AS SIGNED)
                            -
-                           COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                           CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)), 0) AS SIGNED)
                            +
-                           COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                           CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0) AS SIGNED)
                        ) as stock_pieces, 
                        0 as stock_boxes
                 FROM products p 
@@ -204,11 +204,11 @@ class ManagerController extends Controller
         $items = $this->db->query("
             SELECT p.*, c.name AS company_name, cat.name AS category_name,
                    (
-                       COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
+                       CAST(COALESCE((SELECT SUM(CAST(qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(qty_pieces AS SIGNED)) FROM lots WHERE product_id = p.id), 0) AS SIGNED)
                        -
-                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                       CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)), 0) AS SIGNED)
                        +
-                       COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                       CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0) AS SIGNED)
                    ) AS stock_pieces,
                    0 AS stock_boxes
             FROM products p
@@ -1061,11 +1061,11 @@ class ManagerController extends Controller
                    '-' AS lot_number,
                    0 AS qty_boxes,
                    (
-                       COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
+                       CAST(COALESCE((SELECT SUM(CAST(qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(qty_pieces AS SIGNED)) FROM lots WHERE product_id = p.id), 0) AS SIGNED)
                        -
-                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
+                       CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)), 0) AS SIGNED)
                        +
-                       COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                       CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0) AS SIGNED)
                    ) AS qty_pieces
             FROM products p
             WHERE p.status=1
@@ -1114,21 +1114,30 @@ class ManagerController extends Controller
             ")->fetchColumn();
             $sch['total_order_oc'] = (float)$orderOC;
 
-            // Use dispatch_items as actual dispatched value
+            // Calculate dispatch value (dispatch_items base value + negative dispatch_extras)
             $dispatchValStmt = $this->db->prepare("
-                SELECT COALESCE(SUM(di.quantity * di.unit_price), 0)
-                FROM dispatches d
-                JOIN dispatch_items di ON di.dispatch_id = d.id
-                WHERE d.dsr_id = ? AND d.dispatch_date = ?
+                SELECT 
+                    (SELECT COALESCE(SUM(di.quantity * COALESCE(di.base_selling_price, p.price)), 0)
+                     FROM dispatches d
+                     JOIN dispatch_items di ON di.dispatch_id = d.id
+                     JOIN products p ON p.id = di.product_id
+                     WHERE d.dsr_id = ? AND d.dispatch_date = ? AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL))
+                    + 
+                    (SELECT COALESCE(SUM(
+                         (CAST(de.qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p.price
+                     ), 0)
+                     FROM dispatch_extras de
+                     JOIN products p ON p.id = de.product_id
+                     WHERE de.schedule_id = ? AND (de.qty_boxes < 0 OR de.qty_pieces < 0))
             ");
-            $dispatchValStmt->execute([$sch['dsr_id'], $delivery_date]);
+            $dispatchValStmt->execute([$sch['dsr_id'], $delivery_date, $sid]);
             $sch['total_dispatch_value'] = (float)$dispatchValStmt->fetchColumn();
 
             $dispatchOC = $this->db->query("
                 SELECT COALESCE(SUM(di.quantity * (di.unit_price - di.base_selling_price)), 0)
                 FROM dispatches d
                 JOIN dispatch_items di ON di.dispatch_id = d.id
-                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}'
+                WHERE d.dsr_id = {$sch['dsr_id']} AND d.dispatch_date = '{$delivery_date}' AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
             ")->fetchColumn();
             $sch['total_dispatch_oc'] = (float)$dispatchOC;
             $sch['total_return_value'] = (float)$this->db->query("
@@ -1565,11 +1574,19 @@ class ManagerController extends Controller
             $company['ordered_value'] = (float)$orderedVal;
 
             $dispatchVal = $this->db->query("
-                SELECT COALESCE(SUM(di.quantity * di.unit_price), 0)
-                FROM dispatches d
-                JOIN dispatch_items di ON di.dispatch_id = d.id
-                JOIN products p ON p.id = di.product_id
-                WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND {$companyCondition}
+                SELECT 
+                    (SELECT COALESCE(SUM(di.quantity * COALESCE(di.base_selling_price, p.price)), 0)
+                     FROM dispatches d
+                     JOIN dispatch_items di ON di.dispatch_id = d.id
+                     JOIN products p ON p.id = di.product_id
+                     WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND {$companyCondition})
+                    + 
+                    (SELECT COALESCE(SUM(
+                         (CAST(de.qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p.price
+                     ), 0)
+                     FROM dispatch_extras de
+                     JOIN products p ON p.id = de.product_id
+                     WHERE de.schedule_id = {$scheduleId} AND (de.qty_boxes < 0 OR de.qty_pieces < 0) AND {$companyCondition})
             ")->fetchColumn();
             $company['dispatch_items_value'] = (float)$dispatchVal;
 
@@ -1601,7 +1618,14 @@ class ManagerController extends Controller
             $company['sale_value'] = (float)$saleVal;
 
             $products = $this->db->query("
-                SELECT p.id, p.name, p.price AS base_price,
+                SELECT p.id, p.name, 
+                       COALESCE((
+                           SELECT MAX(COALESCE(oi.base_selling_price, p.price))
+                           FROM dispatch_schedule_srs dss
+                           JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
+                           JOIN order_items oi ON oi.order_id = o.id
+                           WHERE dss.schedule_id = {$scheduleId} AND oi.product_id = p.id
+                       ), p.price) AS base_price,
                        (
                            SELECT COALESCE(SUM(oi.quantity), 0)
                            FROM dispatch_schedule_srs dss
@@ -1610,10 +1634,36 @@ class ManagerController extends Controller
                            WHERE dss.schedule_id = {$scheduleId} AND oi.product_id = p.id
                        ) as ordered_qty,
                        (
-                           SELECT COALESCE(SUM(vs.initial_qty), 0)
-                           FROM van_stock vs
-                           WHERE vs.dsr_id = {$dsrId} AND DATE(vs.loaded_at) = '{$deliveryDate}' AND vs.product_id = p.id
+                           COALESCE((
+                               SELECT SUM(di.quantity)
+                               FROM dispatches d
+                               JOIN dispatch_items di ON di.dispatch_id = d.id
+                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
+                           ), 0)
+                           +
+                           COALESCE((
+                               SELECT SUM(CAST(de.qty_boxes AS SIGNED) * CAST(p2.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED))
+                               FROM dispatch_extras de
+                               JOIN products p2 ON p2.id = de.product_id
+                               WHERE de.schedule_id = {$scheduleId} AND de.product_id = p.id AND (de.qty_boxes < 0 OR de.qty_pieces < 0)
+                           ), 0)
                        ) as dispatched_qty,
+                       (
+                           COALESCE((
+                               SELECT SUM(di.quantity * COALESCE(di.base_selling_price, p2.price))
+                               FROM dispatches d
+                               JOIN dispatch_items di ON di.dispatch_id = d.id
+                               JOIN products p2 ON p2.id = di.product_id
+                               WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = p.id AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
+                           ), 0)
+                           +
+                           COALESCE((
+                               SELECT SUM((CAST(de.qty_boxes AS SIGNED) * CAST(p2.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)) * p2.price)
+                               FROM dispatch_extras de
+                               JOIN products p2 ON p2.id = de.product_id
+                               WHERE de.schedule_id = {$scheduleId} AND de.product_id = p.id AND (de.qty_boxes < 0 OR de.qty_pieces < 0)
+                           ), 0)
+                       ) as dispatched_value,
                        (
                            SELECT COALESCE(SUM(di.delivered_quantity), 0)
                            FROM dispatch_items di
@@ -1679,7 +1729,10 @@ class ManagerController extends Controller
                 $srId = (int)$sr['id'];
                 $sr['products'] = $this->db->query("
                     SELECT p.name,
-                           SUM(oi.quantity) as ordered_qty
+                           MAX(COALESCE(oi.base_selling_price, p.price)) as base_price,
+                           SUM(oi.quantity) as ordered_qty,
+                           SUM(oi.quantity * COALESCE(oi.base_selling_price, p.price)) as total_base_order_value,
+                           SUM(oi.quantity * (oi.unit_price - COALESCE(oi.base_selling_price, p.price))) as total_oc
                     FROM orders o
                     JOIN order_items oi ON oi.order_id = o.id
                     JOIN products p ON p.id = oi.product_id
@@ -1988,6 +2041,138 @@ class ManagerController extends Controller
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiDispatchUndoDispatch(string $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $id = (int)$id;
+        
+        $sch = $this->db->query("SELECT dsr_id, dispatch_date, delivery_date, status FROM dispatch_schedules WHERE id = " . $id)->fetch();
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found']);
+            exit;
+        }
+        
+        if ($sch['status'] !== 'dispatched') {
+            echo json_encode(['success' => false, 'message' => 'Cannot undo a schedule that is not dispatched']);
+            exit;
+        }
+
+        $dsrId = $sch['dsr_id'];
+        $date = $sch['dispatch_date'];
+        $deliv_date = $sch['delivery_date'] ?: $date;
+
+        $this->db->beginTransaction();
+        try {
+            // 1. Get all dispatch_items under 'in_transit' dispatches for this DSR on delivery date
+            $q = $this->db->prepare("
+                SELECT di.product_id, di.lot_id, d.warehouse_id, SUM(di.quantity) as total_qty
+                FROM dispatch_items di
+                JOIN dispatches d ON d.id = di.dispatch_id
+                WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status='in_transit'
+                GROUP BY di.product_id, di.lot_id, d.warehouse_id
+            ");
+            $q->execute([$dsrId, $deliv_date]);
+            $itemsToUndo = $q->fetchAll();
+
+            // 2. Get dispatch_extras adjustments for this schedule (negative = manager reduced van load)
+            $extrasQ = $this->db->prepare("
+                SELECT de.product_id,
+                       de.qty_boxes,
+                       de.qty_pieces,
+                       p.pieces_per_box
+                FROM dispatch_extras de
+                JOIN products p ON p.id = de.product_id
+                WHERE de.schedule_id = ?
+            ");
+            $extrasQ->execute([$id]);
+            $extrasAdjMap = [];
+            foreach ($extrasQ->fetchAll() as $exRow) {
+                $ppb = max(1, (int)$exRow['pieces_per_box']);
+                $adj = ((int)$exRow['qty_boxes'] * $ppb) + (int)$exRow['qty_pieces'];
+                if ($adj < 0) { // Only negative (reduction)
+                    $extrasAdjMap[(int)$exRow['product_id']] = ($extrasAdjMap[(int)$exRow['product_id']] ?? 0) + $adj;
+                }
+            }
+
+            // 3. Apply negative adjustments to get actual organized qty
+            $appliedProducts = [];
+            foreach ($itemsToUndo as &$item) {
+                $pid = (int)$item['product_id'];
+                if (!isset($appliedProducts[$pid]) && isset($extrasAdjMap[$pid])) {
+                    $item['total_qty'] = max(0, (int)$item['total_qty'] + $extrasAdjMap[$pid]);
+                    $appliedProducts[$pid] = true;
+                }
+            }
+            unset($item);
+
+            // 4. Reverse van_stock and warehouse inventory
+            foreach ($itemsToUndo as $item) {
+                if ((int)$item['total_qty'] <= 0) continue;
+
+                // 4.a Deduct quantity and initial_qty from van_stock
+                $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
+                $params = [$item['total_qty'], $item['total_qty'], $dsrId, $item['product_id']];
+                if ($item['lot_id'] !== null) $params[] = $item['lot_id'];
+
+                $this->db->prepare("
+                    UPDATE van_stock 
+                    SET quantity = GREATEST(0, quantity - ?), 
+                        initial_qty = GREATEST(0, initial_qty - ?) 
+                    WHERE dsr_id = ? AND product_id = ? AND lot_id $lotCondition
+                ")->execute($params);
+
+                // Clean up van_stock rows that became 0
+                $cleanParams = [$dsrId, $item['product_id']];
+                if ($item['lot_id'] !== null) $cleanParams[] = $item['lot_id'];
+                $this->db->prepare("
+                    DELETE FROM van_stock 
+                    WHERE dsr_id = ? AND product_id = ? AND lot_id $lotCondition AND quantity = 0 AND initial_qty = 0
+                ")->execute($cleanParams);
+
+                // 4.b Restore to warehouse inventory
+                $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
+                $lotParams = $item['lot_id'] === null ? [] : [$item['lot_id']];
+                $invQuery = $this->db->prepare("
+                    SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                    FROM inventory i 
+                    JOIN products p ON p.id = i.product_id 
+                    WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id $lotCondition
+                ");
+                $invQuery->execute(array_merge([$item['product_id'], $item['warehouse_id']], $lotParams));
+                $invRow = $invQuery->fetch();
+
+                if ($invRow) {
+                    $ppb = max(1, (int)$invRow['pieces_per_box']);
+                    $totalStockPcs = ((int)$invRow['qty_boxes'] * $ppb) + (int)$invRow['qty_pieces'];
+                    $newStockPcs = $totalStockPcs + (int)$item['total_qty']; // Restore
+
+                    $newBoxes = floor($newStockPcs / $ppb);
+                    $newPcs = $newStockPcs % $ppb;
+
+                    $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                             ->execute([$newBoxes, $newPcs, $invRow['id']]);
+                }
+            }
+
+            // 5. Mark dispatches as pending
+            $this->db->prepare("UPDATE dispatches SET status='pending', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status='in_transit'")
+                     ->execute([$dsrId, $deliv_date]);
+
+            // 6. Mark schedule status back to organized
+            $this->db->prepare("UPDATE dispatch_schedules SET status = 'organized' WHERE id = ?")->execute([$id]);
+
+            $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'dispatch_status_undo', "Undid dispatch for schedule $id", $id);
+            echo json_encode(['success' => true, 'message' => 'Dispatch has been successfully reverted to Organized.']);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         exit;
@@ -2488,6 +2673,103 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiDispatchUndoReturn(string $scheduleId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $scheduleId = (int)$scheduleId;
+
+        $sch = $this->db->query("SELECT dsr_id, dispatch_date, delivery_date, status FROM dispatch_schedules WHERE id = " . $scheduleId)->fetch();
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found']);
+            exit;
+        }
+
+        if ($sch['status'] !== 'returned') {
+            echo json_encode(['success' => false, 'message' => 'Schedule is not in returned status']);
+            exit;
+        }
+
+        $dsrId = $sch['dsr_id'];
+        $deliv_date = $sch['delivery_date'] ?: $sch['dispatch_date'];
+
+        $wIdRow = $this->db->prepare("SELECT warehouse_id FROM dispatches WHERE dsr_id=? AND dispatch_date=? LIMIT 1");
+        $wIdRow->execute([$dsrId, $deliv_date]);
+        $wId = $wIdRow->fetchColumn() ?: (\App\Core\Auth::warehouseId() ?: 1);
+
+        $this->db->beginTransaction();
+        try {
+            // Find return record for this DSR on delivery date
+            $retQuery = $this->db->prepare("SELECT id FROM returns WHERE dsr_id = ? AND return_date = ? ORDER BY id DESC LIMIT 1");
+            $retQuery->execute([$dsrId, $deliv_date]);
+            $returnId = $retQuery->fetchColumn();
+
+            if ($returnId) {
+                // Fetch returned items
+                $itemsStmt = $this->db->prepare("SELECT product_id, quantity FROM return_items WHERE return_id = ?");
+                $itemsStmt->execute([$returnId]);
+                $returnItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($returnItems as $ri) {
+                    $pid = (int)$ri['product_id'];
+                    $qty = (int)$ri['quantity'];
+                    if ($qty <= 0) continue;
+
+                    // 1. Deduct from warehouse inventory (reverse inventory restore)
+                    $invQuery = $this->db->prepare("
+                        SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                        FROM inventory i 
+                        JOIN products p ON p.id = i.product_id 
+                        WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id IS NULL
+                    ");
+                    $invQuery->execute([$pid, $wId]);
+                    $invRow = $invQuery->fetch();
+
+                    if ($invRow) {
+                        $ppb = max(1, (int)$invRow['pieces_per_box']);
+                        $currTotalPcs = ((int)$invRow['qty_boxes'] * $ppb) + (int)$invRow['qty_pieces'];
+                        $newStockPcs = max(0, $currTotalPcs - $qty);
+
+                        $newBoxes = floor($newStockPcs / $ppb);
+                        $newPcs = $newStockPcs % $ppb;
+
+                        $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                                 ->execute([$newBoxes, $newPcs, $invRow['id']]);
+                    }
+
+                    // 2. Restore returned quantities to van_stock
+                    $vsCheck = $this->db->prepare("SELECT id FROM van_stock WHERE dsr_id = ? AND product_id = ? LIMIT 1");
+                    $vsCheck->execute([$dsrId, $pid]);
+                    $vsId = $vsCheck->fetchColumn();
+
+                    if ($vsId) {
+                        $this->db->prepare("UPDATE van_stock SET quantity = quantity + ? WHERE id = ?")
+                                 ->execute([$qty, $vsId]);
+                    }
+                }
+
+                // Delete return items and return record
+                $this->db->prepare("DELETE FROM return_items WHERE return_id = ?")->execute([$returnId]);
+                $this->db->prepare("DELETE FROM returns WHERE id = ?")->execute([$returnId]);
+            }
+
+            // 3. Update dispatch_schedules status back to 'dispatched'
+            $this->db->prepare("UPDATE dispatch_schedules SET status = 'dispatched' WHERE id = ?")->execute([$scheduleId]);
+
+            // 4. Update dispatches status back to 'in_transit'
+            $this->db->prepare("UPDATE dispatches SET status = 'in_transit', updated_at = NOW() WHERE dsr_id = ? AND dispatch_date = ? AND status = 'returned'")
+                     ->execute([$dsrId, $deliv_date]);
+
+            $this->db->commit();
+            echo json_encode(['success' => true, 'message' => 'রিটার্ন সফলভাবে রিভার্ট (Undo) করা হয়েছে।']);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     // ══════════════════════════════════════════════════════════
     //  Attendance QR API
     // ══════════════════════════════════════════════════════════
@@ -2550,7 +2832,19 @@ class ManagerController extends Controller
     // ──────────────────────────────────────────────────────────────
     public function operations(): void
     {
-        $this->render('operations');
+        $wId = Auth::warehouseId();
+        
+        $q = $this->db->prepare("
+            SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton, p.pieces_per_box as ppb
+            FROM products p
+            LEFT JOIN companies c ON c.id=p.company_id
+            WHERE p.status=1
+            ORDER BY p.name
+        ");
+        $q->execute();
+        $allProducts = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->render('operations', ['allProducts' => $allProducts]);
     }
 
     public function apiOperationsOrders(): void
@@ -2558,26 +2852,56 @@ class ManagerController extends Controller
         header('Content-Type: application/json; charset=utf-8');
         try {
             $wId = Auth::warehouseId();
-            // Get orders from last 2 days
-            $sql = "SELECT o.*, u.name as sr_name, r.name as retailer_name, r.address as retailer_address 
+            
+            $dateFilter = $_GET['date'] ?? date('Y-m-d');
+            $srIdFilter = $_GET['sr_id'] ?? '';
+            
+            $whereSql = "WHERE o.warehouse_id = ?";
+            $params = [$wId];
+            
+            if (!empty($dateFilter)) {
+                $whereSql .= " AND DATE(o.created_at) = ?";
+                $params[] = $dateFilter;
+            }
+            if (!empty($srIdFilter)) {
+                $whereSql .= " AND o.sr_id = ?";
+                $params[] = $srIdFilter;
+            }
+
+            // Get SRs for filter dropdown
+            $srStmt = $this->db->prepare("SELECT id, name FROM users WHERE role_id = (SELECT id FROM roles WHERE slug = 'sr' LIMIT 1)");
+            $srStmt->execute();
+            $srs = $srStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Get orders
+            $sql = "SELECT o.*, u.name as sr_name, d.name AS dealer_name, r.name as retailer_name, r.phone as retailer_phone, r.address as retailer_address,
+                           (SELECT COUNT(*) FROM dispatch_schedules ds 
+                            JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
+                            WHERE dss.sr_id = o.sr_id AND ds.dispatch_date = DATE(o.created_at)) as is_assigned
                     FROM orders o
                     LEFT JOIN users u ON o.sr_id = u.id
+                    LEFT JOIN dealers d ON d.id = o.dealer_id
                     LEFT JOIN retailers r ON o.retailer_id = r.id
-                    WHERE o.warehouse_id = ? AND o.created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
-                    ORDER BY o.id DESC";
+                    $whereSql
+                    ORDER BY o.created_at DESC";
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$wId]);
+            $stmt->execute($params);
             $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            // Get products (exact same fields as SR panel)
             foreach ($orders as &$order) {
-                $stmt = $this->db->prepare("SELECT oi.*, p.name as product_name, p.pieces_per_box as pack_size 
-                                            FROM order_items oi 
-                                            JOIN products p ON oi.product_id = p.id 
-                                            WHERE oi.order_id = ?");
+                $stmt = $this->db->prepare("
+                    SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
+                    FROM order_items oi
+                    JOIN products p ON p.id = oi.product_id
+                    LEFT JOIN companies c ON c.id = p.company_id
+                    WHERE oi.order_id = ?
+                ");
                 $stmt->execute([$order['id']]);
-                $order['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $order['products'] = $stmt->fetchAll(PDO::FETCH_ASSOC); // SR panel uses 'products' key
             }
-            echo json_encode(['success' => true, 'data' => $orders]);
+            
+            echo json_encode(['success' => true, 'data' => $orders, 'srs' => $srs]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
@@ -2612,6 +2936,228 @@ class ManagerController extends Controller
             }
             echo json_encode(['success' => true, 'data' => $deliveries]);
         } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsDsrDeliveries(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        try {
+            $wId = Auth::warehouseId();
+            $date = $_GET['date'] ?? date('Y-m-d');
+            $dsrId = $_GET['dsr_id'] ?? '';
+
+            // Get DSRs list
+            $dsrsStmt = $this->db->query("
+                SELECT u.id, u.name, u.phone 
+                FROM users u 
+                JOIN roles r ON r.id = u.role_id 
+                WHERE r.slug = 'dsr' AND u.status = 1 
+                ORDER BY u.name
+            ");
+            $dsrs = $dsrsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Build SQL
+            $whereSql = "WHERE d.warehouse_id = ? AND DATE(d.created_at) = ?";
+            $params = [$wId, $date];
+
+            if (!empty($dsrId)) {
+                $whereSql .= " AND d.dsr_id = ?";
+                $params[] = $dsrId;
+            }
+
+            $sql = "SELECT d.id as dispatch_id, d.order_id, d.dsr_id, d.status, d.paid_amount, d.is_ready_sale, d.created_at as dispatch_date,
+                           o.total_amount as order_total, o.is_ready_sale as order_ready_sale,
+                           r.id as retailer_id, r.name as retailer_name, r.phone as retailer_phone, r.address as retailer_address, r.lat as latitude, r.lng as longitude,
+                           u.name as dsr_name
+                    FROM dispatches d
+                    JOIN orders o ON o.id = d.order_id
+                    JOIN retailers r ON r.id = o.retailer_id
+                    LEFT JOIN users u ON u.id = d.dsr_id
+                    $whereSql
+                    ORDER BY d.id DESC";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $dispatches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($dispatches as &$del) {
+                // Determine display status and color code
+                $status = strtolower($del['status'] ?? 'pending');
+                $paid = (float)($del['paid_amount'] ?? 0);
+                $total = (float)($del['order_total'] ?? 0);
+
+                if ($status === 'canceled' || $status === 'cancelled') {
+                    $del['status_code'] = 'canceled';
+                    $del['status_label'] = 'Canceled';
+                    $del['color'] = 'red';
+                } elseif ($status === 'delivered' && $paid >= $total && $total > 0) {
+                    $del['status_code'] = 'delivered';
+                    $del['status_label'] = 'Delivered (Full)';
+                    $del['color'] = 'green';
+                } elseif ($status === 'partial' || ($status === 'delivered' && $paid < $total)) {
+                    $del['status_code'] = 'partial';
+                    $del['status_label'] = 'Partial / Due';
+                    $del['color'] = 'orange';
+                } else {
+                    $del['status_code'] = 'pending';
+                    $del['status_label'] = 'Pending';
+                    $del['color'] = 'blue';
+                }
+
+                // Fetch items
+                $itemsStmt = $this->db->prepare("
+                    SELECT di.*, p.name as product_name, p.buying_price, p.dealer_percentage, p.image as product_image,
+                           COALESCE(c.id, 0) as company_id, COALESCE(c.name, 'Uncategorized') as company_name
+                    FROM dispatch_items di
+                    JOIN products p ON p.id = di.product_id
+                    LEFT JOIN companies c ON c.id = p.company_id
+                    WHERE di.dispatch_id = ?
+                ");
+                $itemsStmt->execute([$del['dispatch_id']]);
+                $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($items as &$item) {
+                    $bp = (float)($item['buying_price'] ?? 0);
+                    $dp = (float)($item['dealer_percentage'] ?? 0);
+                    $basePrice = $bp + ($bp * ($dp / 100.0));
+                    $unitPrice = (float)($item['unit_price'] ?? 0);
+
+                    $item['base_price'] = $basePrice;
+                    $item['oc_per_unit'] = $unitPrice - $basePrice;
+                    $item['order_qty'] = (int)($item['quantity'] ?? 0);
+                    $item['delivered_qty'] = isset($item['delivered_quantity']) && $item['delivered_quantity'] !== null 
+                        ? (int)$item['delivered_quantity'] 
+                        : (int)($item['quantity'] ?? 0);
+
+                    // Fetch current van stock for product if DSR ID exists
+                    $vanStock = 0;
+                    if (!empty($del['dsr_id'])) {
+                        $stockStmt = $this->db->prepare("
+                            SELECT COALESCE(SUM(quantity), 0) FROM van_stock WHERE dsr_id = ? AND product_id = ?
+                        ");
+                        $stockStmt->execute([$del['dsr_id'], $item['product_id']]);
+                        $vanStock = (int)($stockStmt->fetchColumn() ?: 0);
+                    }
+                    $item['van_stock'] = $vanStock;
+                }
+
+                $del['items'] = $items;
+            }
+
+            echo json_encode(['success' => true, 'dsrs' => $dsrs, 'deliveries' => $dispatches]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiOperationsDsrDeliveryAction(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            $dispatchId = (int)($_POST['dispatch_id'] ?? 0);
+            $action = trim($_POST['action'] ?? '');
+            $itemsJson = $_POST['items'] ?? '[]';
+            $paidAmountInput = isset($_POST['paid_amount']) ? (float)$_POST['paid_amount'] : null;
+
+            if ($dispatchId <= 0 || empty($action)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid dispatch ID or action.']);
+                exit;
+            }
+
+            $items = json_decode($itemsJson, true) ?: [];
+
+            $this->db->beginTransaction();
+
+            $dispStmt = $this->db->prepare("SELECT * FROM dispatches WHERE id = ?");
+            $dispStmt->execute([$dispatchId]);
+            $dispatch = $dispStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$dispatch) {
+                throw new \Exception("Dispatch record not found.");
+            }
+
+            $orderId = (int)$dispatch['order_id'];
+
+            // Calculate updated total based on items and adjust van_stock
+            $newTotalAmount = 0;
+            foreach ($items as $item) {
+                $itemId = (int)($item['id'] ?? 0);
+                $qty = (int)($item['qty'] ?? 0);
+                $unitPrice = (float)($item['unit_price'] ?? 0);
+
+                if ($itemId > 0) {
+                    $oldItem = $this->db->prepare("SELECT product_id, COALESCE(delivered_quantity, 0) as delivered_quantity FROM dispatch_items WHERE id = ? AND dispatch_id = ?");
+                    $oldItem->execute([$itemId, $dispatchId]);
+                    $oldItemData = $oldItem->fetch(PDO::FETCH_ASSOC);
+
+                    if ($oldItemData) {
+                        $oldQty = (int)$oldItemData['delivered_quantity'];
+                        $productId = (int)$oldItemData['product_id'];
+                        $diff = $qty - $oldQty;
+
+                        $upItem = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ? AND dispatch_id = ?");
+                        $upItem->execute([$qty, $itemId, $dispatchId]);
+
+                        if ($diff != 0) {
+                            $this->db->prepare("UPDATE van_stock SET quantity = GREATEST(0, CAST(quantity AS SIGNED) - ?) WHERE dsr_id = ? AND product_id = ?")
+                                     ->execute([$diff, $dispatch['dsr_id'], $productId]);
+                        }
+                    } else {
+                        $upItem = $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE id = ? AND dispatch_id = ?");
+                        $upItem->execute([$qty, $itemId, $dispatchId]);
+                    }
+
+                    $newTotalAmount += ($qty * $unitPrice);
+                }
+            }
+
+            if (empty($items)) {
+                // If items not sent, fetch current total from orders
+                $ordRow = $this->db->query("SELECT total_amount FROM orders WHERE id = $orderId")->fetch();
+                $newTotalAmount = (float)($ordRow['total_amount'] ?? $dispatch['paid_amount']);
+            }
+
+            if ($action === 'complete') {
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = 'delivered', paid_amount = ? WHERE id = ?");
+                $upDisp->execute([$newTotalAmount, $dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = 'delivered', total_amount = ? WHERE id = ?")->execute([$newTotalAmount, $orderId]);
+            } elseif ($action === 'cancel') {
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = 'cancelled', paid_amount = 0 WHERE id = ?");
+                $upDisp->execute([$dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")->execute([$orderId]);
+            } elseif ($action === 'undo') {
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = 'pending', paid_amount = 0 WHERE id = ?");
+                $upDisp->execute([$dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = 'pending' WHERE id = ?")->execute([$orderId]);
+            } elseif ($action === 'continue_partial') {
+                $paid = $paidAmountInput !== null ? $paidAmountInput : 0.00;
+                $status = ($paid >= $newTotalAmount && $newTotalAmount > 0) ? 'delivered' : 'partial';
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = ?, paid_amount = ? WHERE id = ?");
+                $upDisp->execute([$status, $paid, $dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = ?, total_amount = ? WHERE id = ?")->execute([$status, $newTotalAmount, $orderId]);
+            } elseif ($action === 'modify') {
+                $paid = $paidAmountInput !== null ? $paidAmountInput : (float)$dispatch['paid_amount'];
+                $status = ($paid >= $newTotalAmount && $newTotalAmount > 0) ? 'delivered' : 'partial';
+                $upDisp = $this->db->prepare("UPDATE dispatches SET status = ?, paid_amount = ? WHERE id = ?");
+                $upDisp->execute([$status, $paid, $dispatchId]);
+                $this->db->prepare("UPDATE orders SET status = ?, total_amount = ? WHERE id = ?")->execute([$status, $newTotalAmount, $orderId]);
+            } else {
+                throw new \Exception("Unsupported action.");
+            }
+
+            $this->db->commit();
+            echo json_encode(['success' => true, 'message' => 'Delivery action processed successfully.']);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
         exit;
@@ -2653,20 +3199,23 @@ class ManagerController extends Controller
 
             $originalDateStr = $orderDate->format('Y-m-d');
             $newDateStr = $orderDateInput ? date('Y-m-d', strtotime($orderDateInput)) : $originalDateStr;
+            // 1. Check if SR is assigned on the original date
+            $checkAssign = $this->db->prepare("
+                SELECT COUNT(*) 
+                FROM dispatch_schedules ds 
+                JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
+                WHERE dss.sr_id = ? AND ds.dispatch_date = ?
+            ");
+            $checkAssign->execute([$order['sr_id'], $originalDateStr]);
+            if ($checkAssign->fetchColumn() > 0) {
+                throw new \Exception("Cannot edit order. The SR is already assigned to a dispatch on this date.");
+            }
             
             if ($newDateStr !== $originalDateStr) {
-                // Check if SR is assigned on the original date OR the new date
-                $checkAssign = $this->db->prepare("
-                    SELECT COUNT(*) 
-                    FROM dispatch_schedules ds 
-                    JOIN dispatch_schedule_srs dss ON ds.id = dss.schedule_id 
-                    WHERE dss.sr_id = ? AND (ds.dispatch_date = ? OR ds.dispatch_date = ?)
-                ");
-                $checkAssign->execute([$order['sr_id'], $originalDateStr, $newDateStr]);
-                $isAssigned = $checkAssign->fetchColumn();
-
-                if ($isAssigned > 0) {
-                    throw new \Exception("Cannot change date. The SR is already assigned to a dispatch on the original or new date.");
+                // 2. Check if the NEW date is assigned
+                $checkAssign->execute([$order['sr_id'], $newDateStr]);
+                if ($checkAssign->fetchColumn() > 0) {
+                    throw new \Exception("Cannot change date. The SR is already assigned to a dispatch on the new date.");
                 }
 
                 // Update created_at with new date but keep original time
@@ -2678,19 +3227,69 @@ class ManagerController extends Controller
             $oldTotal = (float)$order['total_amount'];
             $newTotal = 0;
 
+            // Delete old items
+            $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$id]);
+
+            // Insert updated items
+            $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, base_selling_price, total_price, product_name, box_type, pieces_per_box, buying_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
             foreach ($items as $item) {
-                $itemId = (int)$item['id'];
+                $pid = (int)($item['product_id'] ?? $item['id']);
                 $price = (float)$item['price'];
                 $qty = (int)$item['qty'];
                 
+                if ($qty <= 0) continue;
+
                 $newTotal += ($price * $qty);
                 
-                $this->db->prepare("UPDATE order_items SET quantity = ?, unit_price = ?, total_price = ? WHERE id = ? AND order_id = ?")
-                         ->execute([$qty, $price, $qty * $price, $itemId, $id]);
+                // Fetch product details for insertion
+                $pdStmt = $this->db->prepare("SELECT * FROM products WHERE id = ?");
+                $pdStmt->execute([$pid]);
+                $pd = $pdStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($pd) {
+                    $basePrice = (float)($pd['buying_price'] + ($pd['buying_price'] * ($pd['dealer_percentage'] / 100)));
+                    $insStmt->execute([
+                        $id,
+                        $pid,
+                        $qty,
+                        $price,
+                        $basePrice,
+                        $qty * $price,
+                        $pd['name'],
+                        $pd['box_type'] ?? 'Piece',
+                        $pd['pieces_per_box'] ?? 1,
+                        $pd['buying_price']
+                    ]);
+                }
             }
 
             // Update order total
             $this->db->prepare("UPDATE orders SET total_amount = ? WHERE id = ?")->execute([$newTotal, $id]);
+
+            // Refresh order data to return
+            $stmt = $this->db->prepare("
+                SELECT o.*, u.name as sr_name, d.name AS dealer_name, r.name as retailer_name, r.phone as retailer_phone, r.address as retailer_address 
+                FROM orders o
+                LEFT JOIN users u ON o.sr_id = u.id
+                LEFT JOIN dealers d ON d.id = o.dealer_id
+                LEFT JOIN retailers r ON o.retailer_id = r.id
+                WHERE o.id = ?
+            ");
+            $stmt->execute([$id]);
+            $updatedOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($updatedOrder) {
+                $stmt = $this->db->prepare("
+                    SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
+                    FROM order_items oi
+                    JOIN products p ON p.id = oi.product_id
+                    LEFT JOIN companies c ON c.id = p.company_id
+                    WHERE oi.order_id = ?
+                ");
+                $stmt->execute([$id]);
+                $updatedOrder['products'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
 
             $oldLogData = ['total_amount' => $oldTotal];
             $newLogData = ['total_amount' => $newTotal];
@@ -2713,7 +3312,7 @@ class ManagerController extends Controller
             \Helpers::logManagerActivity(\Auth::id(), 'edit_order', 'Edited operation order ID: ' . $id . ' for reason: ' . $reason, $id);
 
             $this->db->commit();
-            echo json_encode(['success' => true]);
+            echo json_encode(['success' => true, 'order' => $updatedOrder ?? null]);
         } catch (\Exception $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -2876,11 +3475,23 @@ class ManagerController extends Controller
 
             \Helpers::logManagerActivity(\Auth::id(), 'delete_order', 'Deleted operation order ID: ' . $id . ' for reason: ' . $reason, $id);
 
-            // Delete dispatches & dispatch items if any
-            $dispatchesStmt = $this->db->prepare("SELECT id FROM dispatches WHERE order_id = ?");
+            // Delete dispatches & dispatch items if any, restoring van_stock if previously delivered
+            $dispatchesStmt = $this->db->prepare("SELECT id, dsr_id FROM dispatches WHERE order_id = ?");
             $dispatchesStmt->execute([$id]);
-            $dispatchIds = $dispatchesStmt->fetchAll(PDO::FETCH_COLUMN);
-            if (!empty($dispatchIds)) {
+            $dispatches = $dispatchesStmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($dispatches)) {
+                foreach ($dispatches as $disp) {
+                    $dispItems = $this->db->prepare("SELECT product_id, COALESCE(delivered_quantity, 0) as delivered_quantity FROM dispatch_items WHERE dispatch_id = ?");
+                    $dispItems->execute([$disp['id']]);
+                    foreach ($dispItems->fetchAll(PDO::FETCH_ASSOC) as $di) {
+                        $delQty = (int)$di['delivered_quantity'];
+                        if ($delQty > 0) {
+                            $this->db->prepare("UPDATE van_stock SET quantity = quantity + ? WHERE dsr_id = ? AND product_id = ?")
+                                     ->execute([$delQty, $disp['dsr_id'], $di['product_id']]);
+                        }
+                    }
+                }
+                $dispatchIds = array_column($dispatches, 'id');
                 $inQuery = implode(',', array_fill(0, count($dispatchIds), '?'));
                 $this->db->prepare("DELETE FROM dispatch_items WHERE dispatch_id IN ($inQuery)")->execute($dispatchIds);
                 $this->db->prepare("DELETE FROM dispatches WHERE order_id = ?")->execute([$id]);

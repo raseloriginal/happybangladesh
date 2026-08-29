@@ -214,36 +214,63 @@
 <!-- ========================================== -->
 <!-- 2. ORGANIZE MODAL                          -->
 <!-- ========================================== -->
-<div id="organize-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-    <div class="p-4 bg-amber-500 text-white flex justify-between items-center">
-      <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-box-open"></i> Organize Dispatch Items</h2>
-      <button onclick="closeOrganizeModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+<div id="organize-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-1 sm:p-4 overflow-y-auto">
+  <div class="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl h-[94vh] sm:h-[88vh] flex flex-col overflow-hidden my-auto">
+    <!-- Modal Header (Fixed) -->
+    <div class="px-3 sm:px-5 py-3 sm:py-4 bg-amber-500 text-white flex justify-between items-center shrink-0 shadow-sm z-20">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <h2 class="text-sm sm:text-lg font-bold flex items-center gap-2">
+          <i class="fa-solid fa-box-open"></i> Organize Dispatch Items
+        </h2>
+        <span id="org-count-badge" class="bg-white/20 text-white text-[11px] sm:text-xs px-2 py-0.5 rounded-full font-semibold"></span>
+      </div>
+      <button onclick="closeOrganizeModal()" class="text-white/80 hover:text-white p-1 rounded-lg hover:bg-amber-600 transition" title="Close Modal">
+        <i class="fa-solid fa-xmark text-lg sm:text-xl"></i>
+      </button>
     </div>
     
-    <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
-      <div class="excel-container">
-        <table class="excel-table">
-          <thead>
-            <tr>
-              <th class="excel-row-num">#</th>
-              <th>Product</th>
-              <th>Ordered Qty</th>
-              <th>Dispatch Qty</th>
-              <th class="text-center">Change (কম / বেশি)</th>
-              <th class="text-center">Organized?</th>
+    <!-- Modal Body (Scrollable Table with Sticky Header) -->
+    <div class="flex-1 overflow-y-auto overflow-x-auto p-2 sm:p-4 bg-gray-50/70 relative">
+      <div class="min-w-[620px] sm:min-w-full bg-white rounded-lg shadow-sm border border-gray-200">
+        <table class="w-full text-left border-collapse">
+          <thead class="sticky top-0 z-10 bg-amber-100 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+            <tr class="text-gray-800 text-[11px] sm:text-xs font-bold uppercase">
+              <th class="py-2.5 px-2 text-center w-10 whitespace-nowrap bg-amber-100">#</th>
+              <th class="py-2.5 px-3 whitespace-nowrap bg-amber-100">Product</th>
+              <th class="py-2.5 px-3 whitespace-nowrap bg-amber-100">Ordered Qty</th>
+              <th class="py-2.5 px-3 whitespace-nowrap bg-amber-100">Dispatch Qty</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap bg-amber-100">Change (কম / বেশি)</th>
+              <th class="py-2.5 px-3 text-center whitespace-nowrap bg-amber-100">
+                <label class="inline-flex items-center gap-1 cursor-pointer select-none" title="Select / Deselect All">
+                  <input type="checkbox" id="org-select-all" onchange="toggleSelectAllOrg(this)" class="w-4 h-4 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer">
+                  <span class="text-[11px] font-semibold text-gray-700">All</span>
+                </label>
+              </th>
             </tr>
           </thead>
-          <tbody id="organize-tbody">
+          <tbody id="organize-tbody" class="divide-y divide-gray-200 text-xs">
             <!-- Rows injected via JS -->
           </tbody>
         </table>
       </div>
     </div>
     
-    <div class="p-4 border-t border-gray-200 flex justify-end gap-3 bg-white">
-      <button onclick="closeOrganizeModal()" class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium">Cancel</button>
-      <button onclick="saveOrganize(event)" class="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md">Save Organized</button>
+    <!-- Modal Footer (Fixed) -->
+    <div class="p-3 sm:p-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-2.5 sm:gap-3 bg-white shrink-0 shadow-[0_-2px_6px_rgba(0,0,0,0.03)] z-20">
+      <div class="w-full sm:w-auto text-xs text-gray-500 flex items-center justify-between sm:justify-start gap-3">
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="selectAllOrgCheckboxes(true)" class="text-amber-600 hover:text-amber-700 font-semibold text-xs py-1 px-1.5 rounded hover:bg-amber-50 transition">Check All</button>
+          <span class="text-gray-300">|</span>
+          <button type="button" onclick="selectAllOrgCheckboxes(false)" class="text-gray-600 hover:text-gray-800 font-semibold text-xs py-1 px-1.5 rounded hover:bg-gray-100 transition">Uncheck All</button>
+        </div>
+        <span class="text-[11px] text-gray-400 hidden sm:inline">(Checked items will be confirmed)</span>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+        <button type="button" onclick="closeOrganizeModal()" class="w-1/2 sm:w-auto px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium text-xs sm:text-sm transition">Cancel</button>
+        <button type="button" onclick="saveOrganize(event)" class="w-1/2 sm:w-auto px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+          <i class="fa-solid fa-floppy-disk"></i> Save Organized
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -342,7 +369,12 @@ function renderSchedules() {
     } else if (sch.status === 'organized') {
       actionBtn = `<button onclick="updateStatus(${sch.id}, 'dispatched')" class="text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded text-xs font-bold border border-emerald-300 transition"><i class="fa-solid fa-truck-fast mr-1"></i> Dispatch</button>`;
     } else if (sch.status === 'dispatched') {
-      actionBtn = `<button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded text-xs font-bold border border-gray-300 transition"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>`;
+      actionBtn = `
+        <button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded text-xs font-bold border border-gray-300 transition mr-1"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>
+        <button type="button" onclick="window.undoDispatch(${sch.id})" class="text-rose-700 hover:bg-rose-100 px-2.5 py-1 rounded text-xs font-bold border border-rose-300 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Undo Dispatch</button>
+      `;
+    } else if (sch.status === 'returned') {
+      actionBtn = `<button type="button" onclick="undoReturn(${sch.id})" class="text-rose-700 hover:bg-rose-100 px-2.5 py-1 rounded text-xs font-bold border border-rose-300 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Undo Return</button>`;
     }
 
     const tr = document.createElement('tr');
@@ -567,7 +599,7 @@ function toggleProductRow(schId, compId) {
       const returnedQty = parseInt(p.returned_qty || 0);
       
       const orderedVal = orderedQty * basePrice;
-      const dispatchedVal = dispatchedQty * basePrice;
+      const dispatchedVal = parseFloat(p.dispatched_value || 0);
       const saleVal = saleQty * basePrice;
       const returnedVal = returnedQty * basePrice;
       
@@ -624,8 +656,15 @@ function toggleCompanySrRow(schId, compId) {
       const orderVal = parseFloat(sr.order_value || 0);
       const baseSaleVal = parseFloat(sr.base_sale_value || 0);
       const saleVal = parseFloat(sr.sale_value || 0);
-      const totalOc = baseOrderVal - orderVal;
+      const totalOc = orderVal - baseOrderVal;
       
+      let ocClass = 'text-indigo-600';
+      if (totalOc < 0) {
+        ocClass = 'text-rose-600';
+      } else if (totalOc > 0) {
+        ocClass = 'text-emerald-600';
+      }
+
       html += `<tr>
         <td class="excel-row-num">${srIdx + 1}</td>
         <td class="font-bold text-gray-800 text-xs">
@@ -643,7 +682,7 @@ function toggleCompanySrRow(schId, compId) {
         <td class="excel-money text-right text-teal-600 font-bold">
           ${showValues ? '৳ ' + saleVal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}
         </td>
-        <td class="excel-money text-right text-indigo-600 font-semibold">
+        <td class="excel-money text-right ${ocClass} font-semibold">
           ৳ ${totalOc.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}
         </td>
         <td class="text-center no-print">
@@ -677,21 +716,66 @@ function toggleSrProductRow(schId, compId, srId) {
       return;
     }
     
-    let html = `<div class="excel-container shadow-none border border-slate-200"><table class="excel-table text-xs">
+    let html = `<div class="excel-container shadow-none border border-slate-200 w-full overflow-x-auto"><table class="excel-table sub-table text-xs whitespace-nowrap">
       <thead><tr>
         <th class="excel-row-num">#</th>
         <th>Product Name</th>
+        <th class="text-right">Base Price</th>
         <th class="text-center">Ordered Qty</th>
+        <th class="text-right">Total Order Value</th>
+        <th class="text-right">Total O/C</th>
       </tr></thead><tbody>`;
       
+    let totalQty = 0;
+    let totalVal = 0;
+    let totalOc = 0;
+
     products.forEach((p, pIdx) => {
+      const basePrice = parseFloat(p.base_price || 0);
+      const orderedQty = parseInt(p.ordered_qty || 0);
+      const rowVal = parseFloat(p.total_base_order_value || 0);
+      const rowOc = parseFloat(p.total_oc || 0);
+
+      totalQty += orderedQty;
+      totalVal += rowVal;
+      totalOc += rowOc;
+
+      let ocClass = 'text-indigo-600';
+      if (rowOc < 0) {
+        ocClass = 'text-rose-600';
+      } else if (rowOc > 0) {
+        ocClass = 'text-emerald-600';
+      }
+
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
         <td class="font-bold text-gray-800">${p.name}</td>
-        <td class="excel-qty text-center">${p.ordered_qty || 0}</td>
+        <td class="excel-money text-right text-amber-600">৳ ${basePrice.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td class="excel-qty text-center">${orderedQty}</td>
+        <td class="excel-money text-right text-gray-600">৳ ${rowVal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        <td class="excel-money text-right ${ocClass}">৳ ${rowOc.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
       </tr>`;
     });
-    html += `</tbody></table></div>`;
+    
+    let totalOcClass = 'text-indigo-600';
+    if (totalOc < 0) {
+      totalOcClass = 'text-rose-600';
+    } else if (totalOc > 0) {
+      totalOcClass = 'text-emerald-600';
+    }
+
+    html += `</tbody>
+      <tfoot>
+        <tr class="bg-slate-100 font-bold border-t-2 border-slate-300">
+          <td colspan="2" class="text-right py-2 px-3">Total:</td>
+          <td class="text-right py-2 px-3"></td>
+          <td class="excel-qty text-center py-2 px-3">${totalQty}</td>
+          <td class="excel-money text-right py-2 px-3">৳ ${totalVal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+          <td class="excel-money text-right ${totalOcClass} py-2 px-3">৳ ${totalOc.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        </tr>
+      </tfoot>
+    </table></div>`;
+    
     container.innerHTML = html;
   } else {
     row.classList.add('hidden');
@@ -780,12 +864,18 @@ async function openOrganizeModal(schId) {
   
   const tbody = document.getElementById('organize-tbody');
   tbody.innerHTML = '';
+
+  const countBadge = document.getElementById('org-count-badge');
+  if (countBadge) countBadge.textContent = `${products.length} items`;
+
+  const selectAllCb = document.getElementById('org-select-all');
+  if (selectAllCb) selectAllCb.checked = false;
   
   if (products.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center p-5 text-gray-400">No products found for these orders.</td></tr>';
   } else {
     products.forEach((p, pIdx) => {
-      const img = p.image ? `<img src="<?= BASE_URL ?>/${p.image}" class="w-8 h-8 rounded object-cover border border-gray-200">` : `<div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center"><i class="fa-solid fa-box text-gray-300"></i></div>`;
+      const img = p.image ? `<img src="<?= BASE_URL ?>/${p.image}" class="w-8 h-8 rounded object-cover border border-gray-200 flex-shrink-0">` : `<div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-box text-gray-300"></i></div>`;
       
       const ppb = Math.max(1, parseInt(p.pieces_per_box) || 1);
       const boxTypeStr = (p.box_type || '').toString().trim().toLowerCase();
@@ -810,48 +900,48 @@ async function openOrganizeModal(schId) {
       const subtitleText = isPcs ? `1 Pcs` : `${ppb} Pcs / ${boxLabel}`;
 
       const inputControlsHtml = isPcs ? `
-        <div class="flex items-center gap-2">
-          <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm">
+        <div class="flex items-center gap-1 sm:gap-2">
+          <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm max-w-full">
             <input type="hidden" value="0" class="org-dispatch-box">
-            <input type="number" min="0" value="${initDispatchPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-16 text-xs py-1 px-2 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
-            <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-gray-200 font-semibold">Pcs</span>
+            <input type="number" min="0" value="${initDispatchPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-14 sm:w-16 text-xs py-1 px-1.5 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
+            <span class="bg-gray-100 text-gray-500 text-[10px] sm:text-[11px] px-1.5 py-1 border-l border-gray-200 font-semibold">Pcs</span>
           </div>
         </div>
       ` : `
-        <div class="flex items-center gap-2">
-          <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm">
-            <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-14 text-xs py-1 px-2 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
-            <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-r border-gray-200 font-semibold">${boxLabel}</span>
-            <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-14 text-xs py-1 px-2 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
-            <span class="bg-gray-100 text-gray-500 text-[11px] px-2 py-1 border-l border-gray-200 font-semibold">Pcs</span>
+        <div class="flex items-center gap-1 sm:gap-2">
+          <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm max-w-full">
+            <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-10 sm:w-14 text-xs py-1 px-1 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
+            <span class="bg-gray-100 text-gray-500 text-[10px] sm:text-[11px] px-1 sm:px-2 py-1 border-l border-r border-gray-200 font-semibold whitespace-nowrap">${boxLabel}</span>
+            <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-10 sm:w-14 text-xs py-1 px-1 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
+            <span class="bg-gray-100 text-gray-500 text-[10px] sm:text-[11px] px-1 sm:px-2 py-1 border-l border-gray-200 font-semibold whitespace-nowrap">Pcs</span>
           </div>
         </div>
       `;
 
       tbody.innerHTML += `
-        <tr class="hover:bg-blue-50/50" data-pid="${p.product_id}" data-orig-pcs="${origPcs}" data-ppb="${ppb}" data-ispcs="${isPcs}" data-boxlabel="${boxLabel}">
-          <td class="excel-row-num">${pIdx + 1}</td>
-          <td class="p-3">
-            <div class="flex items-center gap-3">
+        <tr class="hover:bg-blue-50/50 transition-colors" data-pid="${p.product_id}" data-orig-pcs="${origPcs}" data-ppb="${ppb}" data-ispcs="${isPcs}" data-boxlabel="${boxLabel}">
+          <td class="py-2.5 px-2 text-center text-gray-400 font-mono text-[11px] whitespace-nowrap">${pIdx + 1}</td>
+          <td class="p-2 sm:p-3 whitespace-nowrap">
+            <div class="flex items-center gap-2 sm:gap-3">
               ${img}
               <div>
-                <div class="font-bold text-gray-800 text-xs">${p.name}</div>
-                <div class="text-[11px] text-gray-400 font-medium">${subtitleText}</div>
+                <div class="font-bold text-gray-800 text-xs sm:text-xs whitespace-nowrap">${p.name}</div>
+                <div class="text-[10px] sm:text-[11px] text-gray-400 font-medium whitespace-nowrap">${subtitleText}</div>
               </div>
             </div>
           </td>
-          <td class="p-3 whitespace-nowrap">
-            <span class="bg-slate-100 text-gray-700 px-2 py-0.5 rounded text-xs font-bold border border-slate-200">${origStr}</span>
-            <div class="text-[11px] text-gray-400 mt-0.5">Total: ${origPcs} pcs</div>
+          <td class="p-2 sm:p-3 whitespace-nowrap">
+            <span class="bg-slate-100 text-gray-700 px-1.5 sm:px-2 py-0.5 rounded text-[11px] sm:text-xs font-bold border border-slate-200 whitespace-nowrap">${origStr}</span>
+            <div class="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">Total: ${origPcs} pcs</div>
           </td>
-          <td class="p-3">
+          <td class="p-2 sm:p-3 whitespace-nowrap">
             ${inputControlsHtml}
           </td>
-          <td class="p-3 text-center whitespace-nowrap">
+          <td class="p-2 sm:p-3 text-center whitespace-nowrap">
             <div class="org-diff-badge flex items-center justify-center"></div>
           </td>
-          <td class="p-3 text-center">
-            <input type="checkbox" class="org-check w-5 h-5 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer">
+          <td class="p-2 sm:p-3 text-center whitespace-nowrap">
+            <input type="checkbox" onchange="updateOrgSelectAllState()" class="org-check w-5 h-5 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer">
           </td>
         </tr>
       `;
@@ -910,6 +1000,29 @@ function updateOrgDiff(elem) {
 function closeOrganizeModal() {
   document.getElementById('organize-modal').classList.add('hidden');
   currentOrgId = null;
+}
+
+function toggleSelectAllOrg(master) {
+  document.querySelectorAll('.org-check').forEach(cb => {
+    cb.checked = master.checked;
+  });
+}
+
+function selectAllOrgCheckboxes(checked) {
+  const master = document.getElementById('org-select-all');
+  if (master) master.checked = checked;
+  document.querySelectorAll('.org-check').forEach(cb => {
+    cb.checked = checked;
+  });
+}
+
+function updateOrgSelectAllState() {
+  const all = document.querySelectorAll('.org-check');
+  const checked = document.querySelectorAll('.org-check:checked');
+  const master = document.getElementById('org-select-all');
+  if (master && all.length > 0) {
+    master.checked = (all.length === checked.length);
+  }
 }
 
 async function saveOrganize(event) {
@@ -1327,6 +1440,60 @@ window.submitReturn = async function() {
     }
   } catch(e) {
     alert('Network error processing returns');
+  }
+};
+
+window.undoReturn = async function(scheduleId) {
+  if (!confirm('আপনি কি নিশ্চিত যে এই রিটার্নটি Undo করতে চান? এটি রিটার্নকৃত প্রোডাক্ট স্টক DSR Van Stock-এ ফেরত পাঠাবে এবং রিটার্ন রেকর্ড রিভার্ট করবে।')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`<?= url("manager/api/dispatch/undo-return/") ?>${scheduleId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showToast === 'function') {
+        showToast(data.message || 'রিটার্ন সফলভাবে রিভার্ট করা হয়েছে।', 'success');
+      } else {
+        alert(data.message || 'রিটার্ন সফলভাবে রিভার্ট করা হয়েছে।');
+      }
+      if (typeof loadSchedules === 'function') loadSchedules();
+    } else {
+      alert(data.message || 'রিটার্ন রিভার্ট করতে সমস্যা হয়েছে।');
+    }
+  } catch (e) {
+    console.error('Undo Return error:', e);
+    alert('নেটওয়ার্ক এরর: রিটার্ন রিভার্ট করা সম্ভব হয়নি।');
+  }
+};
+
+window.undoDispatch = async function(scheduleId) {
+  if (!confirm('আপনি কি নিশ্চিত যে এই ডিসপ্যাচটি Undo করতে চান? এটি প্রোডাক্টের স্টক ওয়্যারহাউজে ফেরত পাঠাবে এবং DSR Van Stock থেকে কেটে নিবে।')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`<?= url("manager/api/dispatch/undo-dispatch/") ?>${scheduleId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showToast === 'function') {
+        showToast(data.message || 'ডিসপ্যাচ সফলভাবে রিভার্ট করা হয়েছে।', 'success');
+      } else {
+        alert(data.message || 'ডিসপ্যাচ সফলভাবে রিভার্ট করা হয়েছে।');
+      }
+      if (typeof loadSchedules === 'function') loadSchedules();
+    } else {
+      alert(data.message || 'ডিসপ্যাচ রিভার্ট করতে সমস্যা হয়েছে।');
+    }
+  } catch (e) {
+    console.error('Undo Dispatch error:', e);
+    alert('নেটওয়ার্ক এরর: ডিসপ্যাচ রিভার্ট করা সম্ভব হয়নি।');
   }
 };
 </script>
