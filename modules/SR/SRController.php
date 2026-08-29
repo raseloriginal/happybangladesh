@@ -138,11 +138,11 @@ class SRController extends Controller
             SELECT p.*, c.name AS company_name, p.pieces_per_box AS pieces_per_carton,
                    p.buying_price, p.dealer_percentage,
                    (
-                       COALESCE((SELECT SUM(qty_boxes * pieces_per_box + qty_pieces) FROM lots WHERE product_id = p.id), 0)
-                       -
-                       COALESCE((SELECT SUM(quantity) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0)
-                       +
-                       COALESCE((SELECT SUM(quantity) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0)
+                        CAST(COALESCE((SELECT SUM(CAST(qty_boxes AS SIGNED) * CAST(p.pieces_per_box AS SIGNED) + CAST(qty_pieces AS SIGNED)) FROM lots WHERE product_id = p.id), 0) AS SIGNED)
+                        -
+                        CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM dispatch_items di JOIN dispatches d ON d.id=di.dispatch_id WHERE di.product_id = p.id AND d.status != 'cancelled'), 0) AS SIGNED)
+                        +
+                        CAST(COALESCE((SELECT SUM(CAST(quantity AS SIGNED)) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE ri.product_id = p.id AND r.status != 'cancelled'), 0) AS SIGNED)
                    ) AS stock,
                    (SELECT new_data FROM approvals WHERE module='products_price' AND record_id=p.id AND status='pending' ORDER BY id DESC LIMIT 1) AS pending_approval_data
             FROM products p
