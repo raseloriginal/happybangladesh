@@ -1070,13 +1070,13 @@ class DSRController extends Controller
         // Calculate Original Selling Price Total (base dealer selling price)
         $qOrigSales = $this->db->prepare("
             SELECT (
-                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * p.price), 0)
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, 0) * COALESCE(di.base_selling_price, p.price)), 0)
                 FROM dispatches d
                 JOIN dispatch_items di ON di.dispatch_id = d.id
                 JOIN products p ON p.id = di.product_id
                 WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
             ) + (
-                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * p.price), 0)
+                SELECT COALESCE(SUM(COALESCE(di.delivered_quantity, di.quantity, 0) * COALESCE(di.base_selling_price, p.price)), 0)
                 FROM dispatches d
                 JOIN dispatch_items di ON di.dispatch_id = d.id
                 JOIN products p ON p.id = di.product_id

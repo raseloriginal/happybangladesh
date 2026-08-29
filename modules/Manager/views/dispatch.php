@@ -369,7 +369,10 @@ function renderSchedules() {
     } else if (sch.status === 'organized') {
       actionBtn = `<button onclick="updateStatus(${sch.id}, 'dispatched')" class="text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded text-xs font-bold border border-emerald-300 transition"><i class="fa-solid fa-truck-fast mr-1"></i> Dispatch</button>`;
     } else if (sch.status === 'dispatched') {
-      actionBtn = `<button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded text-xs font-bold border border-gray-300 transition"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>`;
+      actionBtn = `
+        <button type="button" onclick="window.openReturnModal(${sch.id}, ${sch.dsr_id}, '${sch.dispatch_date}')" class="text-gray-700 hover:bg-gray-100 px-2.5 py-1 rounded text-xs font-bold border border-gray-300 transition mr-1"><i class="fa-solid fa-rotate-left mr-1"></i> Return</button>
+        <button type="button" onclick="window.undoDispatch(${sch.id})" class="text-rose-700 hover:bg-rose-100 px-2.5 py-1 rounded text-xs font-bold border border-rose-300 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Undo Dispatch</button>
+      `;
     } else if (sch.status === 'returned') {
       actionBtn = `<button type="button" onclick="undoReturn(${sch.id})" class="text-rose-700 hover:bg-rose-100 px-2.5 py-1 rounded text-xs font-bold border border-rose-300 transition"><i class="fa-solid fa-rotate-right mr-1"></i> Undo Return</button>`;
     }
@@ -1464,6 +1467,33 @@ window.undoReturn = async function(scheduleId) {
   } catch (e) {
     console.error('Undo Return error:', e);
     alert('নেটওয়ার্ক এরর: রিটার্ন রিভার্ট করা সম্ভব হয়নি।');
+  }
+};
+
+window.undoDispatch = async function(scheduleId) {
+  if (!confirm('আপনি কি নিশ্চিত যে এই ডিসপ্যাচটি Undo করতে চান? এটি প্রোডাক্টের স্টক ওয়্যারহাউজে ফেরত পাঠাবে এবং DSR Van Stock থেকে কেটে নিবে।')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`<?= url("manager/api/dispatch/undo-dispatch/") ?>${scheduleId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showToast === 'function') {
+        showToast(data.message || 'ডিসপ্যাচ সফলভাবে রিভার্ট করা হয়েছে।', 'success');
+      } else {
+        alert(data.message || 'ডিসপ্যাচ সফলভাবে রিভার্ট করা হয়েছে।');
+      }
+      if (typeof loadSchedules === 'function') loadSchedules();
+    } else {
+      alert(data.message || 'ডিসপ্যাচ রিভার্ট করতে সমস্যা হয়েছে।');
+    }
+  } catch (e) {
+    console.error('Undo Dispatch error:', e);
+    alert('নেটওয়ার্ক এরর: ডিসপ্যাচ রিভার্ট করা সম্ভব হয়নি।');
   }
 };
 </script>
