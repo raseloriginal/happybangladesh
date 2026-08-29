@@ -2046,6 +2046,138 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiDispatchUndoDispatch(string $id): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $id = (int)$id;
+        
+        $sch = $this->db->query("SELECT dsr_id, dispatch_date, delivery_date, status FROM dispatch_schedules WHERE id = " . $id)->fetch();
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found']);
+            exit;
+        }
+        
+        if ($sch['status'] !== 'dispatched') {
+            echo json_encode(['success' => false, 'message' => 'Cannot undo a schedule that is not dispatched']);
+            exit;
+        }
+
+        $dsrId = $sch['dsr_id'];
+        $date = $sch['dispatch_date'];
+        $deliv_date = $sch['delivery_date'] ?: $date;
+
+        $this->db->beginTransaction();
+        try {
+            // 1. Get all dispatch_items under 'in_transit' dispatches for this DSR on delivery date
+            $q = $this->db->prepare("
+                SELECT di.product_id, di.lot_id, d.warehouse_id, SUM(di.quantity) as total_qty
+                FROM dispatch_items di
+                JOIN dispatches d ON d.id = di.dispatch_id
+                WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status='in_transit'
+                GROUP BY di.product_id, di.lot_id, d.warehouse_id
+            ");
+            $q->execute([$dsrId, $deliv_date]);
+            $itemsToUndo = $q->fetchAll();
+
+            // 2. Get dispatch_extras adjustments for this schedule (negative = manager reduced van load)
+            $extrasQ = $this->db->prepare("
+                SELECT de.product_id,
+                       de.qty_boxes,
+                       de.qty_pieces,
+                       p.pieces_per_box
+                FROM dispatch_extras de
+                JOIN products p ON p.id = de.product_id
+                WHERE de.schedule_id = ?
+            ");
+            $extrasQ->execute([$id]);
+            $extrasAdjMap = [];
+            foreach ($extrasQ->fetchAll() as $exRow) {
+                $ppb = max(1, (int)$exRow['pieces_per_box']);
+                $adj = ((int)$exRow['qty_boxes'] * $ppb) + (int)$exRow['qty_pieces'];
+                if ($adj < 0) { // Only negative (reduction)
+                    $extrasAdjMap[(int)$exRow['product_id']] = ($extrasAdjMap[(int)$exRow['product_id']] ?? 0) + $adj;
+                }
+            }
+
+            // 3. Apply negative adjustments to get actual organized qty
+            $appliedProducts = [];
+            foreach ($itemsToUndo as &$item) {
+                $pid = (int)$item['product_id'];
+                if (!isset($appliedProducts[$pid]) && isset($extrasAdjMap[$pid])) {
+                    $item['total_qty'] = max(0, (int)$item['total_qty'] + $extrasAdjMap[$pid]);
+                    $appliedProducts[$pid] = true;
+                }
+            }
+            unset($item);
+
+            // 4. Reverse van_stock and warehouse inventory
+            foreach ($itemsToUndo as $item) {
+                if ((int)$item['total_qty'] <= 0) continue;
+
+                // 4.a Deduct quantity and initial_qty from van_stock
+                $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
+                $params = [$item['total_qty'], $item['total_qty'], $dsrId, $item['product_id']];
+                if ($item['lot_id'] !== null) $params[] = $item['lot_id'];
+
+                $this->db->prepare("
+                    UPDATE van_stock 
+                    SET quantity = GREATEST(0, quantity - ?), 
+                        initial_qty = GREATEST(0, initial_qty - ?) 
+                    WHERE dsr_id = ? AND product_id = ? AND lot_id $lotCondition
+                ")->execute($params);
+
+                // Clean up van_stock rows that became 0
+                $cleanParams = [$dsrId, $item['product_id']];
+                if ($item['lot_id'] !== null) $cleanParams[] = $item['lot_id'];
+                $this->db->prepare("
+                    DELETE FROM van_stock 
+                    WHERE dsr_id = ? AND product_id = ? AND lot_id $lotCondition AND quantity = 0 AND initial_qty = 0
+                ")->execute($cleanParams);
+
+                // 4.b Restore to warehouse inventory
+                $lotCondition = $item['lot_id'] === null ? "IS NULL" : "= ?";
+                $lotParams = $item['lot_id'] === null ? [] : [$item['lot_id']];
+                $invQuery = $this->db->prepare("
+                    SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                    FROM inventory i 
+                    JOIN products p ON p.id = i.product_id 
+                    WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id $lotCondition
+                ");
+                $invQuery->execute(array_merge([$item['product_id'], $item['warehouse_id']], $lotParams));
+                $invRow = $invQuery->fetch();
+
+                if ($invRow) {
+                    $ppb = max(1, (int)$invRow['pieces_per_box']);
+                    $totalStockPcs = ((int)$invRow['qty_boxes'] * $ppb) + (int)$invRow['qty_pieces'];
+                    $newStockPcs = $totalStockPcs + (int)$item['total_qty']; // Restore
+
+                    $newBoxes = floor($newStockPcs / $ppb);
+                    $newPcs = $newStockPcs % $ppb;
+
+                    $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                             ->execute([$newBoxes, $newPcs, $invRow['id']]);
+                }
+            }
+
+            // 5. Mark dispatches as pending
+            $this->db->prepare("UPDATE dispatches SET status='pending', updated_at=NOW() WHERE dsr_id=? AND dispatch_date=? AND status='in_transit'")
+                     ->execute([$dsrId, $deliv_date]);
+
+            // 6. Mark schedule status back to organized
+            $this->db->prepare("UPDATE dispatch_schedules SET status = 'organized' WHERE id = ?")->execute([$id]);
+
+            $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'dispatch_status_undo', "Undid dispatch for schedule $id", $id);
+            echo json_encode(['success' => true, 'message' => 'Dispatch has been successfully reverted to Organized.']);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     // ══════════════════════════════════════════════════════════
     //  Settlements
     // ══════════════════════════════════════════════════════════

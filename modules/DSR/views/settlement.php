@@ -17,7 +17,8 @@ $isReturned = ($scheduleStatus === 'returned');
 $isNoDispatch = ($dispatchedValue <= 0);
 $isLocked = $isSubmitted || !$isReturned || $isNoDispatch;
 $readonlyAttr = $isLocked ? 'readonly' : '';
-$initialShouldPay = round($dispatchedValue - $returnedValue - $savedDamage - $savedExpense + $savedDeliveryOc - ($totalDue ?? 0));
+// The SR collected exactly the $salesAmount (SR Rate). We subtract damage, expense, and due from it.
+$initialShouldPay = round($salesAmount - $savedDamage - $savedExpense - ($totalDue ?? 0));
 ?>
 
 <style>
@@ -417,6 +418,7 @@ const damageVal = <?= (float)$savedDamage ?>;
 const expenseVal = <?= (float)$savedExpense ?>;
 const deliveryOcVal = <?= (float)$savedDeliveryOc ?>;
 const totalDueVal = <?= (float)($totalDue ?? 0) ?>;
+const salesAmountVal = <?= (float)$salesAmount ?>;
 
 function stepDenom(denom, step) {
   const input = document.getElementById(`denom-input-${denom}`);
@@ -428,7 +430,8 @@ function stepDenom(denom, step) {
 }
 
 function autoFillCash() {
-  const shouldPay = Math.round(dispatched - returned - damageVal - expenseVal + deliveryOcVal - totalDueVal);
+  // Use salesAmountVal directly, no need to subtract deliveryOcVal as it is already accounted for in the SR rate
+  const shouldPay = Math.round(salesAmountVal - damageVal - expenseVal - totalDueVal);
   if (shouldPay <= 0) return;
   
   document.querySelectorAll('.denomination-input').forEach(inp => inp.value = '');
@@ -454,7 +457,8 @@ function clearCash() {
 }
 
 function calculate() {
-    const shouldPay = dispatched - returned - damageVal - expenseVal + deliveryOcVal - totalDueVal;
+    // Use salesAmountVal directly, no need to subtract deliveryOcVal
+    const shouldPay = salesAmountVal - damageVal - expenseVal - totalDueVal;
     const roundedShouldPay = Math.round(shouldPay);
     
     document.getElementById('displayShouldPay').innerText = '৳ ' + roundedShouldPay.toLocaleString('en-US');
