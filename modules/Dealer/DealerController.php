@@ -329,6 +329,11 @@ class DealerController extends Controller
                 $orderStmt->execute([$date]);
                 $orderData = $orderStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
+                $dayOutQty = 0;
+                $dayOutValue = 0;
+                $dayInQty = 0;
+                $dayInValue = 0;
+                $daySellQty = 0;
                 $grossSale = 0;
                 $netSale = 0;
                 $grossProfit = 0;
@@ -350,6 +355,12 @@ class DealerController extends Controller
                         $itemTotalSale = $sellQty * $p['price'];
                         $itemProfit = $itemTotalSale - $itemNetSale;
 
+                        $dayOutQty += $outQty;
+                        $dayOutValue += ($outQty * $p['price']);
+                        $dayInQty += $inQty;
+                        $dayInValue += ($inQty * $p['price']);
+                        $daySellQty += $sellQty;
+
                         $netSale += $itemNetSale;
                         $grossSale += $itemTotalSale;
                         $grossProfit += $itemProfit;
@@ -364,6 +375,11 @@ class DealerController extends Controller
 
                 $bills[] = [
                     'date' => $date,
+                    'dispatch_qty' => $dayOutQty,
+                    'dispatch_value' => $dayOutValue,
+                    'return_qty' => $dayInQty,
+                    'return_value' => $dayInValue,
+                    'sold_qty' => $daySellQty,
                     'gross_sale' => $grossSale,
                     'net_sale' => $netSale,
                     'gross_profit' => $grossProfit,
@@ -394,7 +410,7 @@ class DealerController extends Controller
         $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
 
         if (empty($srIds)) {
-            echo json_encode(['success' => true, 'data' => []]);
+            echo json_encode(['success' => true, 'summary' => [], 'data' => []]);
             return;
         }
 
@@ -439,6 +455,15 @@ class DealerController extends Controller
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $results = [];
+        $totalOutQty = 0;
+        $totalOutValue = 0;
+        $totalInQty = 0;
+        $totalInValue = 0;
+        $totalSellQty = 0;
+        $totalNetSale = 0;
+        $totalGrossSale = 0;
+        $totalGrossProfit = 0;
+
         foreach ($products as $p) {
             $sellQty = $p['out_qty'] > 0 ? max(0, $p['out_qty'] - $p['in_qty']) : $p['order_qty'];
             
@@ -451,21 +476,43 @@ class DealerController extends Controller
             $totalSale = $sellQty * $p['price'];
             $profit = $totalSale - $netSale;
 
+            $totalOutQty += $p['out_qty'];
+            $totalOutValue += $outValue;
+            $totalInQty += $p['in_qty'];
+            $totalInValue += $inValue;
+            $totalSellQty += $sellQty;
+            $totalNetSale += $netSale;
+            $totalGrossSale += $totalSale;
+            $totalGrossProfit += $profit;
+
             $results[] = [
                 'name' => $p['product_name'],
-                'out_qty' => $p['out_qty'],
-                'in_qty' => $p['in_qty'],
-                'sell_qty' => $sellQty,
-                'out_value' => $outValue,
-                'in_value' => $inValue,
-                'net_sale' => $netSale,
-                'profit' => $profit,
-                'total_sale' => $totalSale,
-                'success_ratio' => $successRatio
+                'out_qty' => (int)$p['out_qty'],
+                'in_qty' => (int)$p['in_qty'],
+                'sell_qty' => (int)$sellQty,
+                'out_value' => (float)$outValue,
+                'in_value' => (float)$inValue,
+                'net_sale' => (float)$netSale,
+                'profit' => (float)$profit,
+                'total_sale' => (float)$totalSale,
+                'success_ratio' => (float)$successRatio
             ];
         }
 
-        echo json_encode(['success' => true, 'data' => $results]);
+        $summary = [
+            'dispatch_qty' => $totalOutQty,
+            'dispatch_value' => $totalOutValue,
+            'return_qty' => $totalInQty,
+            'return_value' => $totalInValue,
+            'sold_qty' => $totalSellQty,
+            'gross_sale' => $totalGrossSale,
+            'net_sale' => $totalNetSale,
+            'gross_profit' => $totalGrossProfit,
+            'net_profit' => $totalGrossProfit / 2,
+            'success_rate' => $totalOutQty > 0 ? ($totalSellQty / $totalOutQty) * 100 : ($totalSellQty > 0 ? 100 : 0)
+        ];
+
+        echo json_encode(['success' => true, 'summary' => $summary, 'data' => $results]);
     }
 
     // ══════════════════════════════════════════════════════════
