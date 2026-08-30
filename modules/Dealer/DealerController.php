@@ -137,7 +137,14 @@ class DealerController extends Controller
 
         foreach ($dates as $date) {
             $outStmt = $this->db->prepare("
-                SELECT di.product_id, SUM(di.quantity) as qty
+                SELECT 
+                    di.product_id, 
+                    SUM(di.quantity) as qty,
+                    SUM(CASE 
+                        WHEN di.delivered_quantity IS NOT NULL THEN di.delivered_quantity
+                        WHEN d.status = 'delivered' THEN di.quantity
+                        ELSE 0 
+                    END) as delivered_qty
                 FROM dispatch_items di
                 JOIN dispatches d ON di.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
@@ -145,7 +152,7 @@ class DealerController extends Controller
                 GROUP BY di.product_id
             ");
             $outStmt->execute([$date, $dealerId, $warehouseId]);
-            $outData = $outStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            $outData = $outStmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
 
             $inStmt = $this->db->prepare("
                 SELECT ri.product_id, SUM(ri.quantity) as qty
@@ -160,14 +167,17 @@ class DealerController extends Controller
             $inData = $inStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
             $orderStmt = $this->db->prepare("
-                SELECT oi.product_id, SUM(oi.quantity) as qty
+                SELECT 
+                    oi.product_id, 
+                    SUM(oi.quantity) as qty,
+                    SUM(CASE WHEN o.status = 'delivered' THEN oi.quantity ELSE 0 END) as delivered_qty
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.id
                 WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                 GROUP BY oi.product_id
             ");
             $orderStmt->execute([$date, $dealerId]);
-            $orderData = $orderStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            $orderData = $orderStmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
 
             $dayGrossSale = 0;
             $dayNetSale = 0;
@@ -175,12 +185,12 @@ class DealerController extends Controller
 
             $allProductIds = array_unique(array_merge(array_keys($outData), array_keys($inData), array_keys($orderData)));
             foreach ($allProductIds as $pid) {
-                $outQty = $outData[$pid] ?? 0;
-                $inQty = $inData[$pid] ?? 0;
-                $orderQty = $orderData[$pid] ?? 0;
+                $hasDispatch = isset($outData[$pid]);
+                $outQty = $hasDispatch ? (int)$outData[$pid]['qty'] : (int)($orderData[$pid]['qty'] ?? 0);
+                $inQty = (int)($inData[$pid] ?? 0);
+                $sellQty = $hasDispatch ? (int)$outData[$pid]['delivered_qty'] : (int)($orderData[$pid]['delivered_qty'] ?? 0);
                 
-                $dispatchQty = $outQty > 0 ? $outQty : $orderQty;
-                $sellQty = max(0, $dispatchQty - $inQty);
+                $sellQty = min($sellQty, max(0, $outQty - $inQty));
                 
                 if (isset($products[$pid])) {
                     $p = $products[$pid];
@@ -192,7 +202,7 @@ class DealerController extends Controller
                     $dayGrossProfit += ($itemTotalSale - $itemNetSale);
                 }
 
-                $totals['success_out'] += $dispatchQty;
+                $totals['success_out'] += $outQty;
                 $totals['success_sell'] += $sellQty;
             }
 
@@ -311,7 +321,14 @@ class DealerController extends Controller
             foreach ($dates as $date) {
                 // Out Data
                 $outStmt = $this->db->prepare("
-                    SELECT di.product_id, SUM(di.quantity) as qty
+                    SELECT 
+                        di.product_id, 
+                        SUM(di.quantity) as qty,
+                        SUM(CASE 
+                            WHEN di.delivered_quantity IS NOT NULL THEN di.delivered_quantity
+                            WHEN d.status = 'delivered' THEN di.quantity
+                            ELSE 0 
+                        END) as delivered_qty
                     FROM dispatch_items di
                     JOIN dispatches d ON di.dispatch_id = d.id
                     LEFT JOIN orders o ON d.order_id = o.id
@@ -319,7 +336,7 @@ class DealerController extends Controller
                     GROUP BY di.product_id
                 ");
                 $outStmt->execute([$date, $dealerId, $warehouseId]);
-                $outData = $outStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+                $outData = $outStmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
 
                 // In Data
                 $inStmt = $this->db->prepare("
@@ -336,14 +353,17 @@ class DealerController extends Controller
 
                 // Order Data
                 $orderStmt = $this->db->prepare("
-                    SELECT oi.product_id, SUM(oi.quantity) as qty
+                    SELECT 
+                        oi.product_id, 
+                        SUM(oi.quantity) as qty,
+                        SUM(CASE WHEN o.status = 'delivered' THEN oi.quantity ELSE 0 END) as delivered_qty
                     FROM order_items oi
                     JOIN orders o ON oi.order_id = o.id
                     WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     GROUP BY oi.product_id
                 ");
                 $orderStmt->execute([$date, $dealerId]);
-                $orderData = $orderStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+                $orderData = $orderStmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
 
                 $dayOutQty = 0;
                 $dayOutValue = 0;
@@ -356,21 +376,21 @@ class DealerController extends Controller
 
                 $allProductIds = array_unique(array_merge(array_keys($outData), array_keys($inData), array_keys($orderData)));
                 foreach ($allProductIds as $pid) {
-                    $outQty = $outData[$pid] ?? 0;
-                    $inQty = $inData[$pid] ?? 0;
-                    $orderQty = $orderData[$pid] ?? 0;
+                    $hasDispatch = isset($outData[$pid]);
+                    $outQty = $hasDispatch ? (int)$outData[$pid]['qty'] : (int)($orderData[$pid]['qty'] ?? 0);
+                    $inQty = (int)($inData[$pid] ?? 0);
+                    $sellQty = $hasDispatch ? (int)$outData[$pid]['delivered_qty'] : (int)($orderData[$pid]['delivered_qty'] ?? 0);
                     
-                    $dispatchQty = $outQty > 0 ? $outQty : $orderQty;
-                    $sellQty = max(0, $dispatchQty - $inQty);
-                    
+                    $sellQty = min($sellQty, max(0, $outQty - $inQty));
+
                     if (isset($products[$pid])) {
                         $p = $products[$pid];
                         $itemNetSale = $sellQty * $p['buying_price'];
                         $itemTotalSale = $sellQty * $p['price'];
                         $itemProfit = $itemTotalSale - $itemNetSale;
 
-                        $dayOutQty += $dispatchQty;
-                        $dayOutValue += ($dispatchQty * $p['price']);
+                        $dayOutQty += $outQty;
+                        $dayOutValue += ($outQty * $p['price']);
                         $dayInQty += $inQty;
                         $dayInValue += ($inQty * $p['price']);
                         $daySellQty += $sellQty;
@@ -438,11 +458,20 @@ class DealerController extends Controller
                 p.price as price,
                 p.buying_price as buying_price,
                 COALESCE(out_data.out_qty, 0) as out_qty,
+                COALESCE(out_data.delivered_qty, 0) as delivered_qty,
                 COALESCE(in_data.in_qty, 0) as in_qty,
-                COALESCE(order_data.order_qty, 0) as order_qty
+                COALESCE(order_data.order_qty, 0) as order_qty,
+                COALESCE(order_data.delivered_order_qty, 0) as delivered_order_qty
             FROM products p
             LEFT JOIN (
-                SELECT di.product_id, SUM(di.quantity) as out_qty
+                SELECT 
+                    di.product_id, 
+                    SUM(di.quantity) as out_qty,
+                    SUM(CASE 
+                        WHEN di.delivered_quantity IS NOT NULL THEN di.delivered_quantity
+                        WHEN d.status = 'delivered' THEN di.quantity
+                        ELSE 0 
+                    END) as delivered_qty
                 FROM dispatch_items di
                 JOIN dispatches d ON di.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
@@ -459,7 +488,10 @@ class DealerController extends Controller
                 GROUP BY ri.product_id
             ) in_data ON p.id = in_data.product_id
             LEFT JOIN (
-                SELECT oi.product_id, SUM(oi.quantity) as order_qty
+                SELECT 
+                    oi.product_id, 
+                    SUM(oi.quantity) as order_qty,
+                    SUM(CASE WHEN o.status = 'delivered' THEN oi.quantity ELSE 0 END) as delivered_order_qty
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.id
                 WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
@@ -483,11 +515,14 @@ class DealerController extends Controller
         $totalGrossProfit = 0;
 
         foreach ($products as $p) {
-            $dispatchQty = $p['out_qty'] > 0 ? (int)$p['out_qty'] : (int)$p['order_qty'];
+            $hasDispatch = $p['out_qty'] > 0;
+            $dispatchQty = $hasDispatch ? (int)$p['out_qty'] : (int)$p['order_qty'];
             $returnQty = (int)$p['in_qty'];
-            $sellQty = max(0, $dispatchQty - $returnQty);
+            $sellQty = $hasDispatch ? (int)$p['delivered_qty'] : (int)$p['delivered_order_qty'];
             
-            $successRatio = $dispatchQty > 0 ? ($sellQty / $dispatchQty) * 100 : ($sellQty > 0 ? 100 : 0);
+            $sellQty = min($sellQty, max(0, $dispatchQty - $returnQty));
+
+            $successRatio = $dispatchQty > 0 ? ($sellQty / $dispatchQty) * 100 : 0;
             
             $outValue = $dispatchQty * $p['price'];
             $inValue = $returnQty * $p['price'];
