@@ -459,10 +459,21 @@ class AdminController extends Controller
     public function dealerStore(): void
     {
         $this->verifyCsrf();
+        
+        $username = trim($this->post('username')) ?: null;
+        if ($username) {
+            $chk = $this->db->prepare("SELECT id FROM dealers WHERE username=?");
+            $chk->execute([$username]);
+            if ($chk->fetch()) {
+                $this->flash('error', 'Username "' . $username . '" is already taken.');
+                $this->redirect('admin/dealers/create');
+                return;
+            }
+        }
+
         $this->db->beginTransaction();
         
         try {
-            $username = trim($this->post('username')) ?: null;
             $password = trim($this->post('password'));
             $hashedPassword = $password ? password_hash($password, PASSWORD_DEFAULT) : null;
 
@@ -480,6 +491,11 @@ class AdminController extends Controller
                      ]);
             
             $dealerId = $this->db->lastInsertId();
+
+            if (!$username) {
+                $defaultUsername = 'dealer_' . $dealerId;
+                $this->db->prepare("UPDATE dealers SET username=? WHERE id=?")->execute([$defaultUsername, $dealerId]);
+            }
             
             $cIds = $_POST['company_id'] ?? [];
             $sIds = $_POST['sr_id'] ?? [];
@@ -533,10 +549,21 @@ class AdminController extends Controller
     public function dealerUpdate(string $id): void
     {
         $this->verifyCsrf();
+        
+        $username = trim($this->post('username')) ?: null;
+        if ($username) {
+            $chk = $this->db->prepare("SELECT id FROM dealers WHERE username=? AND id!=?");
+            $chk->execute([$username, $id]);
+            if ($chk->fetch()) {
+                $this->flash('error', 'Username "' . $username . '" is already taken by another dealer.');
+                $this->redirect('admin/dealers/edit/' . $id);
+                return;
+            }
+        }
+
         $this->db->beginTransaction();
         
         try {
-            $username = trim($this->post('username')) ?: null;
             $password = trim($this->post('password'));
 
             $this->db->prepare("UPDATE dealers SET warehouse_id=?,name=?,username=?,phone=?,address=?,trade_license=?,business_name=?,happy_commission=?,status=? WHERE id=?")

@@ -27,12 +27,12 @@
         </div>
         
         <div class="form-group col-span-2 md:col-span-1">
-          <label class="form-label">Username (For Login)</label>
-          <input type="text" name="username" class="form-input" value="<?= h($item['username'] ?? '') ?>" placeholder="e.g. dealer_john">
+          <label class="form-label" for="username">Username (For Login)</label>
+          <input type="text" id="username" name="username" class="form-input" value="<?= h($item['username'] ?? '') ?>" placeholder="e.g. dealer_john" autocomplete="off">
         </div>
         <div class="form-group col-span-2 md:col-span-1">
-          <label class="form-label">Password <?= $isEdit ? '<span class="text-xs text-gray-400 font-normal">(Leave blank to keep unchanged)</span>' : '<span class="required">*</span>' ?></label>
-          <input type="text" name="password" <?= $isEdit ? '' : 'required' ?> class="form-input" placeholder="e.g. 123456">
+          <label class="form-label" for="password">Password <?= $isEdit ? '<span class="text-xs text-gray-400 font-normal">(Leave blank to keep unchanged)</span>' : '<span class="required">*</span>' ?></label>
+          <input type="password" id="password" name="password" <?= $isEdit ? '' : 'required' ?> class="form-input" placeholder="<?= $isEdit ? 'Leave blank to keep unchanged' : 'e.g. 123456' ?>" autocomplete="new-password">
         </div>
         <div class="form-group col-span-2">
           <label class="form-label">Business Name</label>
