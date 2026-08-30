@@ -80,6 +80,10 @@ class DealerController extends Controller
         $dStmt->execute([$dealerId]);
         $warehouseId = $dStmt->fetchColumn() ?: 0;
 
+        $compStmt = $this->db->prepare("SELECT DISTINCT company_id FROM dealer_companies WHERE dealer_id = ?");
+        $compStmt->execute([$dealerId]);
+        $companyIds = $compStmt->fetchAll(PDO::FETCH_COLUMN);
+
         $srStmt = $this->db->prepare("SELECT DISTINCT sr_id FROM dealer_companies WHERE dealer_id = ?");
         $srStmt->execute([$dealerId]);
         $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
@@ -97,39 +101,70 @@ class DealerController extends Controller
         
         $daily = [];
 
-        if (empty($srIds)) {
+        if (empty($companyIds) || empty($srIds)) {
             return ['totals' => $totals, 'daily' => $daily];
         }
 
+        $companyIdsStr = implode(',', $companyIds);
         $inStr = implode(',', $srIds);
         
         // Get dates
         if ($startDate && $endDate) {
             $stmt = $this->db->prepare("
                 SELECT DISTINCT date FROM (
-                    SELECT DATE(d.dispatch_date) as date FROM dispatches d LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) AND DATE(d.dispatch_date) BETWEEN ? AND ?
+                    SELECT DATE(d.dispatch_date) as date 
+                    FROM dispatches d 
+                    JOIN dispatch_items di ON di.dispatch_id = d.id
+                    JOIN products p ON di.product_id = p.id
+                    LEFT JOIN orders o ON d.order_id = o.id 
+                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) AND DATE(d.dispatch_date) BETWEEN ? AND ?
                     UNION
-                    SELECT DATE(r.return_date) as date FROM returns r LEFT JOIN dispatches d ON r.dispatch_id = d.id LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(r.return_date) BETWEEN ? AND ?
+                    SELECT DATE(r.return_date) as date 
+                    FROM returns r 
+                    JOIN return_items ri ON ri.return_id = r.id
+                    JOIN products p ON ri.product_id = p.id
+                    LEFT JOIN dispatches d ON r.dispatch_id = d.id 
+                    LEFT JOIN orders o ON d.order_id = o.id 
+                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(r.return_date) BETWEEN ? AND ?
                     UNION
-                    SELECT DATE(o.created_at) as date FROM orders o WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(o.created_at) BETWEEN ? AND ?
+                    SELECT DATE(o.created_at) as date 
+                    FROM orders o 
+                    JOIN order_items oi ON oi.order_id = o.id
+                    JOIN products p ON oi.product_id = p.id
+                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(o.created_at) BETWEEN ? AND ?
                 ) as dates ORDER BY date ASC
             ");
             $stmt->execute([$dealerId, $warehouseId, $startDate, $endDate, $dealerId, $startDate, $endDate, $dealerId, $startDate, $endDate]);
         } else {
             $stmt = $this->db->prepare("
                 SELECT DISTINCT date FROM (
-                    SELECT DATE(d.dispatch_date) as date FROM dispatches d LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) AND d.dispatch_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+                    SELECT DATE(d.dispatch_date) as date 
+                    FROM dispatches d 
+                    JOIN dispatch_items di ON di.dispatch_id = d.id
+                    JOIN products p ON di.product_id = p.id
+                    LEFT JOIN orders o ON d.order_id = o.id 
+                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) AND d.dispatch_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
                     UNION
-                    SELECT DATE(r.return_date) as date FROM returns r LEFT JOIN dispatches d ON r.dispatch_id = d.id LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND r.return_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+                    SELECT DATE(r.return_date) as date 
+                    FROM returns r 
+                    JOIN return_items ri ON ri.return_id = r.id
+                    JOIN products p ON ri.product_id = p.id
+                    LEFT JOIN dispatches d ON r.dispatch_id = d.id 
+                    LEFT JOIN orders o ON d.order_id = o.id 
+                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND r.return_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
                     UNION
-                    SELECT DATE(o.created_at) as date FROM orders o WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+                    SELECT DATE(o.created_at) as date 
+                    FROM orders o 
+                    JOIN order_items oi ON oi.order_id = o.id
+                    JOIN products p ON oi.product_id = p.id
+                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
                 ) as dates ORDER BY date ASC
             ");
             $stmt->execute([$dealerId, $warehouseId, $days, $dealerId, $days, $dealerId, $days]);
         }
         $dates = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-        $priceStmt = $this->db->query("SELECT id, price, buying_price FROM products");
+        $priceStmt = $this->db->query("SELECT id, price, buying_price FROM products WHERE company_id IN ($companyIdsStr)");
         $products = [];
         while ($row = $priceStmt->fetch(PDO::FETCH_ASSOC)) {
             $products[$row['id']] = $row;
@@ -146,9 +181,10 @@ class DealerController extends Controller
                         ELSE 0 
                     END) as delivered_qty
                 FROM dispatch_items di
+                JOIN products p ON di.product_id = p.id
                 JOIN dispatches d ON di.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
-                WHERE DATE(d.dispatch_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
+                WHERE p.company_id IN ($companyIdsStr) AND DATE(d.dispatch_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
                 GROUP BY di.product_id
             ");
             $outStmt->execute([$date, $dealerId, $warehouseId]);
@@ -157,10 +193,11 @@ class DealerController extends Controller
             $inStmt = $this->db->prepare("
                 SELECT ri.product_id, SUM(ri.quantity) as qty
                 FROM return_items ri
+                JOIN products p ON ri.product_id = p.id
                 JOIN returns r ON ri.return_id = r.id
                 LEFT JOIN dispatches d ON r.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
-                WHERE DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                WHERE p.company_id IN ($companyIdsStr) AND DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                 GROUP BY ri.product_id
             ");
             $inStmt->execute([$date, $dealerId]);
@@ -172,8 +209,9 @@ class DealerController extends Controller
                     SUM(oi.quantity) as qty,
                     SUM(CASE WHEN o.status = 'delivered' THEN oi.quantity ELSE 0 END) as delivered_qty
                 FROM order_items oi
+                JOIN products p ON oi.product_id = p.id
                 JOIN orders o ON oi.order_id = o.id
-                WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                WHERE p.company_id IN ($companyIdsStr) AND DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                 GROUP BY oi.product_id
             ");
             $orderStmt->execute([$date, $dealerId]);
@@ -275,12 +313,17 @@ class DealerController extends Controller
         $dStmt->execute([$dealerId]);
         $warehouseId = $dStmt->fetchColumn() ?: 0;
 
+        $compStmt = $this->db->prepare("SELECT DISTINCT company_id FROM dealer_companies WHERE dealer_id = ?");
+        $compStmt->execute([$dealerId]);
+        $companyIds = $compStmt->fetchAll(PDO::FETCH_COLUMN);
+
         $srStmt = $this->db->prepare("SELECT DISTINCT sr_id FROM dealer_companies WHERE dealer_id = ?");
         $srStmt->execute([$dealerId]);
         $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
 
         $bills = [];
-        if (!empty($srIds)) {
+        if (!empty($companyIds) && !empty($srIds)) {
+            $companyIdsStr = implode(',', $companyIds);
             $inStr = implode(',', $srIds);
             
             $startDate = $this->get('start_date');
@@ -289,30 +332,60 @@ class DealerController extends Controller
             if ($startDate && $endDate) {
                 $stmt = $this->db->prepare("
                     SELECT DISTINCT date FROM (
-                        SELECT DATE(d.dispatch_date) as date FROM dispatches d LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) AND DATE(d.dispatch_date) BETWEEN ? AND ?
+                        SELECT DATE(d.dispatch_date) as date 
+                        FROM dispatches d 
+                        JOIN dispatch_items di ON di.dispatch_id = d.id
+                        JOIN products p ON di.product_id = p.id
+                        LEFT JOIN orders o ON d.order_id = o.id 
+                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) AND DATE(d.dispatch_date) BETWEEN ? AND ?
                         UNION
-                        SELECT DATE(r.return_date) as date FROM returns r LEFT JOIN dispatches d ON r.dispatch_id = d.id LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(r.return_date) BETWEEN ? AND ?
+                        SELECT DATE(r.return_date) as date 
+                        FROM returns r 
+                        JOIN return_items ri ON ri.return_id = r.id
+                        JOIN products p ON ri.product_id = p.id
+                        LEFT JOIN dispatches d ON r.dispatch_id = d.id 
+                        LEFT JOIN orders o ON d.order_id = o.id 
+                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(r.return_date) BETWEEN ? AND ?
                         UNION
-                        SELECT DATE(o.created_at) as date FROM orders o WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(o.created_at) BETWEEN ? AND ?
+                        SELECT DATE(o.created_at) as date 
+                        FROM orders o 
+                        JOIN order_items oi ON oi.order_id = o.id
+                        JOIN products p ON oi.product_id = p.id
+                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(o.created_at) BETWEEN ? AND ?
                     ) as dates ORDER BY date DESC
                 ");
                 $stmt->execute([$dealerId, $warehouseId, $startDate, $endDate, $dealerId, $startDate, $endDate, $dealerId, $startDate, $endDate]);
             } else {
                 $stmt = $this->db->prepare("
                     SELECT DISTINCT date FROM (
-                        SELECT DATE(d.dispatch_date) as date FROM dispatches d LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
+                        SELECT DATE(d.dispatch_date) as date 
+                        FROM dispatches d 
+                        JOIN dispatch_items di ON di.dispatch_id = d.id
+                        JOIN products p ON di.product_id = p.id
+                        LEFT JOIN orders o ON d.order_id = o.id 
+                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
                         UNION
-                        SELECT DATE(r.return_date) as date FROM returns r LEFT JOIN dispatches d ON r.dispatch_id = d.id LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                        SELECT DATE(r.return_date) as date 
+                        FROM returns r 
+                        JOIN return_items ri ON ri.return_id = r.id
+                        JOIN products p ON ri.product_id = p.id
+                        LEFT JOIN dispatches d ON r.dispatch_id = d.id 
+                        LEFT JOIN orders o ON d.order_id = o.id 
+                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                         UNION
-                        SELECT DATE(o.created_at) as date FROM orders o WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                        SELECT DATE(o.created_at) as date 
+                        FROM orders o 
+                        JOIN order_items oi ON oi.order_id = o.id
+                        JOIN products p ON oi.product_id = p.id
+                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     ) as dates ORDER BY date DESC LIMIT 30
                 ");
                 $stmt->execute([$dealerId, $warehouseId, $dealerId, $dealerId]);
             }
             $dates = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-            // Fetch product prices to calculate totals
-            $priceStmt = $this->db->query("SELECT id, price, buying_price FROM products");
+            // Fetch product prices to calculate totals for dealer companies
+            $priceStmt = $this->db->query("SELECT id, price, buying_price FROM products WHERE company_id IN ($companyIdsStr)");
             $products = [];
             while ($row = $priceStmt->fetch(PDO::FETCH_ASSOC)) {
                 $products[$row['id']] = $row;
@@ -330,9 +403,10 @@ class DealerController extends Controller
                             ELSE 0 
                         END) as delivered_qty
                     FROM dispatch_items di
+                    JOIN products p ON di.product_id = p.id
                     JOIN dispatches d ON di.dispatch_id = d.id
                     LEFT JOIN orders o ON d.order_id = o.id
-                    WHERE DATE(d.dispatch_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
+                    WHERE p.company_id IN ($companyIdsStr) AND DATE(d.dispatch_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
                     GROUP BY di.product_id
                 ");
                 $outStmt->execute([$date, $dealerId, $warehouseId]);
@@ -342,10 +416,11 @@ class DealerController extends Controller
                 $inStmt = $this->db->prepare("
                     SELECT ri.product_id, SUM(ri.quantity) as qty
                     FROM return_items ri
+                    JOIN products p ON ri.product_id = p.id
                     JOIN returns r ON ri.return_id = r.id
                     LEFT JOIN dispatches d ON r.dispatch_id = d.id
                     LEFT JOIN orders o ON d.order_id = o.id
-                    WHERE DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                    WHERE p.company_id IN ($companyIdsStr) AND DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     GROUP BY ri.product_id
                 ");
                 $inStmt->execute([$date, $dealerId]);
@@ -358,8 +433,9 @@ class DealerController extends Controller
                         SUM(oi.quantity) as qty,
                         SUM(CASE WHEN o.status = 'delivered' THEN oi.quantity ELSE 0 END) as delivered_qty
                     FROM order_items oi
+                    JOIN products p ON oi.product_id = p.id
                     JOIN orders o ON oi.order_id = o.id
-                    WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                    WHERE p.company_id IN ($companyIdsStr) AND DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     GROUP BY oi.product_id
                 ");
                 $orderStmt->execute([$date, $dealerId]);
@@ -440,15 +516,20 @@ class DealerController extends Controller
         $dStmt->execute([$dealerId]);
         $warehouseId = $dStmt->fetchColumn() ?: 0;
 
+        $compStmt = $this->db->prepare("SELECT DISTINCT company_id FROM dealer_companies WHERE dealer_id = ?");
+        $compStmt->execute([$dealerId]);
+        $companyIds = $compStmt->fetchAll(PDO::FETCH_COLUMN);
+
         $srStmt = $this->db->prepare("SELECT DISTINCT sr_id FROM dealer_companies WHERE dealer_id = ?");
         $srStmt->execute([$dealerId]);
         $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
 
-        if (empty($srIds)) {
+        if (empty($companyIds) || empty($srIds)) {
             echo json_encode(['success' => true, 'summary' => [], 'data' => []]);
             return;
         }
 
+        $companyIdsStr = implode(',', $companyIds);
         $inStr = implode(',', $srIds);
         
         $stmt = $this->db->prepare("
@@ -497,7 +578,8 @@ class DealerController extends Controller
                 WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                 GROUP BY oi.product_id
             ) order_data ON p.id = order_data.product_id
-            WHERE COALESCE(out_data.out_qty, 0) > 0 OR COALESCE(in_data.in_qty, 0) > 0 OR COALESCE(order_data.order_qty, 0) > 0
+            WHERE p.company_id IN ($companyIdsStr) 
+              AND (COALESCE(out_data.out_qty, 0) > 0 OR COALESCE(in_data.in_qty, 0) > 0 OR COALESCE(order_data.order_qty, 0) > 0)
             ORDER BY p.name ASC
         ");
         
@@ -577,22 +659,33 @@ class DealerController extends Controller
     {
         $this->checkAuth();
         $dealerId = $_SESSION['dealer_id'];
-        $warehouseId = $_SESSION['dealer_warehouse_id'];
 
-        $companies = $this->getDealerCompanies($dealerId);
-        $companyIds = array_column($companies, 'company_id');
-        
-        if (empty($companyIds)) {
-            $inventory = [];
-        } else {
+        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
+        $dStmt->execute([$dealerId]);
+        $warehouseId = $dStmt->fetchColumn() ?: 0;
+
+        $compStmt = $this->db->prepare("SELECT DISTINCT company_id FROM dealer_companies WHERE dealer_id = ?");
+        $compStmt->execute([$dealerId]);
+        $companyIds = $compStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $inventory = [];
+        if (!empty($companyIds)) {
             $companyIdsStr = implode(',', $companyIds);
+            
             $stmt = $this->db->prepare("
-                SELECT p.id, p.name, p.sku, p.price, p.buying_price, c.name as category_name, co.name as company_name, 
-                       COALESCE(SUM(i.qty_boxes), 0) as qty_boxes, COALESCE(SUM(i.qty_pieces), 0) as qty_pieces
+                SELECT 
+                    p.id, 
+                    p.name, 
+                    p.sku, 
+                    p.price, 
+                    p.buying_price, 
+                    COALESCE(SUM(l.current_quantity), 0) as stock_qty,
+                    cat.name as category_name,
+                    c.name as company_name
                 FROM products p
-                LEFT JOIN categories c ON p.category_id = c.id
-                LEFT JOIN companies co ON p.company_id = co.id
-                LEFT JOIN inventory i ON i.product_id = p.id AND i.warehouse_id = ?
+                LEFT JOIN lots l ON p.id = l.product_id AND l.warehouse_id = ?
+                LEFT JOIN categories cat ON p.category_id = cat.id
+                LEFT JOIN companies c ON p.company_id = c.id
                 WHERE p.company_id IN ($companyIdsStr) AND p.status = 1
                 GROUP BY p.id
                 ORDER BY p.name ASC
@@ -611,6 +704,18 @@ class DealerController extends Controller
     {
         $this->checkAuth();
         $dealerId = $_SESSION['dealer_id'];
+
+        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
+        $dStmt->execute([$dealerId]);
+        $warehouseId = $dStmt->fetchColumn() ?: 0;
+
+        $compStmt = $this->db->prepare("SELECT DISTINCT company_id FROM dealer_companies WHERE dealer_id = ?");
+        $compStmt->execute([$dealerId]);
+        $companyIds = $compStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $srStmt = $this->db->prepare("SELECT DISTINCT sr_id FROM dealer_companies WHERE dealer_id = ?");
+        $srStmt->execute([$dealerId]);
+        $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
 
         $startDate = $this->get('start_date');
         $endDate = $this->get('end_date');
@@ -639,20 +744,13 @@ class DealerController extends Controller
             }
         }
 
-        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
-        $dStmt->execute([$dealerId]);
-        $warehouseId = $dStmt->fetchColumn() ?: 0;
-
-        $srStmt = $this->db->prepare("SELECT DISTINCT sr_id FROM dealer_companies WHERE dealer_id = ?");
-        $srStmt->execute([$dealerId]);
-        $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
-
         $productPerformance = [];
         $categoryPerformance = [];
         $totalOut = 0;
         $totalIn = 0;
 
-        if (!empty($srIds)) {
+        if (!empty($companyIds) && !empty($srIds)) {
+            $companyIdsStr = implode(',', $companyIds);
             $inStr = implode(',', $srIds);
             
             $dateCondDispatch = "";
@@ -678,9 +776,10 @@ class DealerController extends Controller
             $dispatchStmt = $this->db->prepare("
                 SELECT di.product_id, SUM(di.quantity) as qty
                 FROM dispatch_items di
+                JOIN products p ON di.product_id = p.id
                 JOIN dispatches d ON di.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
-                WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) $dateCondDispatch
+                WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) $dateCondDispatch
                 GROUP BY di.product_id
             ");
             $dispatchStmt->execute($paramsDispatch);
@@ -689,10 +788,11 @@ class DealerController extends Controller
             $returnStmt = $this->db->prepare("
                 SELECT ri.product_id, SUM(ri.quantity) as qty
                 FROM return_items ri
+                JOIN products p ON ri.product_id = p.id
                 JOIN returns r ON ri.return_id = r.id
                 LEFT JOIN dispatches d ON r.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
-                WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) $dateCondReturn
+                WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) $dateCondReturn
                 GROUP BY ri.product_id
             ");
             $returnStmt->execute($paramsReturn);
@@ -701,8 +801,9 @@ class DealerController extends Controller
             $orderStmt = $this->db->prepare("
                 SELECT oi.product_id, SUM(oi.quantity) as qty
                 FROM order_items oi
+                JOIN products p ON oi.product_id = p.id
                 JOIN orders o ON oi.order_id = o.id
-                WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) $dateCondOrder
+                WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) $dateCondOrder
                 GROUP BY oi.product_id
             ");
             $orderStmt->execute($paramsOrder);
@@ -712,6 +813,7 @@ class DealerController extends Controller
                 SELECT p.id, p.name, p.price, p.buying_price, cat.name as category_name
                 FROM products p
                 LEFT JOIN categories cat ON p.category_id = cat.id
+                WHERE p.company_id IN ($companyIdsStr)
             ");
             
             while ($p = $prodStmt->fetch(PDO::FETCH_ASSOC)) {
@@ -804,32 +906,29 @@ class DealerController extends Controller
         $this->checkAuth();
         $dealerId = $_SESSION['dealer_id'];
 
+        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
+        $dStmt->execute([$dealerId]);
+        $warehouseId = $dStmt->fetchColumn() ?: 0;
+
         $dsrStmt = $this->db->prepare("
             SELECT DISTINCT u.id, u.name
             FROM users u
             JOIN roles r ON r.id = u.role_id AND r.slug = 'dsr'
             WHERE u.status = 1
-              AND u.id IN (
-                  SELECT DISTINCT d.dsr_id 
-                  FROM dispatches d 
-                  JOIN orders o ON o.id = d.order_id 
-                  JOIN dealer_companies dc ON dc.sr_id = o.sr_id 
-                  WHERE dc.dealer_id = ? AND d.dsr_id IS NOT NULL
+              AND (
+                  u.id IN (
+                      SELECT DISTINCT d.dsr_id 
+                      FROM dispatches d 
+                      JOIN orders o ON o.id = d.order_id 
+                      JOIN dealer_companies dc ON dc.sr_id = o.sr_id 
+                      WHERE dc.dealer_id = ? AND d.dsr_id IS NOT NULL
+                  )
+                  OR (u.warehouse_id = ? AND ? > 0)
               )
             ORDER BY u.name ASC
         ");
-        $dsrStmt->execute([$dealerId]);
+        $dsrStmt->execute([$dealerId, $warehouseId, $warehouseId]);
         $dsrList = $dsrStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        if (empty($dsrList)) {
-            $dsrList = $this->db->query("
-                SELECT u.id, u.name 
-                FROM users u 
-                JOIN roles r ON r.id = u.role_id AND r.slug = 'dsr' 
-                WHERE u.status = 1 
-                ORDER BY u.name ASC
-            ")->fetchAll(PDO::FETCH_ASSOC);
-        }
 
         $pageTitle = 'DSR Tracking';
         $this->render('dsr_tracking', compact('dsrList', 'pageTitle'), 'dealer');
@@ -923,6 +1022,10 @@ class DealerController extends Controller
         header('Content-Type: application/json');
         $dealerId = $_SESSION['dealer_id'];
 
+        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
+        $dStmt->execute([$dealerId]);
+        $warehouseId = $dStmt->fetchColumn() ?: 0;
+
         $dsrStmt = $this->db->prepare("
             SELECT DISTINCT u.id, u.name,
                    dl.lat, dl.lng, dl.address, dl.recorded_at,
@@ -935,34 +1038,20 @@ class DealerController extends Controller
                 ORDER BY recorded_at DESC LIMIT 1
             )
             WHERE u.status = 1
-              AND u.id IN (
-                  SELECT DISTINCT d.dsr_id 
-                  FROM dispatches d 
-                  JOIN orders o ON o.id = d.order_id 
-                  JOIN dealer_companies dc ON dc.sr_id = o.sr_id 
-                  WHERE dc.dealer_id = ? AND d.dsr_id IS NOT NULL
+              AND (
+                  u.id IN (
+                      SELECT DISTINCT d.dsr_id 
+                      FROM dispatches d 
+                      JOIN orders o ON o.id = d.order_id 
+                      JOIN dealer_companies dc ON dc.sr_id = o.sr_id 
+                      WHERE dc.dealer_id = ? AND d.dsr_id IS NOT NULL
+                  )
+                  OR (u.warehouse_id = ? AND ? > 0)
               )
             ORDER BY u.name ASC
         ");
-        $dsrStmt->execute([$dealerId]);
+        $dsrStmt->execute([$dealerId, $warehouseId, $warehouseId]);
         $rows = $dsrStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        if (empty($rows)) {
-            $rows = $this->db->query("
-                SELECT u.id, u.name,
-                       dl.lat, dl.lng, dl.address, dl.recorded_at,
-                       TIMESTAMPDIFF(SECOND, dl.recorded_at, NOW()) AS seconds_ago
-                FROM users u
-                JOIN roles r ON r.id = u.role_id AND r.slug = 'dsr'
-                LEFT JOIN dsr_locations dl ON dl.id = (
-                    SELECT id FROM dsr_locations
-                    WHERE dsr_id = u.id
-                    ORDER BY recorded_at DESC LIMIT 1
-                )
-                WHERE u.status = 1
-                ORDER BY u.name ASC
-            ")->fetchAll(PDO::FETCH_ASSOC);
-        }
 
         $result = [];
         foreach ($rows as $dsr) {
@@ -985,6 +1074,11 @@ class DealerController extends Controller
     {
         $this->checkAuth();
         header('Content-Type: application/json');
+        $dealerId = $_SESSION['dealer_id'];
+
+        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
+        $dStmt->execute([$dealerId]);
+        $warehouseId = $dStmt->fetchColumn() ?: 0;
 
         $dsrId    = (int)$this->get('dsr_id', 0);
         $date     = $this->get('date', date('Y-m-d'));
@@ -993,6 +1087,25 @@ class DealerController extends Controller
 
         if (!$dsrId) {
             echo json_encode(['success' => false, 'message' => 'dsr_id required']);
+            return;
+        }
+
+        $check = $this->db->prepare("
+            SELECT 1 FROM users u
+            WHERE u.id = ? AND (
+                u.id IN (
+                    SELECT DISTINCT d.dsr_id 
+                    FROM dispatches d 
+                    JOIN orders o ON o.id = d.order_id 
+                    JOIN dealer_companies dc ON dc.sr_id = o.sr_id 
+                    WHERE dc.dealer_id = ? AND d.dsr_id IS NOT NULL
+                )
+                OR (u.warehouse_id = ? AND ? > 0)
+            ) LIMIT 1
+        ");
+        $check->execute([$dsrId, $dealerId, $warehouseId, $warehouseId]);
+        if (!$check->fetch()) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
             return;
         }
 
