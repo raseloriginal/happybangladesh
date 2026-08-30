@@ -193,28 +193,35 @@
             </div>
 
             <!-- Products Breakdown -->
-            <h4 class="text-md font-bold text-gray-800 mb-3">কোন পণ্য কত বিক্রি হলো</h4>
+            <h4 class="text-md font-bold text-gray-800 mb-3 flex items-center justify-between">
+                <span><i class="fas fa-boxes-stacked text-blue-600 mr-2"></i>কোন পণ্য কত ডেলিভারি ও ফেরত হলো</span>
+                <span class="text-xs text-gray-500 font-normal">ম্যানেজার ডেসপাস স্প্রেডশিট স্ট্রাকচার</span>
+            </h4>
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <!-- Desktop Table View -->
-                <table class="hidden md:table w-full text-center text-xs text-gray-700">
-                    <thead class="bg-gray-50 border-b border-gray-200 font-bold text-gray-600">
-                        <tr>
-                            <th class="px-4 py-3 text-left">পণ্যের নাম</th>
-                            <th class="px-4 py-3">স্টক থেকে বের হয়েছে</th>
-                            <th class="px-4 py-3">ফেরত এসেছে</th>
-                            <th class="px-4 py-3">বিক্রি হয়েছে</th>
-                            <th class="px-4 py-3">বের হওয়া দাম</th>
-                            <th class="px-4 py-3">ফেরত আসা দাম</th>
-                            <th class="px-4 py-3 text-green-600">বিক্রির টাকা (Net)</th>
-                            <th class="px-4 py-3">মোট দাম (Gross)</th>
-                            <th class="px-4 py-3 text-blue-600">লাভ</th>
-                            <th class="px-4 py-3">সফলতার %</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modal-table-body" class="divide-y divide-gray-100 font-bold">
-                        <!-- Loaded via JS -->
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="hidden md:table w-full text-center text-xs text-gray-700 whitespace-nowrap">
+                        <thead class="bg-gray-50 border-b border-gray-200 font-bold text-gray-600">
+                            <tr>
+                                <th class="px-3 py-3 text-left">#</th>
+                                <th class="px-4 py-3 text-left">পণ্যের নাম</th>
+                                <th class="px-3 py-3 text-right">একক মূল্য</th>
+                                <th class="px-3 py-3 text-center text-blue-700">ডেসপাস পরিমাণ</th>
+                                <th class="px-3 py-3 text-right text-blue-700">ডেসপাস মূল্য</th>
+                                <th class="px-3 py-3 text-center text-rose-600 bg-rose-50/50">ফেরত পরিমাণ</th>
+                                <th class="px-3 py-3 text-right text-rose-600 bg-rose-50/50">ফেরত মূল্য</th>
+                                <th class="px-3 py-3 text-center text-emerald-700 bg-emerald-50/50">বিক্রি পরিমাণ</th>
+                                <th class="px-3 py-3 text-right text-emerald-700 bg-emerald-50/50">আসল বিক্রি (Net)</th>
+                                <th class="px-3 py-3 text-right text-gray-800">মোট বিক্রি (Gross)</th>
+                                <th class="px-3 py-3 text-right text-blue-600">লাভ</th>
+                                <th class="px-3 py-3 text-center">ডেলিভারি %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-table-body" class="divide-y divide-gray-100 font-bold">
+                            <!-- Loaded via JS -->
+                        </tbody>
+                    </table>
+                </div>
 
                 <!-- Mobile Card View -->
                 <div id="modal-mobile-list" class="block md:hidden divide-y divide-gray-100 font-bold text-xs">
@@ -269,20 +276,22 @@ function openModal(date, grossSale, netSale, grossProfit, netProfit, successRate
                 if (res.data) {
                     let html = '';
                     let mobileHtml = '';
-                    res.data.forEach(item => {
+                    res.data.forEach((item, idx) => {
                         html += `
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3 text-left text-gray-800">${item.name}</td>
-                                <td class="px-4 py-3 text-blue-700 font-bold">${item.out_qty}</td>
-                                <td class="px-4 py-3 text-red-600 font-bold">${item.in_qty}</td>
-                                <td class="px-4 py-3 text-emerald-700 font-bold">${item.sell_qty}</td>
-                                <td class="px-4 py-3">৳${item.out_value.toFixed(2)}</td>
-                                <td class="px-4 py-3">৳${item.in_value.toFixed(2)}</td>
-                                <td class="px-4 py-3 text-emerald-700">৳${item.net_sale.toFixed(2)}</td>
-                                <td class="px-4 py-3 text-gray-800">৳${item.total_sale.toFixed(2)}</td>
-                                <td class="px-4 py-3 text-blue-600">৳${item.profit.toFixed(2)}</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px]">
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-3 py-3 text-left text-gray-400 font-normal">${idx + 1}</td>
+                                <td class="px-4 py-3 text-left text-gray-900 font-bold">${item.name}</td>
+                                <td class="px-3 py-3 text-right text-amber-600">৳${(item.price || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td class="px-3 py-3 text-center text-blue-700 font-bold">${item.out_qty}</td>
+                                <td class="px-3 py-3 text-right text-blue-700">৳${item.out_value.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td class="px-3 py-3 text-center text-rose-600 font-bold bg-rose-50/40">${item.in_qty}</td>
+                                <td class="px-3 py-3 text-right text-rose-600 font-bold bg-rose-50/40">৳${item.in_value.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td class="px-3 py-3 text-center text-emerald-700 font-bold bg-emerald-50/40">${item.sell_qty}</td>
+                                <td class="px-3 py-3 text-right text-emerald-700 font-bold bg-emerald-50/40">৳${item.net_sale.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td class="px-3 py-3 text-right text-gray-800">৳${item.total_sale.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td class="px-3 py-3 text-right text-blue-600 font-bold">৳${item.profit.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td class="px-3 py-3 text-center">
+                                    <span class="px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">
                                         ${item.success_ratio.toFixed(1)}%
                                     </span>
                                 </td>
@@ -290,39 +299,42 @@ function openModal(date, grossSale, netSale, grossProfit, netProfit, successRate
                         `;
                         mobileHtml += `
                             <div class="p-4 hover:bg-gray-50/50 flex flex-col gap-2.5">
-                                <div class="text-gray-800 font-bold text-sm text-left">${item.name}</div>
+                                <div class="flex justify-between items-start">
+                                    <div class="text-gray-800 font-bold text-sm text-left">${item.name}</div>
+                                    <span class="text-xs text-amber-600 font-bold">৳${(item.price || 0).toFixed(2)}/পিস</span>
+                                </div>
                                 <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
-                                    <div class="bg-blue-50/70 p-2 rounded-lg border border-blue-100">
-                                        <span class="text-blue-600 block mb-0.5 font-bold">বের হয়েছে</span>
-                                        <span class="text-gray-800 font-extrabold">${item.out_qty} টি</span>
-                                        <span class="text-gray-400 block text-[9px]">৳${item.out_value.toFixed(2)}</span>
+                                    <div class="bg-blue-50/70 p-2.5 rounded-xl border border-blue-100">
+                                        <span class="text-blue-600 block mb-0.5 font-bold uppercase tracking-wide">ডেসপাস</span>
+                                        <span class="text-gray-800 font-extrabold text-xs">${item.out_qty} টি</span>
+                                        <span class="text-blue-600 block text-[10px] font-semibold mt-0.5">৳${item.out_value.toFixed(2)}</span>
                                     </div>
-                                    <div class="bg-red-50/70 p-2 rounded-lg border border-red-100">
-                                        <span class="text-red-500 block mb-0.5 font-bold">ফেরত এসেছে</span>
-                                        <span class="text-gray-800 font-extrabold">${item.in_qty} টি</span>
-                                        <span class="text-gray-400 block text-[9px]">৳${item.in_value.toFixed(2)}</span>
+                                    <div class="bg-rose-50/70 p-2.5 rounded-xl border border-rose-100">
+                                        <span class="text-rose-600 block mb-0.5 font-bold uppercase tracking-wide">ফেরত</span>
+                                        <span class="text-gray-800 font-extrabold text-xs">${item.in_qty} টি</span>
+                                        <span class="text-rose-600 block text-[10px] font-semibold mt-0.5">৳${item.in_value.toFixed(2)}</span>
                                     </div>
-                                    <div class="bg-emerald-50/70 p-2 rounded-lg border border-emerald-100">
-                                        <span class="text-emerald-700 block mb-0.5 font-bold">বিক্রি হয়েছে</span>
-                                        <span class="text-emerald-800 font-extrabold">${item.sell_qty} টি</span>
-                                        <span class="text-emerald-600 block text-[9px]">৳${item.net_sale.toFixed(2)}</span>
+                                    <div class="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-100">
+                                        <span class="text-emerald-700 block mb-0.5 font-bold uppercase tracking-wide">বিক্রি</span>
+                                        <span class="text-emerald-800 font-extrabold text-xs">${item.sell_qty} টি</span>
+                                        <span class="text-emerald-600 block text-[10px] font-semibold mt-0.5">৳${item.net_sale.toFixed(2)}</span>
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-left pt-1">
                                     <div>
-                                        <span class="text-gray-400">বের হওয়া দাম:</span>
+                                        <span class="text-gray-400">ডেসপাস মূল্য:</span>
                                         <span class="text-gray-700 font-bold">৳${item.out_value.toFixed(2)}</span>
                                     </div>
                                     <div>
-                                        <span class="text-gray-400">ফেরত আসা দাম:</span>
-                                        <span class="text-gray-700 font-bold">৳${item.in_value.toFixed(2)}</span>
+                                        <span class="text-rose-500 font-medium">ফেরত মূল্য:</span>
+                                        <span class="text-rose-600 font-bold">৳${item.in_value.toFixed(2)}</span>
                                     </div>
                                     <div>
-                                        <span class="text-emerald-600">বিক্রির টাকা (Net):</span>
+                                        <span class="text-emerald-600 font-medium">আসল বিক্রি (Net):</span>
                                         <span class="text-emerald-700 font-bold">৳${item.net_sale.toFixed(2)}</span>
                                     </div>
                                     <div>
-                                        <span class="text-blue-600">লাভ (Profit):</span>
+                                        <span class="text-blue-600 font-medium">আসল লাভ:</span>
                                         <span class="text-blue-700 font-bold">৳${item.profit.toFixed(2)}</span>
                                     </div>
                                 </div>
@@ -331,7 +343,7 @@ function openModal(date, grossSale, netSale, grossProfit, netProfit, successRate
                                         <span class="text-gray-400">মোট বিক্রি (Gross):</span>
                                         <span class="text-gray-800 font-bold">৳${item.total_sale.toFixed(2)}</span>
                                     </div>
-                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-bold">
+                                    <span class="px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full font-bold">
                                         ডেলিভারি: ${item.success_ratio.toFixed(1)}%
                                     </span>
                                 </div>
