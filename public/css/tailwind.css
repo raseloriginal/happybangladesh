@@ -2746,11 +2746,6 @@ video {
   background-color: rgb(240 253 244 / var(--tw-bg-opacity, 1));
 }
 
-.bg-\[\#fff0f0\] {
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 240 240 / var(--tw-bg-opacity, 1));
-}
-
 .bg-\[\#fffcf0\] {
   --tw-bg-opacity: 1;
   background-color: rgb(255 252 240 / var(--tw-bg-opacity, 1));
@@ -2781,6 +2776,10 @@ video {
 
 .bg-amber-50\/30 {
   background-color: rgb(255 251 235 / 0.3);
+}
+
+.bg-amber-50\/50 {
+  background-color: rgb(255 251 235 / 0.5);
 }
 
 .bg-amber-50\/60 {
@@ -2940,6 +2939,10 @@ video {
 
 .bg-emerald-50\/60 {
   background-color: rgb(236 253 245 / 0.6);
+}
+
+.bg-emerald-50\/70 {
+  background-color: rgb(236 253 245 / 0.7);
 }
 
 .bg-emerald-500 {
@@ -3125,6 +3128,14 @@ video {
 
 .bg-red-50\/20 {
   background-color: rgb(254 242 242 / 0.2);
+}
+
+.bg-red-50\/50 {
+  background-color: rgb(254 242 242 / 0.5);
+}
+
+.bg-red-50\/70 {
+  background-color: rgb(254 242 242 / 0.7);
 }
 
 .bg-red-500 {
