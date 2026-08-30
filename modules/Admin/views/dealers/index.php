@@ -47,6 +47,7 @@
         <tr>
           <th class="excel-row-num">#</th>
           <th>Dealer Name</th>
+          <th>Username</th>
           <th>Business Name</th>
           <th>Warehouse</th>
           <th>Phone</th>
@@ -60,6 +61,7 @@
         <tr>
           <td class="excel-row-num"><?= $i+1 ?></td>
           <td class="font-bold text-gray-900"><?= h($d['name']) ?></td>
+          <td class="text-blue-600 font-mono text-sm"><?= h($d['username'] ?? '—') ?></td>
           <td class="text-gray-700"><?= h($d['business_name'] ?? '—') ?></td>
           <td class="text-gray-500"><?= h($d['warehouse_name'] ?? '—') ?></td>
           <td class="font-mono text-gray-700"><?= h($d['phone'] ?? '—') ?></td>
