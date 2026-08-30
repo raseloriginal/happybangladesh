@@ -125,7 +125,16 @@ class DealerController extends Controller
                     JOIN products p ON ri.product_id = p.id
                     LEFT JOIN dispatches d ON r.dispatch_id = d.id 
                     LEFT JOIN orders o ON d.order_id = o.id 
-                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(r.return_date) BETWEEN ? AND ?
+                    WHERE p.company_id IN ($companyIdsStr) 
+                      AND (
+                          o.sr_id IN ($inStr) 
+                          OR o.dealer_id = ? 
+                          OR d.warehouse_id = ?
+                          OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                          OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                          OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                      ) 
+                      AND DATE(r.return_date) BETWEEN ? AND ?
                     UNION
                     SELECT DATE(o.created_at) as date 
                     FROM orders o 
@@ -134,7 +143,11 @@ class DealerController extends Controller
                     WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(o.created_at) BETWEEN ? AND ?
                 ) as dates ORDER BY date ASC
             ");
-            $stmt->execute([$dealerId, $warehouseId, $startDate, $endDate, $dealerId, $startDate, $endDate, $dealerId, $startDate, $endDate]);
+            $stmt->execute([
+                $dealerId, $warehouseId, $startDate, $endDate, 
+                $dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId, $startDate, $endDate, 
+                $dealerId, $startDate, $endDate
+            ]);
         } else {
             $stmt = $this->db->prepare("
                 SELECT DISTINCT date FROM (
@@ -151,7 +164,16 @@ class DealerController extends Controller
                     JOIN products p ON ri.product_id = p.id
                     LEFT JOIN dispatches d ON r.dispatch_id = d.id 
                     LEFT JOIN orders o ON d.order_id = o.id 
-                    WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND r.return_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+                    WHERE p.company_id IN ($companyIdsStr) 
+                      AND (
+                          o.sr_id IN ($inStr) 
+                          OR o.dealer_id = ? 
+                          OR d.warehouse_id = ?
+                          OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                          OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                          OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                      ) 
+                      AND r.return_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
                     UNION
                     SELECT DATE(o.created_at) as date 
                     FROM orders o 
@@ -160,7 +182,11 @@ class DealerController extends Controller
                     WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND o.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
                 ) as dates ORDER BY date ASC
             ");
-            $stmt->execute([$dealerId, $warehouseId, $days, $dealerId, $days, $dealerId, $days]);
+            $stmt->execute([
+                $dealerId, $warehouseId, $days, 
+                $dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId, $days, 
+                $dealerId, $days
+            ]);
         }
         $dates = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
@@ -197,10 +223,19 @@ class DealerController extends Controller
                 JOIN returns r ON ri.return_id = r.id
                 LEFT JOIN dispatches d ON r.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
-                WHERE p.company_id IN ($companyIdsStr) AND DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                WHERE p.company_id IN ($companyIdsStr) 
+                  AND DATE(r.return_date) = ? 
+                  AND (
+                      o.sr_id IN ($inStr) 
+                      OR o.dealer_id = ? 
+                      OR d.warehouse_id = ?
+                      OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                      OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                      OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                  )
                 GROUP BY ri.product_id
             ");
-            $inStmt->execute([$date, $dealerId]);
+            $inStmt->execute([$date, $dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId]);
             $inData = $inStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
             $orderStmt = $this->db->prepare("
@@ -345,7 +380,16 @@ class DealerController extends Controller
                         JOIN products p ON ri.product_id = p.id
                         LEFT JOIN dispatches d ON r.dispatch_id = d.id 
                         LEFT JOIN orders o ON d.order_id = o.id 
-                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(r.return_date) BETWEEN ? AND ?
+                        WHERE p.company_id IN ($companyIdsStr) 
+                          AND (
+                              o.sr_id IN ($inStr) 
+                              OR o.dealer_id = ? 
+                              OR d.warehouse_id = ?
+                              OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                              OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                              OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                          ) 
+                          AND DATE(r.return_date) BETWEEN ? AND ?
                         UNION
                         SELECT DATE(o.created_at) as date 
                         FROM orders o 
@@ -354,7 +398,11 @@ class DealerController extends Controller
                         WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(o.created_at) BETWEEN ? AND ?
                     ) as dates ORDER BY date DESC
                 ");
-                $stmt->execute([$dealerId, $warehouseId, $startDate, $endDate, $dealerId, $startDate, $endDate, $dealerId, $startDate, $endDate]);
+                $stmt->execute([
+                    $dealerId, $warehouseId, $startDate, $endDate, 
+                    $dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId, $startDate, $endDate, 
+                    $dealerId, $startDate, $endDate
+                ]);
             } else {
                 $stmt = $this->db->prepare("
                     SELECT DISTINCT date FROM (
@@ -371,7 +419,15 @@ class DealerController extends Controller
                         JOIN products p ON ri.product_id = p.id
                         LEFT JOIN dispatches d ON r.dispatch_id = d.id 
                         LEFT JOIN orders o ON d.order_id = o.id 
-                        WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                        WHERE p.company_id IN ($companyIdsStr) 
+                          AND (
+                              o.sr_id IN ($inStr) 
+                              OR o.dealer_id = ? 
+                              OR d.warehouse_id = ?
+                              OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                              OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                              OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                          )
                         UNION
                         SELECT DATE(o.created_at) as date 
                         FROM orders o 
@@ -380,7 +436,11 @@ class DealerController extends Controller
                         WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     ) as dates ORDER BY date DESC LIMIT 30
                 ");
-                $stmt->execute([$dealerId, $warehouseId, $dealerId, $dealerId]);
+                $stmt->execute([
+                    $dealerId, $warehouseId, 
+                    $dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId, 
+                    $dealerId
+                ]);
             }
             $dates = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
@@ -420,10 +480,19 @@ class DealerController extends Controller
                     JOIN returns r ON ri.return_id = r.id
                     LEFT JOIN dispatches d ON r.dispatch_id = d.id
                     LEFT JOIN orders o ON d.order_id = o.id
-                    WHERE p.company_id IN ($companyIdsStr) AND DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                    WHERE p.company_id IN ($companyIdsStr) 
+                      AND DATE(r.return_date) = ? 
+                      AND (
+                          o.sr_id IN ($inStr) 
+                          OR o.dealer_id = ? 
+                          OR d.warehouse_id = ?
+                          OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                          OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                          OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                      )
                     GROUP BY ri.product_id
                 ");
-                $inStmt->execute([$date, $dealerId]);
+                $inStmt->execute([$date, $dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId]);
                 $inData = $inStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
                 // Order Data
@@ -565,7 +634,15 @@ class DealerController extends Controller
                 JOIN returns r ON ri.return_id = r.id
                 LEFT JOIN dispatches d ON r.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
-                WHERE DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
+                WHERE DATE(r.return_date) = ? 
+                  AND (
+                      o.sr_id IN ($inStr) 
+                      OR o.dealer_id = ? 
+                      OR d.warehouse_id = ?
+                      OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                      OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                      OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                  )
                 GROUP BY ri.product_id
             ) in_data ON p.id = in_data.product_id
             LEFT JOIN (
@@ -583,7 +660,11 @@ class DealerController extends Controller
             ORDER BY p.name ASC
         ");
         
-        $stmt->execute([$date, $dealerId, $warehouseId, $date, $dealerId, $date, $dealerId]);
+        $stmt->execute([
+            $date, $dealerId, $warehouseId, 
+            $date, $dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId, 
+            $date, $dealerId
+        ]);
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $results = [];
@@ -757,7 +838,7 @@ class DealerController extends Controller
             $dateCondReturn = "";
             $dateCondOrder = "";
             $paramsDispatch = [$dealerId, $warehouseId];
-            $paramsReturn = [$dealerId];
+            $paramsReturn = [$dealerId, $warehouseId, $dealerId, $warehouseId, $warehouseId, $warehouseId];
             $paramsOrder = [$dealerId];
 
             if ($startDate && $endDate) {
@@ -792,7 +873,15 @@ class DealerController extends Controller
                 JOIN returns r ON ri.return_id = r.id
                 LEFT JOIN dispatches d ON r.dispatch_id = d.id
                 LEFT JOIN orders o ON d.order_id = o.id
-                WHERE p.company_id IN ($companyIdsStr) AND (o.sr_id IN ($inStr) OR o.dealer_id = ?) $dateCondReturn
+                WHERE p.company_id IN ($companyIdsStr) 
+                  AND (
+                      o.sr_id IN ($inStr) 
+                      OR o.dealer_id = ? 
+                      OR d.warehouse_id = ?
+                      OR r.dsr_id IN (SELECT DISTINCT d2.dsr_id FROM dispatches d2 JOIN orders o2 ON o2.id = d2.order_id WHERE o2.sr_id IN ($inStr) OR o2.dealer_id = ? OR d2.warehouse_id = ?)
+                      OR r.dsr_id IN (SELECT ds.dsr_id FROM dispatch_schedules ds JOIN dispatch_schedule_srs dss ON dss.schedule_id = ds.id WHERE dss.sr_id IN ($inStr))
+                      OR (r.dsr_id IN (SELECT u.id FROM users u WHERE u.warehouse_id = ?) AND ? > 0)
+                  ) $dateCondReturn
                 GROUP BY ri.product_id
             ");
             $returnStmt->execute($paramsReturn);
