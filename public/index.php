@@ -324,8 +324,19 @@ $router->post('/dsr/qr-code/mark',             ['DSRController', 'qrCodeMark']);
 // ── Dealer routes ───────────────────────────────────────────────
 $router->get( '/dealer/dashboard',    ['DealerController', 'dashboard']);
 $router->get( '/dealer/transactions', ['DealerController', 'transactions']);
+$router->get( '/dealer/transactions/bill', ['DealerController', 'billDetails']);
 $router->get( '/dealer/inventory',    ['DealerController', 'inventory']);
 $router->get( '/dealer/profit-report',['DealerController', 'profitReport']);
 
+// Dealer Tracking (SR & DSR)
+$router->get( '/dealer/sr-tracking',             ['DealerController', 'srTracking']);
+$router->get( '/dealer/api/sr-tracking/live',    ['DealerController', 'apiSrTrackingLive']);
+$router->get( '/dealer/api/sr-tracking/history', ['DealerController', 'apiSrTrackingHistory']);
+
+$router->get( '/dealer/dsr-tracking',            ['DealerController', 'dsrTracking']);
+$router->get( '/dealer/api/dsr-tracking/live',   ['DealerController', 'apiDsrTrackingLive']);
+$router->get( '/dealer/api/dsr-tracking/history',['DealerController', 'apiDsrTrackingHistory']);
+
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);
+
