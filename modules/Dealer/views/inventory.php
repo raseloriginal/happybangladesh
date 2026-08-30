@@ -33,12 +33,13 @@
                     <?php 
                     $totalValue = 0;
                     foreach($inventory as $item): 
-                        $value = $item['qty_boxes'] * $item['price'];
+                        $qty = (int)($item['stock_qty'] ?? $item['qty_boxes'] ?? 0);
+                        $value = $qty * (float)$item['price'];
                         $totalValue += $value;
                     ?>
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-6 py-4 font-medium text-gray-800"><?= htmlspecialchars($item['name']) ?></td>
-                        <td class="px-6 py-4"><?= htmlspecialchars($item['sku']) ?></td>
+                        <td class="px-6 py-4"><?= htmlspecialchars($item['sku'] ?? '-') ?></td>
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 <?= htmlspecialchars($item['company_name'] ?? 'N/A') ?>
@@ -47,8 +48,8 @@
                         <td class="px-6 py-4"><?= htmlspecialchars($item['category_name'] ?? 'N/A') ?></td>
                         <td class="px-6 py-4 text-right font-medium">৳<?= number_format($item['price'], 2) ?></td>
                         <td class="px-6 py-4 text-right">
-                            <span class="font-bold <?= $item['qty_boxes'] > 10 ? 'text-emerald-600' : ($item['qty_boxes'] > 0 ? 'text-yellow-600' : 'text-red-500') ?>">
-                                <?= number_format($item['qty_boxes']) ?>
+                            <span class="font-bold <?= $qty > 10 ? 'text-emerald-600' : ($qty > 0 ? 'text-yellow-600' : 'text-red-500') ?>">
+                                <?= number_format($qty) ?>
                             </span>
                         </td>
                         <td class="px-6 py-4 text-right text-gray-800 font-semibold">৳<?= number_format($value, 2) ?></td>
