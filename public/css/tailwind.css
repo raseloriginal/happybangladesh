@@ -3134,10 +3134,6 @@ video {
   background-color: rgb(254 242 242 / 0.5);
 }
 
-.bg-red-50\/70 {
-  background-color: rgb(254 242 242 / 0.7);
-}
-
 .bg-red-500 {
   --tw-bg-opacity: 1;
   background-color: rgb(239 68 68 / var(--tw-bg-opacity, 1));
@@ -3165,6 +3161,18 @@ video {
 
 .bg-rose-50\/20 {
   background-color: rgb(255 241 242 / 0.2);
+}
+
+.bg-rose-50\/40 {
+  background-color: rgb(255 241 242 / 0.4);
+}
+
+.bg-rose-50\/50 {
+  background-color: rgb(255 241 242 / 0.5);
+}
+
+.bg-rose-50\/70 {
+  background-color: rgb(255 241 242 / 0.7);
 }
 
 .bg-rose-50\/80 {
