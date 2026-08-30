@@ -31,6 +31,7 @@ spl_autoload_register(function (string $class): void {
         MOD_PATH . '/Manager/' . $class . '.php',
         MOD_PATH . '/SR/'      . $class . '.php',
         MOD_PATH . '/DSR/'     . $class . '.php',
+        MOD_PATH . '/Dealer/'  . $class . '.php',
     ];
     foreach ($searchPaths as $file) {
         if (file_exists($file)) {
@@ -82,10 +83,13 @@ $router->get( '/sr/login',      ['AuthController', 'showLoginSR']);
 $router->post('/sr/login',      ['AuthController', 'loginSR']);
 $router->get( '/dsr/login',     ['AuthController', 'showLoginDSR']);
 $router->post('/dsr/login',     ['AuthController', 'loginDSR']);
+$router->get( '/dealer/login',  ['DealerController', 'login']);
+$router->post('/dealer/login',  ['DealerController', 'loginSubmit']);
 $router->get( '/admin/logout',   ['AuthController', 'logout']);
 $router->get( '/manager/logout', ['AuthController', 'logout']);
 $router->get( '/sr/logout',      ['AuthController', 'logout']);
 $router->get( '/dsr/logout',     ['AuthController', 'logout']);
+$router->get( '/dealer/logout',  ['DealerController', 'logout']);
 
 $router->get( '/forgot',   ['AuthController', 'showForgot']);
 $router->post('/forgot',   ['AuthController', 'forgot']);
@@ -316,6 +320,12 @@ $router->get( '/dsr/qr-code',                  ['DSRController', 'qrCode']);
 $router->post('/dsr/qr-code/mark',             ['DSRController', 'qrCodeMark']);
 
 
+
+// ── Dealer routes ───────────────────────────────────────────────
+$router->get( '/dealer/dashboard',    ['DealerController', 'dashboard']);
+$router->get( '/dealer/transactions', ['DealerController', 'transactions']);
+$router->get( '/dealer/inventory',    ['DealerController', 'inventory']);
+$router->get( '/dealer/profit-report',['DealerController', 'profitReport']);
 
 // ── Dispatch ──────────────────────────────────────────────────
 $router->dispatch($url, $method);

@@ -462,10 +462,16 @@ class AdminController extends Controller
         $this->db->beginTransaction();
         
         try {
-            $this->db->prepare("INSERT INTO dealers (warehouse_id, name, phone, address, trade_license, business_name, happy_commission) VALUES (?,?,?,?,?,?,?)")
+            $username = trim($this->post('username')) ?: null;
+            $password = trim($this->post('password'));
+            $hashedPassword = $password ? password_hash($password, PASSWORD_DEFAULT) : null;
+
+            $this->db->prepare("INSERT INTO dealers (warehouse_id, name, username, password, phone, address, trade_license, business_name, happy_commission) VALUES (?,?,?,?,?,?,?,?,?)")
                      ->execute([
                          $this->post('warehouse_id') ?: null, 
                          trim($this->post('name')), 
+                         $username,
+                         $hashedPassword,
                          trim($this->post('phone')), 
                          trim($this->post('address')), 
                          trim($this->post('trade_license')), 
@@ -530,10 +536,14 @@ class AdminController extends Controller
         $this->db->beginTransaction();
         
         try {
-            $this->db->prepare("UPDATE dealers SET warehouse_id=?,name=?,phone=?,address=?,trade_license=?,business_name=?,happy_commission=?,status=? WHERE id=?")
+            $username = trim($this->post('username')) ?: null;
+            $password = trim($this->post('password'));
+
+            $this->db->prepare("UPDATE dealers SET warehouse_id=?,name=?,username=?,phone=?,address=?,trade_license=?,business_name=?,happy_commission=?,status=? WHERE id=?")
                      ->execute([
                          $this->post('warehouse_id') ?: null, 
                          trim($this->post('name')), 
+                         $username,
                          trim($this->post('phone')), 
                          trim($this->post('address')), 
                          trim($this->post('trade_license')), 
@@ -542,6 +552,11 @@ class AdminController extends Controller
                          $this->post('status',1), 
                          $id
                      ]);
+
+            if (!empty($password)) {
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $this->db->prepare("UPDATE dealers SET password=? WHERE id=?")->execute([$hashedPassword, $id]);
+            }
             
             $this->db->prepare("DELETE FROM dealer_companies WHERE dealer_id=?")->execute([$id]);
             

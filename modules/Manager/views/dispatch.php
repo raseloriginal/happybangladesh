@@ -871,6 +871,8 @@ async function openOrganizeModal(schId) {
   const selectAllCb = document.getElementById('org-select-all');
   if (selectAllCb) selectAllCb.checked = false;
   
+  const savedState = JSON.parse(localStorage.getItem(`organize_dispatch_${schId}`) || '{}');
+  
   if (products.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center p-5 text-gray-400">No products found for these orders.</td></tr>';
   } else {
@@ -893,9 +895,20 @@ async function openOrganizeModal(schId) {
 
       // Pre-fill editable inputs with existing dispatch quantity if extra/diff exists
       const extraPcs = (parseInt(p.extra_boxes || 0) * ppb) + parseInt(p.extra_pieces || 0);
-      const initDispatchPcs = Math.max(0, origPcs + extraPcs);
-      const initDispatchBoxes = Math.floor(initDispatchPcs / ppb);
-      const initDispatchRemPcs = initDispatchPcs % ppb;
+      let initDispatchPcs = Math.max(0, origPcs + extraPcs);
+      let initDispatchBoxes = Math.floor(initDispatchPcs / ppb);
+      let initDispatchRemPcs = initDispatchPcs % ppb;
+
+      let isChecked = false;
+      if (savedState[p.product_id]) {
+        if (savedState[p.product_id].boxVal !== undefined) initDispatchBoxes = savedState[p.product_id].boxVal;
+        if (savedState[p.product_id].pcsVal !== undefined) {
+            initDispatchRemPcs = savedState[p.product_id].pcsVal;
+            if (isPcs) initDispatchPcs = savedState[p.product_id].pcsVal;
+        }
+        isChecked = savedState[p.product_id].checked || false;
+      }
+      const checkedAttr = isChecked ? 'checked' : '';
 
       const subtitleText = isPcs ? `1 Pcs` : `${ppb} Pcs / ${boxLabel}`;
 
@@ -903,16 +916,16 @@ async function openOrganizeModal(schId) {
         <div class="flex items-center gap-1 sm:gap-2">
           <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm max-w-full">
             <input type="hidden" value="0" class="org-dispatch-box">
-            <input type="number" min="0" value="${initDispatchPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-14 sm:w-16 text-xs py-1 px-1.5 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
+            <input type="number" min="0" value="${initDispatchPcs}" oninput="updateOrgDiff(this); saveOrgStateToLocal();" class="org-dispatch-pcs w-14 sm:w-16 text-xs py-1 px-1.5 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
             <span class="bg-gray-100 text-gray-500 text-[10px] sm:text-[11px] px-1.5 py-1 border-l border-gray-200 font-semibold">Pcs</span>
           </div>
         </div>
       ` : `
         <div class="flex items-center gap-1 sm:gap-2">
           <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm max-w-full">
-            <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this)" class="org-dispatch-box w-10 sm:w-14 text-xs py-1 px-1 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
+            <input type="number" min="0" value="${initDispatchBoxes}" oninput="updateOrgDiff(this); saveOrgStateToLocal();" class="org-dispatch-box w-10 sm:w-14 text-xs py-1 px-1 text-center outline-none border-0 font-bold text-gray-800" placeholder="0">
             <span class="bg-gray-100 text-gray-500 text-[10px] sm:text-[11px] px-1 sm:px-2 py-1 border-l border-r border-gray-200 font-semibold whitespace-nowrap">${boxLabel}</span>
-            <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this)" class="org-dispatch-pcs w-10 sm:w-14 text-xs py-1 px-1 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
+            <input type="number" min="0" value="${initDispatchRemPcs}" oninput="updateOrgDiff(this); saveOrgStateToLocal();" class="org-dispatch-pcs w-10 sm:w-14 text-xs py-1 px-1 text-center outline-none border-0 font-semibold text-gray-800" placeholder="0">
             <span class="bg-gray-100 text-gray-500 text-[10px] sm:text-[11px] px-1 sm:px-2 py-1 border-l border-gray-200 font-semibold whitespace-nowrap">Pcs</span>
           </div>
         </div>
@@ -941,7 +954,7 @@ async function openOrganizeModal(schId) {
             <div class="org-diff-badge flex items-center justify-center"></div>
           </td>
           <td class="p-2 sm:p-3 text-center whitespace-nowrap">
-            <input type="checkbox" onchange="updateOrgSelectAllState()" class="org-check w-5 h-5 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer">
+            <input type="checkbox" onchange="updateOrgSelectAllState(); saveOrgStateToLocal();" class="org-check w-5 h-5 text-amber-500 rounded border-gray-300 focus:ring-amber-500 cursor-pointer" ${checkedAttr}>
           </td>
         </tr>
       `;
@@ -1014,6 +1027,25 @@ function selectAllOrgCheckboxes(checked) {
   document.querySelectorAll('.org-check').forEach(cb => {
     cb.checked = checked;
   });
+  saveOrgStateToLocal();
+}
+
+function saveOrgStateToLocal() {
+  if (!currentOrgId) return;
+  const state = {};
+  document.querySelectorAll('#organize-tbody tr').forEach(tr => {
+    const pid = tr.getAttribute('data-pid');
+    if (!pid) return;
+    const boxInput = tr.querySelector('.org-dispatch-box');
+    const pcsInput = tr.querySelector('.org-dispatch-pcs');
+    const cb = tr.querySelector('.org-check');
+    state[pid] = {
+      boxVal: boxInput ? parseInt(boxInput.value) || 0 : 0,
+      pcsVal: pcsInput ? parseInt(pcsInput.value) || 0 : 0,
+      checked: cb ? cb.checked : false
+    };
+  });
+  localStorage.setItem(`organize_dispatch_${currentOrgId}`, JSON.stringify(state));
 }
 
 function updateOrgSelectAllState() {
@@ -1067,6 +1099,7 @@ async function saveOrganize(event) {
 
   const data = await res.json();
   if (data.success) {
+    localStorage.removeItem(`organize_dispatch_${currentOrgId}`);
     closeOrganizeModal();
     loadSchedules();
   } else {
