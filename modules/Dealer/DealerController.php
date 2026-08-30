@@ -261,6 +261,10 @@ class DealerController extends Controller
         $this->checkAuth();
         $dealerId = $_SESSION['dealer_id'];
 
+        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
+        $dStmt->execute([$dealerId]);
+        $warehouseId = $dStmt->fetchColumn() ?: 0;
+
         $srStmt = $this->db->prepare("SELECT DISTINCT sr_id FROM dealer_companies WHERE dealer_id = ?");
         $srStmt->execute([$dealerId]);
         $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
@@ -275,24 +279,25 @@ class DealerController extends Controller
             if ($startDate && $endDate) {
                 $stmt = $this->db->prepare("
                     SELECT DISTINCT date FROM (
-                        SELECT DISTINCT DATE(dispatch_date) as date FROM dispatches WHERE dsr_id IN ($inStr) AND DATE(dispatch_date) BETWEEN ? AND ?
+                        SELECT DATE(d.dispatch_date) as date FROM dispatches d LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?) AND DATE(d.dispatch_date) BETWEEN ? AND ?
                         UNION
-                        SELECT DISTINCT DATE(return_date) as date FROM returns WHERE dsr_id IN ($inStr) AND DATE(return_date) BETWEEN ? AND ?
+                        SELECT DATE(r.return_date) as date FROM returns r LEFT JOIN dispatches d ON r.dispatch_id = d.id LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(r.return_date) BETWEEN ? AND ?
                         UNION
-                        SELECT DISTINCT DATE(created_at) as date FROM orders WHERE sr_id IN ($inStr) AND DATE(created_at) BETWEEN ? AND ?
+                        SELECT DATE(o.created_at) as date FROM orders o WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?) AND DATE(o.created_at) BETWEEN ? AND ?
                     ) as dates ORDER BY date DESC
                 ");
-                $stmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
+                $stmt->execute([$dealerId, $warehouseId, $startDate, $endDate, $dealerId, $startDate, $endDate, $dealerId, $startDate, $endDate]);
             } else {
-                $stmt = $this->db->query("
+                $stmt = $this->db->prepare("
                     SELECT DISTINCT date FROM (
-                        SELECT DISTINCT DATE(dispatch_date) as date FROM dispatches WHERE dsr_id IN ($inStr)
+                        SELECT DATE(d.dispatch_date) as date FROM dispatches d LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
                         UNION
-                        SELECT DISTINCT DATE(return_date) as date FROM returns WHERE dsr_id IN ($inStr)
+                        SELECT DATE(r.return_date) as date FROM returns r LEFT JOIN dispatches d ON r.dispatch_id = d.id LEFT JOIN orders o ON d.order_id = o.id WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                         UNION
-                        SELECT DISTINCT DATE(created_at) as date FROM orders WHERE sr_id IN ($inStr)
+                        SELECT DATE(o.created_at) as date FROM orders o WHERE (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     ) as dates ORDER BY date DESC LIMIT 30
                 ");
+                $stmt->execute([$dealerId, $warehouseId, $dealerId, $dealerId]);
             }
             $dates = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
@@ -309,10 +314,11 @@ class DealerController extends Controller
                     SELECT di.product_id, SUM(di.quantity) as qty
                     FROM dispatch_items di
                     JOIN dispatches d ON di.dispatch_id = d.id
-                    WHERE DATE(d.dispatch_date) = ? AND d.dsr_id IN ($inStr)
+                    LEFT JOIN orders o ON d.order_id = o.id
+                    WHERE DATE(d.dispatch_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
                     GROUP BY di.product_id
                 ");
-                $outStmt->execute([$date]);
+                $outStmt->execute([$date, $dealerId, $warehouseId]);
                 $outData = $outStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
                 // In Data
@@ -320,10 +326,12 @@ class DealerController extends Controller
                     SELECT ri.product_id, SUM(ri.quantity) as qty
                     FROM return_items ri
                     JOIN returns r ON ri.return_id = r.id
-                    WHERE DATE(r.return_date) = ? AND r.dsr_id IN ($inStr)
+                    LEFT JOIN dispatches d ON r.dispatch_id = d.id
+                    LEFT JOIN orders o ON d.order_id = o.id
+                    WHERE DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     GROUP BY ri.product_id
                 ");
-                $inStmt->execute([$date]);
+                $inStmt->execute([$date, $dealerId]);
                 $inData = $inStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
                 // Order Data
@@ -331,10 +339,10 @@ class DealerController extends Controller
                     SELECT oi.product_id, SUM(oi.quantity) as qty
                     FROM order_items oi
                     JOIN orders o ON oi.order_id = o.id
-                    WHERE DATE(o.created_at) = ? AND o.sr_id IN ($inStr)
+                    WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                     GROUP BY oi.product_id
                 ");
-                $orderStmt->execute([$date]);
+                $orderStmt->execute([$date, $dealerId]);
                 $orderData = $orderStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
                 $dayOutQty = 0;
@@ -345,8 +353,6 @@ class DealerController extends Controller
                 $grossSale = 0;
                 $netSale = 0;
                 $grossProfit = 0;
-                $successOut = 0;
-                $successSell = 0;
 
                 $allProductIds = array_unique(array_merge(array_keys($outData), array_keys($inData), array_keys($orderData)));
                 foreach ($allProductIds as $pid) {
@@ -354,8 +360,8 @@ class DealerController extends Controller
                     $inQty = $inData[$pid] ?? 0;
                     $orderQty = $orderData[$pid] ?? 0;
                     
-                    // If there's an out_qty, calculate sold as out - in. If not, use order qty directly.
-                    $sellQty = $outQty > 0 ? max(0, $outQty - $inQty) : $orderQty;
+                    $dispatchQty = $outQty > 0 ? $outQty : $orderQty;
+                    $sellQty = max(0, $dispatchQty - $inQty);
                     
                     if (isset($products[$pid])) {
                         $p = $products[$pid];
@@ -363,8 +369,8 @@ class DealerController extends Controller
                         $itemTotalSale = $sellQty * $p['price'];
                         $itemProfit = $itemTotalSale - $itemNetSale;
 
-                        $dayOutQty += $outQty;
-                        $dayOutValue += ($outQty * $p['price']);
+                        $dayOutQty += $dispatchQty;
+                        $dayOutValue += ($dispatchQty * $p['price']);
                         $dayInQty += $inQty;
                         $dayInValue += ($inQty * $p['price']);
                         $daySellQty += $sellQty;
@@ -373,13 +379,10 @@ class DealerController extends Controller
                         $grossSale += $itemTotalSale;
                         $grossProfit += $itemProfit;
                     }
-
-                    $successOut += ($outQty > 0) ? $outQty : $sellQty;
-                    $successSell += $sellQty;
                 }
 
                 $netProfit = $grossProfit / 2; // Dealer gets 50% of the gross profit generated
-                $successRate = $successOut > 0 ? ($successSell / $successOut) * 100 : ($successSell > 0 ? 100 : 0);
+                $successRate = $dayOutQty > 0 ? ($daySellQty / $dayOutQty) * 100 : 0;
 
                 $bills[] = [
                     'date' => $date,
@@ -413,6 +416,10 @@ class DealerController extends Controller
             return;
         }
 
+        $dStmt = $this->db->prepare("SELECT warehouse_id FROM dealers WHERE id = ?");
+        $dStmt->execute([$dealerId]);
+        $warehouseId = $dStmt->fetchColumn() ?: 0;
+
         $srStmt = $this->db->prepare("SELECT DISTINCT sr_id FROM dealer_companies WHERE dealer_id = ?");
         $srStmt->execute([$dealerId]);
         $srIds = $srStmt->fetchAll(PDO::FETCH_COLUMN);
@@ -438,28 +445,31 @@ class DealerController extends Controller
                 SELECT di.product_id, SUM(di.quantity) as out_qty
                 FROM dispatch_items di
                 JOIN dispatches d ON di.dispatch_id = d.id
-                WHERE DATE(d.dispatch_date) = ? AND d.dsr_id IN ($inStr)
+                LEFT JOIN orders o ON d.order_id = o.id
+                WHERE DATE(d.dispatch_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ? OR d.warehouse_id = ?)
                 GROUP BY di.product_id
             ) out_data ON p.id = out_data.product_id
             LEFT JOIN (
                 SELECT ri.product_id, SUM(ri.quantity) as in_qty
                 FROM return_items ri
                 JOIN returns r ON ri.return_id = r.id
-                WHERE DATE(r.return_date) = ? AND r.dsr_id IN ($inStr)
+                LEFT JOIN dispatches d ON r.dispatch_id = d.id
+                LEFT JOIN orders o ON d.order_id = o.id
+                WHERE DATE(r.return_date) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                 GROUP BY ri.product_id
             ) in_data ON p.id = in_data.product_id
             LEFT JOIN (
                 SELECT oi.product_id, SUM(oi.quantity) as order_qty
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.id
-                WHERE DATE(o.created_at) = ? AND o.sr_id IN ($inStr)
+                WHERE DATE(o.created_at) = ? AND (o.sr_id IN ($inStr) OR o.dealer_id = ?)
                 GROUP BY oi.product_id
             ) order_data ON p.id = order_data.product_id
             WHERE COALESCE(out_data.out_qty, 0) > 0 OR COALESCE(in_data.in_qty, 0) > 0 OR COALESCE(order_data.order_qty, 0) > 0
             ORDER BY p.name ASC
         ");
         
-        $stmt->execute([$date, $date, $date]);
+        $stmt->execute([$date, $dealerId, $warehouseId, $date, $dealerId, $date, $dealerId]);
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $results = [];
@@ -473,20 +483,22 @@ class DealerController extends Controller
         $totalGrossProfit = 0;
 
         foreach ($products as $p) {
-            $sellQty = $p['out_qty'] > 0 ? max(0, $p['out_qty'] - $p['in_qty']) : $p['order_qty'];
+            $dispatchQty = $p['out_qty'] > 0 ? (int)$p['out_qty'] : (int)$p['order_qty'];
+            $returnQty = (int)$p['in_qty'];
+            $sellQty = max(0, $dispatchQty - $returnQty);
             
-            $successRatio = $p['out_qty'] > 0 ? ($sellQty / $p['out_qty']) * 100 : ($sellQty > 0 ? 100 : 0);
+            $successRatio = $dispatchQty > 0 ? ($sellQty / $dispatchQty) * 100 : ($sellQty > 0 ? 100 : 0);
             
-            $outValue = $p['out_qty'] * $p['price'];
-            $inValue = $p['in_qty'] * $p['price'];
+            $outValue = $dispatchQty * $p['price'];
+            $inValue = $returnQty * $p['price'];
             
             $netSale = $sellQty * $p['buying_price'];
             $totalSale = $sellQty * $p['price'];
             $profit = $totalSale - $netSale;
 
-            $totalOutQty += $p['out_qty'];
+            $totalOutQty += $dispatchQty;
             $totalOutValue += $outValue;
-            $totalInQty += $p['in_qty'];
+            $totalInQty += $returnQty;
             $totalInValue += $inValue;
             $totalSellQty += $sellQty;
             $totalNetSale += $netSale;
@@ -495,9 +507,9 @@ class DealerController extends Controller
 
             $results[] = [
                 'name' => $p['product_name'],
-                'out_qty' => (int)$p['out_qty'],
-                'in_qty' => (int)$p['in_qty'],
-                'sell_qty' => (int)$sellQty,
+                'out_qty' => $dispatchQty,
+                'in_qty' => $returnQty,
+                'sell_qty' => $sellQty,
                 'out_value' => (float)$outValue,
                 'in_value' => (float)$inValue,
                 'net_sale' => (float)$netSale,
@@ -517,7 +529,7 @@ class DealerController extends Controller
             'net_sale' => $totalNetSale,
             'gross_profit' => $totalGrossProfit,
             'net_profit' => $totalGrossProfit / 2,
-            'success_rate' => $totalOutQty > 0 ? ($totalSellQty / $totalOutQty) * 100 : ($totalSellQty > 0 ? 100 : 0)
+            'success_rate' => $totalOutQty > 0 ? ($totalSellQty / $totalOutQty) * 100 : 0
         ];
 
         echo json_encode(['success' => true, 'summary' => $summary, 'data' => $results]);
