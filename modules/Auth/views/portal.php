@@ -59,6 +59,18 @@
         </div>
         <i class="fa-solid fa-chevron-right text-xs text-slate-300 group-hover:text-blue-600"></i>
       </a>
+      
+      <!-- Dealer Portal -->
+      <a href="<?= url('dealer/login') ?>" class="flex items-center gap-3.5 p-4 rounded-2xl border border-slate-200 hover:border-emerald-600 hover:bg-emerald-50/50 transition group">
+        <div class="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-base font-bold group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-store"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-sm text-slate-900 group-hover:text-emerald-600">Dealer Portal</div>
+          <div class="text-xs text-slate-500 truncate">Stock & transactions</div>
+        </div>
+        <i class="fa-solid fa-chevron-right text-xs text-slate-300 group-hover:text-emerald-600"></i>
+      </a>
     </div>
 
     <!-- Bottom Footer -->

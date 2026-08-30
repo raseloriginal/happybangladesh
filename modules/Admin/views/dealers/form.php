@@ -25,6 +25,15 @@
           <label class="form-label">Dealer Name <span class="required">*</span></label>
           <input type="text" name="name" required class="form-input" value="<?= h($item['name'] ?? '') ?>">
         </div>
+        
+        <div class="form-group col-span-2 md:col-span-1">
+          <label class="form-label">Username (For Login)</label>
+          <input type="text" name="username" class="form-input" value="<?= h($item['username'] ?? '') ?>" placeholder="e.g. dealer_john">
+        </div>
+        <div class="form-group col-span-2 md:col-span-1">
+          <label class="form-label">Password <?= $isEdit ? '<span class="text-xs text-gray-400 font-normal">(Leave blank to keep unchanged)</span>' : '<span class="required">*</span>' ?></label>
+          <input type="text" name="password" <?= $isEdit ? '' : 'required' ?> class="form-input" placeholder="e.g. 123456">
+        </div>
         <div class="form-group col-span-2">
           <label class="form-label">Business Name</label>
           <input type="text" name="business_name" class="form-input" value="<?= h($item['business_name'] ?? '') ?>">
