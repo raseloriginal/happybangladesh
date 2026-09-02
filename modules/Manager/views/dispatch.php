@@ -298,6 +298,69 @@
   </div>
 </div>
 
+<!-- ========================================== -->
+<!-- 5. EDIT DISPATCH QUANTITY MODAL            -->
+<!-- ========================================== -->
+<div id="edit-dispatch-qty-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col animate-fade-in">
+    <!-- Modal Header -->
+    <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-blue-50/70">
+      <h3 class="font-bold text-gray-800 text-sm sm:text-base flex items-center gap-2">
+        <i class="fa-solid fa-pen-to-square text-blue-600"></i> Edit Dispatched Quantity
+      </h3>
+      <button type="button" onclick="closeEditDispatchQtyModal()" class="text-gray-400 hover:text-gray-600 transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-5 space-y-4">
+      <input type="hidden" id="edit-disp-sch-id">
+      <input type="hidden" id="edit-disp-comp-id">
+      <input type="hidden" id="edit-disp-prod-id">
+      <input type="hidden" id="edit-disp-ordered-qty">
+      <input type="hidden" id="edit-disp-sale-qty">
+      <input type="hidden" id="edit-disp-cur-qty">
+
+      <div>
+        <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Product Name</div>
+        <div id="edit-disp-prod-name" class="text-sm font-bold text-gray-800 mt-0.5"></div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
+        <div>
+          <div class="text-[10px] sm:text-[11px] text-gray-500 font-medium">Ordered Qty</div>
+          <div id="edit-disp-badge-ordered" class="text-xs font-bold text-gray-800 mt-0.5">0</div>
+        </div>
+        <div>
+          <div class="text-[10px] sm:text-[11px] text-gray-500 font-medium">Sale (Delivered)</div>
+          <div id="edit-disp-badge-sale" class="text-xs font-bold text-emerald-600 mt-0.5">0</div>
+        </div>
+        <div>
+          <div class="text-[10px] sm:text-[11px] text-gray-500 font-medium">Current Dispatch</div>
+          <div id="edit-disp-badge-cur" class="text-xs font-bold text-blue-600 mt-0.5">0</div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1.5">New Dispatched Quantity (Pcs):</label>
+        <div class="relative">
+          <input type="number" min="0" id="edit-disp-new-qty" oninput="onEditDispQtyInput()" class="w-full border border-gray-300 rounded-xl py-2 px-3 text-sm font-bold text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition" placeholder="Enter quantity">
+        </div>
+        <div id="edit-disp-diff-hint" class="mt-2 text-xs font-semibold"></div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="px-5 py-3.5 border-t border-gray-100 flex justify-end gap-2.5 bg-gray-50/50">
+      <button type="button" onclick="closeEditDispatchQtyModal()" class="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-xs transition">Cancel</button>
+      <button type="button" id="edit-disp-save-btn" onclick="submitEditDispatchQty()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-floppy-disk"></i> Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================================
 // MAIN SPREADSHEET LOGIC
@@ -589,8 +652,12 @@ function toggleProductRow(schId, compId) {
         <th class="text-right">Sale Value</th>
         <th class="text-center">Return Qty</th>
         <th class="text-right">Return Value</th>
+        <th class="text-center no-print">Action</th>
       </tr></thead><tbody>`;
       
+    const sch = schedules.find(s => s.id == schId);
+    const canEdit = sch && (sch.status === 'assigned' || sch.status === 'organized' || sch.status === 'dispatched');
+
     products.forEach((p, pIdx) => {
       const basePrice = parseFloat(p.base_price || 0);
       const orderedQty = parseInt(p.ordered_qty || 0);
@@ -603,6 +670,15 @@ function toggleProductRow(schId, compId) {
       const saleVal = saleQty * basePrice;
       const returnedVal = returnedQty * basePrice;
       
+      const escapedName = (p.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const actionCol = canEdit ? `
+        <td class="text-center no-print">
+          <button type="button" onclick="openEditDispatchQtyModal(${schId}, ${compId}, ${p.id}, '${escapedName}', ${orderedQty}, ${dispatchedQty}, ${saleQty}, ${basePrice})" class="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-0.5 rounded border border-blue-200 transition text-[11px] font-semibold flex items-center justify-center gap-1 mx-auto" title="Edit Dispatched Qty">
+            <i class="fa-solid fa-pen-to-square text-[10px]"></i> Edit
+          </button>
+        </td>
+      ` : `<td class="text-center no-print text-gray-400 text-[11px]">-</td>`;
+
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
         <td class="font-bold text-gray-800">${p.name}</td>
@@ -615,6 +691,7 @@ function toggleProductRow(schId, compId) {
         <td class="excel-money text-right font-bold text-emerald-700">৳ ${saleVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
         <td class="excel-qty text-center text-rose-600">${returnedQty}</td>
         <td class="excel-money text-right text-rose-600">৳ ${returnedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
+        ${actionCol}
       </tr>`;
     });
     html += `</tbody></table></div>`;
@@ -1527,6 +1604,212 @@ window.undoDispatch = async function(scheduleId) {
   } catch (e) {
     console.error('Undo Dispatch error:', e);
     alert('নেটওয়ার্ক এরর: ডিসপ্যাচ রিভার্ট করা সম্ভব হয়নি।');
+  }
+};
+
+// ── Edit Dispatched Quantity at Product Level ────────────────
+window.openEditDispatchQtyModal = function(schId, compId, prodId, prodName, orderedQty, dispatchedQty, saleQty, basePrice) {
+  document.getElementById('edit-disp-sch-id').value = schId;
+  document.getElementById('edit-disp-comp-id').value = compId;
+  document.getElementById('edit-disp-prod-id').value = prodId;
+  document.getElementById('edit-disp-ordered-qty').value = orderedQty;
+  document.getElementById('edit-disp-sale-qty').value = saleQty;
+  document.getElementById('edit-disp-cur-qty').value = dispatchedQty;
+
+  document.getElementById('edit-disp-prod-name').textContent = prodName;
+  document.getElementById('edit-disp-badge-ordered').textContent = `${orderedQty} pcs`;
+  document.getElementById('edit-disp-badge-sale').textContent = `${saleQty} pcs`;
+  document.getElementById('edit-disp-badge-cur').textContent = `${dispatchedQty} pcs`;
+
+  const inputEl = document.getElementById('edit-disp-new-qty');
+  inputEl.value = dispatchedQty;
+  inputEl.min = saleQty;
+
+  window.onEditDispQtyInput();
+  document.getElementById('edit-dispatch-qty-modal').classList.remove('hidden');
+  inputEl.focus();
+  inputEl.select();
+};
+
+window.closeEditDispatchQtyModal = function() {
+  document.getElementById('edit-dispatch-qty-modal').classList.add('hidden');
+};
+
+window.onEditDispQtyInput = function() {
+  const newQty = parseInt(document.getElementById('edit-disp-new-qty').value) || 0;
+  const curQty = parseInt(document.getElementById('edit-disp-cur-qty').value) || 0;
+  const saleQty = parseInt(document.getElementById('edit-disp-sale-qty').value) || 0;
+  const hintEl = document.getElementById('edit-disp-diff-hint');
+  const saveBtn = document.getElementById('edit-disp-save-btn');
+
+  if (newQty < saleQty) {
+    hintEl.className = 'mt-2 text-xs font-semibold text-rose-600 flex items-center gap-1';
+    hintEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> বিক্রি হয়েছে ${saleQty} পিস, এর চেয়ে কম করা যাবে না।`;
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    return;
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
+
+  const diff = newQty - curQty;
+  if (diff === 0) {
+    hintEl.className = 'mt-2 text-xs font-semibold text-gray-500';
+    hintEl.textContent = 'বর্তমান কোয়ান্টিটি অপরিবর্তিত আছে।';
+  } else if (diff > 0) {
+    hintEl.className = 'mt-2 text-xs font-semibold text-emerald-600 flex items-center gap-1';
+    hintEl.innerHTML = `<i class="fa-solid fa-arrow-up"></i> +${diff} পিস বাড়বে (ওয়্যারহাউজ থেকে কমে ভ্যানে যোগ হবে)`;
+  } else {
+    hintEl.className = 'mt-2 text-xs font-semibold text-amber-600 flex items-center gap-1';
+    hintEl.innerHTML = `<i class="fa-solid fa-arrow-down"></i> ${diff} পিস কমবে (ভ্যান থেকে কমে ওয়্যারহাউজে জমা হবে)`;
+  }
+};
+
+window.submitEditDispatchQty = async function() {
+  const schId = document.getElementById('edit-disp-sch-id').value;
+  const compId = document.getElementById('edit-disp-comp-id').value;
+  const prodId = document.getElementById('edit-disp-prod-id').value;
+  const newQty = parseInt(document.getElementById('edit-disp-new-qty').value) || 0;
+  const saleQty = parseInt(document.getElementById('edit-disp-sale-qty').value) || 0;
+
+  if (newQty < saleQty) {
+    alert(`ইতোমধ্যে ${saleQty} পিস বিক্রি হয়েছে। এর চেয়ে কম ডিসপ্যাচ করা যাবে না।`);
+    return;
+  }
+
+  const saveBtn = document.getElementById('edit-disp-save-btn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+  }
+
+  try {
+    const res = await fetch(`<?= url("manager/api/dispatch/update-product-qty/") ?>${schId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: prodId, new_dispatched_qty: newQty })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      window.closeEditDispatchQtyModal();
+      if (typeof showToast === 'function') {
+        showToast(data.message || 'ডিসপ্যাচ কোয়ান্টিটি সফলভাবে আপডেট হয়েছে।', 'success');
+      } else {
+        alert(data.message || 'ডিসপ্যাচ কোয়ান্টিটি সফলভাবে আপডেট হয়েছে।');
+      }
+
+      await window.reloadScheduleAndProducts(schId, compId);
+    } else {
+      alert(data.message || 'ডিসপ্যাচ কোয়ান্টিটি আপডেট করতে সমস্যা হয়েছে।');
+    }
+  } catch (e) {
+    console.error('Update dispatch qty error:', e);
+    alert('নেটওয়ার্ক এরর: আপডেট করা সম্ভব হয়নি।');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    }
+  }
+};
+
+window.reloadScheduleAndProducts = async function(schId, compId) {
+  try {
+    const res = await fetch('<?= url("manager/api/dispatch/data") ?>');
+    schedules = await res.json();
+    renderSchedules();
+  } catch (e) {
+    console.error('Failed to reload schedules', e);
+  }
+
+  const schRow = document.getElementById(`exp-sch-${schId}`);
+  const schIcon = document.getElementById(`icon-sch-${schId}`);
+  if (schRow) {
+    schRow.classList.remove('hidden');
+    if (schIcon) schIcon.classList.add('rotate-180');
+
+    try {
+      const resComp = await fetch(`<?= url("manager/api/dispatch/company-details/") ?>${schId}`);
+      const companies = await resComp.json();
+
+      const container = document.getElementById(`sr-container-${schId}`);
+      if (container && companies.length > 0) {
+        const sch = schedules.find(s => s.id == schId);
+        const showValues = sch && (sch.status === 'dispatched' || sch.status === 'returned');
+
+        let html = `<div class="excel-container shadow-sm border border-slate-300">
+          <table class="excel-table sub-table">
+            <thead><tr>
+              <th class="excel-row-num">#</th>
+              <th>Company Name</th>
+              <th class="text-right">Total Base Selling Value</th>
+              <th class="text-right">Dispatch Items Value</th>
+              <th class="text-right">Returned Value</th>
+              <th class="text-right">Damage Value</th>
+              <th class="text-right">Sales Value</th>
+              <th class="text-center no-print">Action</th>
+            </tr></thead>
+            <tbody>`;
+
+        companies.forEach((comp, compIdx) => {
+          const orderedVal = parseFloat(comp.ordered_value || 0);
+          const dispatchItemsVal = parseFloat(comp.dispatch_items_value || 0);
+          const returnVal = parseFloat(comp.return_value || 0);
+          const damageVal = parseFloat(comp.damage_value || 0);
+          const saleVal = parseFloat(comp.sale_value || 0);
+
+          html += `<tr>
+            <td class="excel-row-num">${compIdx + 1}</td>
+            <td class="font-bold text-gray-800 text-xs">
+              <i class="fa-solid fa-building text-blue-600 text-xs mr-1"></i>${comp.name}
+            </td>
+            <td class="excel-money">
+              ৳ ${orderedVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+            </td>
+            <td class="excel-money">
+              ${showValues ? `৳ ${dispatchItemsVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}` : '-'}
+            </td>
+            <td class="excel-money text-rose-600">${sch && sch.status === 'returned' ? '৳ ' + returnVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+            <td class="excel-money text-amber-600">${showValues ? '৳ ' + damageVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+            <td class="excel-money text-emerald-600 font-bold">${showValues ? '৳ ' + saleVal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+            <td class="text-center no-print">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="toggleProductRow(${schId}, ${comp.id})" class="text-xs text-gray-700 hover:text-blue-700 px-2 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-semibold transition">
+                  <i class="fa-solid fa-box-archive mr-1 text-blue-600"></i> Products
+                </button>
+                <button onclick="toggleCompanySrRow(${schId}, ${comp.id})" class="text-xs text-gray-700 hover:text-purple-700 px-2 py-1 bg-gray-100 hover:bg-purple-100 border border-gray-300 rounded font-semibold transition">
+                  <i class="fa-solid fa-users mr-1 text-purple-600"></i> SRs
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr id="exp-prod-${schId}-${comp.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
+            <div id="prod-container-${schId}-${comp.id}" class="p-2"></div>
+          </td></tr>
+          <tr id="exp-sr-${schId}-${comp.id}" class="hidden bg-white"><td colspan="8" class="p-0 border-b border-gray-300">
+            <div id="sr-container-${schId}-${comp.id}" class="p-2"></div>
+          </td></tr>`;
+
+          window[`prod_data_${schId}_${comp.id}`] = comp.products;
+          window[`sr_data_${schId}_${comp.id}`] = comp.srs;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+
+        if (compId) {
+          toggleProductRow(schId, compId);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to reload company details', e);
+    }
   }
 };
 </script>

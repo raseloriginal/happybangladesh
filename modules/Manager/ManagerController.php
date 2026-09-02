@@ -2178,6 +2178,274 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiDispatchUpdateProductQty(string $scheduleId): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $input = json_decode(file_get_contents('php://input'), true);
+        $productId = isset($input['product_id']) ? (int)$input['product_id'] : 0;
+        $newDispatchedQty = isset($input['new_dispatched_qty']) ? max(0, (int)$input['new_dispatched_qty']) : 0;
+
+        if ($productId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid product.']);
+            exit;
+        }
+
+        $sch = $this->db->query("SELECT id, dsr_id, dispatch_date, delivery_date, status FROM dispatch_schedules WHERE id = " . (int)$scheduleId)->fetch();
+        if (!$sch) {
+            echo json_encode(['success' => false, 'message' => 'Schedule not found.']);
+            exit;
+        }
+
+        if ($sch['status'] === 'returned') {
+            echo json_encode(['success' => false, 'message' => 'রিটার্ন সম্পন্ন হওয়া শিডিউলের ডিসপ্যাচ কোয়ান্টিটি পরিবর্তন করা যাবে না।']);
+            exit;
+        }
+
+        $scheduleIdInt = (int)$sch['id'];
+        $dsrId = (int)$sch['dsr_id'];
+        $dispatchDate = $sch['dispatch_date'];
+        $deliveryDate = $sch['delivery_date'] ?: $dispatchDate;
+        $status = $sch['status'];
+
+        $product = $this->db->query("SELECT id, name, pieces_per_box, box_type, price, buying_price FROM products WHERE id = {$productId}")->fetch();
+        if (!$product) {
+            echo json_encode(['success' => false, 'message' => 'Product not found.']);
+            exit;
+        }
+
+        $ppb = max(1, (int)$product['pieces_per_box']);
+        $productPrice = (float)$product['price'];
+        $productBuyingPrice = (float)($product['buying_price'] ?? $productPrice);
+        $boxType = $product['box_type'] ?: 'Box';
+
+        // 1. Calculate ordered quantity for this product in this schedule
+        $orderedQty = (int)$this->db->query("
+            SELECT COALESCE(SUM(oi.quantity), 0)
+            FROM dispatch_schedule_srs dss
+            JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
+            JOIN order_items oi ON oi.order_id = o.id
+            WHERE dss.schedule_id = {$scheduleIdInt} AND oi.product_id = {$productId}
+        ")->fetchColumn();
+
+        // 2. Calculate already delivered/sale quantity for this product
+        $alreadyDeliveredQty = (int)$this->db->query("
+            SELECT COALESCE(SUM(di.delivered_quantity), 0)
+            FROM dispatches d
+            JOIN dispatch_items di ON di.dispatch_id = d.id
+            WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = {$productId}
+        ")->fetchColumn();
+
+        // Check safety rule: cannot dispatch less than already delivered/sold
+        if ($newDispatchedQty < $alreadyDeliveredQty) {
+            echo json_encode([
+                'success' => false, 
+                'message' => "ইতোমধ্যে {$alreadyDeliveredQty} পিস বিক্রি/ডেলিভারি হয়ে গেছে। ডিসপ্যাচ কোয়ান্টিটি এর চেয়ে কম ({$newDispatchedQty}) করা যাবে না।"
+            ]);
+            exit;
+        }
+
+        // 3. Calculate current dispatched quantity
+        $currentRegularDispatched = (int)$this->db->query("
+            SELECT COALESCE(SUM(di.quantity), 0)
+            FROM dispatches d
+            JOIN dispatch_items di ON di.dispatch_id = d.id
+            WHERE d.dsr_id = {$dsrId} AND d.dispatch_date = '{$deliveryDate}' AND di.product_id = {$productId} AND (d.is_ready_sale = 0 OR d.is_ready_sale IS NULL)
+        ")->fetchColumn();
+
+        $currentNegativeExtras = (int)$this->db->query("
+            SELECT COALESCE(SUM(CAST(de.qty_boxes AS SIGNED) * CAST(p2.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)), 0)
+            FROM dispatch_extras de
+            JOIN products p2 ON p2.id = de.product_id
+            WHERE de.schedule_id = {$scheduleIdInt} AND de.product_id = {$productId} AND (de.qty_boxes < 0 OR de.qty_pieces < 0)
+        ")->fetchColumn();
+
+        if ($currentRegularDispatched == 0 && $status === 'assigned') {
+            $currentExtras = (int)$this->db->query("
+                SELECT COALESCE(SUM(CAST(de.qty_boxes AS SIGNED) * CAST(p2.pieces_per_box AS SIGNED) + CAST(de.qty_pieces AS SIGNED)), 0)
+                FROM dispatch_extras de
+                JOIN products p2 ON p2.id = de.product_id
+                WHERE de.schedule_id = {$scheduleIdInt} AND de.product_id = {$productId}
+            ")->fetchColumn();
+            $currentDispatchedQty = max(0, $orderedQty + $currentExtras);
+        } else {
+            $currentDispatchedQty = max(0, $currentRegularDispatched + $currentNegativeExtras);
+        }
+
+        $diffQty = $newDispatchedQty - $currentDispatchedQty;
+        if ($diffQty == 0) {
+            echo json_encode(['success' => true, 'message' => 'কোনো পরিবর্তন করা হয়নি।']);
+            exit;
+        }
+
+        // Determine warehouse ID
+        $wIdRow = $this->db->prepare("SELECT warehouse_id FROM dispatches WHERE dsr_id=? AND dispatch_date=? AND warehouse_id IS NOT NULL LIMIT 1");
+        $wIdRow->execute([$dsrId, $deliveryDate]);
+        $wId = $wIdRow->fetchColumn() ?: (\App\Core\Auth::warehouseId() ?: 1);
+
+        $this->db->beginTransaction();
+        try {
+            // If already dispatched, adjust physical inventory and van stock
+            if ($status === 'dispatched') {
+                if ($diffQty > 0) {
+                    // Check warehouse inventory
+                    $invQuery = $this->db->prepare("
+                        SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                        FROM inventory i 
+                        JOIN products p ON p.id = i.product_id 
+                        WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id IS NULL
+                    ");
+                    $invQuery->execute([$productId, $wId]);
+                    $invRow = $invQuery->fetch();
+
+                    $invPpb = $invRow ? max(1, (int)$invRow['pieces_per_box']) : $ppb;
+                    $totalStockPcs = $invRow ? (((int)$invRow['qty_boxes'] * $invPpb) + (int)$invRow['qty_pieces']) : 0;
+
+                    if ($totalStockPcs < $diffQty) {
+                        $this->db->rollBack();
+                        echo json_encode([
+                            'success' => false, 
+                            'message' => "ওয়্যারহাউজে পর্যাপ্ত স্টক নেই। অতিরিক্ত প্রয়োজন: {$diffQty} পিস, ওয়্যারহাউজে আছে: {$totalStockPcs} পিস।"
+                        ]);
+                        exit;
+                    }
+
+                    // Deduct from warehouse
+                    $newStockPcs = $totalStockPcs - $diffQty;
+                    $newBoxes = floor($newStockPcs / $invPpb);
+                    $newPcs = $newStockPcs % $invPpb;
+                    if ($invRow) {
+                        $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                                 ->execute([$newBoxes, $newPcs, $invRow['id']]);
+                    }
+
+                    // Add to van_stock
+                    $vsCheck = $this->db->prepare("SELECT id FROM van_stock WHERE dsr_id = ? AND product_id = ? AND lot_id IS NULL LIMIT 1");
+                    $vsCheck->execute([$dsrId, $productId]);
+                    $vsRow = $vsCheck->fetch();
+                    if ($vsRow) {
+                        $this->db->prepare("UPDATE van_stock SET quantity = quantity + ?, initial_qty = initial_qty + ?, loaded_at = ? WHERE id = ?")
+                                 ->execute([$diffQty, $diffQty, $deliveryDate, $vsRow['id']]);
+                    } else {
+                        $this->db->prepare("INSERT INTO van_stock (dsr_id, product_id, lot_id, quantity, initial_qty, loaded_at) VALUES (?, ?, NULL, ?, ?, ?)")
+                                 ->execute([$dsrId, $productId, $diffQty, $diffQty, $deliveryDate]);
+                    }
+                } elseif ($diffQty < 0) {
+                    $reduceQty = abs($diffQty);
+
+                    // Deduct from van_stock
+                    $this->db->prepare("
+                        UPDATE van_stock 
+                        SET quantity = GREATEST(0, quantity - ?), 
+                            initial_qty = GREATEST(0, initial_qty - ?) 
+                        WHERE dsr_id = ? AND product_id = ? AND lot_id IS NULL
+                    ")->execute([$reduceQty, $reduceQty, $dsrId, $productId]);
+
+                    // Restore to warehouse inventory
+                    $invQuery = $this->db->prepare("
+                        SELECT i.id, i.qty_boxes, i.qty_pieces, p.pieces_per_box 
+                        FROM inventory i 
+                        JOIN products p ON p.id = i.product_id 
+                        WHERE i.product_id=? AND i.warehouse_id=? AND i.lot_id IS NULL
+                    ");
+                    $invQuery->execute([$productId, $wId]);
+                    $invRow = $invQuery->fetch();
+
+                    $invPpb = $invRow ? max(1, (int)$invRow['pieces_per_box']) : $ppb;
+                    $totalStockPcs = $invRow ? (((int)$invRow['qty_boxes'] * $invPpb) + (int)$invRow['qty_pieces']) : 0;
+                    $newStockPcs = $totalStockPcs + $reduceQty;
+
+                    $newBoxes = floor($newStockPcs / $invPpb);
+                    $newPcs = $newStockPcs % $invPpb;
+
+                    if ($invRow) {
+                        $this->db->prepare("UPDATE inventory SET qty_boxes = ?, qty_pieces = ? WHERE id = ?")
+                                 ->execute([$newBoxes, $newPcs, $invRow['id']]);
+                    } else {
+                        $this->db->prepare("INSERT INTO inventory (warehouse_id, product_id, lot_id, qty_boxes, qty_pieces) VALUES (?, ?, NULL, ?, ?)")
+                                 ->execute([$wId, $productId, $newBoxes, $newPcs]);
+                    }
+                }
+            }
+
+            // Update dispatch_extras and extra dispatch_items
+            $extraDiff = $newDispatchedQty - $orderedQty;
+
+            // Clear old dispatch_extras for this schedule & product
+            $this->db->prepare("DELETE FROM dispatch_extras WHERE schedule_id = ? AND product_id = ?")
+                     ->execute([$scheduleIdInt, $productId]);
+
+            // Clear old extra dispatch_item for this product where order_id IS NULL
+            $extraDispCheck = $this->db->prepare("
+                SELECT di.id, di.dispatch_id 
+                FROM dispatch_items di
+                JOIN dispatches d ON d.id = di.dispatch_id
+                WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.order_id IS NULL AND di.product_id = ?
+            ");
+            $extraDispCheck->execute([$dsrId, $deliveryDate, $productId]);
+            $oldExtraItem = $extraDispCheck->fetch();
+            if ($oldExtraItem) {
+                $this->db->prepare("DELETE FROM dispatch_items WHERE id = ?")->execute([$oldExtraItem['id']]);
+            }
+
+            if ($extraDiff > 0) {
+                // Positive extra
+                $extraBoxes = floor($extraDiff / $ppb);
+                $extraPcs = $extraDiff % $ppb;
+                $this->db->prepare("INSERT INTO dispatch_extras (schedule_id, product_id, qty_boxes, qty_pieces) VALUES (?, ?, ?, ?)")
+                         ->execute([$scheduleIdInt, $productId, $extraBoxes, $extraPcs]);
+
+                if ($status === 'organized' || $status === 'dispatched') {
+                    // Ensure extra dispatch record exists
+                    $extraDispatchId = $this->db->query("
+                        SELECT id FROM dispatches 
+                        WHERE dsr_id = {$dsrId} AND dispatch_date = '{$deliveryDate}' AND order_id IS NULL 
+                        LIMIT 1
+                    ")->fetchColumn();
+
+                    $dispStatus = ($status === 'dispatched') ? 'in_transit' : 'pending';
+
+                    if (!$extraDispatchId) {
+                        $this->db->prepare("INSERT INTO dispatches (order_id, dsr_id, warehouse_id, dispatch_date, status) VALUES (NULL, ?, ?, ?, ?)")
+                                 ->execute([$dsrId, $wId, $deliveryDate, $dispStatus]);
+                        $extraDispatchId = $this->db->lastInsertId();
+                    }
+
+                    // Insert extra dispatch item
+                    $this->db->prepare("
+                        INSERT INTO dispatch_items (dispatch_id, product_id, lot_id, quantity, product_name, box_type, pieces_per_box, unit_price, base_selling_price, buying_price, total_price) 
+                        VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ")->execute([
+                        $extraDispatchId, $productId, $extraDiff, $product['name'], $boxType, $ppb,
+                        $productPrice, $productPrice, $productBuyingPrice, $extraDiff * $productPrice
+                    ]);
+                }
+            } elseif ($extraDiff < 0) {
+                // Negative adjustment
+                $absDiff = abs($extraDiff);
+                $negBoxes = -floor($absDiff / $ppb);
+                $negPcs = -($absDiff % $ppb);
+                $this->db->prepare("INSERT INTO dispatch_extras (schedule_id, product_id, qty_boxes, qty_pieces) VALUES (?, ?, ?, ?)")
+                         ->execute([$scheduleIdInt, $productId, $negBoxes, $negPcs]);
+            }
+
+            $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'dispatch_qty_update', "Updated product {$productId} dispatch qty to {$newDispatchedQty} (diff: {$diffQty}) for schedule {$scheduleIdInt}", $scheduleIdInt);
+
+            echo json_encode([
+                'success' => true, 
+                'message' => 'ডিসপ্যাচ কোয়ান্টিটি সফলভাবে আপডেট করা হয়েছে।',
+                'new_dispatched_qty' => $newDispatchedQty,
+                'diff_qty' => $diffQty
+            ]);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     // ══════════════════════════════════════════════════════════
     //  Settlements
     // ══════════════════════════════════════════════════════════
