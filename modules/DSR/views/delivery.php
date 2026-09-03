@@ -1122,6 +1122,11 @@ function initMap() {
                 color: #fff;
             }
             .pin-mixed-all .map-pin-tail { border-top: 9px solid #15803d; }
+            .map-anchor-dot {
+                width: 12px; height: 12px; border-radius: 50%;
+                background: #2563eb; border: 2.5px solid #ffffff;
+                box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45), 0 2px 5px rgba(0,0,0,0.3);
+            }
         `;
         document.head.appendChild(s);
     }
@@ -1131,64 +1136,26 @@ function initMap() {
     const fallbackLat = 23.8103, fallbackLng = 90.4125;
     let firstValidLat = null, firstValidLng = null;
 
-    // ── Plot only van-loaded retailers ──
+    // Validate coordinates
     orderedRetailers.forEach((ret, i) => {
         ret.name = ret.dealer_name || ret.name || 'Retailer';
-
-        // Use real coordinates if available, else spread around Dhaka
-        if (!ret.lat || !ret.lng) {
-            ret.lat = fallbackLat + (Math.random() - 0.5) * 0.05;
-            ret.lng = fallbackLng + (Math.random() - 0.5) * 0.05;
+        if (!ret.lat || !ret.lng || isNaN(parseFloat(ret.lat)) || isNaN(parseFloat(ret.lng))) {
+            ret.lat = fallbackLat + (Math.sin(i) * 0.005);
+            ret.lng = fallbackLng + (Math.cos(i) * 0.005);
+        } else {
+            ret.lat = parseFloat(ret.lat);
+            ret.lng = parseFloat(ret.lng);
         }
-
-        if (!firstValidLat) { firstValidLat = parseFloat(ret.lat); firstValidLng = parseFloat(ret.lng); }
-
-        // Determine aggregate status for pin color
-        const pinInfo = getRetailerPinInfo(ret);
-        const pinClass = pinInfo.pinClass;
-        const pinIcon = pinInfo.pinIcon;
-
-        let shouldWarn = true;
-        ret.orders.forEach(o => {
-            if (o.status !== 'delivered' && o.status !== 'cancelled') {
-                shouldWarn = false;
-            }
-        });
-
-        // Order count summary
-        let orderSummary = '';
-        if (ret.orders.length > 1) {
-            orderSummary = `<div class="text-[9px] font-normal opacity-80 mt-[-2px]">${ret.orders.length} Orders</div>`;
-        }
-
-        const icon = L.divIcon({
-            className: pinClass,
-            html: `
-                <div class="map-pin-wrap">
-                    <div class="map-pin-card">
-                        <div class="pin-icon"><i class="fa-solid ${pinIcon}"></i></div>
-                        <div>
-                            <div>${ret.name}</div>
-                            ${orderSummary}
-                        </div>
-                    </div>
-                    <div class="map-pin-tail"></div>
-                </div>
-            `,
-            iconSize: [120, 45],
-            iconAnchor: [60, 45]
-        });
-        const marker = L.marker([parseFloat(ret.lat), parseFloat(ret.lng)], { icon }).addTo(map);
-        marker.on('click', () => {
-            handleRetailerClick(ret, shouldWarn);
-        });
-        markers.push(marker);
+        if (!firstValidLat) { firstValidLat = ret.lat; firstValidLng = ret.lng; }
     });
 
     // Center map on first retailer if coords exist, else locate DSR
     if (firstValidLat) {
         map.setView([firstValidLat, firstValidLng], 14);
     }
+
+    redrawMapPins();
+    map.on('zoomend', redrawMapPins);
 
     locateMe();
 }
@@ -2077,50 +2044,193 @@ async function syncUndoQueue() {
 window.addEventListener('online', syncUndoQueue);
 document.addEventListener('DOMContentLoaded', syncUndoQueue);
 
+let overlapLayers = [];
+
+function createRetailerPinMarker(ret, latlng, isOffset = false) {
+    const pinInfo = getRetailerPinInfo(ret);
+    const pinClass = pinInfo.pinClass;
+    const pinIcon = pinInfo.pinIcon;
+
+    let shouldWarn = true;
+    (ret.orders || []).forEach(o => {
+        if (o.status !== 'delivered' && o.status !== 'cancelled') {
+            shouldWarn = false;
+        }
+    });
+
+    let orderSummary = '';
+    if (ret.orders && ret.orders.length > 1) {
+        orderSummary = `<div class="text-[9px] font-normal opacity-80 mt-[-2px]">${ret.orders.length} Orders</div>`;
+    }
+
+    const icon = L.divIcon({
+        className: pinClass,
+        html: `
+            <div class="map-pin-wrap">
+                <div class="map-pin-card">
+                    <div class="pin-icon"><i class="fa-solid ${pinIcon}"></i></div>
+                    <div>
+                        <div>${ret.name}</div>
+                        ${orderSummary}
+                    </div>
+                </div>
+                <div class="map-pin-tail"></div>
+            </div>
+        `,
+        iconSize: [120, 45],
+        iconAnchor: [60, 45]
+    });
+
+    const marker = L.marker(latlng, {
+        icon: icon,
+        zIndexOffset: isOffset ? 500 : 200
+    });
+
+    marker.on('click', () => {
+        handleRetailerClick(ret, shouldWarn);
+    });
+
+    return marker;
+}
+
 function redrawMapPins() {
     if (!map) return;
-    markers.forEach(m => map.removeLayer(m));
+
+    // 1. Remove existing markers and connecting layers
+    markers.forEach(m => {
+        try { map.removeLayer(m); } catch(e) {}
+    });
     markers = [];
-    
+
+    overlapLayers.forEach(l => {
+        try { map.removeLayer(l); } catch(e) {}
+    });
+    overlapLayers = [];
+
+    if (!orderedRetailers || orderedRetailers.length === 0) return;
+
+    // 2. Validate coordinates
+    const fallbackLat = 23.8103, fallbackLng = 90.4125;
     orderedRetailers.forEach((ret, i) => {
-        const pinInfo = getRetailerPinInfo(ret);
-        const pinClass = pinInfo.pinClass;
-        const pinIcon = pinInfo.pinIcon;
-
-        let shouldWarn = true;
-        ret.orders.forEach(o => {
-            if (o.status !== 'delivered' && o.status !== 'cancelled') {
-                shouldWarn = false;
-            }
-        });
-
-        let orderSummary = '';
-        if (ret.orders.length > 1) {
-            orderSummary = `<div class="text-[9px] font-normal opacity-80 mt-[-2px]">${ret.orders.length} Orders</div>`;
+        ret.name = ret.dealer_name || ret.retailer_name || ret.name || 'Retailer';
+        if (!ret.lat || !ret.lng || isNaN(parseFloat(ret.lat)) || isNaN(parseFloat(ret.lng))) {
+            ret.lat = fallbackLat + (Math.sin(i) * 0.005);
+            ret.lng = fallbackLng + (Math.cos(i) * 0.005);
+        } else {
+            ret.lat = parseFloat(ret.lat);
+            ret.lng = parseFloat(ret.lng);
         }
+    });
 
-        const icon = L.divIcon({
-            className: pinClass,
-            html: `
-                <div class="map-pin-wrap">
-                    <div class="map-pin-card">
-                        <div class="pin-icon"><i class="fa-solid ${pinIcon}"></i></div>
-                        <div>
-                            <div>${ret.name}</div>
-                            ${orderSummary}
-                        </div>
-                    </div>
-                    <div class="map-pin-tail"></div>
-                </div>
-            `,
-            iconSize: [120, 45],
-            iconAnchor: [60, 45]
-        });
-        const marker = L.marker([parseFloat(ret.lat), parseFloat(ret.lng)], { icon }).addTo(map);
-        marker.on('click', () => {
-            handleRetailerClick(ret, shouldWarn);
-        });
-        markers.push(marker);
+    // 3. Proximity / overlap grouping
+    const currentZoom = map.getZoom();
+    const isFullZoom = currentZoom >= 19; // Trigger ONLY on zoom 19+
+    const OVERLAP_DIST_PX = 75;
+
+    const screenPoints = orderedRetailers.map(r => map.latLngToContainerPoint([r.lat, r.lng]));
+    const visited = new Set();
+    const groups = [];
+
+    for (let i = 0; i < orderedRetailers.length; i++) {
+        if (visited.has(i)) continue;
+        const group = [i];
+        visited.add(i);
+
+        // Only group and disperse if map is at full zoom
+        if (isFullZoom) {
+            for (let j = i + 1; j < orderedRetailers.length; j++) {
+                if (visited.has(j)) continue;
+                const isSameCoord = Math.abs(orderedRetailers[i].lat - orderedRetailers[j].lat) < 0.00002 &&
+                                    Math.abs(orderedRetailers[i].lng - orderedRetailers[j].lng) < 0.00002;
+                const dx = screenPoints[i].x - screenPoints[j].x;
+                const dy = screenPoints[i].y - screenPoints[j].y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (isSameCoord || dist < OVERLAP_DIST_PX || (Math.abs(dx) < 85 && Math.abs(dy) < 42)) {
+                    group.push(j);
+                    visited.add(j);
+                }
+            }
+        }
+        groups.push(group);
+    }
+
+    // 4. Render markers and fan out if overlapping
+    groups.forEach(group => {
+        if (group.length === 1) {
+            const ret = orderedRetailers[group[0]];
+            const marker = createRetailerPinMarker(ret, [ret.lat, ret.lng], false);
+            marker.addTo(map);
+            markers.push(marker);
+        } else {
+            // Overlapping retailers: calculate centroid and auto move aside
+            let sumLat = 0, sumLng = 0;
+            group.forEach(idx => {
+                sumLat += orderedRetailers[idx].lat;
+                sumLng += orderedRetailers[idx].lng;
+            });
+            const centroidLat = sumLat / group.length;
+            const centroidLng = sumLng / group.length;
+            const centerPt = map.latLngToContainerPoint([centroidLat, centroidLng]);
+
+            // Origin anchor dot on the map
+            const anchorIcon = L.divIcon({
+                className: '',
+                html: `<div class="map-anchor-dot" title="${group.length} টি দোকান এই স্থানে"></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+            const anchorMarker = L.marker([centroidLat, centroidLng], {
+                icon: anchorIcon,
+                zIndexOffset: 150,
+                interactive: false
+            }).addTo(map);
+            overlapLayers.push(anchorMarker);
+
+            const n = group.length;
+
+            group.forEach((idx, k) => {
+                const ret = orderedRetailers[idx];
+                let px, py;
+
+                if (n === 2) {
+                    const offsetX = 68;
+                    const offsetY = 36;
+                    px = centerPt.x + (k === 0 ? -offsetX : offsetX);
+                    py = centerPt.y - offsetY;
+                } else if (n <= 5) {
+                    const radius = n === 3 ? 75 : 90;
+                    const startAngle = -Math.PI * 0.90;
+                    const endAngle = -Math.PI * 0.10;
+                    const angle = startAngle + (k / (n - 1)) * (endAngle - startAngle);
+                    px = centerPt.x + radius * Math.cos(angle);
+                    py = centerPt.y + radius * Math.sin(angle);
+                } else {
+                    const radius = 95 + (n - 5) * 10;
+                    const angle = -Math.PI / 2 + (2 * Math.PI * k) / n;
+                    px = centerPt.x + radius * Math.cos(angle);
+                    py = centerPt.y + radius * Math.sin(angle);
+                }
+
+                const pinLatLng = map.containerPointToLatLng([px, py]);
+
+                // Connecting line from anchor dot to pin tail
+                const line = L.polyline([[centroidLat, centroidLng], pinLatLng], {
+                    color: '#2563eb',
+                    weight: 1.5,
+                    opacity: 0.65,
+                    dashArray: '3, 4',
+                    smoothFactor: 1,
+                    interactive: false
+                }).addTo(map);
+                overlapLayers.push(line);
+
+                // Retailer pin card
+                const marker = createRetailerPinMarker(ret, pinLatLng, true);
+                marker.addTo(map);
+                markers.push(marker);
+            });
+        }
     });
 }
 
