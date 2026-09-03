@@ -96,10 +96,10 @@ $hasDeliveries = !empty($retailers);
       <button onclick="openReadySaleModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 active:scale-95 transition" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Ready Sale is disabled"' : '' ?>>
         <i class="fa-solid fa-bolt text-amber-100"></i> Ready Sale
       </button>
-      <button onclick="openRetailerListModal()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md active:scale-95 transition">
+      <button onclick="openRetailerListModal()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md active:scale-95 transition" title="Retailer List">
         <i class="fa-solid fa-list-ul"></i>
       </button>
-      <button onclick="locateMe()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-md active:scale-95 transition">
+      <button onclick="locateMe()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-md active:scale-95 transition" title="My Location">
         <i class="fa-solid fa-location-crosshairs"></i>
       </button>
     </div>
@@ -609,6 +609,9 @@ const vanStockMap = <?= json_encode($vanStockMap ?? new stdClass()) ?>;
 let map, userMarker, radiusCircle = null;
 let currentDispatchId = null;
 let markers = [];
+let clusterMarkers = [];
+let spiderLayers = [];
+let activeSpiderClusterId = null;
 
 let currentPartialDueRetailer = null;
 let currentPartialDueOrders = [];
@@ -1040,12 +1043,12 @@ function initMap() {
         updateWhenZooming: false
     }).addTo(map);
 
-    // ── Pin styles ──
+    // ── Previous Pin Styles with Auto-Spider ──
     if (!document.getElementById('pin-styles')) {
         const s = document.createElement('style');
         s.id = 'pin-styles';
         s.textContent = `
-            .map-pin-wrap { display:flex; flex-direction:column; align-items:center; }
+            .map-pin-wrap { display:flex; flex-direction:column; align-items:center; cursor:pointer; }
             .map-pin-card {
                 display: flex; align-items: center; gap: 5px;
                 padding: 5px 10px 5px 7px; border-radius: 20px;
@@ -1122,75 +1125,238 @@ function initMap() {
                 color: #fff;
             }
             .pin-mixed-all .map-pin-tail { border-top: 9px solid #15803d; }
+
+            /* Center hub dot for close area clusters */
+            .spider-center-dot {
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: #2563eb;
+                border: 2.5px solid #ffffff;
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35), 0 2px 6px rgba(0,0,0,0.25);
+            }
+            .spider-leg-line {
+                pointer-events: none;
+            }
         `;
         document.head.appendChild(s);
     }
 
-// getRetailerPinInfo moved outside
+    // Auto-update spider layout on zoom or pan
+    map.on('zoomend', () => redrawMapPins());
+    map.on('moveend', () => redrawMapPins());
 
-    const fallbackLat = 23.8103, fallbackLng = 90.4125;
-    let firstValidLat = null, firstValidLng = null;
-
-    // ── Plot only van-loaded retailers ──
-    orderedRetailers.forEach((ret, i) => {
-        ret.name = ret.dealer_name || ret.name || 'Retailer';
-
-        // Use real coordinates if available, else spread around Dhaka
-        if (!ret.lat || !ret.lng) {
-            ret.lat = fallbackLat + (Math.random() - 0.5) * 0.05;
-            ret.lng = fallbackLng + (Math.random() - 0.5) * 0.05;
-        }
-
-        if (!firstValidLat) { firstValidLat = parseFloat(ret.lat); firstValidLng = parseFloat(ret.lng); }
-
-        // Determine aggregate status for pin color
-        const pinInfo = getRetailerPinInfo(ret);
-        const pinClass = pinInfo.pinClass;
-        const pinIcon = pinInfo.pinIcon;
-
-        let shouldWarn = true;
-        ret.orders.forEach(o => {
-            if (o.status !== 'delivered' && o.status !== 'cancelled') {
-                shouldWarn = false;
-            }
-        });
-
-        // Order count summary
-        let orderSummary = '';
-        if (ret.orders.length > 1) {
-            orderSummary = `<div class="text-[9px] font-normal opacity-80 mt-[-2px]">${ret.orders.length} Orders</div>`;
-        }
-
-        const icon = L.divIcon({
-            className: pinClass,
-            html: `
-                <div class="map-pin-wrap">
-                    <div class="map-pin-card">
-                        <div class="pin-icon"><i class="fa-solid ${pinIcon}"></i></div>
-                        <div>
-                            <div>${ret.name}</div>
-                            ${orderSummary}
-                        </div>
-                    </div>
-                    <div class="map-pin-tail"></div>
-                </div>
-            `,
-            iconSize: [120, 45],
-            iconAnchor: [60, 45]
-        });
-        const marker = L.marker([parseFloat(ret.lat), parseFloat(ret.lng)], { icon }).addTo(map);
-        marker.on('click', () => {
-            handleRetailerClick(ret, shouldWarn);
-        });
-        markers.push(marker);
-    });
+    // Plot all retailers immediately with auto-spider layout
+    redrawMapPins();
 
     // Center map on first retailer if coords exist, else locate DSR
-    if (firstValidLat) {
+    let firstValidLat = null, firstValidLng = null;
+    orderedRetailers.forEach(ret => {
+        if (!firstValidLat && ret.lat && ret.lng && !isNaN(parseFloat(ret.lat))) {
+            firstValidLat = parseFloat(ret.lat);
+            firstValidLng = parseFloat(ret.lng);
+        }
+    });
+
+    if (firstValidLat && firstValidLng) {
         map.setView([firstValidLat, firstValidLng], 14);
     }
 
     locateMe();
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function getRingsConfig(n) {
+    if (n <= 4) {
+        return [{ r: 120 + n * 10, cap: n, stagger: 0 }];
+    }
+    if (n <= 8) {
+        return [{ r: 160 + (n - 4) * 12, cap: n, stagger: 0 }];
+    }
+    if (n <= 20) {
+        const r1Count = Math.min(6, Math.ceil(n * 0.35));
+        const r2Count = n - r1Count;
+        return [
+            { r: 140, cap: r1Count, stagger: 0 },
+            { r: 245, cap: r2Count, stagger: Math.PI / r2Count }
+        ];
+    }
+    const r1Count = 6;
+    const r2Count = 12;
+    const r3Count = n - 18;
+    return [
+        { r: 140, cap: r1Count, stagger: 0 },
+        { r: 245, cap: r2Count, stagger: Math.PI / 12 },
+        { r: 355, cap: r3Count, stagger: Math.PI / Math.max(1, r3Count) }
+    ];
+}
+
+function createRetailerPinMarker(ret, latlng, isSpider = false) {
+    const pinInfo = getRetailerPinInfo(ret);
+    let shouldWarn = true;
+    (ret.orders || []).forEach(o => {
+        if (o.status !== 'delivered' && o.status !== 'cancelled') shouldWarn = false;
+    });
+
+    let orderSummary = '';
+    if (ret.orders && ret.orders.length > 1) {
+        orderSummary = `<div class="text-[9px] font-normal opacity-80 mt-[-2px]">${ret.orders.length} Orders</div>`;
+    }
+
+    const icon = L.divIcon({
+        className: pinInfo.pinClass,
+        html: `
+            <div class="map-pin-wrap">
+                <div class="map-pin-card">
+                    <div class="pin-icon"><i class="fa-solid ${pinInfo.pinIcon}"></i></div>
+                    <div>
+                        <div>${escapeHtml(ret.name)}</div>
+                        ${orderSummary}
+                    </div>
+                </div>
+                <div class="map-pin-tail"></div>
+            </div>
+        `,
+        iconSize: [120, 45],
+        iconAnchor: [60, 45]
+    });
+
+    const marker = L.marker(latlng, {
+        icon: icon,
+        zIndexOffset: isSpider ? 1000 : 200
+    });
+
+    marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        handleRetailerClick(ret, shouldWarn);
+    });
+
+    return marker;
+}
+
+function redrawMapPins() {
+    if (!map) return;
+    spiderLayers.forEach(l => {
+        try { map.removeLayer(l); } catch(e) {}
+    });
+    markers.forEach(m => {
+        try { map.removeLayer(m); } catch(e) {}
+    });
+    spiderLayers = [];
+    markers = [];
+
+    if (!orderedRetailers || orderedRetailers.length === 0) return;
+
+    const fallbackLat = 23.8103, fallbackLng = 90.4125;
+    orderedRetailers.forEach((ret, idx) => {
+        ret.name = ret.dealer_name || ret.retailer_name || ret.name || 'Retailer';
+        if (!ret.lat || !ret.lng || isNaN(parseFloat(ret.lat)) || isNaN(parseFloat(ret.lng))) {
+            ret.lat = fallbackLat + (Math.sin(idx) * 0.006);
+            ret.lng = fallbackLng + (Math.cos(idx) * 0.006);
+        } else {
+            ret.lat = parseFloat(ret.lat);
+            ret.lng = parseFloat(ret.lng);
+        }
+    });
+
+    // Proximity grouping: if retailers are in a close area (within 60px on screen)
+    const CLUSTER_DISTANCE_PX = 60;
+    const visited = new Set();
+    const groups = [];
+
+    const screenPoints = orderedRetailers.map(r => map.latLngToContainerPoint([r.lat, r.lng]));
+
+    for (let i = 0; i < orderedRetailers.length; i++) {
+        if (visited.has(i)) continue;
+        const group = [orderedRetailers[i]];
+        visited.add(i);
+
+        for (let j = i + 1; j < orderedRetailers.length; j++) {
+            if (visited.has(j)) continue;
+            const dx = screenPoints[i].x - screenPoints[j].x;
+            const dy = screenPoints[i].y - screenPoints[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist <= CLUSTER_DISTANCE_PX) {
+                group.push(orderedRetailers[j]);
+                visited.add(j);
+            }
+        }
+        groups.push(group);
+    }
+
+    groups.forEach((group) => {
+        if (group.length === 1) {
+            // Standalone retailer: pin at real location
+            const ret = group[0];
+            const marker = createRetailerPinMarker(ret, [ret.lat, ret.lng]);
+            marker.addTo(map);
+            markers.push(marker);
+            spiderLayers.push(marker);
+        } else {
+            // Close area group: AUTO-SPIDER ALL RETAILERS ALWAYS
+            let sumLat = 0, sumLng = 0;
+            group.forEach(r => { sumLat += r.lat; sumLng += r.lng; });
+            const centroid = [sumLat / group.length, sumLng / group.length];
+            const centerPt = map.latLngToContainerPoint(centroid);
+
+            // Center origin dot
+            const hubIcon = L.divIcon({
+                className: '',
+                html: `<div class="spider-center-dot" title="${group.length} Retailers in this area"></div>`,
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+            const hubMarker = L.marker(centroid, {
+                icon: hubIcon,
+                zIndexOffset: 300,
+                interactive: false
+            }).addTo(map);
+            spiderLayers.push(hubMarker);
+
+            // Concentric spider rings
+            const n = group.length;
+            const rings = getRingsConfig(n);
+            let itemIdx = 0;
+
+            rings.forEach(ring => {
+                const countInRing = Math.min(ring.cap, n - itemIdx);
+                for (let i = 0; i < countInRing; i++) {
+                    if (itemIdx >= n) break;
+                    const ret = group[itemIdx++];
+                    const angle = -Math.PI / 2 + (2 * Math.PI * i) / countInRing + ring.stagger;
+                    const px = centerPt.x + ring.r * Math.cos(angle);
+                    const py = centerPt.y + ring.r * Math.sin(angle);
+                    const pinLatLng = map.containerPointToLatLng([px, py]);
+
+                    // Connector line from center to pin tail
+                    const line = L.polyline([centroid, pinLatLng], {
+                        color: '#2563eb',
+                        weight: 1.5,
+                        opacity: 0.65,
+                        smoothFactor: 1,
+                        interactive: false,
+                        className: 'spider-leg-line'
+                    }).addTo(map);
+                    spiderLayers.push(line);
+
+                    // Retailer pin using previous pin design
+                    const spiderMarker = createRetailerPinMarker(ret, pinLatLng, true);
+                    spiderMarker.addTo(map);
+                    markers.push(spiderMarker);
+                    spiderLayers.push(spiderMarker);
+                }
+            });
+        }
+    });
 }
 
 function getRetailerPinInfo(ret) {
@@ -2077,52 +2243,7 @@ async function syncUndoQueue() {
 window.addEventListener('online', syncUndoQueue);
 document.addEventListener('DOMContentLoaded', syncUndoQueue);
 
-function redrawMapPins() {
-    if (!map) return;
-    markers.forEach(m => map.removeLayer(m));
-    markers = [];
-    
-    orderedRetailers.forEach((ret, i) => {
-        const pinInfo = getRetailerPinInfo(ret);
-        const pinClass = pinInfo.pinClass;
-        const pinIcon = pinInfo.pinIcon;
-
-        let shouldWarn = true;
-        ret.orders.forEach(o => {
-            if (o.status !== 'delivered' && o.status !== 'cancelled') {
-                shouldWarn = false;
-            }
-        });
-
-        let orderSummary = '';
-        if (ret.orders.length > 1) {
-            orderSummary = `<div class="text-[9px] font-normal opacity-80 mt-[-2px]">${ret.orders.length} Orders</div>`;
-        }
-
-        const icon = L.divIcon({
-            className: pinClass,
-            html: `
-                <div class="map-pin-wrap">
-                    <div class="map-pin-card">
-                        <div class="pin-icon"><i class="fa-solid ${pinIcon}"></i></div>
-                        <div>
-                            <div>${ret.name}</div>
-                            ${orderSummary}
-                        </div>
-                    </div>
-                    <div class="map-pin-tail"></div>
-                </div>
-            `,
-            iconSize: [120, 45],
-            iconAnchor: [60, 45]
-        });
-        const marker = L.marker([parseFloat(ret.lat), parseFloat(ret.lng)], { icon }).addTo(map);
-        marker.on('click', () => {
-            handleRetailerClick(ret, shouldWarn);
-        });
-        markers.push(marker);
-    });
-}
+// redrawMapPins is defined in main map section
 
 function renderRetailerListGrid() {
     const grid = document.getElementById('retailerListGrid');
