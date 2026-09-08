@@ -9,6 +9,7 @@ $menus = [
     'admin' => [
         ['section' => 'OVERVIEW'],
         ['icon' => 'fa-gauge',        'label' => 'Dashboard',   'url' => '/admin/dashboard'],
+        ['icon' => 'fa-wand-magic-sparkles', 'label' => 'AI Assistant', 'url' => '/admin/ai-assistant'],
         ['section' => 'OPERATIONS'],
         ['icon' => 'fa-warehouse',    'label' => 'Warehouses',  'url' => '/admin/warehouses'],
         ['icon' => 'fa-user-tie',     'label' => 'Managers',    'url' => '/admin/managers'],

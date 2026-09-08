@@ -97,6 +97,9 @@ $router->get( '/',         fn() => header('Location: ' . BASE_URL . '/login') ?:
 
 // ── Admin routes ──────────────────────────────────────────────
 $router->get( '/admin/dashboard',          ['AdminController', 'dashboard']);
+$router->get( '/admin/ai-assistant',       ['AdminController', 'aiAssistant']);
+$router->post('/admin/ai-assistant/api',   ['AdminController', 'aiAssistantApi']);
+$router->post('/admin/ai-assistant/translate', ['AdminController', 'aiAssistantTranslate']);
 
 // Warehouses
 $router->get( '/admin/warehouses',         ['AdminController', 'warehouses']);
