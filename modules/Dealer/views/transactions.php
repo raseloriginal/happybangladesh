@@ -205,7 +205,6 @@
                             <tr>
                                 <th class="px-3 py-3 text-left">#</th>
                                 <th class="px-4 py-3 text-left">পণ্যের নাম</th>
-                                <th class="px-3 py-3 text-right">একক মূল্য</th>
                                 <th class="px-3 py-3 text-center text-blue-700">ডেসপাস পরিমাণ</th>
                                 <th class="px-3 py-3 text-right text-blue-700">ডেসপাস মূল্য</th>
                                 <th class="px-3 py-3 text-center text-rose-600 bg-rose-50/50">ফেরত পরিমাণ</th>
@@ -281,7 +280,6 @@ function openModal(date, grossSale, netSale, grossProfit, netProfit, successRate
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="px-3 py-3 text-left text-gray-400 font-normal">${idx + 1}</td>
                                 <td class="px-4 py-3 text-left text-gray-900 font-bold">${item.name}</td>
-                                <td class="px-3 py-3 text-right text-amber-600">৳${(item.price || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td class="px-3 py-3 text-center text-blue-700 font-bold">${item.out_qty}</td>
                                 <td class="px-3 py-3 text-right text-blue-700">৳${item.out_value.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td class="px-3 py-3 text-center text-rose-600 font-bold bg-rose-50/40">${item.in_qty}</td>
@@ -299,10 +297,7 @@ function openModal(date, grossSale, netSale, grossProfit, netProfit, successRate
                         `;
                         mobileHtml += `
                             <div class="p-4 hover:bg-gray-50/50 flex flex-col gap-2.5">
-                                <div class="flex justify-between items-start">
-                                    <div class="text-gray-800 font-bold text-sm text-left">${item.name}</div>
-                                    <span class="text-xs text-amber-600 font-bold">৳${(item.price || 0).toFixed(2)}/পিস</span>
-                                </div>
+                                <div class="text-gray-800 font-bold text-sm text-left">${item.name}</div>
                                 <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
                                     <div class="bg-blue-50/70 p-2.5 rounded-xl border border-blue-100">
                                         <span class="text-blue-600 block mb-0.5 font-bold uppercase tracking-wide">ডেসপাস</span>
