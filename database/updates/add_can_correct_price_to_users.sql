@@ -1,1 +1,0 @@
-ALTER TABLE users ADD COLUMN can_correct_price TINYINT(1) DEFAULT 1;
