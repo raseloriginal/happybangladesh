@@ -47,17 +47,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     FOREIGN KEY (`company_id`)   REFERENCES `companies`(`id`)  ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- ── Permissions ──────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS `permissions` (
-    `id`         SMALLINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `role_id`    TINYINT UNSIGNED NOT NULL,
-    `module`     VARCHAR(80)      NOT NULL,
-    `can_view`   TINYINT(1)       NOT NULL DEFAULT 0,
-    `can_create` TINYINT(1)       NOT NULL DEFAULT 0,
-    `can_edit`   TINYINT(1)       NOT NULL DEFAULT 0,
-    `can_delete` TINYINT(1)       NOT NULL DEFAULT 0,
-    FOREIGN KEY (`role_id`) REFERENCES `roles`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB;
+
 
 -- ── Main Categories ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `main_categories` (

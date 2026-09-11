@@ -90,178 +90,178 @@ $router->post('/admin/ai-assistant/api',   ['AdminController', 'aiAssistantApi']
 $router->post('/admin/ai-assistant/translate', ['AdminController', 'aiAssistantTranslate']);
 
 // Warehouses
-$router->get( '/admin/warehouses',         ['AdminController', 'warehouses']);
-$router->get( '/admin/warehouses/create',  ['AdminController', 'warehouseCreate']);
-$router->post('/admin/warehouses/store',   ['AdminController', 'warehouseStore']);
-$router->get( '/admin/warehouses/edit/{id}',   ['AdminController', 'warehouseEdit']);
-$router->post('/admin/warehouses/update/{id}', ['AdminController', 'warehouseUpdate']);
-$router->post('/admin/warehouses/delete/{id}', ['AdminController', 'warehouseDelete']);
+$router->get( '/admin/warehouses',         ['SystemAdminController', 'warehouses']);
+$router->get( '/admin/warehouses/create',  ['SystemAdminController', 'warehouseCreate']);
+$router->post('/admin/warehouses/store',   ['SystemAdminController', 'warehouseStore']);
+$router->get( '/admin/warehouses/edit/{id}',   ['SystemAdminController', 'warehouseEdit']);
+$router->post('/admin/warehouses/update/{id}', ['SystemAdminController', 'warehouseUpdate']);
+$router->post('/admin/warehouses/delete/{id}', ['SystemAdminController', 'warehouseDelete']);
 
 // Managers
-$router->get( '/admin/managers',           ['AdminController', 'managers']);
-$router->get( '/admin/managers/create',    ['AdminController', 'managerCreate']);
-$router->post('/admin/managers/store',     ['AdminController', 'managerStore']);
-$router->get( '/admin/managers/edit/{id}', ['AdminController', 'managerEdit']);
-$router->post('/admin/managers/update/{id}', ['AdminController', 'managerUpdate']);
-$router->post('/admin/managers/delete/{id}', ['AdminController', 'managerDelete']);
+$router->get( '/admin/managers',           ['UserAdminController', 'managers']);
+$router->get( '/admin/managers/create',    ['UserAdminController', 'managerCreate']);
+$router->post('/admin/managers/store',     ['UserAdminController', 'managerStore']);
+$router->get( '/admin/managers/edit/{id}', ['UserAdminController', 'managerEdit']);
+$router->post('/admin/managers/update/{id}', ['UserAdminController', 'managerUpdate']);
+$router->post('/admin/managers/delete/{id}', ['UserAdminController', 'managerDelete']);
 
 // SRs
-$router->get( '/admin/srs',               ['AdminController', 'srs']);
-$router->get( '/admin/srs/create',        ['AdminController', 'srCreate']);
-$router->post('/admin/srs/store',         ['AdminController', 'srStore']);
-$router->get( '/admin/srs/edit/{id}',     ['AdminController', 'srEdit']);
-$router->post('/admin/srs/update/{id}',   ['AdminController', 'srUpdate']);
-$router->post('/admin/srs/delete/{id}',   ['AdminController', 'srDelete']);
-$router->get( '/admin/api/sr-orders-cutoff',        ['AdminController', 'apiSrOrdersCutoff']);
-$router->post('/admin/api/sr-orders-cutoff/toggle', ['AdminController', 'apiToggleSrOrderCutoff']);
-$router->post('/admin/api/sr-price-correction/toggle', ['AdminController', 'apiToggleSrPriceCorrection']);
+$router->get( '/admin/srs',               ['UserAdminController', 'srs']);
+$router->get( '/admin/srs/create',        ['UserAdminController', 'srCreate']);
+$router->post('/admin/srs/store',         ['UserAdminController', 'srStore']);
+$router->get( '/admin/srs/edit/{id}',     ['UserAdminController', 'srEdit']);
+$router->post('/admin/srs/update/{id}',   ['UserAdminController', 'srUpdate']);
+$router->post('/admin/srs/delete/{id}',   ['UserAdminController', 'srDelete']);
+$router->get( '/admin/api/sr-orders-cutoff',        ['UserAdminController', 'apiSrOrdersCutoff']);
+$router->post('/admin/api/sr-orders-cutoff/toggle', ['UserAdminController', 'apiToggleSrOrderCutoff']);
+$router->post('/admin/api/sr-price-correction/toggle', ['UserAdminController', 'apiToggleSrPriceCorrection']);
 
 // DSRs
-$router->get( '/admin/dsrs',              ['AdminController', 'dsrs']);
-$router->get( '/admin/dsrs/create',       ['AdminController', 'dsrCreate']);
-$router->post('/admin/dsrs/store',        ['AdminController', 'dsrStore']);
-$router->get( '/admin/dsrs/edit/{id}',    ['AdminController', 'dsrEdit']);
-$router->post('/admin/dsrs/update/{id}',  ['AdminController', 'dsrUpdate']);
-$router->post('/admin/dsrs/delete/{id}',  ['AdminController', 'dsrDelete']);
+$router->get( '/admin/dsrs',              ['UserAdminController', 'dsrs']);
+$router->get( '/admin/dsrs/create',       ['UserAdminController', 'dsrCreate']);
+$router->post('/admin/dsrs/store',        ['UserAdminController', 'dsrStore']);
+$router->get( '/admin/dsrs/edit/{id}',    ['UserAdminController', 'dsrEdit']);
+$router->post('/admin/dsrs/update/{id}',  ['UserAdminController', 'dsrUpdate']);
+$router->post('/admin/dsrs/delete/{id}',  ['UserAdminController', 'dsrDelete']);
 
 // Companies
-$router->get( '/admin/companies',              ['AdminController', 'companies']);
-$router->get( '/admin/companies/create',       ['AdminController', 'companyCreate']);
-$router->post('/admin/companies/store',        ['AdminController', 'companyStore']);
-$router->get( '/admin/companies/edit/{id}',    ['AdminController', 'companyEdit']);
-$router->post('/admin/companies/update/{id}',  ['AdminController', 'companyUpdate']);
-$router->post('/admin/companies/delete/{id}',  ['AdminController', 'companyDelete']);
+$router->get( '/admin/companies',              ['SystemAdminController', 'companies']);
+$router->get( '/admin/companies/create',       ['SystemAdminController', 'companyCreate']);
+$router->post('/admin/companies/store',        ['SystemAdminController', 'companyStore']);
+$router->get( '/admin/companies/edit/{id}',    ['SystemAdminController', 'companyEdit']);
+$router->post('/admin/companies/update/{id}',  ['SystemAdminController', 'companyUpdate']);
+$router->post('/admin/companies/delete/{id}',  ['SystemAdminController', 'companyDelete']);
 
 // Dealers
-$router->get( '/admin/dealers',               ['AdminController', 'dealers']);
-$router->get( '/admin/dealers/create',        ['AdminController', 'dealerCreate']);
-$router->post('/admin/dealers/store',         ['AdminController', 'dealerStore']);
-$router->get( '/admin/dealers/edit/{id}',     ['AdminController', 'dealerEdit']);
-$router->post('/admin/dealers/update/{id}',   ['AdminController', 'dealerUpdate']);
-$router->post('/admin/dealers/delete/{id}',   ['AdminController', 'dealerDelete']);
+$router->get( '/admin/dealers',               ['UserAdminController', 'dealers']);
+$router->get( '/admin/dealers/create',        ['UserAdminController', 'dealerCreate']);
+$router->post('/admin/dealers/store',         ['UserAdminController', 'dealerStore']);
+$router->get( '/admin/dealers/edit/{id}',     ['UserAdminController', 'dealerEdit']);
+$router->post('/admin/dealers/update/{id}',   ['UserAdminController', 'dealerUpdate']);
+$router->post('/admin/dealers/delete/{id}',   ['UserAdminController', 'dealerDelete']);
 
 // Approvals & Reports
-$router->get( '/admin/approvals',             ['AdminController', 'approvals']);
-$router->post('/admin/approvals/approve/{id}',['AdminController', 'approvalApprove']);
-$router->post('/admin/approvals/reject/{id}', ['AdminController', 'approvalReject']);
-$router->get( '/admin/reports',               ['AdminController', 'reports']);
+$router->get( '/admin/approvals',             ['SystemAdminController', 'approvals']);
+$router->post('/admin/approvals/approve/{id}',['SystemAdminController', 'approvalApprove']);
+$router->post('/admin/approvals/reject/{id}', ['SystemAdminController', 'approvalReject']);
+$router->get( '/admin/reports',               ['SystemAdminController', 'reports']);
 
 // Database Sync
-$router->get( '/admin/database-sync',         ['AdminController', 'databaseSync']);
-$router->post('/admin/database-sync/run',     ['AdminController', 'databaseSyncRun']);
-$router->post('/admin/database-sync/clear',          ['AdminController', 'databaseClear']);
-$router->post('/admin/database-sync/clear-dispatch', ['AdminController', 'dispatchClear']);
+$router->get( '/admin/database-sync',         ['SystemAdminController', 'databaseSync']);
+$router->post('/admin/database-sync/run',     ['SystemAdminController', 'databaseSyncRun']);
+$router->post('/admin/database-sync/clear',          ['SystemAdminController', 'databaseClear']);
+$router->post('/admin/database-sync/clear-dispatch', ['SystemAdminController', 'dispatchClear']);
 
 // Retailers
-$router->get( '/admin/retailers',             ['AdminController', 'retailers']);
-$router->get( '/admin/retailers/import',      ['AdminController', 'retailersImport']);
-$router->post('/admin/retailers/import',      ['AdminController', 'retailersImportPost']);
+$router->get( '/admin/retailers',             ['SystemAdminController', 'retailers']);
+$router->get( '/admin/retailers/import',      ['SystemAdminController', 'retailersImport']);
+$router->post('/admin/retailers/import',      ['SystemAdminController', 'retailersImportPost']);
 
 // Orders
-$router->get( '/admin/orders',                ['AdminController', 'orders']);
-$router->get( '/admin/api/orders',            ['AdminController', 'apiOrders']);
+$router->get( '/admin/orders',                ['SystemAdminController', 'orders']);
+$router->get( '/admin/api/orders',            ['SystemAdminController', 'apiOrders']);
 
 // Sessions
-$router->get( '/admin/sessions',              ['AdminController', 'sessions']);
-$router->post('/admin/sessions/logout/{id}',  ['AdminController', 'sessionForceLogout']);
+$router->get( '/admin/sessions',              ['SystemAdminController', 'sessions']);
+$router->post('/admin/sessions/logout/{id}',  ['SystemAdminController', 'sessionForceLogout']);
 
 // SR Tracking
-$router->get( '/admin/sr-tracking',                   ['AdminController', 'srTracking']);
-$router->get( '/admin/api/sr-tracking/live',          ['AdminController', 'apiSrTrackingLive']);
-$router->get( '/admin/api/sr-tracking/history',       ['AdminController', 'apiSrTrackingHistory']);
+$router->get( '/admin/sr-tracking',                   ['TrackingController', 'srTracking']);
+$router->get( '/admin/api/sr-tracking/live',          ['TrackingController', 'apiSrTrackingLive']);
+$router->get( '/admin/api/sr-tracking/history',       ['TrackingController', 'apiSrTrackingHistory']);
 
 // DSR Tracking
-$router->get( '/admin/dsr-tracking',                  ['AdminController', 'dsrTracking']);
-$router->get( '/admin/api/dsr-tracking/live',         ['AdminController', 'apiDsrTrackingLive']);
-$router->get( '/admin/api/dsr-tracking/history',      ['AdminController', 'apiDsrTrackingHistory']);
+$router->get( '/admin/dsr-tracking',                  ['TrackingController', 'dsrTracking']);
+$router->get( '/admin/api/dsr-tracking/live',         ['TrackingController', 'apiDsrTrackingLive']);
+$router->get( '/admin/api/dsr-tracking/history',      ['TrackingController', 'apiDsrTrackingHistory']);
 
 // Custom Areas Map Management
-$router->get( '/admin/custom-areas',                  ['AdminController', 'customAreas']);
-$router->get( '/admin/api/custom-areas',              ['AdminController', 'apiCustomAreas']);
-$router->post('/admin/api/custom-areas/store',        ['AdminController', 'apiCustomAreaStore']);
-$router->post('/admin/api/custom-areas/update/{id}',  ['AdminController', 'apiCustomAreaUpdate']);
-$router->post('/admin/api/custom-areas/delete/{id}',  ['AdminController', 'apiCustomAreaDelete']);
+$router->get( '/admin/custom-areas',                  ['TrackingController', 'customAreas']);
+$router->get( '/admin/api/custom-areas',              ['TrackingController', 'apiCustomAreas']);
+$router->post('/admin/api/custom-areas/store',        ['TrackingController', 'apiCustomAreaStore']);
+$router->post('/admin/api/custom-areas/update/{id}',  ['TrackingController', 'apiCustomAreaUpdate']);
+$router->post('/admin/api/custom-areas/delete/{id}',  ['TrackingController', 'apiCustomAreaDelete']);
 
 // Manager Logs
-$router->get( '/admin/manager-logs',                  ['AdminController', 'managerLogs']);
+$router->get( '/admin/manager-logs',                  ['SystemAdminController', 'managerLogs']);
 
 
 // ── Manager routes ────────────────────────────────────────────
 $router->get( '/manager/dashboard',           ['ManagerController', 'dashboard']);
 
 // Products (API based)
-$router->get( '/manager/products',            ['ManagerController', 'products']);
-$router->post('/manager/api/products',        ['ManagerController', 'apiProductStore']);
-$router->post('/manager/api/products/update', ['ManagerController', 'apiProductUpdate']);
-$router->post('/manager/api/products/adjust-buying-price', ['ManagerController', 'apiAdjustBuyingPrice']);
-$router->get( '/manager/api/products/price-history',       ['ManagerController', 'apiProductPriceHistory']);
-$router->post('/manager/api/products/delete', ['ManagerController', 'apiProductDelete']);
-$router->post('/manager/api/stock/adjust',    ['ManagerController', 'apiStockAdjust']);
+$router->get( '/manager/products',            ['ProductController', 'products']);
+$router->post('/manager/api/products',        ['ProductController', 'apiProductStore']);
+$router->post('/manager/api/products/update', ['ProductController', 'apiProductUpdate']);
+$router->post('/manager/api/products/adjust-buying-price', ['ProductController', 'apiAdjustBuyingPrice']);
+$router->get( '/manager/api/products/price-history',       ['ProductController', 'apiProductPriceHistory']);
+$router->post('/manager/api/products/delete', ['ProductController', 'apiProductDelete']);
+$router->post('/manager/api/stock/adjust',    ['ProductController', 'apiStockAdjust']);
 
 // Categories
-$router->get( '/manager/categories',          ['ManagerController', 'categories']);
-$router->post('/manager/api/categories',      ['ManagerController', 'apiCategoryStore']);
-$router->post('/manager/api/categories/update',['ManagerController', 'apiCategoryUpdate']);
-$router->post('/manager/api/categories/delete',['ManagerController', 'apiCategoryDelete']);
+$router->get( '/manager/categories',          ['ProductController', 'categories']);
+$router->post('/manager/api/categories',      ['ProductController', 'apiCategoryStore']);
+$router->post('/manager/api/categories/update',['ProductController', 'apiCategoryUpdate']);
+$router->post('/manager/api/categories/delete',['ProductController', 'apiCategoryDelete']);
 // Lots
-$router->get( '/manager/lots',                ['ManagerController', 'lots']);
-$router->post('/manager/api/lots/store',      ['ManagerController', 'apiLotStore']);
-$router->post('/manager/api/lots/update',     ['ManagerController', 'apiLotUpdate']);
-$router->post('/manager/api/lots/delete',     ['ManagerController', 'apiLotDelete']);
-$router->post('/manager/api/lots/delete-batch',['ManagerController', 'apiLotBatchDelete']);
-$router->post('/manager/api/lots/update-batch',['ManagerController', 'apiLotBatchUpdate']);
-$router->post('/manager/api/lots/request-edit', ['ManagerController', 'apiLotBatchEditRequest']);
+$router->get( '/manager/lots',                ['ProductController', 'lots']);
+$router->post('/manager/api/lots/store',      ['ProductController', 'apiLotStore']);
+$router->post('/manager/api/lots/update',     ['ProductController', 'apiLotUpdate']);
+$router->post('/manager/api/lots/delete',     ['ProductController', 'apiLotDelete']);
+$router->post('/manager/api/lots/delete-batch',['ProductController', 'apiLotBatchDelete']);
+$router->post('/manager/api/lots/update-batch',['ProductController', 'apiLotBatchUpdate']);
+$router->post('/manager/api/lots/request-edit', ['ProductController', 'apiLotBatchEditRequest']);
 
 // Manager Orders
-$router->get( '/manager/orders',                             ['ManagerController', 'orders']);
-$router->get( '/manager/api/orders/companies',               ['ManagerController', 'apiOrdersCompanies']);
-$router->get( '/manager/api/orders/srs',                     ['ManagerController', 'apiOrdersSrs']);
-$router->get( '/manager/api/orders/products',                ['ManagerController', 'apiOrdersProducts']);
+$router->get( '/manager/orders',                             ['ReportController', 'orders']);
+$router->get( '/manager/api/orders/companies',               ['ReportController', 'apiOrdersCompanies']);
+$router->get( '/manager/api/orders/srs',                     ['ReportController', 'apiOrdersSrs']);
+$router->get( '/manager/api/orders/products',                ['ReportController', 'apiOrdersProducts']);
 
 // Other manager pages
-$router->get( '/manager/inventory',           ['ManagerController', 'inventory']);
-$router->get( '/manager/dispatch',                           ['ManagerController', 'dispatch']);
-$router->get( '/manager/api/dispatch/data',                  ['ManagerController', 'apiDispatchData']);
-$router->get( '/manager/api/dispatch/new-popup-data',        ['ManagerController', 'apiDispatchNewPopupData']);
-$router->post('/manager/api/dispatch/assign',                ['ManagerController', 'apiDispatchAssign']);
-$router->get( '/manager/api/dispatch/sr-details/{id}',       ['ManagerController', 'apiDispatchSrDetails']);
-$router->get( '/manager/api/dispatch/company-details/{id}',  ['ManagerController', 'apiDispatchCompanyDetails']);
-$router->get( '/manager/api/dispatch/organize-data/{id}',    ['ManagerController', 'apiDispatchOrganizeData']);
-$router->post('/manager/api/dispatch/organize-save/{id}',    ['ManagerController', 'apiDispatchOrganizeSave']);
-$router->post('/manager/api/dispatch/status-update/{id}',    ['ManagerController', 'apiDispatchStatusUpdate']);
-$router->post('/manager/api/dispatch/undo-dispatch/{id}',    ['ManagerController', 'apiDispatchUndoDispatch']);
-$router->get('/manager/api/dispatch/van-stock/{dsrId}',      ['ManagerController', 'apiDispatchVanStock']);
-$router->post('/manager/api/dispatch/return-save/{scheduleId}',   ['ManagerController', 'apiDispatchReturnSave']);
-$router->post('/manager/api/dispatch/undo-return/{scheduleId}',   ['ManagerController', 'apiDispatchUndoReturn']);
-$router->post('/manager/api/dispatch/update-product-qty/{scheduleId}', ['ManagerController', 'apiDispatchUpdateProductQty']);
-$router->post('/manager/api/dispatch/update-dsr',            ['ManagerController', 'apiDispatchUpdateDsr']);
-$router->post('/manager/api/dispatch/update-delivery-date',     ['ManagerController', 'apiDispatchUpdateDeliveryDate']);
-$router->post('/manager/api/dispatch/delete/{id}',            ['ManagerController', 'apiDispatchDelete']);
-$router->get( '/manager/settlements',               ['ManagerController', 'settlements']);
-$router->post('/manager/api/settlements/update/{id}',['ManagerController', 'apiSettlementUpdate']);
-$router->get( '/manager/attendance',                    ['ManagerController', 'attendance']);
-$router->post('/manager/attendance/store',              ['ManagerController', 'attendanceStore']);
-$router->get( '/manager/api/attendance/qr',             ['ManagerController', 'apiAttendanceQrGet']);
-$router->post('/manager/api/attendance/qr/generate',    ['ManagerController', 'apiAttendanceQrGenerate']);
-$router->get( '/manager/readysale',           ['ManagerController', 'readysale']);
-$router->post('/manager/readysale/store',     ['ManagerController', 'readysaleStore']);
+$router->get( '/manager/inventory',           ['InventoryController', 'inventory']);
+$router->get( '/manager/dispatch',                           ['DispatchController', 'dispatch']);
+$router->get( '/manager/api/dispatch/data',                  ['DispatchController', 'apiDispatchData']);
+$router->get( '/manager/api/dispatch/new-popup-data',        ['DispatchController', 'apiDispatchNewPopupData']);
+$router->post('/manager/api/dispatch/assign',                ['DispatchController', 'apiDispatchAssign']);
+$router->get( '/manager/api/dispatch/sr-details/{id}',       ['DispatchController', 'apiDispatchSrDetails']);
+$router->get( '/manager/api/dispatch/company-details/{id}',  ['DispatchController', 'apiDispatchCompanyDetails']);
+$router->get( '/manager/api/dispatch/organize-data/{id}',    ['DispatchController', 'apiDispatchOrganizeData']);
+$router->post('/manager/api/dispatch/organize-save/{id}',    ['DispatchController', 'apiDispatchOrganizeSave']);
+$router->post('/manager/api/dispatch/status-update/{id}',    ['DispatchController', 'apiDispatchStatusUpdate']);
+$router->post('/manager/api/dispatch/undo-dispatch/{id}',    ['DispatchController', 'apiDispatchUndoDispatch']);
+$router->get('/manager/api/dispatch/van-stock/{dsrId}',      ['DispatchController', 'apiDispatchVanStock']);
+$router->post('/manager/api/dispatch/return-save/{scheduleId}',   ['DispatchController', 'apiDispatchReturnSave']);
+$router->post('/manager/api/dispatch/undo-return/{scheduleId}',   ['DispatchController', 'apiDispatchUndoReturn']);
+$router->post('/manager/api/dispatch/update-product-qty/{scheduleId}', ['DispatchController', 'apiDispatchUpdateProductQty']);
+$router->post('/manager/api/dispatch/update-dsr',            ['DispatchController', 'apiDispatchUpdateDsr']);
+$router->post('/manager/api/dispatch/update-delivery-date',     ['DispatchController', 'apiDispatchUpdateDeliveryDate']);
+$router->post('/manager/api/dispatch/delete/{id}',            ['DispatchController', 'apiDispatchDelete']);
+$router->get( '/manager/settlements',               ['SettlementController', 'settlements']);
+$router->post('/manager/api/settlements/update/{id}',['SettlementController', 'apiSettlementUpdate']);
+$router->get( '/manager/attendance',                    ['AttendanceController', 'attendance']);
+$router->post('/manager/attendance/store',              ['AttendanceController', 'attendanceStore']);
+$router->get( '/manager/api/attendance/qr',             ['AttendanceController', 'apiAttendanceQrGet']);
+$router->post('/manager/api/attendance/qr/generate',    ['AttendanceController', 'apiAttendanceQrGenerate']);
+$router->get( '/manager/readysale',           ['ReportController', 'readysale']);
+$router->post('/manager/readysale/store',     ['ReportController', 'readysaleStore']);
 
 // Order Cutoff
-$router->get( '/manager/api/sr-cutoff-status',              ['ManagerController', 'apiSrCutoffStatus']);
-$router->post('/manager/api/order-cutoff/undo/{srId}',      ['ManagerController', 'apiUndoOrderCutoff']);
+$router->get( '/manager/api/sr-cutoff-status',              ['OperationsController', 'apiSrCutoffStatus']);
+$router->post('/manager/api/order-cutoff/undo/{srId}',      ['OperationsController', 'apiUndoOrderCutoff']);
 
 // Operations Panel
-$router->get( '/manager/operations',                          ['ManagerController', 'operations']);
-$router->get( '/manager/api/operations/orders',               ['ManagerController', 'apiOperationsOrders']);
-$router->get( '/manager/api/operations/deliveries',           ['ManagerController', 'apiOperationsDeliveries']);
-$router->get( '/manager/api/operations/dsr-deliveries',       ['ManagerController', 'apiOperationsDsrDeliveries']);
-$router->post('/manager/api/operations/dsr-delivery-action',  ['ManagerController', 'apiOperationsDsrDeliveryAction']);
-$router->post('/manager/api/operations/edit-order/{id}',      ['ManagerController', 'apiOperationsEditOrder']);
-$router->post('/manager/api/operations/bulk-change-order-date', ['ManagerController', 'apiOperationsBulkChangeOrderDate']);
-$router->post('/manager/api/operations/delete-order/{id}',    ['ManagerController', 'apiOperationsDeleteOrder']);
-$router->post('/manager/api/operations/edit-delivery/{id}',   ['ManagerController', 'apiOperationsEditDelivery']);
-$router->post('/manager/api/operations/place-order',          ['ManagerController', 'apiOperationsPlaceOrder']);
-$router->post('/manager/api/operations/make-delivery',        ['ManagerController', 'apiOperationsMakeDelivery']);
+$router->get( '/manager/operations',                          ['OperationsController', 'operations']);
+$router->get( '/manager/api/operations/orders',               ['OperationsController', 'apiOperationsOrders']);
+$router->get( '/manager/api/operations/deliveries',           ['OperationsController', 'apiOperationsDeliveries']);
+$router->get( '/manager/api/operations/dsr-deliveries',       ['OperationsController', 'apiOperationsDsrDeliveries']);
+$router->post('/manager/api/operations/dsr-delivery-action',  ['OperationsController', 'apiOperationsDsrDeliveryAction']);
+$router->post('/manager/api/operations/edit-order/{id}',      ['OperationsController', 'apiOperationsEditOrder']);
+$router->post('/manager/api/operations/bulk-change-order-date', ['OperationsController', 'apiOperationsBulkChangeOrderDate']);
+$router->post('/manager/api/operations/delete-order/{id}',    ['OperationsController', 'apiOperationsDeleteOrder']);
+$router->post('/manager/api/operations/edit-delivery/{id}',   ['OperationsController', 'apiOperationsEditDelivery']);
+$router->post('/manager/api/operations/place-order',          ['OperationsController', 'apiOperationsPlaceOrder']);
+$router->post('/manager/api/operations/make-delivery',        ['OperationsController', 'apiOperationsMakeDelivery']);
 
 // ── SR routes ─────────────────────────────────────────────────
 $router->get( '/sr/dashboard',                ['SRController', 'dashboard']);

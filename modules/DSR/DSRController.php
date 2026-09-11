@@ -14,7 +14,6 @@ class DSRController extends Controller
         RoleMiddleware::check([ROLE_ADMIN, ROLE_MANAGER, ROLE_DSR]);
         $this->viewPath = MOD_PATH . '/DSR/views';
         $this->db = Database::getInstance();
-        $this->db = Database::getInstance();
     }
 
     public function qrCode(): void
