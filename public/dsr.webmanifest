@@ -1,0 +1,54 @@
+{
+  "name": "HappyBangladesh DSR",
+  "short_name": "DSR App",
+  "description": "HappyBangladesh DMS — Delivery Sales Representative Panel",
+  "start_url": "./dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1e40af",
+  "background_color": "#1e40af",
+  "lang": "bn",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "assets/images/icons/dsr/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icons/dsr/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/images/icons/dsr/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/images/icons/dsr/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "ডেলিভারি রুট",
+      "short_name": "ডেলিভারি",
+      "url": "./delivery",
+      "icons": [{ "src": "assets/images/icons/dsr/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "ড্যাশবোর্ড",
+      "short_name": "হোম",
+      "url": "./dashboard",
+      "icons": [{ "src": "assets/images/icons/dsr/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
