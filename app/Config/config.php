@@ -35,44 +35,21 @@ if ($isLocalhost) {
     define('BASE_URL', $protocol . $host . $basePath);
 }
 
+// ─── Environment Loading ────────────────────────────────────────────────────────
+require_once __DIR__ . '/env.php';
+
 // ─── Application ──────────────────────────────────────────────────────────────
 define('APP_NAME', 'HappyBangladesh DMS');
 define('APP_VERSION', '1.0.0');
-define('APP_ENV', $isLocalhost ? 'development' : 'production');
-define('DEBUG_MODE', $isLocalhost);  // true locally, false on live
+define('APP_ENV', env('APP_ENV', 'development'));
+define('DEBUG_MODE', env('APP_ENV', 'production') !== 'production');
 
 // ─── Database ─────────────────────────────────────────────────────────────────
-if ($isLocalhost) {
-    define('DB_HOST', 'localhost');
-    define('DB_PORT', '3306');
-    define('DB_NAME', 'happybangladesh_dms');
-    define('DB_USER', 'root');
-    define('DB_PASS', '');
-} elseif ($isMainDomain) {
-    define('DB_HOST', 'localhost');
-    define('DB_PORT', '3306');
-    define('DB_NAME', 'happybd');
-    define('DB_USER', 'happybd');
-    define('DB_PASS', '9pH{53ff.uB5Qehh');
-} elseif ($isDraft) {
-    define('DB_HOST', 'localhost');
-    define('DB_PORT', '3306');
-    define('DB_NAME', 'happybddraft');
-    define('DB_USER', 'happybddraft');
-    define('DB_PASS', '9pH{53ff.uB5Qehh');
-} elseif ($isv1) {
-    define('DB_HOST', 'localhost');
-    define('DB_PORT', '3306');
-    define('DB_NAME', 'happybangladeshV1');
-    define('DB_USER', 'happybangladeshV1');
-    define('DB_PASS', 'OaSaTHTEbWrt5I607RTo');
-} else {
-    define('DB_HOST', 'localhost');
-    define('DB_PORT', '3306');
-    define('DB_NAME', 'rasedwwq_happybd');
-    define('DB_USER', 'rasedwwq_happybd');
-    define('DB_PASS', '9pH{53ff.uB5Qehh');
-}
+define('DB_HOST', env('DB_HOST', 'localhost'));
+define('DB_PORT', env('DB_PORT', '3306'));
+define('DB_NAME', env('DB_NAME', 'happybangladesh_dms'));
+define('DB_USER', env('DB_USER', 'root'));
+define('DB_PASS', env('DB_PASS', ''));
 define('DB_CHARSET', 'utf8mb4');
 
 // ─── Session ──────────────────────────────────────────────────────────────────

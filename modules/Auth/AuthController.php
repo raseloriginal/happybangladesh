@@ -66,7 +66,17 @@ class AuthController extends Controller
         $identity = trim($this->post('email', ''));
         $password = $this->post('password', '');
 
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $rateLimitKey = "login:{$role}:{$ip}";
+
+        if (RateLimiter::tooManyAttempts($rateLimitKey)) {
+            $this->flash('error', 'Too many failed login attempts. Please try again in 5 minutes.');
+            $this->redirect($loginUrl);
+            return;
+        }
+
         if (empty($identity) || empty($password)) {
+            RateLimiter::hit($rateLimitKey);
             $this->flash('error', 'Email/Phone and password are required.');
             $this->redirect($loginUrl);
             return;
@@ -84,10 +94,14 @@ class AuthController extends Controller
         $user = $stmt->fetch();
 
         if (!$user || !password_verify($password, $user['password'])) {
-            $this->flash('error', 'Invalid credentials.');
+            RateLimiter::hit($rateLimitKey);
+            $left = RateLimiter::retriesLeft($rateLimitKey);
+            $this->flash('error', "Invalid credentials. {$left} attempts remaining.");
             $this->redirect($loginUrl);
             return;
         }
+
+        RateLimiter::clear($rateLimitKey);
 
         if ($user['role_slug'] !== $role) {
             $this->flash('error', "This portal is only for {$role}s. Please use the correct portal.");

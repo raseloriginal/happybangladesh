@@ -2793,7 +2793,7 @@ class ManagerController extends Controller
                 CURLOPT_TIMEOUT => 25,
                 CURLOPT_CONNECTTIMEOUT => 10,
                 CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_HTTPHEADER => [
                     'Accept: image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
