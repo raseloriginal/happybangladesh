@@ -10,3 +10,10 @@ logs/*.log
 # Node & Tailwind
 node_modules/
 package-lock.json
+
+# Environment & Secrets
+.env
+
+# Database Dumps
+happybangladesh_dms.sql
+*.sql.gz
