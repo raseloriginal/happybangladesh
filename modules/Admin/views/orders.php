@@ -552,9 +552,9 @@
   function initMap() {
     // Default center: Dhaka Bangladesh
     leafletMap = L.map('leafletMap').setView([23.8103, 90.4125], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors'
+    L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      attribution: '© Google Maps'
     }).addTo(leafletMap);
   }
 
