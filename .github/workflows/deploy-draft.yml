@@ -17,7 +17,15 @@ jobs:
     - name: Deploy via SSH Git Pull
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.DRAFT_SERVER_USERNAME }}@${{ secrets.DRAFT_SERVER_HOST }} << 'EOF'
+          set -e # Stop script immediately if any command fails!
+          
           cd /home/happybangladesh-test/htdocs/test.happybangladesh.site
+          
+          # Initialize git if it doesn't exist yet
+          if [ ! -d ".git" ]; then
+            git init
+            git remote add origin https://github.com/raseloriginal/happybangladesh.git
+          fi
           
           # Trust the directory for git commands
           git config --global --add safe.directory /home/happybangladesh-test/htdocs/test.happybangladesh.site
