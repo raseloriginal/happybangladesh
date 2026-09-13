@@ -9,14 +9,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Deploy via SSH Git Pull
-      uses: appleboy/ssh-action@v1.0.3
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.9.0
       with:
-        host: ${{ secrets.DRAFT_SERVER_HOST }}
-        username: ${{ secrets.DRAFT_SERVER_USERNAME }}
-        key: ${{ secrets.DRAFT_SSH_PRIVATE_KEY }}
-        port: 22
-        script: |
+        ssh-private-key: ${{ secrets.DRAFT_SSH_PRIVATE_KEY }}
+        
+    - name: Deploy via SSH Git Pull
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.DRAFT_SERVER_USERNAME }}@${{ secrets.DRAFT_SERVER_HOST }} << 'EOF'
           cd /home/happybangladesh-test/htdocs/test.happybangladesh.site
           
           # Trust the directory for git commands
@@ -35,4 +35,4 @@ jobs:
           chmod -R 755 public 2>/dev/null || true
           
           echo "Draft Deploy OK at $(date)"
-
+        EOF
