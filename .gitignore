@@ -17,3 +17,13 @@ package-lock.json
 # Database Dumps
 happybangladesh_dms.sql
 *.sql.gz
+
+# IDE and OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vendor dependencies (if added later)
+vendor/
+
