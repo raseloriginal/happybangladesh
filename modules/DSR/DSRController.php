@@ -1119,9 +1119,10 @@ class DSRController extends Controller
         $date = $this->post('settlement_date', date('Y-m-d'));
 
         // Validate that settlement is not already submitted
-        $check = $this->db->prepare("SELECT id FROM settlements WHERE dsr_id=? AND date=?");
+        $check = $this->db->prepare("SELECT id, status FROM settlements WHERE dsr_id=? AND date=?");
         $check->execute([$dsrId, $date]);
-        if ($check->fetch()) {
+        $existing = $check->fetch();
+        if ($existing && $existing['status'] !== 'rejected') {
             $this->flash('error', 'এই দিনের সেটেলমেন্ট ইতিমধ্যেই জমা দেওয়া হয়েছে।');
             $this->redirect('dsr/settlement?date=' . $date);
             return;
@@ -1234,10 +1235,18 @@ class DSRController extends Controller
         $cashBreakdown['note'] = trim($this->post('note', ''));
         $cashBreakdownStr = json_encode($cashBreakdown);
 
-        $this->db->prepare("
-            INSERT INTO settlements (dsr_id, date, total_dispatched, total_returned, total_damage, total_expense, delivery_oc, should_pay, counted_cash, difference, cash_breakdown)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ")->execute([$dsrId, $date, $dispatched, $returned, $damage, $expense, $deliveryOc, $shouldPay, $countedCash, $difference, $cashBreakdownStr]);
+        if ($existing && $existing['status'] === 'rejected') {
+            $this->db->prepare("
+                UPDATE settlements 
+                SET total_dispatched=?, total_returned=?, total_damage=?, total_expense=?, delivery_oc=?, should_pay=?, counted_cash=?, difference=?, cash_breakdown=?, status='pending'
+                WHERE id=?
+            ")->execute([$dispatched, $returned, $damage, $expense, $deliveryOc, $shouldPay, $countedCash, $difference, $cashBreakdownStr, $existing['id']]);
+        } else {
+            $this->db->prepare("
+                INSERT INTO settlements (dsr_id, date, total_dispatched, total_returned, total_damage, total_expense, delivery_oc, should_pay, counted_cash, difference, cash_breakdown)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ")->execute([$dsrId, $date, $dispatched, $returned, $damage, $expense, $deliveryOc, $shouldPay, $countedCash, $difference, $cashBreakdownStr]);
+        }
 
         $this->flash('success', 'Settlement submitted for Manager approval.');
         $this->redirect('dsr/dashboard');
