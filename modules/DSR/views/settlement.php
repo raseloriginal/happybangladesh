@@ -1,13 +1,16 @@
 <?php 
 $pageTitle = 'Daily Settlement'; 
-$isSubmitted = !empty($existingSettlement);
-$savedDamage = $isSubmitted ? $existingSettlement['total_damage'] : $totalDamage;
-$savedExpense = $isSubmitted ? $existingSettlement['total_expense'] : $totalExpense;
-$savedDeliveryOc = $isSubmitted ? $existingSettlement['delivery_oc'] : $deliveryOc;
-$cashBreakdown = $isSubmitted && !empty($existingSettlement['cash_breakdown']) ? json_decode($existingSettlement['cash_breakdown'], true) : [];
+$hasSettlement = !empty($existingSettlement);
+$isRejected = $hasSettlement && $existingSettlement['status'] === 'rejected';
+$isSubmitted = $hasSettlement && !$isRejected;
+
+$savedDamage = $hasSettlement ? $existingSettlement['total_damage'] : $totalDamage;
+$savedExpense = $hasSettlement ? $existingSettlement['total_expense'] : $totalExpense;
+$savedDeliveryOc = $hasSettlement ? $existingSettlement['delivery_oc'] : $deliveryOc;
+$cashBreakdown = $hasSettlement && !empty($existingSettlement['cash_breakdown']) ? json_decode($existingSettlement['cash_breakdown'], true) : [];
 $savedNote = $cashBreakdown['note'] ?? '';
 
-if ($isSubmitted) {
+if ($hasSettlement) {
     $dispatchedValue = $existingSettlement['total_dispatched'];
     $returnedValue = $existingSettlement['total_returned'];
 }
