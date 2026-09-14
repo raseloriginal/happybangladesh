@@ -559,11 +559,45 @@ function switchOperationsTab(tabName) {
 
 function initDsrMapIfNeeded() {
     if (!dsrMapInstance && typeof L !== 'undefined') {
-        dsrMapInstance = L.map('dsrLeafletMap').setView([23.8103, 90.4125], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(dsrMapInstance);
+        var googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+            maxZoom: 20,
+            subdomains:['mt0','mt1','mt2','mt3'],
+            attribution: '© Google Maps'
+        });
+        
+        var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+            maxZoom: 20,
+            subdomains:['mt0','mt1','mt2','mt3'],
+            attribution: '© Google Maps'
+        });
+        
+        var googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+            maxZoom: 20,
+            subdomains:['mt0','mt1','mt2','mt3'],
+            attribution: '© Google Maps'
+        });
+        
+        var googleTerrain = L.tileLayer('http://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+            maxZoom: 20,
+            subdomains:['mt0','mt1','mt2','mt3'],
+            attribution: '© Google Maps'
+        });
+
+        dsrMapInstance = L.map('dsrLeafletMap', {
+            center: [23.8103, 90.4125],
+            zoom: 12,
+            layers: [googleHybrid] // Default layer
+        });
+
+        var baseMaps = {
+            "Google Hybrid": googleHybrid,
+            "Google Streets": googleStreets,
+            "Google Satellite": googleSat,
+            "Google Terrain": googleTerrain
+        };
+
+        L.control.layers(baseMaps).addTo(dsrMapInstance);
+        
         dsrMarkersGroup = L.layerGroup().addTo(dsrMapInstance);
     }
     if (dsrMapInstance) {
