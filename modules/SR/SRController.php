@@ -955,6 +955,80 @@ class SRController extends Controller
         }
     }
 
+    // ── Delete Order by SR ──────────────────────────────────
+    public function deleteOrder(): void
+    {
+        $orderId = intval($this->post('order_id') ?: 0);
+
+        if ($orderId <= 0) {
+            $this->json(['success' => false, 'message' => 'অর্ডার আইডি পাওয়া যায়নি।']);
+            return;
+        }
+
+        // Verify order exists and belongs to this SR
+        $stmt = $this->db->prepare("SELECT * FROM orders WHERE id = ? AND sr_id = ?");
+        $stmt->execute([$orderId, Auth::id()]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$order) {
+            $this->json(['success' => false, 'message' => 'অর্ডারটি পাওয়া যায়নি বা আপনার এটি মোছার অনুমতি নেই।']);
+            return;
+        }
+
+        // Check status - do not allow deleting if already delivered or dispatched
+        if (in_array($order['status'] ?? '', ['delivered', 'dispatched'])) {
+            $this->json(['success' => false, 'message' => 'ডেলিভারি সম্পন্ন বা ডিসপ্যাচ হওয়া অর্ডার মুছে ফেলা সম্ভব নয়।']);
+            return;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            // Archive order for audit trail if table exists
+            try {
+                $itemsStmt = $this->db->prepare("SELECT * FROM order_items WHERE order_id = ?");
+                $itemsStmt->execute([$orderId]);
+                $oldItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                $this->db->prepare("
+                    INSERT INTO order_archive (original_order_id, sr_id, retailer_id, order_data, items_data, reason)
+                    VALUES (?, ?, ?, ?, ?, 'deleted_by_sr')
+                ")->execute([$orderId, Auth::id(), $order['retailer_id'] ?? null, json_encode($order), json_encode($oldItems)]);
+            } catch (\Exception $archEx) {
+                // Non-critical if table does not exist
+            }
+
+            // Delete order items
+            $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$orderId]);
+
+            // Delete order
+            $this->db->prepare("DELETE FROM orders WHERE id = ?")->execute([$orderId]);
+
+            // Check if retailer had any other order today to update sr_visits
+            if (!empty($order['retailer_id'])) {
+                try {
+                    $chkOther = $this->db->prepare("SELECT COUNT(*) FROM orders WHERE retailer_id = ? AND sr_id = ? AND DATE(created_at) = CURDATE()");
+                    $chkOther->execute([$order['retailer_id'], Auth::id()]);
+                    if ((int)$chkOther->fetchColumn() === 0) {
+                        $this->db->prepare("UPDATE sr_visits SET had_order = 0 WHERE sr_id = ? AND retailer_id = ? AND DATE(visited_at) = CURDATE()")->execute([Auth::id(), $order['retailer_id']]);
+                    }
+                } catch (\Exception $e) {}
+            }
+
+            $this->db->commit();
+
+            $this->json([
+                'success' => true,
+                'message' => "অর্ডার #$orderId সফলভাবে মুছে ফেলা হয়েছে।"
+            ]);
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->json(['success' => false, 'message' => 'অর্ডার মুছতে সমস্যা হয়েছে: ' . $e->getMessage()]);
+        }
+    }
+
     // ── Set Order Cutoff ─────────────────────────────────────
     /**
      * POST /sr/api/order-cutoff
