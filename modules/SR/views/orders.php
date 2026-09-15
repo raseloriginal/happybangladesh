@@ -37,8 +37,8 @@ $truncateName = function($name) {
 
 <div class="p-3 sm:p-5 space-y-4 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none print:bg-white">
 
-  <!-- Toast Notification Container -->
-  <div id="toastContainer" class="fixed top-5 right-5 z-[100000] space-y-2 pointer-events-none"></div>
+  <!-- Toast Notification Container (Over everything, top-left) -->
+  <div id="toastContainer" class="fixed top-5 left-5 space-y-2 pointer-events-none" style="z-index: 999999 !important;"></div>
 
   <!-- Premium Minimal Header Card -->
   <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
@@ -163,10 +163,19 @@ $truncateName = function($name) {
               <!-- Action Column (Invoice View) -->
               <td class="p-3 text-center align-middle bg-white" id="order-actions-cell-<?= $ord['id'] ?>">
                 <div class="flex items-center justify-center gap-1.5">
+                  <!-- Edit Button -->
+                  <button type="button" 
+                          id="btn-edit-order-<?= $ord['id'] ?>"
+                          onclick='openEditOrderModal(ORDERS_MAP[<?= $ord['id'] ?>])'
+                          class="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-600 hover:text-white transition duration-200 flex items-center justify-center shadow-3xs active:scale-95"
+                          title="অর্ডার এডিট করুন">
+                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                  </button>
+
                   <!-- Invoice Button -->
                   <button type="button" 
                           id="btn-invoice-order-<?= $ord['id'] ?>"
-                          onclick='openInvoiceModal(<?= htmlspecialchars(json_encode($ord), ENT_QUOTES, "UTF-8") ?>)'
+                          onclick='openInvoiceModal(ORDERS_MAP[<?= $ord['id'] ?>])'
                           class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white transition duration-200 flex items-center justify-center shadow-3xs active:scale-95"
                           title="ইনভয়েস দেখুন">
                     <i class="fa-solid fa-file-invoice text-xs"></i>
@@ -203,106 +212,180 @@ $truncateName = function($name) {
 </div>
 
 <!-- ========================================================================= -->
-<!-- ULTRA-PREMIUM SLIDE-UP EDIT DRAWER FOR MOBILE (SAME LINE DOR & QTY)        -->
 <!-- ========================================================================= -->
-<div id="editOrderModal" class="fixed inset-0 hidden opacity-0 transition-opacity duration-300 pointer-events-none" style="z-index: 99999 !important;">
+<!-- EDIT ORDER POPUP MODAL                                                    -->
+<!-- ========================================================================= -->
+<div id="editOrderModal" class="fixed inset-0 hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-3 sm:p-4 overflow-y-auto pointer-events-none" style="z-index: 99990 !important;">
   
   <!-- Backdrop Overlay -->
-  <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300 pointer-events-auto" onclick="closeEditOrderModal()"></div>
+  <div class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-200 pointer-events-auto" onclick="closeEditOrderModal()"></div>
 
-  <!-- Bottom Sheet Drawer Container -->
-  <div id="editOrderSheetContent" class="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-slate-50 rounded-t-3xl sm:rounded-3xl sm:mb-4 shadow-2xl transform translate-y-full transition-transform duration-300 ease-out border border-slate-200/90 max-h-[90vh] flex flex-col font-siliguri overflow-hidden text-slate-800 pointer-events-auto" style="padding-bottom: max(10px, env(safe-area-inset-bottom));">
+  <!-- Modal Dialog Container -->
+  <div id="editOrderModalContent" class="relative bg-white w-full max-w-2xl rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4 transform scale-95 transition-transform duration-200 border border-slate-200 my-auto text-slate-800 font-siliguri pointer-events-auto z-10 max-h-[92vh] flex flex-col">
     
-    <!-- Drag Handle -->
-    <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto my-2 shrink-0 cursor-pointer" onclick="closeEditOrderModal()"></div>
-
-    <!-- Header: Premium Dark Bar -->
-    <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between shrink-0 shadow-md">
-      <div class="flex items-center gap-3 min-w-0">
-        <div class="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-400 flex items-center justify-center shrink-0">
-          <i class="fa-solid fa-cart-shopping text-sm"></i>
-        </div>
-        <div class="min-w-0">
-          <h3 class="font-extrabold text-white text-sm sm:text-base leading-snug truncate" id="editModalRetailerName">
-            মিষ্টি ভ্যারাইটিজ স্টোর
+    <!-- Modal Header -->
+    <div class="flex items-start justify-between border-b border-slate-100 pb-3 shrink-0">
+      <div class="min-w-0 pr-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h3 class="font-extrabold text-slate-900 text-base sm:text-lg leading-tight truncate" id="editModalRetailerName">
+            দোকানের নাম
           </h3>
-          <span class="inline-block text-[10px] font-mono font-bold text-slate-300 bg-white/10 px-2 py-0.5 rounded-full mt-0.5" id="editModalOrderBadge">
+          <span class="inline-block text-[11px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full" id="editModalOrderBadge">
             #ORD-0000
           </span>
         </div>
+        <div class="text-[11px] text-slate-400 font-medium mt-1 flex items-center gap-2">
+          <span><i class="fa-solid fa-store text-[10px] text-slate-300 mr-1"></i>অর্ডার সম্পাদনা</span>
+          <span class="text-slate-300">•</span>
+          <span id="editModalOrderDate" class="font-mono text-slate-500"></span>
+        </div>
       </div>
 
-      <button type="button" onclick="closeEditOrderModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition flex items-center justify-center active:scale-95 shrink-0">
+      <button type="button" onclick="closeEditOrderModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition flex items-center justify-center active:scale-95 shrink-0" title="বন্ধ করুন">
         <i class="fa-solid fa-xmark text-sm"></i>
       </button>
     </div>
 
-    <!-- Scrollable Items Area (Card List Layout) -->
-    <div class="flex-1 overflow-y-auto p-3 space-y-3">
+    <!-- Scrollable Items Area: Table -->
+    <div class="flex-1 overflow-y-auto space-y-3 pr-0.5">
       
-      <!-- Container for Product Cards -->
-      <div id="editOrderItemsContainer" class="space-y-2.5">
-        <!-- Populated dynamically via JS -->
+      <!-- Interactive Table -->
+      <div class="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-3xs">
+        <table class="w-full text-left border-collapse text-xs font-sans">
+          <thead>
+            <tr class="bg-slate-50/90 border-b border-slate-200 font-siliguri text-slate-700 font-bold">
+              <th class="p-2.5 min-w-[140px] text-left">পণ্যের নাম</th>
+              <th class="p-2.5 text-center w-[85px] sm:w-[100px]">পরিমাণ (Qty)</th>
+              <th class="p-2.5 text-right w-[95px] sm:w-[110px]">দর / রেট</th>
+              <th class="p-2.5 text-right w-[100px] sm:w-[120px]">মোট টাকা</th>
+              <th class="p-2.5 text-center w-[36px]"></th>
+            </tr>
+          </thead>
+          <tbody id="editOrderTableBody" class="divide-y divide-slate-100 font-sans">
+            <!-- Populated dynamically via JS -->
+          </tbody>
+          <tfoot>
+            <tr class="bg-slate-50 font-bold text-slate-800 border-t border-slate-200 text-xs">
+              <td class="p-2.5 font-siliguri text-slate-600">সর্বমোট (Subtotal):</td>
+              <td class="p-2.5 text-center font-mono font-bold text-slate-800" id="editModalTotalQty">0</td>
+              <td class="p-2.5 text-right">
+                <span id="editModalOCBadge" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black font-mono bg-emerald-100 text-emerald-800">
+                  O/C ৳0.00
+                </span>
+              </td>
+              <td class="p-2.5 text-right font-mono font-black text-slate-950 text-xs sm:text-sm" id="editModalSubtotal">৳ 0.00</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
-      <!-- Add Product Section -->
-      <div class="pt-1">
-        <div id="addProductSelectorArea" class="hidden space-y-2.5 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
-          <div class="flex items-center justify-between text-xs font-bold text-slate-800">
-            <span>নতুন পণ্য নির্বাচন করুন:</span>
-            <button type="button" onclick="toggleAddProductDropdown()" class="text-slate-400 hover:text-slate-600 text-xs">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-          <div class="flex items-center gap-2">
-            <select id="editAddProductSelect" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500">
-              <option value="">-- পণ্য সিলেক্ট করুন --</option>
-            </select>
-            <button type="button" onclick="confirmAddProduct()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shrink-0 transition active:scale-95 shadow-2xs">
-              যোগ করুন
-            </button>
-          </div>
-        </div>
-
-        <button type="button" id="btnAddProductToggle" onclick="toggleAddProductDropdown()" class="w-full py-2.5 px-3 bg-white border border-dashed border-slate-300 hover:border-blue-500 rounded-2xl text-xs font-bold text-slate-700 hover:text-blue-600 hover:bg-blue-50/50 transition flex items-center justify-center gap-2 shadow-2xs active:scale-98">
-          <i class="fa-solid fa-circle-plus text-sm text-blue-500"></i>
-          <span>নতুন পণ্য যোগ করুন</span>
+      <!-- Add New Product Button (Triggers Product Picker Modal) -->
+      <div>
+        <button type="button" onclick="openProductPickerModal()" class="w-full py-2.5 px-3 bg-blue-50/70 hover:bg-blue-100/70 border border-dashed border-blue-300 hover:border-blue-400 rounded-xl text-xs font-bold text-blue-700 transition flex items-center justify-center gap-2 shadow-3xs active:scale-98">
+          <i class="fa-solid fa-circle-plus text-sm text-blue-600"></i>
+          <span>নতুন পণ্য যোগ করুন (Select Product)</span>
         </button>
       </div>
 
     </div>
 
-    <!-- Bottom Red Summary Action Box (High-Contrast & Crystal Clear Button) -->
-    <div class="p-3 sm:p-4 bg-white border-t border-slate-200 shrink-0">
-      <div class="rounded-2xl border-2 border-rose-500 bg-gradient-to-r from-rose-50/80 to-rose-100/40 p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-md">
-        
-        <!-- Left: O/C badge and Subtotal -->
-        <div class="space-y-1 min-w-0">
-          <div class="flex items-center gap-1.5">
-            <span id="editModalOCBadge" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black bg-emerald-100 text-emerald-800 shadow-2xs">
-              O/C +0
-            </span>
-          </div>
-          <div class="text-sm sm:text-base font-black text-slate-950 font-sans tracking-tight leading-tight">
-            Subtotal: <span class="font-mono text-slate-900" id="editModalSubtotal">Tk 0.00</span>
-          </div>
-        </div>
-
-        <!-- Right: Vibrant Red Gradient Confirm Button (High Contrast White Text) -->
-        <button type="button" 
-                id="btnConfirmOrderEdit" 
-                onclick="submitOrderEdit()" 
-                class="px-5 py-3 rounded-full shadow-lg shadow-rose-500/30 transition-all duration-200 flex items-center gap-2 shrink-0 font-extrabold text-xs sm:text-sm active:scale-95"
-                style="background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%) !important; color: #ffffff !important;">
-          <span id="btnConfirmText" style="color: #ffffff !important;">অর্ডার কনফার্ম করুন</span>
-          <i id="btnConfirmIcon" class="fa-solid fa-arrow-right text-xs text-white"></i>
-          <svg id="btnConfirmSpinner" class="hidden animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-          </svg>
+    <!-- Bottom Actions Area -->
+    <div class="pt-3 border-t border-slate-100 shrink-0">
+      
+      <!-- Default Actions: Delete on Left, Cancel & Save on Right -->
+      <div id="editModalDefaultActions" class="flex items-center justify-between gap-2">
+        <button type="button" id="btnTriggerDelete" onclick="startDeleteCountdown()" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 active:scale-95 border border-rose-200 text-rose-600 font-bold rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition shadow-3xs" title="অর্ডার ডিলিট করুন">
+          <i class="fa-solid fa-trash-can text-xs"></i>
+          <span>ডিলিট (Delete)</span>
         </button>
 
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeEditOrderModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-600 rounded-xl text-xs sm:text-sm font-bold transition">
+            বাতিল
+          </button>
+          <button type="button" id="btnConfirmOrderEdit" onclick="submitOrderEdit()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-sm transition">
+            <i id="btnConfirmIcon" class="fa-solid fa-floppy-disk text-xs"></i>
+            <span id="btnConfirmText">সংরক্ষণ করুন (Save)</span>
+            <svg id="btnConfirmSpinner" class="hidden animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+          </button>
+        </div>
       </div>
+
+      <!-- 10-Second Countdown Delete Confirmation Area (Initially Hidden) -->
+      <div id="editModalDeleteCountdownArea" class="hidden bg-gradient-to-r from-rose-50 to-rose-100/50 border border-rose-200 rounded-2xl p-3 sm:p-3.5 space-y-2.5">
+        <div class="flex items-center gap-2 text-xs font-bold text-rose-800">
+          <i class="fa-solid fa-triangle-exclamation text-rose-600 text-sm animate-pulse"></i>
+          <span>সতর্কতা: অর্ডারটি স্থায়ীভাবে মুছে যাবে! নিশ্চিত করতে ১০ সেকেন্ড অপেক্ষা করুন।</span>
+        </div>
+        <div class="flex items-center justify-between gap-2 pt-1">
+          <button type="button" id="btnCancelDelete" onclick="cancelDeleteCountdown()" class="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs sm:text-sm transition active:scale-95 shadow-3xs flex items-center gap-1.5">
+            <i class="fa-solid fa-xmark text-xs"></i>
+            <span>বাতিল করুন</span>
+          </button>
+
+          <button type="button" id="btnConfirmDeleteOrder" onclick="executeOrderDelete()" disabled class="px-5 py-2 bg-rose-200 text-rose-400 cursor-not-allowed opacity-80 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition duration-200">
+            <i class="fa-solid fa-clock text-xs" id="deleteTimerIcon"></i>
+            <span id="deleteTimerBtnText">ডিলিট নিশ্চিত করুন (10s)</span>
+            <svg id="deleteTimerSpinner" class="hidden animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- PRODUCT PICKER BOX MODAL (ASSIGNED COMPANY PRODUCTS ONLY)                 -->
+<!-- ========================================================================= -->
+<div id="productPickerModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-3 sm:p-4 overflow-y-auto pointer-events-none" style="z-index: 99995 !important;">
+  
+  <div id="productPickerModalContent" class="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 my-auto text-slate-800 font-siliguri pointer-events-auto transform scale-95 transition-transform duration-200 max-h-[85vh] flex flex-col overflow-hidden">
+    
+    <!-- Header -->
+    <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between shrink-0">
+      <div>
+        <h4 class="font-extrabold text-white text-sm sm:text-base leading-tight">
+          পণ্য নির্বাচন করুন (Select Product)
+        </h4>
+        <div class="text-[10px] text-slate-300 mt-0.5">
+          শুধুমাত্র আপনার নির্ধারিত কোম্পানির পণ্যসমূহ
+        </div>
+      </div>
+      <button type="button" onclick="closeProductPickerModal()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition flex items-center justify-center active:scale-95">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+
+    <!-- Search Input -->
+    <div class="p-3 bg-slate-50 border-b border-slate-200 shrink-0">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" id="productPickerSearchInput" oninput="filterProductPicker(this.value)" placeholder="পণ্য বা কোম্পানির নাম দিয়ে খুঁজুন..." class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:border-blue-500 focus:outline-none shadow-3xs">
+      </div>
+    </div>
+
+    <!-- Product Grid Container (Box Model) -->
+    <div class="p-3 flex-1 overflow-y-auto">
+      <div id="productPickerGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end shrink-0">
+      <button type="button" onclick="closeProductPickerModal()" class="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 transition active:scale-95 shadow-3xs">
+        বন্ধ করুন
+      </button>
     </div>
 
   </div>
@@ -492,28 +575,68 @@ function formatDateTime12Hr(dateStr) {
   return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
 }
 
-// ── Toast Notification Helper ────────────────────────────────────────────────
+// ── Toast Notification Helper (Slide from Left, Stacks over Everything) ─────
 function showToast(message, type = 'success') {
-  const container = document.getElementById('toastContainer');
+  let container = document.getElementById('toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    document.body.appendChild(container);
+  } else if (container.parentElement !== document.body) {
+    document.body.appendChild(container);
+  }
+  container.className = 'fixed top-4 left-4 space-y-2 pointer-events-none flex flex-col items-start';
+  container.style.cssText = 'position: fixed !important; top: 1rem !important; left: 1rem !important; z-index: 999999 !important; max-width: calc(100vw - 2rem); pointer-events: none;';
+
   const toast = document.createElement('div');
-  const bgClass = type === 'success' ? 'bg-slate-900 text-white' : 'bg-rose-600 text-white';
-  const icon = type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-200';
-  
-  toast.className = `${bgClass} px-4 py-3 rounded-2xl shadow-xl border border-white/10 text-xs font-bold flex items-center gap-2.5 pointer-events-auto transform translate-y-2 opacity-0 transition-all duration-300`;
-  toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i><span>${message}</span>`;
+  const isSuccess = type === 'success';
+  const bg = isSuccess ? '#0f172a' : '#e11d48'; // slate-900 or rose-600
+  const icon = isSuccess ? 'fa-circle-check' : 'fa-circle-exclamation';
+  const iconColor = isSuccess ? '#34d399' : '#fecdd3';
+
+  toast.className = 'pointer-events-auto flex items-center gap-2.5 font-siliguri font-bold text-xs text-white';
+  toast.style.cssText = `
+    background: ${bg};
+    color: #ffffff;
+    padding: 10px 18px;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.45), 0 4px 10px -2px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    pointer-events: auto;
+    max-width: 90vw;
+    word-break: break-word;
+    transform: translateX(-120%);
+    opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+    z-index: 999999;
+  `;
+
+  toast.innerHTML = `<i class="fa-solid ${icon}" style="color: ${iconColor}; font-size: 15px; flex-shrink: 0;"></i><span>${message}</span>`;
   container.appendChild(toast);
 
+  // Force reflow and slide in smoothly from left
+  void toast.offsetWidth;
   setTimeout(() => {
-    toast.classList.remove('translate-y-2', 'opacity-0');
-  }, 10);
+    toast.style.transform = 'translateX(0)';
+    toast.style.opacity = '1';
+  }, 20);
 
+  // Auto dismiss: slide out to left after 1 second then remove
   setTimeout(() => {
-    toast.classList.add('opacity-0', '-translate-y-2');
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
+    toast.style.transform = 'translateX(-120%)';
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      toast.remove();
+    }, 350);
+  }, 1000);
 }
 
-// ── Open Edit Order Bottom Sheet Modal ───────────────────────────────────────
+// ── Open Edit Order Popup Modal ──────────────────────────────────────────────
 function openEditOrderModal(orderData) {
   const orderId = orderData.id;
   const order = ORDERS_MAP[orderId] || orderData;
@@ -521,16 +644,22 @@ function openEditOrderModal(orderData) {
   const retailerName = order.retailer_name || order.dealer_name || 'সাধারণ কাস্টমার';
   document.getElementById('editModalRetailerName').innerText = retailerName;
   document.getElementById('editModalOrderBadge').innerText = `#ORD-${order.id}`;
+  const dateEl = document.getElementById('editModalOrderDate');
+  if (dateEl) {
+    dateEl.innerText = formatDateTime12Hr(order.created_at || '');
+  }
+
+  // Cancel any active delete countdown
+  cancelDeleteCountdown();
 
   // Build mutable editing state
   editingOrder = {
     id: order.id,
     retailer_name: retailerName,
+    created_at: order.created_at,
     items: (order.products || []).map(p => {
       const ppb = parseInt(p.pieces_per_box || 1) || 1;
       const totalQty = parseInt(p.quantity || 0);
-      const boxes = ppb > 1 ? Math.floor(totalQty / ppb) : 0;
-      const pcs = ppb > 1 ? (totalQty % ppb) : totalQty;
       const unitPrice = parseFloat(p.unit_price || 0);
       const basePrice = parseFloat(p.base_price || 0);
 
@@ -542,8 +671,6 @@ function openEditOrderModal(orderData) {
         box_type: p.box_type || 'কার্টন',
         base_price: basePrice,
         unit_price: unitPrice,
-        boxes: boxes,
-        pcs: pcs,
         total_qty: totalQty,
         line_total: totalQty * unitPrice,
         item_oc: (unitPrice - basePrice) * totalQty
@@ -551,220 +678,216 @@ function openEditOrderModal(orderData) {
     })
   };
 
-  // Populate Add Product selector
-  populateAddProductSelector();
-  
-  // Render item cards
   renderEditOrderItems();
 
-  // Show bottom sheet with portal placement
   const modal = document.getElementById('editOrderModal');
-  const sheet = document.getElementById('editOrderSheetContent');
-  
-  // Ensure modal is directly under body to escape any parent stacking contexts
+  const content = document.getElementById('editOrderModalContent');
+
   if (modal.parentElement !== document.body) {
     document.body.appendChild(modal);
   }
-
-  // Prevent background scroll
-  document.body.classList.add('overflow-hidden');
-
-  // Hide bottom nav bar so it never conflicts or covers bottom summary
-  const bottomNav = document.querySelector('.sr-bottom-nav') || document.querySelector('[class*="h-[65px]"]');
-  if (bottomNav) {
-    bottomNav.style.visibility = 'hidden';
+  const picker = document.getElementById('productPickerModal');
+  if (picker && picker.parentElement !== document.body) {
+    document.body.appendChild(picker);
   }
+
+  document.body.classList.add('overflow-hidden');
 
   modal.classList.remove('hidden', 'pointer-events-none');
   setTimeout(() => {
     modal.classList.remove('opacity-0');
-    sheet.classList.remove('translate-y-full');
+    if (content) {
+      content.classList.remove('scale-95');
+      content.classList.add('scale-100');
+    }
   }, 10);
 }
 
-// ── Close Edit Order Bottom Sheet Modal ──────────────────────────────────────
+// ── Close Edit Order Popup Modal ─────────────────────────────────────────────
 function closeEditOrderModal() {
+  cancelDeleteCountdown();
+  closeProductPickerModal();
+
   const modal = document.getElementById('editOrderModal');
-  const sheet = document.getElementById('editOrderSheetContent');
+  const content = document.getElementById('editOrderModalContent');
 
-  sheet.classList.add('translate-y-full');
-  modal.classList.add('opacity-0');
-  
-  document.body.classList.remove('overflow-hidden');
-
-  // Restore bottom navigation visibility
-  const bottomNav = document.querySelector('.sr-bottom-nav') || document.querySelector('[class*="h-[65px]"]');
-  if (bottomNav) {
-    bottomNav.style.visibility = '';
+  if (content) {
+    content.classList.remove('scale-100');
+    content.classList.add('scale-95');
   }
+  modal.classList.add('opacity-0');
+
+  document.body.classList.remove('overflow-hidden');
 
   setTimeout(() => {
     modal.classList.add('hidden', 'pointer-events-none');
-    document.getElementById('addProductSelectorArea').classList.add('hidden');
-    document.getElementById('btnAddProductToggle').classList.remove('hidden');
-  }, 300);
+  }, 200);
 }
 
-// ── Render Item Cards in Edit Modal Drawer (Same Line Dor & Qty Layout) ──────
+// ── Render Items Table in Edit Modal ─────────────────────────────────────────
 function renderEditOrderItems() {
-  const container = document.getElementById('editOrderItemsContainer');
-  container.innerHTML = '';
+  const tbody = document.getElementById('editOrderTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
 
   if (!editingOrder || editingOrder.items.length === 0) {
-    container.innerHTML = `
-      <div class="bg-white rounded-2xl p-8 text-center border border-slate-200 shadow-2xs font-siliguri">
-        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-xl mx-auto mb-2">
-          <i class="fa-solid fa-box-open"></i>
-        </div>
-        <div class="text-xs font-bold text-slate-500">কোনো পণ্য নেই। নতুন পণ্য যোগ করুন।</div>
-      </div>
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="p-8 text-center text-slate-400 bg-white font-siliguri">
+          <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-300 flex items-center justify-center text-lg mx-auto mb-1.5">
+            <i class="fa-solid fa-box-open"></i>
+          </div>
+          <span class="text-xs font-medium">কোনো পণ্য যোগ করা হয়নি। নিচের বাটনে ক্লিক করে পণ্য যোগ করুন।</span>
+        </td>
+      </tr>
     `;
     updateEditOrderSummary();
     return;
   }
 
   editingOrder.items.forEach((item, idx) => {
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50/60 transition-colors';
+    tr.id = `edit-item-row-${idx}`;
+
     const diffPerUnit = item.unit_price - item.base_price;
-    const ocSign = diffPerUnit >= 0 ? '+' : '';
-    const ocFormatted = `${ocSign}${parseFloat(diffPerUnit.toFixed(2))} O/C`;
-    const ocBadgeBg = diffPerUnit > 0 ? 'bg-emerald-100 text-emerald-800' : (diffPerUnit < 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600');
+    const ocSign = item.item_oc >= 0 ? '+' : '-';
+    const ocClass = diffPerUnit > 0 
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+      : (diffPerUnit < 0 ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-500 border-slate-200');
 
-    // Check if single unit product (piece only)
-    const isSingleUnit = (item.ppb <= 1) || (item.box_type && (item.box_type.toLowerCase() === 'piece' || item.box_type === 'পিস' || item.box_type === 'pcs'));
-
-    const card = document.createElement('div');
-    card.className = 'bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3 space-y-2 hover:border-slate-300 transition duration-150 font-siliguri';
-    card.innerHTML = `
-      <!-- Row 1: Image + Product Name + O/C Pill + Delete Button -->
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/80 shrink-0 overflow-hidden flex items-center justify-center text-slate-400 shadow-3xs">
-            ${item.product_image 
-              ? `<img src="<?= url('') ?>${item.product_image}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<i class=\\\'fa-solid fa-box text-slate-400 text-xs\\\'></i>'">` 
-              : `<i class="fa-solid fa-box text-slate-400 text-xs"></i>`
-            }
-          </div>
+    tr.innerHTML = `
+      <!-- Product Column -->
+      <td class="p-2.5 align-middle">
+        <div class="flex items-center gap-2">
+          ${item.product_image ? `
+            <img src="<?= url('') ?>${item.product_image}" class="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0" onerror="this.style.display='none'">
+          ` : `
+            <div class="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-box"></i>
+            </div>
+          `}
           <div class="min-w-0">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <h4 class="font-bold text-slate-900 text-xs sm:text-sm leading-tight truncate">
-                ${item.product_name}
-              </h4>
-              <!-- Dynamic O/C Pill Badge -->
-              <span id="item-oc-pill-${idx}" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black font-mono leading-none ${ocBadgeBg}">
-                ${ocFormatted}
+            <div class="font-bold text-slate-900 truncate leading-tight font-siliguri text-xs">
+              ${item.product_name}
+            </div>
+            <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span class="text-[10px] text-slate-400 font-mono">${item.box_type || 'কার্টন'} (${item.ppb} পিস)</span>
+              <span id="row-oc-${idx}" class="text-[9px] font-bold font-mono px-1 py-0.2 rounded border ${ocClass}">
+                ${ocSign}৳${Math.abs(item.item_oc).toFixed(1)} O/C
               </span>
             </div>
-            <div class="text-[10px] text-slate-400 font-mono mt-0.5">
-              ${item.box_type || 'প্যাকিং'} (${!isSingleUnit ? item.ppb + ' পিস/বক্স' : '১ পিস'})
-            </div>
           </div>
         </div>
+      </td>
 
-        <button type="button" onclick="deleteEditItem(${idx})" class="w-7 h-7 rounded-lg bg-rose-50 border border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white transition flex items-center justify-center shrink-0 active:scale-95 shadow-3xs" title="পণ্য মুছুন">
-          <i class="fa-solid fa-trash-can text-xs"></i>
+      <!-- Ordered Quantity (editable) -->
+      <td class="p-2 align-middle text-center">
+        <input type="number" min="1" step="1" id="item-qty-${idx}" value="${item.total_qty}" 
+               oninput="onEditQtyChange(${idx}, this.value)" 
+               class="w-full text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 px-1 focus:bg-white focus:border-blue-500 focus:outline-none shadow-3xs">
+      </td>
+
+      <!-- Per-Unit / Box Price (editable) -->
+      <td class="p-2 align-middle text-right">
+        <div class="relative">
+          <span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold select-none">৳</span>
+          <input type="number" min="0" step="any" id="item-price-${idx}" value="${item.unit_price}" 
+                 oninput="onEditPriceChange(${idx}, this.value)" 
+                 class="w-full text-right font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 pl-4 pr-1 focus:bg-white focus:border-blue-500 focus:outline-none shadow-3xs">
+        </div>
+      </td>
+
+      <!-- Total Amount (editable) -->
+      <td class="p-2 align-middle text-right">
+        <div class="relative">
+          <span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold select-none">৳</span>
+          <input type="number" min="0" step="any" id="item-total-${idx}" value="${item.line_total.toFixed(2)}" 
+                 oninput="onEditTotalChange(${idx}, this.value)" 
+                 class="w-full text-right font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg py-1 pl-4 pr-1 focus:bg-white focus:border-blue-500 focus:outline-none shadow-3xs">
+        </div>
+      </td>
+
+      <!-- Remove Action -->
+      <td class="p-2 align-middle text-center">
+        <button type="button" onclick="deleteEditItem(${idx})" class="w-6 h-6 rounded-md text-slate-400 hover:text-white hover:bg-rose-500 flex items-center justify-center transition active:scale-95" title="পণ্য সরান">
+          <i class="fa-solid fa-trash-can text-[11px]"></i>
         </button>
-      </div>
-
-      <!-- Row 2: SAME LINE for DOR (Unit Price Stepper) & QTY (Quantity Steppers) -->
-      <div class="bg-slate-50/90 rounded-xl p-2 border border-slate-200/70 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
-        
-        <!-- Left: DOR (Unit Price) with [-] [ ৳ 116 ] [+] -->
-        <div class="flex items-center gap-1">
-          <span class="text-[11px] font-bold text-slate-600 select-none">দর:</span>
-          <div class="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
-            <button type="button" onclick="stepPrice(${idx}, -1)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs active:scale-95 transition">-</button>
-            <div class="flex items-center px-1">
-              <span class="text-[10px] font-bold text-slate-400 select-none">৳</span>
-              <input type="number" step="any" min="0" 
-                     id="item-price-input-${idx}" 
-                     value="${item.unit_price}" 
-                     oninput="onEditUnitPriceChange(${idx}, this.value)" 
-                     class="w-12 text-center text-xs font-mono font-bold text-slate-900 bg-transparent outline-none px-0.5">
-            </div>
-            <button type="button" onclick="stepPrice(${idx}, 1)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs active:scale-95 transition">+</button>
-          </div>
-        </div>
-
-        <!-- Right: QTY (Box & Pcs or Pcs only) -->
-        <div class="flex items-center gap-1.5">
-          <span class="text-[11px] font-bold text-slate-600 select-none">পরিমাণ:</span>
-
-          ${!isSingleUnit ? `
-            <!-- Box Stepper (Only if not single unit) -->
-            <div class="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
-              <button type="button" onclick="stepBox(${idx}, -1)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs active:scale-95 transition">-</button>
-              <input type="number" min="0" id="item-box-input-${idx}" value="${item.boxes}" oninput="onEditBoxChange(${idx}, this.value)" class="w-7 text-center text-xs font-mono font-bold text-slate-900 bg-transparent outline-none px-0.5">
-              <span class="text-[10px] font-bold text-slate-500 pr-1 select-none">B</span>
-              <button type="button" onclick="stepBox(${idx}, 1)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs active:scale-95 transition">+</button>
-            </div>
-          ` : ''}
-
-          <!-- Piece Stepper -->
-          <div class="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
-            <button type="button" onclick="stepPcs(${idx}, -1)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs active:scale-95 transition">-</button>
-            <input type="number" min="0" id="item-pcs-input-${idx}" value="${item.pcs}" oninput="onEditPcsChange(${idx}, this.value)" class="w-7 text-center text-xs font-mono font-bold text-slate-900 bg-transparent outline-none px-0.5">
-            <span class="text-[10px] font-bold text-slate-500 pr-1 select-none">P</span>
-            <button type="button" onclick="stepPcs(${idx}, 1)" class="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs active:scale-95 transition">+</button>
-          </div>
-
-        </div>
-
-      </div>
-
-      <!-- Row 3: Total Pieces Subtext & Line Total Price -->
-      <div class="flex items-center justify-between text-[11px] pt-0.5 px-1">
-        <div class="text-slate-400 font-mono text-[10px]" id="item-total-pcs-${idx}">
-          মোট: ${item.total_qty} পিস
-        </div>
-        <div class="font-bold text-slate-900">
-          মোট দাম: <span class="font-mono text-xs text-slate-950 font-black" id="item-line-total-${idx}">Tk ${parseFloat(item.line_total).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-        </div>
-      </div>
+      </td>
     `;
-    container.appendChild(card);
+    tbody.appendChild(tr);
   });
 
   updateEditOrderSummary();
 }
 
-// ── Stepper & Input Handlers ──────────────────────────────────────────────────
-function stepPrice(idx, delta) {
+// ── Real-Time Bi-Directional Quantity, Price, Total, and O/C Handlers ───────
+function onEditQtyChange(idx, val) {
   if (!editingOrder || !editingOrder.items[idx]) return;
-  const current = editingOrder.items[idx].unit_price || 0;
-  editingOrder.items[idx].unit_price = Math.max(0, parseFloat((current + delta).toFixed(2)));
-  recalculateItem(idx);
+  const item = editingOrder.items[idx];
+  const qty = Math.max(0, parseInt(val) || 0);
+  item.total_qty = qty;
+  item.line_total = qty * item.unit_price;
+  item.item_oc = (item.unit_price - item.base_price) * qty;
+
+  const totalInput = document.getElementById(`item-total-${idx}`);
+  if (totalInput) {
+    totalInput.value = item.line_total.toFixed(2);
+  }
+  updateRowOC(idx);
+  updateEditOrderSummary();
 }
 
-function onEditBoxChange(idx, val) {
+function onEditPriceChange(idx, val) {
   if (!editingOrder || !editingOrder.items[idx]) return;
-  editingOrder.items[idx].boxes = Math.max(0, parseInt(val) || 0);
-  recalculateItem(idx);
+  const item = editingOrder.items[idx];
+  const price = Math.max(0, parseFloat(val) || 0);
+  item.unit_price = price;
+  item.line_total = item.total_qty * price;
+  item.item_oc = (price - item.base_price) * item.total_qty;
+
+  const totalInput = document.getElementById(`item-total-${idx}`);
+  if (totalInput) {
+    totalInput.value = item.line_total.toFixed(2);
+  }
+  updateRowOC(idx);
+  updateEditOrderSummary();
 }
 
-function onEditPcsChange(idx, val) {
+function onEditTotalChange(idx, val) {
   if (!editingOrder || !editingOrder.items[idx]) return;
-  editingOrder.items[idx].pcs = Math.max(0, parseInt(val) || 0);
-  recalculateItem(idx);
+  const item = editingOrder.items[idx];
+  const total = Math.max(0, parseFloat(val) || 0);
+  item.line_total = total;
+
+  if (item.total_qty > 0) {
+    item.unit_price = parseFloat((total / item.total_qty).toFixed(2));
+    const priceInput = document.getElementById(`item-price-${idx}`);
+    if (priceInput) {
+      priceInput.value = item.unit_price;
+    }
+  }
+  item.item_oc = (item.unit_price - item.base_price) * item.total_qty;
+
+  updateRowOC(idx);
+  updateEditOrderSummary();
 }
 
-function stepBox(idx, delta) {
-  if (!editingOrder || !editingOrder.items[idx]) return;
-  const current = editingOrder.items[idx].boxes || 0;
-  editingOrder.items[idx].boxes = Math.max(0, current + delta);
-  recalculateItem(idx);
-}
+function updateRowOC(idx) {
+  const item = editingOrder.items[idx];
+  if (!item) return;
 
-function stepPcs(idx, delta) {
-  if (!editingOrder || !editingOrder.items[idx]) return;
-  const current = editingOrder.items[idx].pcs || 0;
-  editingOrder.items[idx].pcs = Math.max(0, current + delta);
-  recalculateItem(idx);
-}
+  const badge = document.getElementById(`row-oc-${idx}`);
+  if (!badge) return;
 
-function onEditUnitPriceChange(idx, val) {
-  if (!editingOrder || !editingOrder.items[idx]) return;
-  editingOrder.items[idx].unit_price = Math.max(0, parseFloat(val) || 0);
-  recalculateItem(idx);
+  const diffPerUnit = item.unit_price - item.base_price;
+  const ocSign = item.item_oc >= 0 ? '+' : '-';
+  const ocClass = diffPerUnit > 0 
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+    : (diffPerUnit < 0 ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-500 border-slate-200');
+
+  badge.className = `text-[9px] font-bold font-mono px-1 py-0.2 rounded border ${ocClass}`;
+  badge.innerText = `${ocSign}৳${Math.abs(item.item_oc).toFixed(1)} O/C`;
 }
 
 function deleteEditItem(idx) {
@@ -772,156 +895,310 @@ function deleteEditItem(idx) {
   const item = editingOrder.items[idx];
   editingOrder.items.splice(idx, 1);
   renderEditOrderItems();
-  populateAddProductSelector();
   showToast(`"${item.product_name}" সরানো হয়েছে।`, 'error');
 }
 
-// ── Recalculate Specific Item Row & Overall Totals Real-Time ─────────────────
-function recalculateItem(idx) {
-  const item = editingOrder.items[idx];
-  if (!item) return;
-
-  item.total_qty = (item.boxes * item.ppb) + item.pcs;
-  item.line_total = item.total_qty * item.unit_price;
-  item.item_oc = (item.unit_price - item.base_price) * item.total_qty;
-
-  // Sync Box input value if present
-  const boxInput = document.getElementById(`item-box-input-${idx}`);
-  if (boxInput && parseInt(boxInput.value) !== item.boxes) {
-    boxInput.value = item.boxes;
-  }
-
-  // Sync Pcs input value
-  const pcsInput = document.getElementById(`item-pcs-input-${idx}`);
-  if (pcsInput && parseInt(pcsInput.value) !== item.pcs) {
-    pcsInput.value = item.pcs;
-  }
-
-  // Sync Price input value
-  const priceInput = document.getElementById(`item-price-input-${idx}`);
-  if (priceInput && parseFloat(priceInput.value) !== item.unit_price) {
-    priceInput.value = item.unit_price;
-  }
-
-  // Update item Line Total DOM text
-  const lineTotalEl = document.getElementById(`item-line-total-${idx}`);
-  if (lineTotalEl) {
-    lineTotalEl.innerText = `Tk ${parseFloat(item.line_total).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
-  }
-
-  // Update item Total Pieces DOM text
-  const totalPcsEl = document.getElementById(`item-total-pcs-${idx}`);
-  if (totalPcsEl) {
-    totalPcsEl.innerText = `মোট: ${item.total_qty} পিস`;
-  }
-
-  // Update Item O/C Pill DOM text & class
-  const pillEl = document.getElementById(`item-oc-pill-${idx}`);
-  if (pillEl) {
-    const diffPerUnit = item.unit_price - item.base_price;
-    const ocSign = diffPerUnit >= 0 ? '+' : '';
-    pillEl.innerText = `${ocSign}${parseFloat(diffPerUnit.toFixed(2))} O/C`;
-    pillEl.className = `inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black font-mono leading-none ${
-      diffPerUnit > 0 ? 'bg-emerald-100 text-emerald-800' : (diffPerUnit < 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600')
-    }`;
-  }
-
-  // Real-time update for bottom summary card
-  updateEditOrderSummary();
-}
-
-// ── Update Bottom Red Summary Card Calculations Real-Time ────────────────────
 function updateEditOrderSummary() {
   if (!editingOrder) return;
 
   let grandSubtotal = 0;
+  let grandTotalQty = 0;
   let grandOC = 0;
 
   editingOrder.items.forEach(item => {
     grandSubtotal += item.line_total;
+    grandTotalQty += item.total_qty;
     grandOC += item.item_oc;
   });
 
   const subtotalEl = document.getElementById('editModalSubtotal');
+  const qtyEl = document.getElementById('editModalTotalQty');
   const ocBadgeEl = document.getElementById('editModalOCBadge');
 
   if (subtotalEl) {
-    subtotalEl.innerText = `Tk ${parseFloat(grandSubtotal).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    subtotalEl.innerText = `৳ ${parseFloat(grandSubtotal).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
   }
-
+  if (qtyEl) {
+    qtyEl.innerText = grandTotalQty;
+  }
   if (ocBadgeEl) {
     const ocSign = grandOC >= 0 ? '+' : '-';
     const ocAbs = Math.abs(grandOC).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
     ocBadgeEl.innerText = `O/C ${ocSign}৳${ocAbs}`;
-    ocBadgeEl.className = `inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black shadow-2xs ${
+    ocBadgeEl.className = `inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black font-mono ${
       grandOC > 0 ? 'bg-emerald-100 text-emerald-800' : (grandOC < 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700')
     }`;
   }
 }
 
-// ── Add Product Dropdown Logic ───────────────────────────────────────────────
-function toggleAddProductDropdown() {
-  const area = document.getElementById('addProductSelectorArea');
-  const btn = document.getElementById('btnAddProductToggle');
-  if (area.classList.contains('hidden')) {
-    area.classList.remove('hidden');
-    btn.classList.add('hidden');
-  } else {
-    area.classList.add('hidden');
-    btn.classList.remove('hidden');
-  }
-}
+// ── Product Picker Box Modal (Only SR's Assigned Company Products) ───────────
+function openProductPickerModal() {
+  const modal = document.getElementById('productPickerModal');
+  const content = document.getElementById('productPickerModalContent');
+  const searchInput = document.getElementById('productPickerSearchInput');
+  if (searchInput) searchInput.value = '';
 
-function populateAddProductSelector() {
-  const select = document.getElementById('editAddProductSelect');
-  if (!select) return;
-  select.innerHTML = '<option value="">-- পণ্য সিলেক্ট করুন --</option>';
+  renderProductPickerGrid('');
 
-  const currentIds = new Set((editingOrder?.items || []).map(i => i.product_id));
-  (ALL_SR_PRODUCTS || []).forEach(prod => {
-    if (!currentIds.has(parseInt(prod.id))) {
-      const opt = document.createElement('option');
-      opt.value = prod.id;
-      opt.innerText = `${prod.name} (দর: ৳${parseFloat(prod.price || 0)})`;
-      select.appendChild(opt);
+  modal.classList.remove('hidden', 'pointer-events-none');
+  setTimeout(() => {
+    modal.classList.remove('opacity-0');
+    if (content) {
+      content.classList.remove('scale-95');
+      content.classList.add('scale-100');
     }
-  });
+    if (searchInput) searchInput.focus();
+  }, 10);
 }
 
-function confirmAddProduct() {
-  const select = document.getElementById('editAddProductSelect');
-  const prodId = parseInt(select.value);
-  if (!prodId) {
-    alert('অনুগ্রহ করে একটি পণ্য সিলেক্ট করুন।');
+function closeProductPickerModal() {
+  const modal = document.getElementById('productPickerModal');
+  const content = document.getElementById('productPickerModalContent');
+
+  if (content) {
+    content.classList.remove('scale-100');
+    content.classList.add('scale-95');
+  }
+  modal.classList.add('opacity-0');
+
+  setTimeout(() => {
+    modal.classList.add('hidden', 'pointer-events-none');
+  }, 200);
+}
+
+function filterProductPicker(query) {
+  renderProductPickerGrid(query);
+}
+
+function renderProductPickerGrid(filterText) {
+  const grid = document.getElementById('productPickerGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const q = (filterText || '').toLowerCase().trim();
+  const currentProductIds = new Set((editingOrder?.items || []).map(i => i.product_id));
+
+  // ALL_SR_PRODUCTS is already filtered to only products of the SR's assigned company
+  const filtered = (ALL_SR_PRODUCTS || []).filter(p => {
+    if (!q) return true;
+    const name = (p.name || '').toLowerCase();
+    const comp = (p.company_name || '').toLowerCase();
+    return name.includes(q) || comp.includes(q);
+  });
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full py-8 text-center text-slate-400 font-siliguri">
+        <i class="fa-solid fa-box-open text-2xl mb-1 text-slate-300"></i>
+        <div class="text-xs font-bold">কোনো পণ্য পাওয়া যায়নি।</div>
+      </div>
+    `;
     return;
   }
 
-  const prod = ALL_SR_PRODUCTS.find(p => parseInt(p.id) === prodId);
+  filtered.forEach(p => {
+    const isAlreadyAdded = currentProductIds.has(parseInt(p.id));
+    const stock = parseInt(p.stock || 0);
+    const stockClass = stock > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200';
+    const ppb = parseInt(p.pieces_per_box || p.pieces_per_carton || 1) || 1;
+    const price = parseFloat(p.price || 0);
+
+    const card = document.createElement('div');
+    card.className = `p-2.5 rounded-xl border transition-all duration-150 flex items-center gap-2.5 cursor-pointer select-none ${
+      isAlreadyAdded 
+        ? 'bg-blue-50/50 border-blue-200 opacity-90' 
+        : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-blue-400 hover:shadow-2xs active:scale-98'
+    }`;
+    card.onclick = () => addProductFromPicker(parseInt(p.id));
+
+    card.innerHTML = `
+      <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200/80 overflow-hidden flex items-center justify-center text-slate-400 shrink-0">
+        ${p.image 
+          ? `<img src="<?= url('') ?>${p.image}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<i class=\\\'fa-solid fa-box text-slate-400 text-xs\\\'></i>'">` 
+          : `<i class="fa-solid fa-box text-slate-400 text-xs"></i>`
+        }
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between gap-1">
+          <h5 class="font-bold text-slate-900 text-xs leading-snug truncate">
+            ${p.name}
+          </h5>
+          ${isAlreadyAdded ? `<span class="text-[9px] font-bold text-blue-600 bg-blue-100/70 px-1.5 py-0.2 rounded shrink-0">যুক্ত আছে</span>` : ''}
+        </div>
+
+        <div class="text-[10px] text-slate-400 font-mono mt-0.5">
+          ${p.company_name || 'কোম্পানি'} • ${p.box_type || 'কার্টন'} (${ppb} পিস)
+        </div>
+
+        <div class="flex items-center justify-between gap-2 mt-1">
+          <span class="inline-flex items-center px-1.5 py-0.2 rounded border text-[9px] font-bold font-mono ${stockClass}">
+            স্টক: ${stock} পিস
+          </span>
+          <span class="font-mono font-black text-slate-800 text-xs">
+            ৳ ${price.toFixed(2)}
+          </span>
+        </div>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+}
+
+function addProductFromPicker(prodId) {
+  if (!editingOrder) return;
+  const prod = (ALL_SR_PRODUCTS || []).find(p => parseInt(p.id) === prodId);
   if (!prod) return;
 
-  const ppb = parseInt(prod.pieces_per_box || prod.pieces_per_carton || 1) || 1;
-  const unitPrice = parseFloat(prod.price || 0);
-  const basePrice = parseFloat(prod.price || 0);
+  const existingIdx = editingOrder.items.findIndex(i => i.product_id === prodId);
+  if (existingIdx !== -1) {
+    editingOrder.items[existingIdx].total_qty += 1;
+    editingOrder.items[existingIdx].line_total = editingOrder.items[existingIdx].total_qty * editingOrder.items[existingIdx].unit_price;
+    editingOrder.items[existingIdx].item_oc = (editingOrder.items[existingIdx].unit_price - editingOrder.items[existingIdx].base_price) * editingOrder.items[existingIdx].total_qty;
+    showToast(`"${prod.name}" এর পরিমাণ বাড়ানো হয়েছে।`, 'success');
+  } else {
+    const ppb = parseInt(prod.pieces_per_box || prod.pieces_per_carton || 1) || 1;
+    const unitPrice = parseFloat(prod.price || 0);
+    const basePrice = parseFloat(prod.price || 0);
 
-  editingOrder.items.push({
-    product_id: parseInt(prod.id),
-    product_name: prod.name,
-    product_image: prod.image || '',
-    ppb: ppb,
-    box_type: prod.box_type || 'কার্টন',
-    base_price: basePrice,
-    unit_price: unitPrice,
-    boxes: 1,
-    pcs: 0,
-    total_qty: ppb,
-    line_total: ppb * unitPrice,
-    item_oc: 0
-  });
+    editingOrder.items.push({
+      product_id: parseInt(prod.id),
+      product_name: prod.name,
+      product_image: prod.image || '',
+      ppb: ppb,
+      box_type: prod.box_type || 'কার্টন',
+      base_price: basePrice,
+      unit_price: unitPrice,
+      total_qty: 1,
+      line_total: 1 * unitPrice,
+      item_oc: 0
+    });
+    showToast(`"${prod.name}" অর্ডারে যোগ করা হয়েছে।`, 'success');
+  }
 
   renderEditOrderItems();
-  populateAddProductSelector();
-  toggleAddProductDropdown();
-  showToast(`"${prod.name}" অর্ডারে যোগ করা হয়েছে।`, 'success');
+  closeProductPickerModal();
+}
+
+// ── Delete Order with 10-Second Countdown Safety Lock ────────────────────────
+let deleteCountdownTimer = null;
+let deleteCountdownSeconds = 10;
+
+function startDeleteCountdown() {
+  document.getElementById('editModalDefaultActions').classList.add('hidden');
+  document.getElementById('editModalDeleteCountdownArea').classList.remove('hidden');
+
+  deleteCountdownSeconds = 10;
+  const btnConfirm = document.getElementById('btnConfirmDeleteOrder');
+  const btnText = document.getElementById('deleteTimerBtnText');
+  const icon = document.getElementById('deleteTimerIcon');
+
+  btnConfirm.disabled = true;
+  btnConfirm.className = 'px-5 py-2 bg-rose-200 text-rose-400 cursor-not-allowed opacity-80 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition duration-200';
+  icon.className = 'fa-solid fa-clock text-xs';
+  btnText.innerText = `ডিলিট নিশ্চিত করুন (10s)`;
+
+  if (deleteCountdownTimer) clearInterval(deleteCountdownTimer);
+
+  deleteCountdownTimer = setInterval(() => {
+    deleteCountdownSeconds--;
+    if (deleteCountdownSeconds > 0) {
+      btnText.innerText = `ডিলিট নিশ্চিত করুন (${deleteCountdownSeconds}s)`;
+    } else {
+      clearInterval(deleteCountdownTimer);
+      deleteCountdownTimer = null;
+      btnConfirm.disabled = false;
+      btnConfirm.className = 'px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white shadow-md active:scale-95 cursor-pointer rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition duration-200';
+      icon.className = 'fa-solid fa-trash-can text-xs';
+      btnText.innerText = 'হ্যাঁ, ডিলিট করুন';
+    }
+  }, 1000);
+}
+
+function cancelDeleteCountdown() {
+  if (deleteCountdownTimer) {
+    clearInterval(deleteCountdownTimer);
+    deleteCountdownTimer = null;
+  }
+  const confirmArea = document.getElementById('editModalDeleteCountdownArea');
+  const defaultActions = document.getElementById('editModalDefaultActions');
+  if (confirmArea) confirmArea.classList.add('hidden');
+  if (defaultActions) defaultActions.classList.remove('hidden');
+}
+
+async function executeOrderDelete() {
+  if (!editingOrder) return;
+  const orderId = editingOrder.id;
+
+  const btnConfirm = document.getElementById('btnConfirmDeleteOrder');
+  const btnText = document.getElementById('deleteTimerBtnText');
+  const spinner = document.getElementById('deleteTimerSpinner');
+  const icon = document.getElementById('deleteTimerIcon');
+
+  btnConfirm.disabled = true;
+  btnText.innerText = 'ডিলিট হচ্ছে...';
+  if (icon) icon.classList.add('hidden');
+  if (spinner) spinner.classList.remove('hidden');
+
+  try {
+    const formData = new FormData();
+    formData.append('order_id', orderId);
+
+    const response = await fetch('<?= url("sr/orders/delete") ?>', {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // Remove from ORDERS_MAP
+      delete ORDERS_MAP[orderId];
+
+      // Remove row from table with animation
+      const row = document.getElementById(`order-row-${orderId}`);
+      if (row) {
+        row.style.transition = 'all 0.3s ease';
+        row.style.opacity = '0';
+        row.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+          row.remove();
+          // Check if table empty
+          const tbody = document.getElementById('tableBody');
+          if (tbody && Object.keys(ORDERS_MAP).length === 0) {
+            tbody.innerHTML = `
+              <tr id="emptyRow">
+                <td colspan="3" class="p-12 text-center text-slate-400 bg-white font-siliguri">
+                  <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center text-xl mx-auto mb-2"><i class="fa-solid fa-box-open"></i></div>
+                  <span class="text-xs font-medium">কোনো অর্ডারের তথ্য পাওয়া যায়নি।</span>
+                </td>
+              </tr>
+            `;
+          }
+        }, 300);
+      }
+
+      // Recalculate table footer
+      recalculateTableFooterTotals();
+
+      showToast(result.message || 'অর্ডার সফলভাবে মুছে ফেলা হয়েছে!', 'success');
+      closeEditOrderModal();
+    } else {
+      alert(result.message || 'অর্ডার ডিলিট করতে সমস্যা হয়েছে।');
+      btnConfirm.disabled = false;
+      btnText.innerText = 'হ্যাঁ, ডিলিট করুন';
+      if (icon) icon.classList.remove('hidden');
+      if (spinner) spinner.classList.add('hidden');
+    }
+  } catch (err) {
+    console.error('Order delete error:', err);
+    alert('সার্ভার এরর: অর্ডার ডিলিট করা সম্ভব হয়নি।');
+    btnConfirm.disabled = false;
+    btnText.innerText = 'হ্যাঁ, ডিলিট করুন';
+    if (icon) icon.classList.remove('hidden');
+    if (spinner) spinner.classList.add('hidden');
+  }
 }
 
 // ── Submit Order Edit via AJAX (In-Place JS Sync) ─────────────────────────────
@@ -939,11 +1216,10 @@ async function submitOrderEdit() {
   const btnIcon = document.getElementById('btnConfirmIcon');
   const btnSpinner = document.getElementById('btnConfirmSpinner');
 
-  // Loading state
   btnConfirm.disabled = true;
   btnText.innerText = 'সংরক্ষণ হচ্ছে...';
-  btnIcon.classList.add('hidden');
-  btnSpinner.classList.remove('hidden');
+  if (btnIcon) btnIcon.classList.add('hidden');
+  if (btnSpinner) btnSpinner.classList.remove('hidden');
   SRLoader.showOverlay('অর্ডার আপডেট করা হচ্ছে...', 'পরিবর্তন সংরক্ষণ হচ্ছে...');
 
   try {
@@ -964,15 +1240,9 @@ async function submitOrderEdit() {
     const result = await response.json();
 
     if (result.success && result.order) {
-      // Update cached order data in map
       ORDERS_MAP[editingOrder.id] = result.order;
-
-      // Update table cells in place
       updateOrderTableRow(result.order);
-
-      // Recalculate Grand Subtotal row in table
       recalculateTableFooterTotals();
-
       showToast(result.message || 'অর্ডার সফলভাবে আপডেট করা হয়েছে!', 'success');
       closeEditOrderModal();
     } else {
@@ -984,9 +1254,9 @@ async function submitOrderEdit() {
   } finally {
     SRLoader.hideOverlay();
     btnConfirm.disabled = false;
-    btnText.innerText = 'অর্ডার কনফার্ম করুন';
-    btnIcon.classList.remove('hidden');
-    btnSpinner.classList.add('hidden');
+    btnText.innerText = 'সংরক্ষণ করুন (Save)';
+    if (btnIcon) btnIcon.classList.remove('hidden');
+    if (btnSpinner) btnSpinner.classList.add('hidden');
   }
 }
 
@@ -1022,6 +1292,10 @@ function updateOrderTableRow(order) {
   const btnInvoice = document.getElementById(`btn-invoice-order-${orderId}`);
   if (btnInvoice) {
     btnInvoice.setAttribute('onclick', `openInvoiceModal(ORDERS_MAP[${orderId}])`);
+  }
+  const btnEdit = document.getElementById(`btn-edit-order-${orderId}`);
+  if (btnEdit) {
+    btnEdit.setAttribute('onclick', `openEditOrderModal(ORDERS_MAP[${orderId}])`);
   }
 }
 
