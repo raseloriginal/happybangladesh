@@ -32,6 +32,11 @@
             <span class="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-700 bg-gray-50">
               <?= $b['items_count'] ?> items
             </span>
+            <?php if (!empty($b['free_items_count'])): ?>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 ml-1 text-xs font-semibold rounded border border-amber-200 text-amber-800 bg-amber-50" title="<?= $b['free_items_count'] ?> free items">
+                <i class="fas fa-gift text-amber-500 text-[10px]"></i> <?= $b['free_items_count'] ?> Free
+              </span>
+            <?php endif; ?>
           </td>
           <td class="py-3.5 px-4 text-right font-bold text-base <?= $b['total_amount'] < 0 ? 'text-rose-600' : 'text-gray-900' ?>">
             <?= ($b['total_amount'] < 0 ? '-' : '') . '৳' . number_format(abs($b['total_amount']), 2, '.', '') ?>
@@ -125,6 +130,25 @@
         </table>
       </div>
 
+      <!-- Free Items Invoice Section -->
+      <div id="inv-free-items-section" class="hidden mb-4 overflow-x-auto">
+        <div class="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <i class="fas fa-gift text-amber-600"></i> Free / Bonus Items
+        </div>
+        <table class="w-full text-left text-xs md:text-sm border-collapse bg-amber-50/40 rounded-lg border border-amber-200">
+          <thead>
+            <tr class="border-b border-amber-200 text-amber-900 font-bold uppercase text-[11px] bg-amber-100/60">
+              <th class="py-2 px-3 text-left">FREE ITEM</th>
+              <th class="py-2 px-3 text-center w-28">FREE QTY</th>
+              <th class="py-2 px-3 text-right w-28">PRICE</th>
+            </tr>
+          </thead>
+          <tbody id="inv-free-items-body" class="divide-y divide-amber-100 text-gray-800">
+            <!-- Populated via JS -->
+          </tbody>
+        </table>
+      </div>
+
       <!-- Grand Total Row -->
       <div class="flex justify-between items-center py-3 border-t border-b-2 border-gray-300 font-bold text-gray-900 text-base md:text-lg mb-2">
         <span>Total Amount:</span>
@@ -174,8 +198,8 @@
             <div class="flex flex-wrap justify-between items-center mb-3 gap-2">
                 <h4 class="text-lg font-bold text-gray-800">Products</h4>
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="downloadLotCSVSample()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md border border-indigo-200 transition-colors">
-                        <i class="fas fa-download"></i> Sample CSV
+                    <button type="button" onclick="openFreeItemModal()" class="text-xs text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-md border border-amber-300 transition-colors shadow-xs" title="Select Free Items">
+                        <i class="fas fa-gift text-amber-600"></i> Free Item <span id="free-item-badge" class="hidden ml-1 px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">0</span>
                     </button>
                     <button type="button" onclick="document.getElementById('bulk-csv-input').click()" class="text-xs text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-md border border-emerald-200 transition-colors">
                         <i class="fas fa-file-csv"></i> Upload CSV
@@ -242,6 +266,49 @@
     </div>
 </div>
 
+<!-- Free Item Modal -->
+<div id="free-item-modal" class="modal-overlay hidden" style="z-index: 1060;">
+    <div class="modal-box p-6 max-w-3xl w-full">
+        <!-- Header with Title & Top-Right Save Button -->
+        <div class="flex justify-between items-center pb-4 mb-4 border-b border-gray-200">
+            <div>
+                <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm shadow-xs">
+                        <i class="fas fa-gift"></i>
+                    </span>
+                    Free Items
+                </h3>
+                <p class="text-xs text-gray-500 mt-1">Select free promotional or bonus items and set their quantities</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="saveFreeItemsModal()" id="btn-save-free-items" class="btn bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all">
+                    <i class="fas fa-check"></i> Save
+                </button>
+                <button type="button" onclick="closeModal('free-item-modal')" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Bar & Summary Bar -->
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <div class="relative flex-1 min-w-[200px]">
+                <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+                <input type="text" id="free-item-search" placeholder="Search free products by name or SKU..." class="form-input text-xs pl-8 pr-3 py-1.5 w-full bg-white border-gray-300 rounded-md" oninput="filterFreeItemProducts()">
+            </div>
+            <div class="text-xs font-semibold text-gray-700 flex items-center gap-2">
+                <span class="text-gray-500">Selected Free Items:</span>
+                <span id="free-item-selected-count" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">0 items</span>
+            </div>
+        </div>
+
+        <!-- Free Items Product List / Cards -->
+        <div id="free-items-container" class="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+            <!-- Injected via JS -->
+        </div>
+    </div>
+</div>
+
 <script>
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
@@ -252,6 +319,187 @@ const productsList = <?= json_encode($products ?? []) ?>;
 let activeProductSelectButton = null;
 let isBatchEdit = false;
 let originalBatchInfo = null;
+let currentFreeItems = {}; // { [productId]: quantity }
+
+function updateFreeItemBadge() {
+    const badge = document.getElementById('free-item-badge');
+    if (!badge) return;
+    const count = Object.values(currentFreeItems).filter(q => q > 0).length;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+    } else {
+        badge.textContent = '0';
+        badge.classList.add('hidden');
+    }
+}
+
+function openFreeItemModal() {
+    const companyId = document.getElementById('bulk-company').value;
+    if (!companyId) {
+        alert('Please select a Company first before selecting Free Items.');
+        return;
+    }
+    
+    const searchInput = document.getElementById('free-item-search');
+    if (searchInput) searchInput.value = '';
+    
+    renderFreeItemsList();
+    openModal('free-item-modal');
+}
+
+function renderFreeItemsList() {
+    const container = document.getElementById('free-items-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const companyId = document.getElementById('bulk-company').value;
+    const filtered = productsList.filter(p => !companyId || p.company_id == companyId);
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="py-8 text-center text-gray-400">
+                <i class="fas fa-box-open text-3xl mb-2"></i>
+                <p>No products found for this company.</p>
+            </div>
+        `;
+        updateFreeItemSelectedCount();
+        return;
+    }
+
+    filtered.forEach(p => {
+        const qty = currentFreeItems[p.id] || 0;
+        const row = document.createElement('div');
+        row.className = "free-item-row flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-amber-400 bg-white transition-all shadow-xs gap-3";
+        row.dataset.id = p.id;
+        row.dataset.name = (p.name || '').toLowerCase();
+        row.dataset.sku = (p.sku || '').toLowerCase();
+
+        let imgHtml = '';
+        if (p.image) {
+            imgHtml = `<img src="<?= BASE_URL ?>/${p.image}" class="w-12 h-12 object-cover rounded-md border border-gray-100 shrink-0" onerror="this.outerHTML='<div class=&quot;w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center shrink-0 border border-gray-200&quot;><i class=&quot;fas fa-box text-gray-400&quot;></i></div>'">`;
+        } else {
+            imgHtml = `<div class="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center shrink-0 border border-gray-200"><i class="fas fa-box text-gray-400 text-lg"></i></div>`;
+        }
+
+        row.innerHTML = `
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+                ${imgHtml}
+                <div class="min-w-0 flex-1">
+                    <h4 class="font-semibold text-sm text-gray-900 truncate" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h4>
+                    <p class="text-xs text-gray-500">${escapeHtml(p.pieces_per_box)} Pcs / ${escapeHtml(p.box_type || 'Box')}</p>
+                    ${p.sku ? `<span class="text-[10px] text-gray-400">SKU: ${escapeHtml(p.sku)}</span>` : ''}
+                </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" onclick="changeFreeItemQty(${p.id}, -1)" class="w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold flex items-center justify-center transition-colors border border-gray-300">
+                    <i class="fas fa-minus text-xs"></i>
+                </button>
+                <input type="number" min="0" value="${qty}" id="free-qty-${p.id}" onchange="setFreeItemQty(${p.id}, this.value)" class="w-14 text-center font-bold text-sm py-1 border border-gray-300 rounded-md focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                <button type="button" onclick="changeFreeItemQty(${p.id}, 1)" class="w-8 h-8 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center justify-center transition-colors shadow-xs">
+                    <i class="fas fa-plus text-xs"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+
+    updateFreeItemSelectedCount();
+}
+
+function filterFreeItemProducts() {
+    const query = (document.getElementById('free-item-search').value || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('.free-item-row');
+    rows.forEach(row => {
+        const name = row.dataset.name || '';
+        const sku = row.dataset.sku || '';
+        if (!query || name.includes(query) || sku.includes(query)) {
+            row.style.display = 'flex';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function changeFreeItemQty(productId, delta) {
+    const cur = parseInt(currentFreeItems[productId]) || 0;
+    const next = Math.max(0, cur + delta);
+    if (next === 0) {
+        delete currentFreeItems[productId];
+    } else {
+        currentFreeItems[productId] = next;
+    }
+    const input = document.getElementById(`free-qty-${productId}`);
+    if (input) input.value = next;
+    updateFreeItemSelectedCount();
+}
+
+function setFreeItemQty(productId, value) {
+    const val = parseInt(value) || 0;
+    if (val <= 0) {
+        delete currentFreeItems[productId];
+    } else {
+        currentFreeItems[productId] = val;
+    }
+    const input = document.getElementById(`free-qty-${productId}`);
+    if (input) input.value = Math.max(0, val);
+    updateFreeItemSelectedCount();
+}
+
+function updateFreeItemSelectedCount() {
+    const countEl = document.getElementById('free-item-selected-count');
+    if (!countEl) return;
+    const totalSelected = Object.values(currentFreeItems).filter(q => q > 0).length;
+    countEl.textContent = `${totalSelected} item${totalSelected === 1 ? '' : 's'}`;
+}
+
+async function saveFreeItemsModal() {
+    const companyId = document.getElementById('bulk-company').value;
+    const lotDate = document.getElementById('bulk-lot-date').value || new Date().toISOString().split('T')[0];
+
+    if (!companyId) {
+        alert('Please select a Company first.');
+        return;
+    }
+
+    const items = [];
+    Object.keys(currentFreeItems).forEach(pid => {
+        const qty = parseInt(currentFreeItems[pid]) || 0;
+        if (qty > 0) {
+            items.push({ product_id: parseInt(pid), quantity: qty });
+        }
+    });
+
+    const btn = document.getElementById('btn-save-free-items');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        const res = await fetch('<?= url('manager/api/lots/free-items') ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+            body: JSON.stringify({
+                csrf_token: csrf,
+                company_id: companyId,
+                lot_date: lotDate,
+                items: items
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            updateFreeItemBadge();
+            closeModal('free-item-modal');
+        } else {
+            alert(data.message || 'Failed to save free items');
+        }
+    } catch (err) {
+        alert('Request failed: ' + (err.message || err));
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -297,6 +545,29 @@ function viewBatchInvoice(batch) {
         tbody.appendChild(tr);
     });
     
+    // Free items in invoice
+    const freeSection = document.getElementById('inv-free-items-section');
+    const freeTbody = document.getElementById('inv-free-items-body');
+    freeTbody.innerHTML = '';
+    const freeItems = batch.free_items || [];
+    if (freeItems.length > 0) {
+        freeItems.forEach(fi => {
+            const ftr = document.createElement('tr');
+            ftr.className = "hover:bg-amber-100/30";
+            ftr.innerHTML = `
+                <td class="py-2 px-3 font-medium text-amber-950 flex items-center gap-1.5">
+                    <i class="fas fa-gift text-amber-600 text-xs"></i> ${escapeHtml(fi.product_name)}
+                </td>
+                <td class="py-2 px-3 text-center font-bold text-amber-900">${fi.quantity}</td>
+                <td class="py-2 px-3 text-right font-semibold text-emerald-700">FREE (৳0.00)</td>
+            `;
+            freeTbody.appendChild(ftr);
+        });
+        freeSection.classList.remove('hidden');
+    } else {
+        freeSection.classList.add('hidden');
+    }
+
     const grandFormatted = totalAmt < 0 ? '-৳' + Math.abs(totalAmt).toFixed(2) : '৳' + totalAmt.toFixed(2);
     const grandEl = document.getElementById('inv-grand-total');
     grandEl.textContent = grandFormatted;
@@ -345,6 +616,8 @@ function printInvoiceModal() {
 function openNewLotModal() {
     isBatchEdit = false;
     originalBatchInfo = null;
+    currentFreeItems = {};
+    updateFreeItemBadge();
     document.getElementById('modal-add-title').textContent = 'Add New Lot';
     document.getElementById('modal-add-subtitle').textContent = 'Record a new product batch received from company';
     document.getElementById('btn-save-lot').textContent = 'Save Lot';
@@ -365,6 +638,15 @@ function editBatchLots(batch) {
         lot_date: batch.lot_date
     };
     
+    // Populate free items for this batch
+    currentFreeItems = {};
+    if (batch.free_items && batch.free_items.length > 0) {
+        batch.free_items.forEach(fi => {
+            currentFreeItems[fi.product_id] = parseInt(fi.quantity) || 0;
+        });
+    }
+    updateFreeItemBadge();
+
     document.getElementById('modal-add-title').textContent = 'Edit Lot Batch';
     document.getElementById('modal-add-subtitle').textContent = `Editing batch for ${batch.company_name} on ${batch.lot_date}`;
     document.getElementById('btn-save-lot').textContent = 'Submit Edit Request';
