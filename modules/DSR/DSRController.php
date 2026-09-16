@@ -1470,8 +1470,12 @@ class DSRController extends Controller
     {
         $dsrId = Auth::id();
         $date = $_GET['date'] ?? date('Y-m-d');
+        
+        // Find the latest loaded_at date for this DSR's stock
+        $dateQ = $this->db->prepare("SELECT MAX(DATE(loaded_at)) FROM van_stock WHERE dsr_id = ?");
+        $dateQ->execute([$dsrId]);
+        $vDate = $dateQ->fetchColumn() ?: $date;
 
-        // Use van_stock table directly for accurate remaining qty (Approach 1: Van-Level Dispatch)
         $vanQ = $this->db->prepare("
             SELECT vs.product_id,
                    vs.lot_id,
@@ -1481,32 +1485,60 @@ class DSRController extends Controller
                    p.pieces_per_box,
                    c.name as company_name,
                    SUM(vs.initial_qty) as dispatched_qty,
-                   SUM(vs.quantity) as available_qty
+                   SUM(vs.initial_qty) as available_qty
             FROM van_stock vs
             JOIN products p ON p.id = vs.product_id
             LEFT JOIN companies c ON c.id = p.company_id
             WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
             GROUP BY vs.product_id, vs.lot_id, p.id, p.name, p.sku, p.price, p.pieces_per_box, c.name
         ");
-        $vanQ->execute([$dsrId, $date]);
-        $items = [];
+        $vanQ->execute([$dsrId, $vDate]);
+        $itemsMap = [];
+        
         foreach ($vanQ->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $available = (int)$row['available_qty'];
-            if ($available > 0) {
-                $items[] = [
-                    'product_id'     => (int)$row['product_id'],
+            $pid = (int)$row['product_id'];
+            if (!isset($itemsMap[$pid])) {
+                $itemsMap[$pid] = [
+                    'product_id'     => $pid,
                     'lot_id'         => $row['lot_id'] ? (int)$row['lot_id'] : null,
                     'product_name'   => $row['product_name'],
                     'sku'            => $row['sku'],
                     'company_name'   => $row['company_name'] ?: 'No Company',
                     'base_price'     => (float)$row['base_price'],
                     'pieces_per_box' => (int)$row['pieces_per_box'],
-                    'available_qty'  => $available
+                    'available_qty'  => (int)$row['available_qty']
                 ];
+            } else {
+                $itemsMap[$pid]['available_qty'] += (int)$row['available_qty'];
             }
         }
 
-        $this->json(['success' => true, 'items' => $items]);
+        $saleQ = $this->db->prepare("SELECT di.product_id, SUM(COALESCE(di.delivered_quantity, 0)) as qty FROM dispatches d JOIN dispatch_items di ON d.id = di.dispatch_id WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') GROUP BY di.product_id");
+        $saleQ->execute([$dsrId, $vDate]);
+        foreach ($saleQ->fetchAll() as $row) {
+            $pid = (int)$row['product_id'];
+            if (isset($itemsMap[$pid])) {
+                $itemsMap[$pid]['available_qty'] -= (int)$row['qty'];
+            }
+        }
+
+        $retQ = $this->db->prepare("SELECT ri.product_id, SUM(ri.quantity) as qty FROM returns r JOIN return_items ri ON r.id = ri.return_id WHERE r.dsr_id = ? AND r.return_date = ? GROUP BY ri.product_id");
+        $retQ->execute([$dsrId, $vDate]);
+        foreach ($retQ->fetchAll() as $row) {
+            $pid = (int)$row['product_id'];
+            if (isset($itemsMap[$pid])) {
+                $itemsMap[$pid]['available_qty'] -= (int)$row['qty'];
+            }
+        }
+
+        $items = [];
+        foreach ($itemsMap as $item) {
+            if ($item['available_qty'] > 0) {
+                $items[] = $item;
+            }
+        }
+
+        $this->json(['success' => true, 'items' => array_values($items)]);
     }
 
     /**
@@ -1572,14 +1604,22 @@ class DSRController extends Controller
                     continue;
                 }
 
-                // Check available van stock using van_stock table (Approach 1: Van-Level Dispatch)
-                $checkQ = $this->db->prepare("
-                    SELECT SUM(quantity) as avail
-                    FROM van_stock
-                    WHERE dsr_id = ? AND product_id = ?
-                ");
-                $checkQ->execute([$dsrId, $pid]);
-                $avail = (int)$checkQ->fetchColumn();
+                // Check available van stock dynamically
+                $dateQ = $this->db->prepare("SELECT MAX(DATE(loaded_at)) FROM van_stock WHERE dsr_id = ? AND product_id = ?");
+                $dateQ->execute([$dsrId, $pid]);
+                $vDate = $dateQ->fetchColumn() ?: date('Y-m-d');
+                
+                $vsQuery = $this->db->prepare("SELECT SUM(initial_qty) FROM van_stock WHERE dsr_id = ? AND product_id = ? AND DATE(loaded_at) = ?");
+                $vsQuery->execute([$dsrId, $pid, $vDate]);
+                $avail = (int)$vsQuery->fetchColumn();
+                
+                $sQ = $this->db->prepare("SELECT SUM(COALESCE(di.delivered_quantity, 0)) FROM dispatches d JOIN dispatch_items di ON d.id = di.dispatch_id WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND d.status IN ('delivered', 'partial')");
+                $sQ->execute([$dsrId, $vDate, $pid]);
+                $avail -= (int)$sQ->fetchColumn();
+                
+                $rQ = $this->db->prepare("SELECT SUM(ri.quantity) FROM returns r JOIN return_items ri ON r.id = ri.return_id WHERE r.dsr_id = ? AND r.return_date = ? AND ri.product_id = ?");
+                $rQ->execute([$dsrId, $vDate, $pid]);
+                $avail -= (int)$rQ->fetchColumn();
 
                 $pNameStmt = $this->db->prepare("SELECT * FROM products WHERE id = ?");
                 $pNameStmt->execute([$pid]);
