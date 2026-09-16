@@ -248,6 +248,12 @@ $router->post('/manager/api/attendance/qr/generate',    ['ManagerController', 'a
 $router->get( '/manager/readysale',           ['ManagerController', 'readysale']);
 $router->post('/manager/readysale/store',     ['ManagerController', 'readysaleStore']);
 
+// Retailers Management
+$router->get( '/manager/retailers',                   ['ManagerController', 'retailers']);
+$router->get( '/manager/api/retailers',               ['ManagerController', 'apiRetailers']);
+$router->get( '/manager/api/retailers/info',          ['ManagerController', 'apiRetailerInfo']);
+$router->post('/manager/api/retailers/update',        ['ManagerController', 'apiRetailerUpdate']);
+
 // Order Cutoff
 $router->get( '/manager/api/sr-cutoff-status',              ['ManagerController', 'apiSrCutoffStatus']);
 $router->post('/manager/api/order-cutoff/undo/{srId}',      ['ManagerController', 'apiUndoOrderCutoff']);
