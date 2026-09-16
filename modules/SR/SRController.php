@@ -323,6 +323,24 @@ class SRController extends Controller
             $iq->execute([$item['id']]);
             $item['products'] = $iq->fetchAll();
 
+            // Fetch free items for this order
+            $fq = $this->db->prepare("
+                SELECT ofi.product_id, ofi.free_product_id, ofi.quantity, p.name AS free_product_name
+                FROM order_free_items ofi
+                JOIN products p ON p.id = ofi.free_product_id
+                WHERE ofi.order_id = ?
+            ");
+            $fq->execute([$item['id']]);
+            $freeRows = $fq->fetchAll(PDO::FETCH_ASSOC);
+            $orderFreeMap = [];
+            foreach ($freeRows as $fr) {
+                $orderFreeMap[$fr['product_id']][] = $fr;
+            }
+            foreach ($item['products'] as &$prRef) {
+                $prRef['free_items'] = $orderFreeMap[$prRef['product_id']] ?? [];
+            }
+            unset($prRef);
+
             $comm_pct = (float)($item['happy_commission'] ?? 0);
 
             foreach ($item['products'] as $p) {
@@ -629,17 +647,50 @@ class SRController extends Controller
         $qItems->execute([$order['id']]);
         $items = $qItems->fetchAll(PDO::FETCH_ASSOC);
 
+        // Fetch free items attached to this order
+        $qFree = $this->db->prepare("
+            SELECT ofi.product_id, ofi.free_product_id, ofi.quantity, p.name AS free_product_name, p.image, p.sku
+            FROM order_free_items ofi
+            JOIN products p ON p.id = ofi.free_product_id
+            WHERE ofi.order_id = ?
+        ");
+        $qFree->execute([$order['id']]);
+        $freeRows = $qFree->fetchAll(PDO::FETCH_ASSOC);
+
+        $freeItemsByProduct = [];
+        foreach ($freeRows as $fr) {
+            $pId = intval($fr['product_id']);
+            if (!isset($freeItemsByProduct[$pId])) {
+                $freeItemsByProduct[$pId] = [];
+            }
+            $freeItemsByProduct[$pId][] = [
+                'free_product_id' => intval($fr['free_product_id']),
+                'name' => $fr['free_product_name'],
+                'quantity' => intval($fr['quantity']),
+                'sku' => $fr['sku'],
+                'image' => $fr['image']
+            ];
+        }
+
         $this->json([
             'success' => true,
             'order' => $order,
-            'items' => array_map(function($item) {
+            'free_items_by_product' => $freeItemsByProduct,
+            'items' => array_map(function($item) use ($freeItemsByProduct) {
+                $pId = intval($item['product_id']);
+                $fMap = [];
+                foreach ($freeItemsByProduct[$pId] ?? [] as $fEntry) {
+                    $fMap[$fEntry['free_product_id']] = intval($fEntry['quantity']);
+                }
                 return [
-                    'id' => intval($item['product_id']),
+                    'id' => $pId,
                     'name' => $item['name'],
                     'qty' => intval($item['quantity']),
                     'price' => floatval($item['unit_price']),
                     'total' => floatval($item['total_price']),
-                    'pcsPerCarton' => intval($item['pieces_per_carton'] ?: 12)
+                    'pcsPerCarton' => intval($item['pieces_per_carton'] ?: 12),
+                    'free_items' => $freeItemsByProduct[$pId] ?? [],
+                    'freeItems' => $fMap
                 ];
             }, $items)
         ]);
@@ -677,6 +728,71 @@ class SRController extends Controller
             $this->json(['success' => true, 'products' => $products]);
         } catch (\Exception $e) {
             $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    // ── API: Get configured free items for retailer & product ─
+    public function apiGetFreeItems(): void
+    {
+        $retailerId = intval($_GET['retailer_id'] ?? 0);
+        $productId  = intval($_GET['product_id'] ?? 0);
+
+        if (!$retailerId || !$productId) {
+            $this->json(['success' => true, 'free_items' => []]);
+            return;
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT rpfi.id, rpfi.free_product_id, rpfi.quantity,
+                   p.name AS product_name, p.image, p.sku, p.pieces_per_box, p.box_type
+            FROM retailer_product_free_items rpfi
+            JOIN products p ON p.id = rpfi.free_product_id
+            WHERE rpfi.retailer_id = ? AND rpfi.product_id = ?
+            ORDER BY rpfi.id ASC
+        ");
+        $stmt->execute([$retailerId, $productId]);
+        $freeItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->json(['success' => true, 'free_items' => $freeItems]);
+    }
+
+    // ── API: Save configured free items for retailer & product ─
+    public function apiSaveFreeItems(): void
+    {
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        $retailerId = intval($input['retailer_id'] ?? 0);
+        $productId  = intval($input['product_id'] ?? 0);
+        $items      = is_array($input['items'] ?? null) ? $input['items'] : [];
+
+        if (!$retailerId || !$productId) {
+            $this->json(['success' => false, 'message' => 'রিটেইলার বা প্রোডাক্ট আইডি পাওয়া যায়নি।']);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            // Delete previous free items for this retailer and product
+            $del = $this->db->prepare("DELETE FROM retailer_product_free_items WHERE retailer_id = ? AND product_id = ?");
+            $del->execute([$retailerId, $productId]);
+
+            $ins = $this->db->prepare("
+                INSERT INTO retailer_product_free_items (retailer_id, product_id, free_product_id, quantity)
+                VALUES (?, ?, ?, ?)
+            ");
+
+            foreach ($items as $item) {
+                $freePid = intval($item['free_product_id'] ?? $item['product_id'] ?? 0);
+                $qty     = intval($item['quantity'] ?? 0);
+                if ($freePid > 0 && $qty > 0) {
+                    $ins->execute([$retailerId, $productId, $freePid, $qty]);
+                }
+            }
+
+            $this->db->commit();
+            $this->json(['success' => true, 'message' => 'ফ্রি আইটেম সফলভাবে সংরক্ষণ করা হয়েছে।']);
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            $this->json(['success' => false, 'message' => 'ত্রুটি: ' . $e->getMessage()]);
         }
     }
 
@@ -801,15 +917,21 @@ class SRController extends Controller
                 $archiveItemsStmt = $this->db->prepare("SELECT * FROM order_items WHERE order_id=?");
                 $archiveItemsStmt->execute([$oldOrderId]);
                 $oldItems = $archiveItemsStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                $archiveFreeStmt = $this->db->prepare("SELECT * FROM order_free_items WHERE order_id=?");
+                $archiveFreeStmt->execute([$oldOrderId]);
+                $oldFreeItems = $archiveFreeStmt->fetchAll(PDO::FETCH_ASSOC);
+
                 try {
                     $this->db->prepare("
                         INSERT INTO order_archive (original_order_id, sr_id, retailer_id, order_data, items_data, reason)
                         VALUES (?, ?, ?, ?, ?, 'replaced_same_day')
-                    ")->execute([$oldOrderId, Auth::id(), $retailerId, json_encode($oldOrder), json_encode($oldItems)]);
+                    ")->execute([$oldOrderId, Auth::id(), $retailerId, json_encode($oldOrder), json_encode(['items' => $oldItems, 'free_items' => $oldFreeItems])]);
                 } catch (\Exception $archEx) {
                     // Archive failure should not block the update
                 }
                 // ── Now delete the old order ──────────────────────────────
+                $this->db->prepare("DELETE FROM order_free_items WHERE order_id=?")->execute([$oldOrderId]);
                 $this->db->prepare("DELETE FROM order_items WHERE order_id=?")->execute([$oldOrderId]);
                 $this->db->prepare("DELETE FROM orders WHERE id=?")->execute([$oldOrderId]);
             }
@@ -852,6 +974,45 @@ class SRController extends Controller
             $pBasePrice = (float)($pd['price'] ?? 0); // snapshot: base selling price at order time
 
             $insStmt->execute([$orderId, $pid, $qty, $price, $pBasePrice, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
+        }
+
+        // ── Store Free Items for this Order ─────────────────────────
+        $rawFreeItems = $this->post('free_items');
+        $orderFreeItemsList = [];
+        if (!empty($rawFreeItems)) {
+            if (is_string($rawFreeItems)) {
+                $orderFreeItemsList = json_decode($rawFreeItems, true) ?: [];
+            } elseif (is_array($rawFreeItems)) {
+                $orderFreeItemsList = $rawFreeItems;
+            }
+        }
+
+        // If no explicit free_items passed in form, check if retailer_product_free_items has defaults
+        if (empty($orderFreeItemsList) && $retailerId && !empty($productIds)) {
+            $inClause = implode(',', array_map('intval', $productIds));
+            $defaultFreeStmt = $this->db->query("
+                SELECT product_id, free_product_id, quantity
+                FROM retailer_product_free_items
+                WHERE retailer_id = " . intval($retailerId) . " AND product_id IN ($inClause)
+            ");
+            if ($defaultFreeStmt) {
+                $orderFreeItemsList = $defaultFreeStmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        }
+
+        if (!empty($orderFreeItemsList)) {
+            $insFreeStmt = $this->db->prepare("
+                INSERT INTO order_free_items (order_id, retailer_id, product_id, free_product_id, quantity)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            foreach ($orderFreeItemsList as $fi) {
+                $parentPid = intval($fi['product_id'] ?? 0);
+                $freePid   = intval($fi['free_product_id'] ?? 0);
+                $fQty      = intval($fi['quantity'] ?? 0);
+                if ($parentPid > 0 && $freePid > 0 && $fQty > 0) {
+                    $insFreeStmt->execute([$orderId, $retailerId ?: 0, $parentPid, $freePid, $fQty]);
+                }
+            }
         }
 
         $this->flash('success', "Order #$orderId placed successfully!");
@@ -937,8 +1098,9 @@ class SRController extends Controller
         try {
             $this->db->beginTransaction();
 
-            // Delete old items
+            // Delete old items & free items
             $this->db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$orderId]);
+            $this->db->prepare("DELETE FROM order_free_items WHERE order_id = ?")->execute([$orderId]);
 
             // Insert updated items
             $insStmt = $this->db->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, base_selling_price, total_price, product_name, box_type, pieces_per_box, buying_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -955,6 +1117,45 @@ class SRController extends Controller
                 $pBasePrice = (float)($pd['price'] ?? 0); // snapshot: base selling price at order time
 
                 $insStmt->execute([$orderId, $pid, $qty, $price, $pBasePrice, $qty * $price, $pName, $pBoxType, $pPcs, $pBuying]);
+            }
+
+            // ── Store Free Items for this Order ─────────────────────────
+            $rawFreeItems = $this->post('free_items');
+            $orderFreeItemsList = [];
+            if (!empty($rawFreeItems)) {
+                if (is_string($rawFreeItems)) {
+                    $orderFreeItemsList = json_decode($rawFreeItems, true) ?: [];
+                } elseif (is_array($rawFreeItems)) {
+                    $orderFreeItemsList = $rawFreeItems;
+                }
+            }
+
+            $retId = intval($order['retailer_id'] ?? 0);
+            if (empty($orderFreeItemsList) && $retId && !empty($productIds)) {
+                $inClause = implode(',', array_map('intval', $productIds));
+                $defaultFreeStmt = $this->db->query("
+                    SELECT product_id, free_product_id, quantity
+                    FROM retailer_product_free_items
+                    WHERE retailer_id = {$retId} AND product_id IN ($inClause)
+                ");
+                if ($defaultFreeStmt) {
+                    $orderFreeItemsList = $defaultFreeStmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+            }
+
+            if (!empty($orderFreeItemsList)) {
+                $insFreeStmt = $this->db->prepare("
+                    INSERT INTO order_free_items (order_id, retailer_id, product_id, free_product_id, quantity)
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                foreach ($orderFreeItemsList as $fi) {
+                    $parentPid = intval($fi['product_id'] ?? 0);
+                    $freePid   = intval($fi['free_product_id'] ?? 0);
+                    $fQty      = intval($fi['quantity'] ?? 0);
+                    if ($parentPid > 0 && $freePid > 0 && $fQty > 0) {
+                        $insFreeStmt->execute([$orderId, $retId, $parentPid, $freePid, $fQty]);
+                    }
+                }
             }
 
             // Update order total amount

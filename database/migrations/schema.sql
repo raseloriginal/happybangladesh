@@ -1067,10 +1067,48 @@ CREATE TABLE `warehouses` (
   `phone` varchar(30) DEFAULT NULL,
   `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1=active,0=inactive',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `retailer_product_free_items`
+--
+
+DROP TABLE IF EXISTS `retailer_product_free_items`;
+CREATE TABLE `retailer_product_free_items` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `retailer_id` int(11) NOT NULL,
+  `product_id` int(10) unsigned NOT NULL,
+  `free_product_id` int(10) unsigned NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ret_prod_free` (`retailer_id`,`product_id`,`free_product_id`),
+  KEY `idx_ret_prod` (`retailer_id`,`product_id`),
+  KEY `idx_free_prod` (`free_product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `order_free_items`
+--
+
+DROP TABLE IF EXISTS `order_free_items`;
+CREATE TABLE `order_free_items` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `order_id` int(11) NOT NULL,
+  `retailer_id` int(11) NOT NULL,
+  `product_id` int(10) unsigned NOT NULL,
+  `free_product_id` int(10) unsigned NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_order_id` (`order_id`),
+  KEY `idx_ret_prod_order` (`retailer_id`,`product_id`),
+  KEY `idx_free_prod_order` (`free_product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

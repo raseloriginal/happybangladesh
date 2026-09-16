@@ -229,8 +229,15 @@
       <div id="productSheetImgWrap"></div>
     </div>
     
-    <!-- Product Name -->
-    <div class="sr-prod-sheet-name-v2 font-sans font-black text-slate-900 text-lg leading-snug" id="productSheetName">—</div>
+    <!-- Product Name & Free Item Button (Red Area) -->
+    <div class="flex items-center justify-between gap-2.5">
+      <div class="sr-prod-sheet-name-v2 font-sans font-black text-slate-900 text-lg leading-snug truncate" id="productSheetName">—</div>
+      <button type="button" id="srProductFreeItemBtn" onclick="openSrFreeItemModal()" class="shrink-0 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:scale-95 border border-amber-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs transition-all select-none" title="ফ্রি আইটেম যুক্ত করুন">
+        <i class="fa-solid fa-gift text-amber-600 text-sm"></i>
+        <span>ফ্রি আইটেম</span>
+        <span id="srProductFreeItemBadge" class="hidden ml-0.5 px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-black leading-tight">0</span>
+      </button>
+    </div>
     
     <!-- Product Info Table (Excel Style) -->
     <div class="overflow-hidden rounded-2xl border border-slate-200/90 bg-white text-xs select-none shadow-2xs">
@@ -409,6 +416,48 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════
+     SR PRODUCT FREE ITEM BOTTOM SHEET MODAL
+══════════════════════════════════════════════════════════════ -->
+<div class="sr-sheet-overlay" id="srFreeItemOverlay" style="z-index: 1049;" onclick="closeSheet('srFreeItemSheet','srFreeItemOverlay')"></div>
+<div class="sr-bottom-sheet-v2" id="srFreeItemSheet" style="z-index: 1050; max-height: 85vh; display: flex; flex-direction: column;">
+  <div class="sr-sheet-handle-v2"></div>
+  
+  <!-- Header with Save button at top right -->
+  <div class="sr-sheet-header-v2 border-b border-slate-100 pb-3 flex items-center justify-between px-4">
+    <div class="min-w-0 flex-1 pr-2">
+      <div class="flex items-center gap-1.5 text-amber-700 font-bold text-xs uppercase tracking-wide">
+        <i class="fa-solid fa-gift text-amber-500"></i>
+        <span>ফ্রি আইটেম নির্বাচন</span>
+      </div>
+      <div class="text-xs text-slate-500 truncate mt-0.5" id="srFreeItemSubtitle">—</div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" onclick="saveSrFreeItemsModal()" id="srFreeItemSaveBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 transition active:scale-95">
+        <i class="fa-solid fa-check text-xs"></i>
+        <span>সংরক্ষণ</span>
+      </button>
+      <button type="button" class="sr-sheet-close-v2 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition" onclick="closeSheet('srFreeItemSheet','srFreeItemOverlay')">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="sr-sheet-body-v2 space-y-3 p-4 overflow-y-auto flex-1">
+    <!-- Search Box -->
+    <div class="relative">
+      <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+      <input type="text" id="srFreeItemSearch" placeholder="ফ্রি প্রোডাক্ট খুঁজুন (নাম বা SKU)..." oninput="filterSrFreeItemProducts()" class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-medium focus:bg-white focus:border-amber-400 focus:outline-none transition">
+    </div>
+
+    <!-- Product list -->
+    <div id="srFreeItemsContainer" class="space-y-2 max-h-[50vh] overflow-y-auto pr-0.5">
+      <!-- Injected via JS -->
+    </div>
+  </div>
+</div>
+
 <script>
 function showConfirmModal(text, onYes) {
   document.getElementById('confirmModalBody').innerText = text;
@@ -436,6 +485,253 @@ function showConfirmModal(text, onYes) {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ══════════════════════════════════════════════════════════════
+// FREE ITEMS STATE & MODAL LOGIC (Retailer + Product Linked)
+// ══════════════════════════════════════════════════════════════
+let currentProductFreeItems = {}; // { [freeProductId]: quantity }
+let retailerFreeItemsCache = {}; // { [retailerId]: { [productId]: { [freeProductId]: qty } } }
+
+function updateSrFreeItemBadge() {
+  const badge = document.getElementById('srProductFreeItemBadge');
+  const btn   = document.getElementById('srProductFreeItemBtn');
+  if (!badge) return;
+  const count = Object.values(currentProductFreeItems).filter(q => q > 0).length;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.classList.remove('hidden');
+    if (btn) {
+      btn.classList.add('bg-amber-100', 'border-amber-400', 'text-amber-900');
+      btn.classList.remove('bg-amber-50', 'border-amber-300', 'text-amber-800');
+    }
+  } else {
+    badge.textContent = '0';
+    badge.classList.add('hidden');
+    if (btn) {
+      btn.classList.remove('bg-amber-100', 'border-amber-400', 'text-amber-900');
+      btn.classList.add('bg-amber-50', 'border-amber-300', 'text-amber-800');
+    }
+  }
+}
+
+function initProductFreeItems(p) {
+  currentProductFreeItems = {};
+  if (!currentRetailer || !p) {
+    updateSrFreeItemBadge();
+    return;
+  }
+
+  // 1. Check if the cart already has freeItems for this product
+  const cart = cartsByRetailer[currentRetailer.id] || [];
+  const existing = cart.find(c => c.id === p.id);
+  if (existing && existing.freeItems && Object.keys(existing.freeItems).length > 0) {
+    currentProductFreeItems = { ...existing.freeItems };
+    updateSrFreeItemBadge();
+    return;
+  }
+
+  // 2. Check local memory cache for this retailer + product
+  if (retailerFreeItemsCache[currentRetailer.id] && retailerFreeItemsCache[currentRetailer.id][p.id]) {
+    currentProductFreeItems = { ...retailerFreeItemsCache[currentRetailer.id][p.id] };
+    updateSrFreeItemBadge();
+    return;
+  }
+
+  // 3. Otherwise, fetch configured free items from server
+  updateSrFreeItemBadge();
+  fetch(`${BASE_URL}/sr/api/free-items?retailer_id=${currentRetailer.id}&product_id=${p.id}`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.success && d.free_items && d.free_items.length > 0) {
+        if (!retailerFreeItemsCache[currentRetailer.id]) retailerFreeItemsCache[currentRetailer.id] = {};
+        if (!retailerFreeItemsCache[currentRetailer.id][p.id]) retailerFreeItemsCache[currentRetailer.id][p.id] = {};
+        
+        d.free_items.forEach(fi => {
+          const fPid = parseInt(fi.free_product_id);
+          const fQty = parseInt(fi.quantity) || 0;
+          if (fQty > 0) {
+            retailerFreeItemsCache[currentRetailer.id][p.id][fPid] = fQty;
+          }
+        });
+
+        if (currentProduct && currentProduct.id === p.id) {
+          currentProductFreeItems = { ...(retailerFreeItemsCache[currentRetailer.id][p.id] || {}) };
+          updateSrFreeItemBadge();
+        }
+      }
+    })
+    .catch(err => console.error('Error fetching free items:', err));
+}
+
+function openSrFreeItemModal() {
+  if (!currentRetailer || !currentProduct) {
+    showMiniToast('দোকান বা প্রোডাক্ট নির্বাচন করা হয়নি', true);
+    return;
+  }
+
+  const sub = document.getElementById('srFreeItemSubtitle');
+  if (sub) {
+    sub.textContent = `${currentRetailer.name} • ${currentProduct.name}`;
+  }
+
+  const searchInput = document.getElementById('srFreeItemSearch');
+  if (searchInput) searchInput.value = '';
+
+  renderSrFreeItemsList();
+  openSheet('srFreeItemSheet', 'srFreeItemOverlay');
+}
+
+function renderSrFreeItemsList() {
+  const container = document.getElementById('srFreeItemsContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!ALL_PRODUCTS || ALL_PRODUCTS.length === 0) {
+    container.innerHTML = `<div class="py-8 text-center text-slate-400 text-xs">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>`;
+    return;
+  }
+
+  // Sort products: same company products first, then others alphabetically
+  const currentCompId = currentProduct ? currentProduct.company_id : null;
+  const sorted = [...ALL_PRODUCTS].sort((a, b) => {
+    if (a.company_id === currentCompId && b.company_id !== currentCompId) return -1;
+    if (a.company_id !== currentCompId && b.company_id === currentCompId) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  sorted.forEach(p => {
+    const qty = currentProductFreeItems[p.id] || 0;
+    const row = document.createElement('div');
+    row.className = "sr-free-item-row flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl hover:border-amber-400 transition shadow-3xs gap-2.5";
+    row.dataset.id = p.id;
+    row.dataset.name = (p.name || '').toLowerCase();
+    row.dataset.sku  = (p.sku  || '').toLowerCase();
+
+    let imgHtml = '';
+    if (p.image) {
+      imgHtml = `<img src="${BASE_URL}/${escHtml(p.image)}" class="w-10 h-10 object-contain rounded-lg bg-slate-50 border border-slate-200 shrink-0" alt="" onerror="this.outerHTML='<div class=&quot;w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0 border border-slate-200 text-slate-400 text-xs&quot;><i class=&quot;fa-solid fa-box&quot;></i></div>'">`;
+    } else {
+      imgHtml = `<div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0 border border-slate-200 text-slate-400 text-xs"><i class="fa-solid fa-box"></i></div>`;
+    }
+
+    const ppb = p.pieces_per_box || p.pieces_per_carton || 1;
+    const boxLabel = p.box_type || 'বক্স';
+
+    row.innerHTML = `
+      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+        ${imgHtml}
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-xs text-slate-900 truncate" title="${escHtml(p.name)}">${escHtml(p.name)}</div>
+          <div class="text-[10px] text-slate-500 font-sans">${escHtml(ppb)} Pcs / ${escHtml(boxLabel)}</div>
+          ${p.company_name ? `<span class="inline-block text-[9px] text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 font-semibold">${escHtml(p.company_name)}</span>` : ''}
+        </div>
+      </div>
+      <div class="flex items-center gap-1 shrink-0 select-none">
+        <button type="button" onclick="changeSrFreeItemQty(${p.id}, -1)" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition border border-slate-200 active:scale-95">
+          <i class="fa-solid fa-minus text-[10px]"></i>
+        </button>
+        <input type="number" min="0" value="${qty}" id="sr-free-qty-${p.id}" onchange="setSrFreeItemQty(${p.id}, this.value)" class="w-12 text-center font-mono font-bold text-xs py-1 border border-slate-200 rounded-lg focus:border-amber-500 focus:outline-none bg-slate-50">
+        <button type="button" onclick="changeSrFreeItemQty(${p.id}, 1)" class="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center justify-center transition active:scale-95 shadow-3xs">
+          <i class="fa-solid fa-plus text-[10px]"></i>
+        </button>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function filterSrFreeItemProducts() {
+  const query = (document.getElementById('srFreeItemSearch').value || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.sr-free-item-row');
+  rows.forEach(row => {
+    const name = row.dataset.name || '';
+    const sku  = row.dataset.sku  || '';
+    if (!query || name.includes(query) || sku.includes(query)) {
+      row.style.display = 'flex';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+function changeSrFreeItemQty(productId, delta) {
+  const cur  = parseInt(currentProductFreeItems[productId]) || 0;
+  const next = Math.max(0, cur + delta);
+  if (next === 0) {
+    delete currentProductFreeItems[productId];
+  } else {
+    currentProductFreeItems[productId] = next;
+  }
+  const input = document.getElementById(`sr-free-qty-${productId}`);
+  if (input) input.value = next;
+}
+
+function setSrFreeItemQty(productId, val) {
+  const next = Math.max(0, parseInt(val) || 0);
+  if (next === 0) {
+    delete currentProductFreeItems[productId];
+  } else {
+    currentProductFreeItems[productId] = next;
+  }
+  const input = document.getElementById(`sr-free-qty-${productId}`);
+  if (input) input.value = next;
+}
+
+async function saveSrFreeItemsModal() {
+  if (!currentRetailer || !currentProduct) {
+    showMiniToast('দোকান বা প্রোডাক্ট নির্বাচন করা হয়নি', true);
+    return;
+  }
+
+  const items = [];
+  Object.keys(currentProductFreeItems).forEach(pid => {
+    const q = parseInt(currentProductFreeItems[pid]) || 0;
+    if (q > 0) {
+      items.push({ free_product_id: parseInt(pid), quantity: q });
+    }
+  });
+
+  const btn = document.getElementById('srFreeItemSaveBtn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>সংরক্ষণ...</span>';
+
+  try {
+    const res = await fetch(`${BASE_URL}/sr/api/free-items/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        retailer_id: currentRetailer.id,
+        product_id: currentProduct.id,
+        items: items
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (!retailerFreeItemsCache[currentRetailer.id]) retailerFreeItemsCache[currentRetailer.id] = {};
+      retailerFreeItemsCache[currentRetailer.id][currentProduct.id] = { ...currentProductFreeItems };
+
+      // Also update in cart if product is already in cart
+      const cart = cartsByRetailer[currentRetailer.id] || [];
+      const existing = cart.find(c => c.id === currentProduct.id);
+      if (existing) {
+        existing.freeItems = { ...currentProductFreeItems };
+        renderRetailerCart();
+      }
+
+      updateSrFreeItemBadge();
+      closeSheet('srFreeItemSheet', 'srFreeItemOverlay');
+      showMiniToast('✓ ফ্রি আইটেম সংরক্ষিত হয়েছে');
+    } else {
+      alert(data.message || 'ফ্রি আইটেম সংরক্ষণ ব্যর্থ হয়েছে');
+    }
+  } catch (err) {
+    alert('Request failed: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -497,12 +793,25 @@ function renderRetailerCart() {
       ? `<span class="inline-block text-[9px] font-extrabold px-1 py-0.2 rounded ${roundedOc < 0 ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}">${roundedOc > 0 ? '+' : ''}${roundedOc} O/C</span>` 
       : '';
         
+    let freeItemsHtml = '';
+    if (c.freeItems) {
+      const freeKeys = Object.keys(c.freeItems).filter(k => c.freeItems[k] > 0);
+      if (freeKeys.length > 0) {
+        freeItemsHtml = '<div class="flex flex-wrap gap-1 mt-0.5">' + freeKeys.map(k => {
+          const fp = ALL_PRODUCTS.find(x => x.id == k);
+          const fpName = fp ? fp.name : `Product #${k}`;
+          return `<span class="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md"><i class="fa-solid fa-gift text-amber-600 text-[8px]"></i> ফ্রি: ${escHtml(fpName)} (${c.freeItems[k]} P)</span>`;
+        }).join('') + '</div>';
+      }
+    }
+
     tableHtml += `
       <tr class="hover:bg-slate-50/50 transition">
         <td class="p-2 border-r border-slate-200 font-semibold text-slate-800 flex items-center gap-2">
           ${imgHtml}
-          <div class="flex flex-col gap-0.5">
-            <span>${escHtml(c.name)}</span>
+          <div class="flex flex-col gap-0.5 min-w-0">
+            <span class="truncate">${escHtml(c.name)}</span>
+            ${freeItemsHtml}
             ${ocHtml}
           </div>
         </td>
@@ -771,6 +1080,7 @@ function isPcsProduct(p) {
 function openProductSheet(idx) {
   currentProduct = ALL_PRODUCTS[idx];
   const p = currentProduct;
+  initProductFreeItems(p);
   const grad  = gradients[idx % gradients.length];
   const emoji = emojis[idx % emojis.length];
 
@@ -989,8 +1299,9 @@ function addToCart() {
     existing.price = currentPiecePrice;
     existing.oc    = oc;
     existing.pcsPerCarton = pcsPerCarton;
+    existing.freeItems = { ...currentProductFreeItems };
   } else {
-    cart.push({ id: p.id, name: p.name, qty: totalPcs, price: currentPiecePrice, total: actualTotal, pcsPerCarton, oc });
+    cart.push({ id: p.id, name: p.name, qty: totalPcs, price: currentPiecePrice, total: actualTotal, pcsPerCarton, oc, freeItems: { ...currentProductFreeItems } });
   }
 
   closeSheet('productSheet','productSheetOverlay');
@@ -1024,11 +1335,29 @@ function confirmRetailerCart() {
   addInput(form, 'notes', notes);
   addInput(form, 'ajax', '1');
   
+  const allFreeItemsPayload = [];
   cart.forEach((c, i) => {
     addInput(form, `product_id[${i}]`, c.id);
     addInput(form, `quantity[${i}]`, c.qty);
     addInput(form, `unit_price[${i}]`, c.price);
+
+    if (c.freeItems && typeof c.freeItems === 'object') {
+      Object.keys(c.freeItems).forEach(freePid => {
+        const fQty = parseInt(c.freeItems[freePid]) || 0;
+        if (fQty > 0) {
+          allFreeItemsPayload.push({
+            product_id: c.id,
+            free_product_id: parseInt(freePid),
+            quantity: fQty
+          });
+        }
+      });
+    }
   });
+
+  if (allFreeItemsPayload.length > 0) {
+    addInput(form, 'free_items', JSON.stringify(allFreeItemsPayload));
+  }
 
   isSubmitting = true;
   const confirmBtn = document.getElementById('retCartConfirmBtn');
@@ -1068,10 +1397,26 @@ function confirmRetailerCart() {
         const boxes = Math.floor(item.qty / pcsPerCarton);
         const pcs = item.qty % pcsPerCarton;
         
+        let freeHtml = '';
+        if (item.freeItems && typeof item.freeItems === 'object') {
+          const fList = Object.keys(item.freeItems).filter(k => (parseInt(item.freeItems[k]) || 0) > 0);
+          if (fList.length > 0) {
+            const tags = fList.map(k => {
+              const fp = allProductsList.find(x => String(x.id) === String(k));
+              const fName = fp ? fp.name : `আইটেম #${k}`;
+              return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold"><i class="fa-solid fa-gift text-amber-600 text-[9px]"></i> ${escHtml(fName)}: <b>${item.freeItems[k]}</b>টি</span>`;
+            }).join(' ');
+            freeHtml = `<div class="mt-1 flex flex-wrap gap-1">${tags}</div>`;
+          }
+        }
+
         return `
         <tr class="hover:bg-slate-50/50 transition">
           <td class="p-2.5 border-r border-slate-200 text-center font-mono font-bold text-slate-500">${idx + 1}</td>
-          <td class="p-2.5 border-r border-slate-200 font-semibold text-slate-800">${escHtml(item.name)}</td>
+          <td class="p-2.5 border-r border-slate-200 font-semibold text-slate-800">
+            <div>${escHtml(item.name)}</div>
+            ${freeHtml}
+          </td>
           <td class="p-2.5 text-center font-mono text-[10px] text-slate-600">
             <div class="flex justify-center items-center">
               <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200/50 font-bold text-xs">${item.qty.toString().padStart(2, '0')} P</span>

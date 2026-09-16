@@ -731,9 +731,21 @@ class DSRController extends Controller
                 }
                 $diff = $newDelivered - $prevDelivered;
                 if ($diff > 0) {
-                    $vsQuery = $this->db->prepare("SELECT quantity FROM van_stock WHERE dsr_id = ? AND product_id = ? AND (lot_id = ? OR (? IS NULL AND lot_id IS NULL)) LIMIT 1");
-                    $vsQuery->execute([$dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+                    $dateQ = $this->db->prepare("SELECT MAX(DATE(loaded_at)) FROM van_stock WHERE dsr_id = ? AND product_id = ?");
+                    $dateQ->execute([$dsrId, $item['product_id']]);
+                    $vDate = $dateQ->fetchColumn() ?: date('Y-m-d');
+                    
+                    $vsQuery = $this->db->prepare("SELECT SUM(initial_qty) FROM van_stock WHERE dsr_id = ? AND product_id = ? AND DATE(loaded_at) = ?");
+                    $vsQuery->execute([$dsrId, $item['product_id'], $vDate]);
                     $vanStock = (int)$vsQuery->fetchColumn();
+                    
+                    $sQ = $this->db->prepare("SELECT SUM(COALESCE(di.delivered_quantity, 0)) FROM dispatches d JOIN dispatch_items di ON d.id = di.dispatch_id WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND d.status IN ('delivered', 'partial')");
+                    $sQ->execute([$dsrId, $vDate, $item['product_id']]);
+                    $vanStock -= (int)$sQ->fetchColumn();
+                    
+                    $rQ = $this->db->prepare("SELECT SUM(ri.quantity) FROM returns r JOIN return_items ri ON r.id = ri.return_id WHERE r.dsr_id = ? AND r.return_date = ? AND ri.product_id = ?");
+                    $rQ->execute([$dsrId, $vDate, $item['product_id']]);
+                    $vanStock -= (int)$rQ->fetchColumn();
                     if ($diff > $vanStock) {
                         $prodQuery = $this->db->prepare("SELECT name FROM products WHERE id = ?");
                         $prodQuery->execute([$item['product_id']]);

@@ -281,6 +281,8 @@ $router->get( '/sr/api/retailers',            ['SRController', 'apiRetailers']);
 $router->get( '/sr/api/retailers/search',     ['SRController', 'apiSearchRetailers']);
 $router->post('/sr/api/retailers/store',      ['SRController', 'apiStoreRetailer']);
 $router->get( '/sr/api/products',             ['SRController', 'apiProducts']);
+$router->get( '/sr/api/free-items',            ['SRController', 'apiGetFreeItems']);
+$router->post('/sr/api/free-items/save',       ['SRController', 'apiSaveFreeItems']);
 $router->get( '/sr/api/today-order',          ['SRController', 'apiGetTodayOrder']);
 $router->post('/sr/api/location/push',        ['SRController', 'apiPushLocation']);
 $router->post('/sr/api/order-cutoff',         ['SRController', 'apiSetOrderCutoff']);
