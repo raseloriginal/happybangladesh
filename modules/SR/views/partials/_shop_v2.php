@@ -8,6 +8,13 @@
   .sr-confirm-modal {
     font-family: 'Hind Siliguri', 'Inter', sans-serif !important;
   }
+  .sr-line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
   /* Redesign the floating bottom cart bar */
   .sr-popup-cart-bar-v2 {
@@ -188,8 +195,24 @@
 
 
 
-    <!-- Products Table -->
-    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white" id="productsGrid">
+    <!-- View Switcher (List vs 2-Column Grid) -->
+    <div class="flex items-center justify-between mb-3 px-0.5 select-none">
+      <div class="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+        <i class="fa-solid fa-boxes-stacked text-blue-600 text-xs"></i>
+        <span id="prodCountBadge">প্রোডাক্ট</span>
+      </div>
+      <div class="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 shadow-2xs">
+        <button type="button" id="srViewListBtn" onclick="setShopViewMode('list')" class="flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all shadow-xs bg-white text-blue-600 cursor-pointer">
+          <i class="fa-solid fa-list text-xs"></i> <span>লিস্ট</span>
+        </button>
+        <button type="button" id="srViewGridBtn" onclick="setShopViewMode('grid')" class="flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all text-slate-600 hover:text-slate-900 cursor-pointer">
+          <i class="fa-solid fa-grip text-xs"></i> <span>গ্রিড</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Products Container -->
+    <div id="productsGrid">
       <!-- Populated by JS -->
     </div>
   </div>
@@ -942,7 +965,7 @@ function updatePopupCartInfo() {
 }
 
 function handleProductImageError(img) {
-  img.outerHTML = `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-regular fa-image text-[10px]"></i></div>`;
+  img.outerHTML = `<i class="fa-regular fa-image text-slate-300 text-xs"></i>`;
 }
 
 let productSearchQuery = '';
@@ -979,25 +1002,67 @@ function filterProductsTable() {
   }, 150);
 }
 
+let shopViewMode = localStorage.getItem('sr_shop_view_mode') || 'list';
+
+function setShopViewMode(mode) {
+  shopViewMode = mode;
+  try { localStorage.setItem('sr_shop_view_mode', mode); } catch (e) {}
+  updateShopViewButtons();
+  renderProductsGrid();
+}
+
+function updateShopViewButtons() {
+  const listBtn = document.getElementById('srViewListBtn');
+  const gridBtn = document.getElementById('srViewGridBtn');
+  if (!listBtn || !gridBtn) return;
+
+  if (shopViewMode === 'grid') {
+    gridBtn.className = "flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all shadow-xs bg-white text-blue-600 cursor-pointer";
+    listBtn.className = "flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all text-slate-600 hover:text-slate-900 cursor-pointer";
+  } else {
+    listBtn.className = "flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all shadow-xs bg-white text-blue-600 cursor-pointer";
+    gridBtn.className = "flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all text-slate-600 hover:text-slate-900 cursor-pointer";
+  }
+}
+
 function renderProductsGrid() {
   const grid = document.getElementById('productsGrid');
+  updateShopViewButtons();
+
   if (!ALL_PRODUCTS || !ALL_PRODUCTS.length) {
-    grid.innerHTML = `
-      <table class="w-full text-left border-collapse font-sans text-xs">
-        <tbody class="divide-y divide-slate-100">
-          ${[1,2,3,4,5].map(() => `
-            <tr class="sr-skeleton-table-row">
-              <td class="p-3 flex items-center gap-2.5">
-                <div class="sr-skeleton-circle" style="width:32px; height:32px; flex-shrink:0;"></div>
-                <div class="sr-skeleton-line" style="width:65%; height:12px;"></div>
-              </td>
-              <td class="p-3 text-center"><div class="sr-skeleton-line" style="width:35px; height:16px; margin:0 auto; border-radius:4px;"></div></td>
-              <td class="p-3 text-center"><div class="sr-skeleton-line" style="width:50px; height:22px; margin:0 auto; border-radius:6px;"></div></td>
-            </tr>
+    if (shopViewMode === 'grid') {
+      grid.innerHTML = `
+        <div class="grid grid-cols-2 gap-2.5">
+          ${[1,2,3,4].map(() => `
+            <div class="bg-white rounded-xl border border-slate-200 p-3 animate-pulse space-y-3">
+              <div class="h-4 bg-slate-100 rounded w-1/2"></div>
+              <div class="h-16 bg-slate-100 rounded"></div>
+              <div class="h-4 bg-slate-100 rounded w-3/4"></div>
+              <div class="h-7 bg-slate-100 rounded"></div>
+            </div>
           `).join('')}
-        </tbody>
-      </table>
-    `;
+        </div>
+      `;
+    } else {
+      grid.innerHTML = `
+        <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <table class="w-full text-left border-collapse font-sans text-xs">
+            <tbody class="divide-y divide-slate-100">
+              ${[1,2,3,4,5].map(() => `
+                <tr class="sr-skeleton-table-row">
+                  <td class="p-3 flex items-center gap-2.5">
+                    <div class="sr-skeleton-circle" style="width:32px; height:32px; flex-shrink:0;"></div>
+                    <div class="sr-skeleton-line" style="width:65%; height:12px;"></div>
+                  </td>
+                  <td class="p-3 text-center"><div class="sr-skeleton-line" style="width:35px; height:16px; margin:0 auto; border-radius:4px;"></div></td>
+                  <td class="p-3 text-center"><div class="sr-skeleton-line" style="width:50px; height:22px; margin:0 auto; border-radius:6px;"></div></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
     return;
   }
 
@@ -1006,23 +1071,76 @@ function renderProductsGrid() {
     return (p.name || '').toLowerCase().includes(productSearchQuery);
   });
 
+  const countBadge = document.getElementById('prodCountBadge');
+  if (countBadge) {
+    countBadge.textContent = `${filteredProducts.length} টি প্রোডাক্ট`;
+  }
+
   if (!filteredProducts.length) {
-    grid.innerHTML = `<div style="text-align:center;padding:24px;color:#94a3b8;">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>`;
+    grid.innerHTML = `<div style="text-align:center;padding:28px;color:#94a3b8;background:#fff;border-radius:12px;border:1px solid #e2e8f0;">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>`;
     return;
   }
   
   const cart = cartsByRetailer[currentRetailer?.id] || [];
-  
+
+  // ── 2-COLUMN GRID VIEW ──────────────────────────────────────
+  if (shopViewMode === 'grid') {
+    let gridHtml = `<div class="grid grid-cols-2 gap-2.5">`;
+    filteredProducts.forEach((p) => {
+      const origIdx = ALL_PRODUCTS.findIndex(prod => prod.id === p.id);
+      const isInCart = cart.some(item => item.id === p.id);
+      const stockQty = parseInt(p.stock || 0);
+      const stockHtml = stockQty > 0 
+        ? `<span class="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/80">${stockQty} টি</span>`
+        : `<span class="inline-block text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200/80">স্টক নেই</span>`;
+
+      const gridImgHtml = (p && p.image)
+        ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="w-full h-full max-h-28 object-contain mx-auto transition-transform group-hover:scale-105" alt="${escHtml(p.name)}" loading="lazy" onerror="this.outerHTML='<div class=\\'w-full h-full flex items-center justify-center text-slate-300\\'><i class=\\'fa-regular fa-image text-xl\\'></i></div>'">`
+        : `<div class="w-full h-full flex items-center justify-center text-slate-300"><i class="fa-regular fa-image text-xl"></i></div>`;
+
+      const btnHtml = isInCart 
+        ? `<button class="w-full py-1.5 px-2 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 rounded-lg hover:bg-emerald-100 active:scale-95 transition flex items-center justify-center gap-1" onclick="event.stopPropagation(); openProductSheet(${origIdx})"><i class="fa-solid fa-circle-check text-[10px]"></i> যোগ হয়েছে</button>`
+        : `<button class="w-full py-1.5 px-2 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 active:scale-95 transition flex items-center justify-center gap-1" onclick="event.stopPropagation(); openProductSheet(${origIdx})"><i class="fa-solid fa-plus text-[10px]"></i> যোগ করুন</button>`;
+
+      gridHtml += `
+        <div class="group bg-white rounded-xl border border-slate-200 p-2.5 shadow-2xs flex flex-col justify-between hover:border-blue-400 hover:shadow-sm active:scale-[0.98] transition cursor-pointer relative" onclick="openProductSheet(${origIdx})">
+          <div class="flex items-center justify-between gap-1 mb-1.5">
+            ${stockHtml}
+            ${isInCart ? '<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs shrink-0" title="কার্টে যোগ করা হয়েছে"></span>' : ''}
+          </div>
+          
+          <div class="h-28 w-full bg-slate-50/70 rounded-lg p-1.5 flex items-center justify-center mb-2 overflow-hidden border border-slate-100">
+            ${gridImgHtml}
+          </div>
+          
+          <div class="mt-auto space-y-2">
+            <div class="text-xs font-bold text-slate-800 sr-line-clamp-2 leading-tight min-h-[28px]" title="${escHtml(p.name)}">
+              ${escHtml(p.name)}
+            </div>
+            <div onclick="event.stopPropagation();">
+              ${btnHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    gridHtml += `</div>`;
+    grid.innerHTML = gridHtml;
+    return;
+  }
+
+  // ── CURRENT LOOK (TABLE LIST VIEW) ──────────────────────────
   let tableHtml = `
-    <table class="w-full text-left border-collapse font-sans text-xs">
-      <thead>
-        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider select-none">
-          <th class="p-3 border-r border-slate-200">প্রোডাক্ট নাম</th>
-          <th class="p-3 text-center border-r border-slate-200">স্টক</th>
-          <th class="p-3 text-center">অ্যাকশন</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-200 text-slate-700">
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+      <table class="w-full text-left border-collapse font-sans text-xs">
+        <thead>
+          <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-wider select-none">
+            <th class="p-3 border-r border-slate-200">প্রোডাক্ট নাম</th>
+            <th class="p-3 text-center border-r border-slate-200">স্টক</th>
+            <th class="p-3 text-center">অ্যাকশন</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 text-slate-700">
   `;
   
   filteredProducts.forEach((p) => {
@@ -1038,8 +1156,8 @@ function renderProductsGrid() {
       : `<span class="inline-block text-[9px] font-extrabold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">স্টক নেই</span>`;
 
     const imgHtml = (p && p.image)
-      ? `<img src="${BASE_URL}/${escHtml(p.image)}" class="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-slate-200/80 shrink-0" alt="${escHtml(p.name)}" loading="lazy" onerror="handleProductImageError(this)">`
-      : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-regular fa-image text-[10px]"></i></div>`;
+      ? `<div class="w-11 h-11 rounded-lg bg-slate-50 border border-slate-200/80 shrink-0 flex items-center justify-center p-0.5"><img src="${BASE_URL}/${escHtml(p.image)}" class="max-w-full max-h-full object-contain mx-auto" alt="${escHtml(p.name)}" loading="lazy" onerror="handleProductImageError(this)"></div>`
+      : `<div class="w-11 h-11 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200"><i class="fa-regular fa-image text-xs"></i></div>`;
 
     tableHtml += `
         <tr class="hover:bg-slate-50/50 transition cursor-pointer" onclick="openProductSheet(${origIdx})">
@@ -1058,8 +1176,9 @@ function renderProductsGrid() {
   });
   
   tableHtml += `
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+    </div>
   `;
   
   grid.innerHTML = tableHtml;

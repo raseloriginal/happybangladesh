@@ -46,6 +46,8 @@ $menus = [
         ['icon' => 'fa-file-invoice-dollar','label' => 'Settlements', 'url' => '/manager/settlements'],
         ['icon' => 'fa-calendar-check','label'=> 'Attendance',  'url' => '/manager/attendance'],
         ['icon' => 'fa-tags',         'label' => 'Ready Sale',  'url' => '/manager/readysale'],
+        ['section' => 'RETAILERS'],
+        ['icon' => 'fa-shop',         'label' => 'Retailers',   'url' => '/manager/retailers'],
     ],
     'sr' => [
         ['section' => 'OVERVIEW'],

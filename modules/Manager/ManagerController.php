@@ -4008,4 +4008,125 @@ class ManagerController extends Controller
         echo json_encode(['success' => false, 'message' => 'Not implemented yet']);
         exit;
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Retailers Management
+    // ══════════════════════════════════════════════════════════
+    public function retailers(): void
+    {
+        $this->render('retailers', []);
+    }
+
+    public function apiRetailers(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $search = trim($_GET['search'] ?? '');
+        $page   = max(1, (int)($_GET['page'] ?? 1));
+        $limit  = (int)($_GET['limit'] ?? 500);
+        $offset = ($page - 1) * $limit;
+
+        $where  = 'WHERE 1=1';
+        $params = [];
+        if ($search !== '') {
+            $where   .= ' AND (r.name LIKE ? OR r.phone LIKE ? OR r.address LIKE ?)';
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        $q = $this->db->prepare("
+            SELECT
+                r.id,
+                r.name,
+                r.phone,
+                r.address,
+                r.lat,
+                r.lng,
+                r.created_at,
+                COUNT(DISTINCT o.id)                                         AS total_orders,
+                COALESCE(SUM(CASE WHEN o.id IS NOT NULL THEN oi_sum.item_total ELSE 0 END), 0) AS total_ordered_value,
+                COUNT(DISTINCT CASE WHEN o.status = 'delivered' THEN o.id END) AS delivered_orders,
+                COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN oi_sum.item_total ELSE 0 END), 0) AS total_delivered_value
+            FROM retailers r
+            LEFT JOIN orders o ON o.retailer_id = r.id
+            LEFT JOIN (
+                SELECT order_id, SUM(total_price) AS item_total
+                FROM order_items
+                GROUP BY order_id
+            ) oi_sum ON oi_sum.order_id = o.id
+            $where
+            GROUP BY r.id
+            ORDER BY r.name ASC
+            LIMIT $limit OFFSET $offset
+        ");
+        $q->execute($params);
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $totalQ = $this->db->prepare("SELECT COUNT(*) FROM retailers r $where");
+        $totalQ->execute($params);
+        $total = (int)$totalQ->fetchColumn();
+
+        echo json_encode([
+            'success'  => true,
+            'total'    => $total,
+            'retailers'=> $rows,
+        ]);
+        exit;
+    }
+
+    public function apiRetailerInfo(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) { echo json_encode(['success' => false]); exit; }
+
+        $q = $this->db->prepare("
+            SELECT
+                r.id, r.name, r.phone, r.address, r.lat, r.lng, r.created_at,
+                COUNT(DISTINCT o.id) AS total_orders,
+                COALESCE(SUM(oi_sum.item_total), 0) AS total_ordered_value,
+                COUNT(DISTINCT CASE WHEN o.status = 'delivered' THEN o.id END) AS delivered_orders,
+                COALESCE(SUM(CASE WHEN o.status = 'delivered' THEN oi_sum.item_total ELSE 0 END), 0) AS total_delivered_value
+            FROM retailers r
+            LEFT JOIN orders o ON o.retailer_id = r.id
+            LEFT JOIN (
+                SELECT order_id, SUM(total_price) AS item_total FROM order_items GROUP BY order_id
+            ) oi_sum ON oi_sum.order_id = o.id
+            WHERE r.id = ?
+            GROUP BY r.id
+        ");
+        $q->execute([$id]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { echo json_encode(['success' => false, 'message' => 'Not found']); exit; }
+
+        echo json_encode(['success' => true, 'retailer' => $row]);
+        exit;
+    }
+
+    public function apiRetailerUpdate(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        $id      = (int)($data['id'] ?? 0);
+        $name    = trim($data['name'] ?? '');
+        $phone   = trim($data['phone'] ?? '');
+        $address = trim($data['address'] ?? '');
+        $lat     = isset($data['lat']) && $data['lat'] !== '' ? (float)$data['lat'] : null;
+        $lng     = isset($data['lng']) && $data['lng'] !== '' ? (float)$data['lng'] : null;
+
+        if (!$id || !$name) {
+            echo json_encode(['success' => false, 'message' => 'ID and name required']);
+            exit;
+        }
+
+        $stmt = $this->db->prepare(
+            'UPDATE retailers SET name=?, phone=?, address=?, lat=?, lng=? WHERE id=?'
+        );
+        $stmt->execute([$name, $phone, $address, $lat, $lng, $id]);
+
+        echo json_encode(['success' => true, 'message' => 'Retailer updated']);
+        exit;
+    }
 }
