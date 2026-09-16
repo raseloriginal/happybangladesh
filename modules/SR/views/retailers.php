@@ -1,178 +1,294 @@
 <?php 
-$pageTitle = 'দোকান তালিকা'; 
+$pageTitle = 'দোকান লিস্ট'; 
 
-// Helper function to truncate retailer name to 2 words
-$truncateName = function($name) {
-    $words = preg_split('/\s+/', trim($name));
-    if (count($words) > 2) {
-        $truncated = implode(' ', array_slice($words, 0, 2)) . '..';
-        return [
-            'is_truncated' => true,
-            'short' => $truncated,
-            'full' => $name
-        ];
-    }
-    return [
-        'is_truncated' => false,
-        'short' => $name,
-        'full' => $name
-    ];
+$formatDist = function($meters) {
+    if ($meters === null || $meters === '') return null;
+    $m = floatval($meters);
+    if ($m < 1000) return round($m) . 'm';
+    return number_format($m / 1000, 1) . 'km';
 };
+$cardPalettes = [
+    '#1e40af', // Cobalt / Royal Blue
+    '#047857', // Deep Emerald Green
+    '#b91c1c', // Crimson Ruby
+    '#6d28d9', // Royal Purple
+    '#c2410c', // Terracotta / Burnt Orange
+    '#0f766e', // Deep Teal
+    '#be185d', // Rose Magenta
+    '#4338ca', // Deep Indigo
+    '#0369a1', // Deep Cerulean
+    '#854d0e', // Bronze Amber
+    '#701a75', // Deep Plum
+    '#334155', // Charcoal Slate
+];
 ?>
 
 <style>
   .font-siliguri {
     font-family: 'Hind Siliguri', 'Inter', sans-serif;
   }
+  .retailer-card {
+    border-radius: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 10px 11px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 132px;
+    color: #ffffff;
+    cursor: pointer;
+    user-select: none;
+    transition: filter 0.15s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .retailer-card:hover {
+    filter: brightness(1.06);
+  }
+  .retailer-card:active {
+    filter: brightness(0.92);
+  }
+  .retailer-situation-icon {
+    position: absolute;
+    top: 9px;
+    right: 10px;
+    font-size: 32px;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 2;
+    transition: transform 0.15s ease;
+  }
+  .retailer-situation-icon.status-ordered {
+    color: #4ade80;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+  }
+  .retailer-situation-icon.status-pending {
+    color: rgba(255, 255, 255, 0.65);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+  }
+  .retailer-card:hover .retailer-situation-icon {
+    transform: scale(1.1);
+  }
+  .retailer-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #ffffff;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .retailer-card-addr {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 3px;
+  }
+  .retailer-bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+  .dist-badge-solid {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .order-btn-solid {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #0f172a;
+    background: #ffffff;
+    border: 1px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: transform 0.1s ease, background-color 0.15s ease;
+  }
+  .order-btn-solid:hover {
+    background-color: #f8fafc;
+  }
+  .order-btn-solid:active {
+    transform: scale(0.95);
+  }
+  .order-btn-completed {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #047857;
+    background: #ffffff;
+    border: 1px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: transform 0.1s ease;
+  }
+  .order-btn-completed:active {
+    transform: scale(0.95);
+  }
 </style>
 
-<div class="p-3 sm:p-5 space-y-4 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none print:bg-white">
+<div class="max-w-2xl mx-auto font-siliguri text-slate-900 pb-28 print:p-0 print:max-w-none print:bg-white">
 
-  <!-- Premium Minimal Header Card -->
-  <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">
-    <div class="flex items-center gap-3">
-      <a href="<?= url('sr/dashboard') ?>" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-900 hover:text-white transition-all duration-200 flex items-center justify-center text-slate-600 shadow-2xs active:scale-95 print:hidden">
-        <i class="fa-solid fa-arrow-left text-xs sm:text-sm"></i>
-      </a>
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight tracking-tight">
-            দোকান তালিকা
-          </h1>
-          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200/50 print:hidden">
-            <?= count($retailers) ?>টি দোকান
-          </span>
-        </div>
-        <p class="text-xs text-slate-400 font-medium leading-tight mt-1">কাস্টমার শপের তালিকা</p>
-      </div>
-    </div>
+  <!-- Top App Bar (Header from sketch) -->
+  <div class="bg-white px-3 py-3 border-b border-slate-300 flex items-center justify-between sticky top-0 z-30 select-none">
+    <a href="<?= url('sr/dashboard') ?>" class="w-8 h-8 flex items-center justify-center text-slate-800 active:scale-90 transition print:hidden" title="পেছনে যান">
+      <i class="fa-solid fa-arrow-left text-lg"></i>
+    </a>
     
-    <div class="flex items-center gap-2 print:hidden">
-      <a href="<?= url('sr/sales') ?>" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition active:scale-95 shadow-sm" title="ম্যাপ ভিউ">
-        <i class="fa-solid fa-map-location-dot text-xs sm:text-sm"></i>
-      </a>
-    </div>
+    <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+      দোকান লিস্ট
+    </h1>
+    
+    <button type="button" id="toggleSearchBtn" onclick="toggleSearchBar()" class="w-8 h-8 flex items-center justify-center text-slate-800 active:scale-90 transition print:hidden cursor-pointer" title="সার্চ">
+      <i class="fa-solid fa-magnifying-glass text-lg"></i>
+    </button>
   </div>
 
-  <!-- Search Box Card -->
-  <div class="bg-white p-3 rounded-2xl border border-slate-200/50 shadow-3xs print:hidden">
+  <!-- Search Row (Shown when Q clicked, as per sketch) -->
+  <div id="searchRow" class="<?= $search !== '' ? '' : 'hidden' ?> bg-slate-50 px-3 py-2 border-b border-slate-300 print:hidden transition-all">
     <form id="retailerSearchForm" method="GET" action="<?= url('sr/retailers') ?>" class="flex gap-2">
       <div class="relative flex-1">
-        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-        <input type="text" id="retailerSearchInput" name="search" value="<?= h($search) ?>" placeholder="দোকানের নাম, ঠিকানা বা মোবাইল নাম্বার..." 
-          class="w-full bg-slate-50 border border-slate-200/60 rounded-xl pl-9 pr-8 py-2 text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition" autocomplete="off">
-        <a href="<?= url('sr/retailers') ?>" id="clearSearchBtn" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs <?= $search !== '' ? '' : 'hidden' ?>">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input type="text" id="retailerSearchInput" name="search" value="<?= h($search) ?>" placeholder="Search..." 
+          class="w-full bg-white border border-slate-300 rounded px-8 py-1.5 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-800 transition" autocomplete="off">
+        <a href="<?= url('sr/retailers') ?>" id="clearSearchBtn" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs <?= $search !== '' ? '' : 'hidden' ?>">
           <i class="fa-solid fa-circle-xmark"></i>
         </a>
       </div>
-      <button type="submit" class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl active:scale-95 transition">
+      <button type="submit" class="bg-slate-900 text-white font-bold text-xs px-3.5 py-1.5 rounded active:scale-95 transition">
         খুঁজুন
       </button>
     </form>
   </div>
 
-  <!-- Minimal Table Container -->
-  <div class="bg-white rounded-2xl border border-slate-200/80 shadow-3xs overflow-hidden print:border-slate-300">
-    <table class="w-full text-left border-collapse table-fixed min-w-0" id="retailersTable">
-      <thead>
-        <tr class="border-b border-slate-200 text-xs text-slate-800 font-bold tracking-tight bg-slate-50">
-          <th class="p-2.5 bg-slate-50/80 border-r border-slate-200/50 w-[58%]">
-            দোকানের নাম
-          </th>
-          <th class="p-2.5 bg-slate-50/80 text-center border-r border-slate-200/50 w-[28%]">
-            মোবাইল
-          </th>
-          <th class="p-2.5 bg-slate-50/80 text-center w-[14%]">
-            অর্ডার
-          </th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-100 font-sans" id="tableBody">
-        <?php if (empty($retailers)): ?>
-          <tr id="emptyRow">
-            <td colspan="3" class="p-12 text-center text-slate-400 bg-white">
-              <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center text-xl mx-auto mb-2"><i class="fa-solid fa-store"></i></div>
-              <span class="text-xs font-medium">কোনো দোকান পাওয়া যায়নি।</span>
-            </td>
-          </tr>
-        <?php else: ?>
-          <?php foreach ($retailers as $r): ?>
-            <tr class="retailer-row hover:bg-slate-50/40 transition-colors">
-              
-              <!-- Retailer Name Cell -->
-              <td class="p-2 border-r border-slate-100 align-middle bg-white overflow-hidden">
-                <div class="flex items-center gap-2 min-w-0">
-                  <?php if ($r['has_order_today']): ?>
-                    <div class="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-emerald-600 text-xs shrink-0 select-none font-siliguri" title="অর্ডার সম্পন্ন">
-                      <i class="fa-solid fa-check text-[10px]"></i>
-                    </div>
-                  <?php else: ?>
-                    <div class="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center font-bold text-blue-600 text-xs shrink-0 select-none font-siliguri" title="পেন্ডিং">
-                      <?= mb_substr($r['name'], 0, 1, 'UTF-8') ?>
-                    </div>
-                  <?php endif; ?>
-                  
-                  <div class="min-w-0 flex-1">
-                    <?php 
-                      $nameInfo = $truncateName($r['name']); 
-                      if ($nameInfo['is_truncated']):
-                    ?>
-                      <div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug cursor-pointer select-none break-words"
-                           onclick="toggleRetailerName(this, '<?= htmlspecialchars($nameInfo['full'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($nameInfo['short'], ENT_QUOTES, 'UTF-8') ?>')">
-                        <?= h($nameInfo['short']) ?>
-                      </div>
-                    <?php else: ?>
-                      <div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug break-words">
-                        <?= h($r['name']) ?>
-                      </div>
-                    <?php endif; ?>
-                  </div>
-                </div>
-              </td>
+  <!-- 2-Column Retailers Grid with Solid Color Cards (No Gap, No Border Radius) -->
+  <div id="retailersContainer" class="grid grid-cols-2 border-t border-l border-white/20">
+    <?php if (empty($retailers)): ?>
+      <div id="emptyContainer" class="col-span-2 p-12 text-center text-slate-500 bg-white border-r border-b border-slate-300">
+        <div class="w-10 h-10 rounded bg-slate-100 text-slate-400 flex items-center justify-center text-lg mx-auto mb-2">
+          <i class="fa-solid fa-store"></i>
+        </div>
+        <p class="text-xs font-bold text-slate-800">কোনো দোকান পাওয়া যায়নি</p>
+      </div>
+    <?php else: ?>
+      <?php foreach ($retailers as $idx => $r): ?>
+        <?php 
+          $hasOrder = !empty($r['has_order_today']);
+          $distStr = isset($r['distance_meters']) ? $formatDist($r['distance_meters']) : null;
+          $cleanAddress = (!empty($r['address']) && stripos($r['address'], 'imported dummy') === false) ? trim($r['address']) : '';
+          $bgColor = $cardPalettes[$idx % count($cardPalettes)];
+        ?>
+        <div class="retailer-card"
+             style="background-color: <?= $bgColor ?>;"
+             onclick="openShop(<?= $r['id'] ?>, '<?= h(addslashes($r['name'])) ?>', '<?= h(addslashes($r['address'] ?? '')) ?>', <?= $hasOrder ? 'true' : 'false' ?>)"
+             data-id="<?= $r['id'] ?>"
+             data-lat="<?= $r['lat'] ?? '' ?>"
+             data-lng="<?= $r['lng'] ?? '' ?>"
+             data-dist="<?= $r['distance_meters'] ?? '' ?>">
+          
+          <!-- Big Situation Icon -->
+          <div class="retailer-situation-icon <?= $hasOrder ? 'status-ordered' : 'status-pending' ?>" title="<?= $hasOrder ? 'আজকের অর্ডার সম্পন্ন' : 'নতুন অর্ডার' ?>">
+            <i class="fa-solid <?= $hasOrder ? 'fa-circle-check' : 'fa-cart-shopping' ?>"></i>
+          </div>
 
-              <!-- Phone Cell -->
-              <td class="p-2 text-center border-r border-slate-100 align-middle bg-white text-slate-600 text-[10px] sm:text-xs font-mono truncate">
-                <?= h($r['phone'] ?: 'N/A') ?>
-              </td>
+          <!-- Name Section (Line 1 & Line 2) -->
+          <div class="min-w-0" style="padding-right: 38px;">
+            <h3 class="retailer-card-title" title="<?= h($r['name']) ?>">
+              <?= h($r['name']) ?>
+            </h3>
+            <?php if (!empty($cleanAddress)): ?>
+              <p class="retailer-card-addr" title="<?= h($cleanAddress) ?>">
+                <?= h($cleanAddress) ?>
+              </p>
+            <?php endif; ?>
+          </div>
 
-              <!-- Order Action Button -->
-              <td class="p-2 text-center align-middle bg-white">
-                <?php if ($r['has_order_today']): ?>
-                  <button type="button" onclick="openShop(<?= $r['id'] ?>, '<?= h(addslashes($r['name'])) ?>', '<?= h(addslashes($r['address'] ?? '')) ?>', true)" 
-                    class="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 transition-all flex items-center justify-center shadow-3xs active:scale-95 mx-auto" 
-                    title="অর্ডার সম্পন্ন (সম্পাদনা করতে ক্লিক করুন)">
-                    <i class="fa-solid fa-circle-check text-sm"></i>
-                  </button>
-                <?php else: ?>
-                  <button type="button" onclick="openShop(<?= $r['id'] ?>, '<?= h(addslashes($r['name'])) ?>', '<?= h(addslashes($r['address'] ?? '')) ?>', false)" 
-                    class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center shadow-3xs active:scale-95 mx-auto" 
-                    title="অর্ডার শুরু">
-                    <i class="fa-solid fa-cart-plus text-xs"></i>
-                  </button>
-                <?php endif; ?>
-              </td>
-            </tr>
-          <?php endforeach; ?>
-        <?php endif; ?>
-      </tbody>
-      </table>
+          <!-- Bottom Row: [ 📍 8m ] and [ Order Button ] -->
+          <div class="retailer-bottom-row">
+            <!-- Distance Badge [ 📍 8m ] -->
+            <span class="dist-badge dist-badge-solid" title="দূরত্ব">
+              <i class="fa-solid fa-location-dot" style="color:#fde047; font-size:9px; flex-shrink:0;"></i>
+              <span class="dist-text truncate"><?= $distStr ?: '...' ?></span>
+            </span>
+
+            <!-- Status / Order Button -->
+            <?php if ($hasOrder): ?>
+              <span class="order-btn-completed" title="আজকের অর্ডার সম্পন্ন">
+                <i class="fa-solid fa-circle-check" style="font-size:10px;"></i>
+                <span>সম্পন্ন</span>
+              </span>
+            <?php else: ?>
+              <span class="order-btn-solid" title="নতুন অর্ডার">
+                <i class="fa-solid fa-cart-shopping" style="font-size:10px;"></i>
+                <span>অর্ডার</span>
+              </span>
+            <?php endif; ?>
+          </div>
+
+        </div>
+      <?php endforeach; ?>
+    <?php endif; ?>
   </div>
 
   <!-- Pagination -->
   <?php if ($totalPages > 1): ?>
-    <div class="flex items-center justify-center gap-2 pt-2 print:hidden select-none">
+    <?php 
+      $locQuery = ($lat != 0 && $lng != 0) ? "&lat={$lat}&lng={$lng}" : '';
+    ?>
+    <div id="paginationContainer" class="flex items-center justify-center gap-2 pt-4 print:hidden select-none">
       <?php if ($page > 1): ?>
-        <a href="<?= url('sr/retailers') ?>?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?>" class="px-3.5 py-2 bg-white border border-slate-200/60 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-3xs active:scale-95 transition">
+        <a href="<?= url('sr/retailers') ?>?page=<?= $page - 1 ?>&search=<?= urlencode($search) ?><?= $locQuery ?>" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-800 hover:bg-slate-50 active:scale-95 transition">
           <i class="fa-solid fa-angle-left"></i> আগে
         </a>
       <?php endif; ?>
 
-      <span class="px-4 py-2 bg-slate-50 border border-slate-200/40 rounded-xl text-xs font-bold text-slate-500 font-mono">
-        পেজ <?= $page ?> / <?= $totalPages ?>
+      <span class="px-3 py-1 bg-slate-100 rounded text-xs font-bold text-slate-700 font-mono">
+        <?= $page ?> / <?= $totalPages ?>
       </span>
 
       <?php if ($page < $totalPages): ?>
-        <a href="<?= url('sr/retailers') ?>?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?>" class="px-3.5 py-2 bg-white border border-slate-200/60 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-3xs active:scale-95 transition">
+        <a href="<?= url('sr/retailers') ?>?page=<?= $page + 1 ?>&search=<?= urlencode($search) ?><?= $locQuery ?>" class="px-3 py-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-800 hover:bg-slate-50 active:scale-95 transition">
           পরে <i class="fa-solid fa-angle-right"></i>
         </a>
       <?php endif; ?>
@@ -189,7 +305,6 @@ const BASE_URL = '<?= BASE_URL ?>';
 const ALL_PRODUCTS_URL = `${BASE_URL}/sr/api/products`;
 let ALL_PRODUCTS = [];
 
-// Fetch products asynchronously
 fetch(ALL_PRODUCTS_URL)
   .then(res => res.json())
   .then(data => {
@@ -204,29 +319,32 @@ let currentRetailer = null;
 let currentProduct  = null;
 let isSubmitting    = false;
 
-// Colour palette for product cards (required by _shop_v2.php)
-const gradients = [
-  'linear-gradient(135deg,#2563eb,#3b82f6)',
-  'linear-gradient(135deg,#06b6d4,#0891b2)',
-  'linear-gradient(135deg,#10b981,#059669)',
-  'linear-gradient(135deg,#f59e0b,#d97706)',
-  'linear-gradient(135deg,#8b5cf6,#7c3aed)',
-  'linear-gradient(135deg,#ef4444,#dc2626)',
+const CARD_PALETTES = [
+  '#1e40af', // Cobalt / Royal Blue
+  '#047857', // Deep Emerald Green
+  '#b91c1c', // Crimson Ruby
+  '#6d28d9', // Royal Purple
+  '#c2410c', // Terracotta / Burnt Orange
+  '#0f766e', // Deep Teal
+  '#be185d', // Rose Magenta
+  '#4338ca', // Deep Indigo
+  '#0369a1', // Deep Cerulean
+  '#854d0e', // Bronze Amber
+  '#701a75', // Deep Plum
+  '#334155'  // Charcoal Slate
 ];
 const emojis = ['📦','🛒','🏪','🎁','🧴','🍬','🧃','🍪'];
 
-// Stub: no map pins on the retailers list page
 function updateAllPins() {}
 
 function openShop(id, name, address, hasOrderToday = false) {
   const ret = { id: id, name: name, address: address, has_order_today: hasOrderToday };
 
-  // Log visit silently (fire-and-forget)
   fetch(`${BASE_URL}/sr/api/log-visit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `retailer_id=${id}`
-  }).catch(() => {}); // silent fail — visit log never blocks the UI
+  }).catch(() => {});
 
   if (ret.has_order_today) {
     showConfirmModal(`"${ret.name}" দোকানে আজ একটি অর্ডার দেওয়া হয়েছে। আপনি কি এই অর্ডার পরিবর্তন করতে চান?`, () => {
@@ -260,16 +378,45 @@ function openShop(id, name, address, hasOrderToday = false) {
   }
 }
 
-function toggleRetailerName(element, fullName, shortName) {
-  if (element.innerText.trim().endsWith('..')) {
-    element.innerText = fullName;
+// ── Toggle Search Bar (as in sketch: when click Q -> show this) ─
+function toggleSearchBar() {
+  const searchRow = document.getElementById('searchRow');
+  const searchInput = document.getElementById('retailerSearchInput');
+  if (!searchRow) return;
+
+  if (searchRow.classList.contains('hidden')) {
+    searchRow.classList.remove('hidden');
+    if (searchInput) searchInput.focus();
   } else {
-    element.innerText = shortName;
+    searchRow.classList.add('hidden');
   }
 }
 
-// ── Client-side fuzzy search with Fuse.js ──────────────────────
+// ── Client-side Retailers Data & Distance Calculation ──────────
 const allRetailers = <?= isset($allRetailers) ? json_encode($allRetailers) : '[]' ?>;
+let userLat = parseFloat(localStorage.getItem('sr_last_lat')) || <?= !empty($lat) ? (float)$lat : 'null' ?>;
+let userLng = parseFloat(localStorage.getItem('sr_last_lng')) || <?= !empty($lng) ? (float)$lng : 'null' ?>;
+
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+function formatDistanceJs(meters) {
+  if (meters === null || meters === undefined || isNaN(meters)) {
+    return '...';
+  }
+  if (meters < 1000) {
+    return `${Math.round(meters)}m`;
+  }
+  return `${(meters / 1000).toFixed(1)}km`;
+}
 
 function normalizeBanglish(text) {
   if (!text) return '';
@@ -289,121 +436,189 @@ function normalizeBanglish(text) {
   return res;
 }
 
+let fuse = null;
+function initRetailersFuse() {
+  allRetailers.forEach(r => {
+    r.normalized_name = normalizeBanglish(r.name);
+  });
+  fuse = new Fuse(allRetailers, {
+    keys: ['name', 'normalized_name', 'phone', 'address'],
+    threshold: 0.4,
+    ignoreLocation: true
+  });
+}
+
+function updateRetailersDistancesAndSort() {
+  if (!userLat || !userLng) return;
+
+  allRetailers.forEach(r => {
+    if (r.lat && r.lng && parseFloat(r.lat) !== 0 && parseFloat(r.lng) !== 0) {
+      r.distance_meters = calculateDistance(userLat, userLng, parseFloat(r.lat), parseFloat(r.lng));
+    } else {
+      r.distance_meters = null;
+    }
+  });
+
+  allRetailers.sort((a, b) => {
+    if (a.distance_meters === null && b.distance_meters === null) return a.name.localeCompare(b.name);
+    if (a.distance_meters === null) return 1;
+    if (b.distance_meters === null) return -1;
+    return a.distance_meters - b.distance_meters;
+  });
+}
+
+function renderRetailerCardHtml(r, index = 0) {
+  const hasOrder = r.has_order_today > 0;
+  const distStr = formatDistanceJs(r.distance_meters);
+  const cleanAddress = (r.address && !r.address.toLowerCase().includes('imported dummy')) ? r.address.trim() : '';
+  const escName = escHtml(r.name);
+  const escAddr = escHtml(cleanAddress);
+  const bgColor = CARD_PALETTES[index % CARD_PALETTES.length];
+
+  return `
+    <div class="retailer-card"
+         style="background-color: ${bgColor};"
+         onclick="openShop(${r.id}, '${escName.replace(/'/g, "\\'")}', '${escAddr.replace(/'/g, "\\'")}', ${hasOrder ? 'true' : 'false'})"
+         data-id="${r.id}"
+         data-lat="${r.lat || ''}"
+         data-lng="${r.lng || ''}"
+         data-dist="${r.distance_meters !== null && r.distance_meters !== undefined ? r.distance_meters : ''}">
+      
+      <!-- Big Situation Icon -->
+      <div class="retailer-situation-icon ${hasOrder ? 'status-ordered' : 'status-pending'}" title="${hasOrder ? 'আজকের অর্ডার সম্পন্ন' : 'নতুন অর্ডার'}">
+        <i class="fa-solid ${hasOrder ? 'fa-circle-check' : 'fa-cart-shopping'}"></i>
+      </div>
+
+      <div class="min-w-0" style="padding-right: 38px;">
+        <h3 class="retailer-card-title" title="${escName}">
+          ${escName}
+        </h3>
+        ${cleanAddress ? `<p class="retailer-card-addr" title="${escAddr}">${escAddr}</p>` : ''}
+      </div>
+
+      <div class="retailer-bottom-row">
+        <span class="dist-badge dist-badge-solid" title="দূরত্ব">
+          <i class="fa-solid fa-location-dot" style="color:#fde047; font-size:9px; flex-shrink:0;"></i>
+          <span class="dist-text truncate">${distStr}</span>
+        </span>
+
+        ${hasOrder 
+          ? `<span class="order-btn-completed" title="আজকের অর্ডার সম্পন্ন">
+              <i class="fa-solid fa-circle-check" style="font-size:10px;"></i>
+              <span>সম্পন্ন</span>
+            </span>`
+          : `<span class="order-btn-solid" title="নতুন অর্ডার">
+              <i class="fa-solid fa-cart-shopping" style="font-size:10px;"></i>
+              <span>অর্ডার</span>
+            </span>`
+        }
+      </div>
+
+    </div>
+  `;
+}
+
+function renderCardsList(list) {
+  const container = document.getElementById('retailersContainer');
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div id="emptyContainer" class="col-span-2 p-12 text-center text-slate-500 bg-white border-r border-b border-slate-300">
+        <div class="w-10 h-10 rounded bg-slate-100 text-slate-400 flex items-center justify-center text-lg mx-auto mb-2">
+          <i class="fa-solid fa-store"></i>
+        </div>
+        <p class="text-xs font-bold text-slate-800">কোনো দোকান পাওয়া যায়নি</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map((r, idx) => renderRetailerCardHtml(r, idx)).join('');
+}
+
+function updateExistingCardsDistances() {
+  const container = document.getElementById('retailersContainer');
+  if (!container || !userLat || !userLng) return;
+
+  const cards = container.querySelectorAll('.retailer-card');
+  cards.forEach(card => {
+    const rLat = parseFloat(card.getAttribute('data-lat'));
+    const rLng = parseFloat(card.getAttribute('data-lng'));
+    const distSpan = card.querySelector('.dist-text');
+
+    if (distSpan) {
+      if (rLat && rLng && !isNaN(rLat) && !isNaN(rLng) && rLat !== 0 && rLng !== 0) {
+        const dist = calculateDistance(userLat, userLng, rLat, rLng);
+        card.setAttribute('data-dist', dist);
+        distSpan.textContent = formatDistanceJs(dist);
+      } else {
+        distSpan.textContent = '...';
+      }
+    }
+  });
+}
+
+function refreshLocation() {
+  if (!navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+
+      localStorage.setItem('sr_last_lat', userLat);
+      localStorage.setItem('sr_last_lng', userLng);
+      document.cookie = `sr_last_lat=${userLat}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `sr_last_lng=${userLng}; path=/; max-age=86400; SameSite=Lax`;
+
+      updateRetailersDistancesAndSort();
+
+      const searchInput = document.getElementById('retailerSearchInput');
+      if (!searchInput || !searchInput.value.trim()) {
+        renderCardsList(allRetailers.slice(0, 32));
+        const paginationContainer = document.getElementById('paginationContainer');
+        if (paginationContainer) paginationContainer.style.display = 'flex';
+      } else {
+        updateExistingCardsDistances();
+      }
+    },
+    (err) => {
+      console.warn('Geolocation error:', err);
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+  );
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  const originalTableHTML = document.getElementById('tableBody') ? document.getElementById('tableBody').innerHTML : '';
-  const paginationContainer = document.querySelector('.flex.items-center.justify-center.gap-2.pt-2.print\\:hidden');
+  const originalContainerHTML = document.getElementById('retailersContainer') ? document.getElementById('retailersContainer').innerHTML : '';
+  const paginationContainer = document.getElementById('paginationContainer');
   const searchInput = document.getElementById('retailerSearchInput');
   const searchForm = document.getElementById('retailerSearchForm');
   const clearSearchBtn = document.getElementById('clearSearchBtn');
-  
-  let fuse = null;
-  let hasSearchedClientSide = false;
 
-  function initRetailersFuse() {
-    allRetailers.forEach(r => {
-      r.normalized_name = normalizeBanglish(r.name);
-    });
-    fuse = new Fuse(allRetailers, {
-      keys: ['name', 'normalized_name', 'phone'],
-      threshold: 0.4,
-      ignoreLocation: true
-    });
-  }
+  if (userLat && userLng) {
+    updateRetailersDistancesAndSort();
 
-  function truncateNameJs(name) {
-    const words = name.trim().split(/\s+/);
-    if (words.length > 2) {
-      const truncated = words.slice(0, 2).join(' ') + '..';
-      return { is_truncated: true, short: truncated, full: name };
+    const serverHadLocation = <?= (!empty($lat) && !empty($lng)) ? 'true' : 'false' ?>;
+    if (!serverHadLocation && allRetailers.length > 0) {
+      renderCardsList(allRetailers.slice(0, 32));
+    } else {
+      updateExistingCardsDistances();
     }
-    return { is_truncated: false, short: name, full: name };
   }
 
-  function renderSearchResults(results) {
-    const tableBody = document.getElementById('tableBody');
-    if (!tableBody) return;
-    if (paginationContainer) paginationContainer.style.display = 'none';
-    
-    if (results.length === 0) {
-      tableBody.innerHTML = `
-        <tr id="emptyRow">
-          <td colspan="3" class="p-12 text-center text-slate-400 bg-white">
-            <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center text-xl mx-auto mb-2"><i class="fa-solid fa-store"></i></div>
-            <span class="text-xs font-medium">কোনো দোকান পাওয়া যায়নি।</span>
-          </td>
-        </tr>
-      `;
-      return;
+  refreshLocation();
+
+  function restoreOriginalCards() {
+    if (userLat && userLng && allRetailers.length > 0) {
+      renderCardsList(allRetailers.slice(0, 32));
+    } else {
+      const container = document.getElementById('retailersContainer');
+      if (container) container.innerHTML = originalContainerHTML;
     }
-
-    tableBody.innerHTML = results.map(res => {
-      const r = res.item;
-      const firstChar = r.name.charAt(0);
-      const nameInfo = truncateNameJs(r.name);
-      
-      let nameHtml = '';
-      if (nameInfo.is_truncated) {
-        nameHtml = `
-          <div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug cursor-pointer select-none break-words"
-               onclick="toggleRetailerName(this, '${escHtml(nameInfo.full).replace(/'/g, "\\'")}', '${escHtml(nameInfo.short).replace(/'/g, "\\'")}')">
-            ${escHtml(nameInfo.short)}
-          </div>
-        `;
-      } else {
-        nameHtml = `
-          <div class="font-bold text-slate-800 text-xs sm:text-sm leading-snug break-words">
-            ${escHtml(r.name)}
-          </div>
-        `;
-      }
-
-      const avatarHtml = r.has_order_today > 0
-        ? `<div class="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-emerald-600 text-xs shrink-0 select-none font-siliguri" title="অর্ডার সম্পন্ন">
-             <i class="fa-solid fa-check text-[10px]"></i>
-           </div>`
-        : `<div class="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center font-bold text-blue-600 text-xs shrink-0 select-none font-siliguri" title="পেন্ডিং">
-             ${escHtml(firstChar)}
-           </div>`;
-
-      const buttonHtml = r.has_order_today > 0
-        ? `<button type="button" onclick="openShop(${r.id}, '${escHtml(r.name).replace(/'/g, "\\'")}', '${escHtml(r.address || '').replace(/'/g, "\\'")}', true)" 
-             class="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 transition-all flex items-center justify-center shadow-3xs active:scale-95 mx-auto" 
-             title="অর্ডার সম্পন্ন (সম্পাদনা করতে ক্লিক করুন)">
-             <i class="fa-solid fa-circle-check text-sm"></i>
-           </button>`
-        : `<button type="button" onclick="openShop(${r.id}, '${escHtml(r.name).replace(/'/g, "\\'")}', '${escHtml(r.address || '').replace(/'/g, "\\'")}', false)" 
-             class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center shadow-3xs active:scale-95 mx-auto" 
-             title="অর্ডার শুরু">
-             <i class="fa-solid fa-cart-plus text-xs"></i>
-           </button>`;
-
-      return `
-        <tr class="retailer-row hover:bg-slate-50/40 transition-colors">
-          <td class="p-2 border-r border-slate-100 align-middle bg-white overflow-hidden">
-            <div class="flex items-center gap-2 min-w-0">
-              ${avatarHtml}
-              <div class="min-w-0 flex-1">
-                ${nameHtml}
-              </div>
-            </div>
-          </td>
-          <td class="p-2 text-center border-r border-slate-100 align-middle bg-white text-slate-600 text-[10px] sm:text-xs font-mono truncate">
-            ${escHtml(r.phone || 'N/A')}
-          </td>
-          <td class="p-2 text-center align-middle bg-white">
-            ${buttonHtml}
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  function restoreOriginalTable() {
-    const tableBody = document.getElementById('tableBody');
-    if (tableBody) tableBody.innerHTML = originalTableHTML;
     if (paginationContainer) paginationContainer.style.display = 'flex';
     if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
-    hasSearchedClientSide = false;
   }
 
   if (searchForm) {
@@ -416,12 +631,12 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.addEventListener('input', () => {
       const q = searchInput.value.trim();
       if (!q) {
-        restoreOriginalTable();
+        restoreOriginalCards();
         return;
       }
-      
+
       if (clearSearchBtn) clearSearchBtn.classList.remove('hidden');
-      hasSearchedClientSide = true;
+      if (paginationContainer) paginationContainer.style.display = 'none';
 
       if (!fuse) {
         initRetailersFuse();
@@ -429,17 +644,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const normalizedQ = normalizeBanglish(q.toLowerCase());
       const results = fuse.search(normalizedQ);
-      renderSearchResults(results);
+      const matchedRetailers = results.map(res => res.item);
+
+      matchedRetailers.sort((a, b) => {
+        if (a.distance_meters === null && b.distance_meters === null) return 0;
+        if (a.distance_meters === null) return 1;
+        if (b.distance_meters === null) return -1;
+        return a.distance_meters - b.distance_meters;
+      });
+
+      renderCardsList(matchedRetailers);
     });
   }
 
   if (clearSearchBtn) {
     clearSearchBtn.addEventListener('click', (e) => {
-      if (hasSearchedClientSide) {
-        e.preventDefault();
-        searchInput.value = '';
-        restoreOriginalTable();
-      }
+      e.preventDefault();
+      if (searchInput) searchInput.value = '';
+      restoreOriginalCards();
     });
   }
 });

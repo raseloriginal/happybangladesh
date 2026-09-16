@@ -407,8 +407,11 @@ class SRController extends Controller
     {
         $search = trim($_GET['search'] ?? '');
         $page = max(1, intval($_GET['page'] ?? 1));
-        $limit = 15;
+        $limit = 18;
         $offset = ($page - 1) * $limit;
+
+        $lat = floatval($_GET['lat'] ?? ($_COOKIE['sr_last_lat'] ?? 0));
+        $lng = floatval($_GET['lng'] ?? ($_COOKIE['sr_last_lng'] ?? 0));
 
         $params = [];
         $where = " WHERE 1=1 ";
@@ -424,34 +427,75 @@ class SRController extends Controller
         $countQuery->execute($params);
         $totalRetailers = (int)$countQuery->fetchColumn();
 
-        // Get paginated items with order count today
         $srId = Auth::id();
-        $q = $this->db->prepare("
-            SELECT r.*,
-                   (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today
-            FROM retailers r
-            $where
-            ORDER BY r.name ASC
-            LIMIT $limit OFFSET $offset
-        ");
-        
-        $selectParams = array_merge([$srId], $params);
-        $q->execute($selectParams);
-        $retailers = $q->fetchAll();
+
+        if ($lat != 0.0 && $lng != 0.0) {
+            $distSelect = "
+                CASE 
+                    WHEN r.lat IS NOT NULL AND r.lng IS NOT NULL AND r.lat != 0 AND r.lng != 0 THEN
+                        ROUND(
+                          6371000 * 2 * ASIN(SQRT(
+                            POWER(SIN(RADIANS(r.lat - ?) / 2), 2) +
+                            COS(RADIANS(?)) * COS(RADIANS(r.lat)) *
+                            POWER(SIN(RADIANS(r.lng - ?) / 2), 2)
+                          ))
+                        )
+                    ELSE NULL
+                END AS distance_meters
+            ";
+            $orderBy = "ORDER BY (distance_meters IS NULL) ASC, distance_meters ASC, r.name ASC";
+
+            $q = $this->db->prepare("
+                SELECT r.*,
+                       (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today,
+                       $distSelect
+                FROM retailers r
+                $where
+                $orderBy
+                LIMIT $limit OFFSET $offset
+            ");
+            $selectParams = array_merge([$srId, $lat, $lat, $lng], $params);
+            $q->execute($selectParams);
+            $retailers = $q->fetchAll();
+
+            // Fetch all retailers for client-side search via Fuse.js
+            $allQ = $this->db->prepare("
+                SELECT r.*,
+                       (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today,
+                       $distSelect
+                FROM retailers r
+                $orderBy
+            ");
+            $allQ->execute([$srId, $lat, $lat, $lng]);
+            $allRetailers = $allQ->fetchAll();
+        } else {
+            $q = $this->db->prepare("
+                SELECT r.*,
+                       (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today,
+                       NULL as distance_meters
+                FROM retailers r
+                $where
+                ORDER BY r.name ASC
+                LIMIT $limit OFFSET $offset
+            ");
+            $selectParams = array_merge([$srId], $params);
+            $q->execute($selectParams);
+            $retailers = $q->fetchAll();
+
+            $allQ = $this->db->prepare("
+                SELECT r.*,
+                       (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today,
+                       NULL as distance_meters
+                FROM retailers r
+                ORDER BY r.name ASC
+            ");
+            $allQ->execute([$srId]);
+            $allRetailers = $allQ->fetchAll();
+        }
 
         $totalPages = ceil($totalRetailers / $limit);
 
-        // Fetch all retailers for client-side search via Fuse.js
-        $allQ = $this->db->prepare("
-            SELECT r.*,
-                   (SELECT COUNT(*) FROM orders o WHERE o.retailer_id = r.id AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()) as has_order_today
-            FROM retailers r
-            ORDER BY r.name ASC
-        ");
-        $allQ->execute([$srId]);
-        $allRetailers = $allQ->fetchAll();
-
-        $this->renderApp('retailers', compact('retailers', 'search', 'page', 'totalPages', 'totalRetailers', 'allRetailers'));
+        $this->renderApp('retailers', compact('retailers', 'search', 'page', 'totalPages', 'totalRetailers', 'allRetailers', 'lat', 'lng'));
     }
 
     // ── Profile ───────────────────────────────────────────────

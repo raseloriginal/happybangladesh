@@ -342,6 +342,8 @@
         // Save to cache for instant preloading
         localStorage.setItem('sr_last_lat', lat);
         localStorage.setItem('sr_last_lng', lng);
+        document.cookie = `sr_last_lat=${lat}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `sr_last_lng=${lng}; path=/; max-age=86400; SameSite=Lax`;
 
         // Push to server every 60 seconds
         pushLocationToServer(lat, lng, accuracy);
