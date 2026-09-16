@@ -732,9 +732,6 @@ function addRetailerPin(ret) {
   const labelIcon = L.divIcon({
     className: '',
     html: `<div class="sr-retailer-marker ${statusClass}">
-      <div class="sr-marker-icon-wrap">
-        <i class="fa-solid fa-store"></i>
-      </div>
       <span class="sr-marker-name">${escHtml(ret.name)}</span>
     </div>`,
     iconSize:   [0, 0],
@@ -1411,12 +1408,12 @@ function handleSuggestionSelect(ret) {
   background: rgba(255,255,255,0.97) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
-  border-radius: 14px !important;
-  padding: 5px 11px 5px 5px !important;
+  border-radius: 12px !important;
+  padding: 5px 12px !important;
   box-shadow:
     0 1px 3px rgba(0,0,0,0.06),
     0 6px 20px rgba(15,23,42,0.10),
-    0 0 0 1px rgba(37,99,235,0.12) !important;
+    0 0 0 1px rgba(37,99,235,0.15) !important;
   cursor: pointer !important;
   white-space: nowrap !important;
   font-family: 'Hind Siliguri', sans-serif !important;
@@ -1428,22 +1425,6 @@ function handleSuggestionSelect(ret) {
   overflow: hidden !important;
 }
 
-/* Icon circle inside label */
-.sr-marker-icon-wrap {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 26px !important;
-  height: 26px !important;
-  border-radius: 9px !important;
-  background: #eff6ff !important;
-  color: #2563eb !important;
-  font-size: 0.72rem !important;
-  flex-shrink: 0 !important;
-  margin-right: 7px !important;
-  transition: background 0.18s, color 0.18s !important;
-}
-
 /* Shop name text */
 .sr-marker-name {
   font-size: 0.72rem !important;
@@ -1453,7 +1434,7 @@ function handleSuggestionSelect(ret) {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
-  max-width: 120px !important;
+  max-width: 155px !important;
 }
 
 /* Hover state */
@@ -1464,24 +1445,20 @@ function handleSuggestionSelect(ret) {
     0 10px 30px rgba(37,99,235,0.22),
     0 0 0 1.5px rgba(37,99,235,0.4) !important;
 }
-.sr-retailer-marker:hover .sr-marker-icon-wrap {
-  background: #2563eb !important;
-  color: #fff !important;
-}
 .sr-retailer-marker:hover .sr-marker-name {
   color: #1e40af !important;
 }
 
 /* Cart status (Yellow) */
 .sr-retailer-marker.has-cart {
+  background: #fefce8 !important;
   box-shadow:
     0 1px 3px rgba(0,0,0,0.06),
     0 6px 20px rgba(234,179,8,0.15),
-    0 0 0 1px rgba(234,179,8,0.25) !important;
+    0 0 0 1px rgba(234,179,8,0.3) !important;
 }
-.sr-retailer-marker.has-cart .sr-marker-icon-wrap {
-  background: #fef9c3 !important;
-  color: #ca8a04 !important;
+.sr-retailer-marker.has-cart .sr-marker-name {
+  color: #854d0e !important;
 }
 .sr-retailer-marker.has-cart:hover {
   box-shadow:
@@ -1489,31 +1466,23 @@ function handleSuggestionSelect(ret) {
     0 10px 30px rgba(234,179,8,0.28),
     0 0 0 1.5px rgba(234,179,8,0.5) !important;
 }
-.sr-retailer-marker.has-cart:hover .sr-marker-icon-wrap {
-  background: #eab308 !important;
-  color: #fff !important;
-}
 
 /* Visited status (Green) */
 .sr-retailer-marker.already-ordered {
+  background: #f0fdf4 !important;
   box-shadow:
     0 1px 3px rgba(0,0,0,0.06),
     0 6px 20px rgba(16,185,129,0.15),
-    0 0 0 1px rgba(16,185,129,0.25) !important;
+    0 0 0 1px rgba(16,185,129,0.3) !important;
 }
-.sr-retailer-marker.already-ordered .sr-marker-icon-wrap {
-  background: #dcfce7 !important;
-  color: #16a34a !important;
+.sr-retailer-marker.already-ordered .sr-marker-name {
+  color: #166534 !important;
 }
 .sr-retailer-marker.already-ordered:hover {
   box-shadow:
     0 2px 6px rgba(0,0,0,0.08),
     0 10px 30px rgba(16,185,129,0.28),
     0 0 0 1.5px rgba(16,185,129,0.5) !important;
-}
-.sr-retailer-marker.already-ordered:hover .sr-marker-icon-wrap {
-  background: #10b981 !important;
-  color: #fff !important;
 }
 
 /* SVG connector layer — sits inside map container */

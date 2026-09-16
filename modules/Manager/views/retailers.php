@@ -16,7 +16,7 @@
 .ret-panel.active { display:flex;flex-direction:column; }
 #ret-map { flex:1;min-height:0;width:100%;border:2px solid #cbd5e1;border-top:none;background:#e2e8f0; }
 .ret-list-bar { display:flex;gap:8px;align-items:center;padding:10px 0 8px;flex-shrink:0;flex-wrap:wrap;border-top:2px solid #e2e8f0; }
-.ret-search { border:1px solid #cbd5e1;border-radius:0;padding:7px 12px;font-size:0.82rem;outline:none;width:280px;background:#fff;color:#1e293b; }
+.ret-search { border:1px solid #cbd5e1;border-radius:0;padding:7px 12px;font-size:0.82rem;outline:none;flex:1;min-width:120px;background:#fff;color:#1e293b; }
 .ret-search:focus { border-color:#3b82f6; }
 .ret-count { font-size:0.78rem;color:#64748b;margin-left:6px; }
 .ret-grid-wrap { flex:1;overflow-y:auto;border:2px solid #cbd5e1;border-top:none; }
@@ -37,6 +37,35 @@
 .rbtn-gray { background:#f1f5f9;color:#475569;border-color:#cbd5e1; }
 .rbtn-gray:hover { background:#e2e8f0; }
 .rbtn-disabled { background:#e2e8f0;color:#94a3b8;border-color:#cbd5e1;cursor:not-allowed; }
+/* view toggle */
+.view-toggle { display:flex;border:1px solid #cbd5e1;overflow:hidden; }
+.view-btn { display:inline-flex;align-items:center;gap:5px;padding:6px 12px;font-size:0.76rem;font-weight:700;cursor:pointer;border:none;background:#f8fafc;color:#64748b;transition:background .1s,color .1s;text-transform:uppercase;letter-spacing:.04em; }
+.view-btn.active { background:#1e40af;color:#fff; }
+.view-btn:not(.active):hover { background:#e2e8f0; }
+/* grid cards */
+.ret-cards-wrap { flex:1;overflow-y:auto;border:2px solid #cbd5e1;border-top:none; }
+.ret-cards-grid { display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px; }
+.ret-card { border:1px solid #cbd5e1;background:#fff;cursor:pointer;transition:box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:0; }
+.ret-card:hover { border-color:#3b82f6;box-shadow:0 4px 16px rgba(59,130,246,.15); }
+.ret-card-hdr { background:#1e293b;color:#fff;padding:9px 12px;display:flex;align-items:center;justify-content:space-between; }
+.ret-card-name { font-size:0.82rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 44px); }
+.ret-card-id { font-size:0.68rem;color:#94a3b8;font-weight:600; }
+.ret-card-body { padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex:1; }
+.ret-card-row { display:flex;align-items:center;gap:6px;font-size:0.76rem;color:#475569; }
+.ret-card-row i { width:14px;text-align:center;color:#3b82f6;flex-shrink:0; }
+.ret-card-row span { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.ret-card-stats { display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #e2e8f0;margin-top:4px; }
+.ret-card-stat { padding:7px 10px;border-right:1px solid #e2e8f0; }
+.ret-card-stat:last-child { border-right:none; }
+.ret-card-stat .sl { font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700; }
+.ret-card-stat .sv { font-size:.85rem;font-weight:800;color:#0f172a;margin-top:2px; }
+.ret-card-footer { padding:7px 12px;border-top:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;background:#f8fafc; }
+.ret-card-ratio { font-size:0.78rem;font-weight:800; }
+.ret-card-ratio.good { color:#16a34a; }
+.ret-card-ratio.avg  { color:#d97706; }
+.ret-card-ratio.poor { color:#dc2626; }
+.ret-card-loc { font-size:0.68rem;color:#3b82f6; }
+.ret-card-noloc { font-size:0.68rem;color:#94a3b8; }
 .rmodal-overlay { position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:none;align-items:center;justify-content:center; }
 .rmodal-overlay.open { display:flex; }
 .rmodal { background:#fff;border:2px solid #1e293b;width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:6px 6px 0 #0f172a; }
@@ -99,8 +128,13 @@
     <div class="ret-list-bar">
       <input type="text" class="ret-search" id="rsearch" placeholder="Search name, phone, address..." oninput="rFilter()">
       <span class="ret-count" id="rcount"></span>
+      <div class="view-toggle" style="margin-left:auto;">
+        <button class="view-btn active" id="vbtn-list" onclick="rSetView('list')" title="List View"><i class="fa-solid fa-table-list"></i> List</button>
+        <button class="view-btn" id="vbtn-grid" onclick="rSetView('grid')" title="Grid View"><i class="fa-solid fa-grip"></i> Grid</button>
+      </div>
     </div>
-    <div class="ret-grid-wrap">
+    <!-- list view -->
+    <div class="ret-grid-wrap" id="view-list">
       <table class="ret-table">
         <thead>
           <tr>
@@ -110,6 +144,10 @@
         </thead>
         <tbody id="rtbody"></tbody>
       </table>
+    </div>
+    <!-- grid view -->
+    <div class="ret-cards-wrap" id="view-grid" style="display:none;">
+      <div class="ret-cards-grid" id="rcardsgrid"></div>
     </div>
   </div>
 </div>
@@ -146,6 +184,7 @@
 <script>
 var BURL = '<?= BASE_URL ?>';
 var allR = [], filtR = [], rMap = null, curR = null;
+var rViewMode = 'list'; /* 'list' | 'grid' */
 var _dotLayer = null; /* our custom canvas layer */
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -314,9 +353,48 @@ function rFilter(){
   rRenderList(filtR);
 }
 
+/* --- View Toggle --- */
+function rSetView(v){
+  rViewMode=v;
+  document.getElementById('view-list').style.display=v==='list'?'':'none';
+  document.getElementById('view-grid').style.display=v==='grid'?'':'none';
+  document.getElementById('vbtn-list').classList.toggle('active',v==='list');
+  document.getElementById('vbtn-grid').classList.toggle('active',v==='grid');
+  rRenderList(filtR);
+}
+
+/* --- Render Grid Cards --- */
+function rRenderGrid(list){
+  var el=document.getElementById('rcardsgrid');
+  if(!list.length){ el.innerHTML='<div style="grid-column:span 2;text-align:center;padding:24px;color:#94a3b8;">No retailers found.</div>'; return; }
+  el.innerHTML=list.map(function(r,i){
+    var rt=rRatio(r),rc=rt>=80?'good':rt>=50?'avg':'poor';
+    var hasLoc=(r.lat&&r.lng&&parseFloat(r.lat)!=0);
+    var locHtml=hasLoc
+      ?'<span class="ret-card-loc"><i class="fa-solid fa-location-dot"></i> '+parseFloat(r.lat).toFixed(4)+', '+parseFloat(r.lng).toFixed(4)+'</span>'
+      :'<span class="ret-card-noloc"><i class="fa-solid fa-location-xmark"></i> No GPS</span>';
+    return '<div class="ret-card" onclick="rOpen('+r.id+')">'  
+      +'<div class="ret-card-hdr"><span class="ret-card-name">'+rEsc(r.name)+'</span><span class="ret-card-id">#'+r.id+'</span></div>'
+      +'<div class="ret-card-body">'
+      +(r.phone?'<div class="ret-card-row"><i class="fa-solid fa-phone"></i><span>'+rEsc(r.phone)+'</span></div>':'')
+      +(r.address?'<div class="ret-card-row"><i class="fa-solid fa-map-pin"></i><span>'+rEsc(r.address)+'</span></div>':'')
+      +'</div>'
+      +'<div class="ret-card-stats">'
+      +'<div class="ret-card-stat"><div class="sl">Orders</div><div class="sv">'+(r.total_orders||0)+'</div></div>'
+      +'<div class="ret-card-stat"><div class="sl">Delivered</div><div class="sv">'+(r.delivered_orders||0)+'</div></div>'
+      +'</div>'
+      +'<div class="ret-card-footer">'
+      +'<span class="ret-card-ratio '+rc+'"><i class="fa-solid fa-chart-pie"></i> '+rt+'%</span>'
+      +locHtml
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
 /* --- Render List --- */
 function rRenderList(list){
   document.getElementById('rcount').textContent='Showing '+list.length.toLocaleString()+' of '+allR.length.toLocaleString();
+  if(rViewMode==='grid'){ rRenderGrid(list); return; }
   var tb=document.getElementById('rtbody');
   if(!list.length){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:#94a3b8;">No retailers found.</td></tr>'; return; }
   tb.innerHTML=list.map(function(r,i){
