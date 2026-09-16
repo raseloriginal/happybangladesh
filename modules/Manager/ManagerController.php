@@ -2929,9 +2929,14 @@ class ManagerController extends Controller
     public function apiDispatchVanStock(string $dsrId): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        $date = $_GET['date'] ?? date('Y-m-d');
         $dsrIdInt = (int)$dsrId;
         
+        // Find the latest loaded_at date for this DSR's stock, instead of relying on the schedule's date
+        // because stock might be carried over to a new day.
+        $dateQ = $this->db->prepare("SELECT MAX(DATE(loaded_at)) FROM van_stock WHERE dsr_id = ?");
+        $dateQ->execute([$dsrIdInt]);
+        $date = $dateQ->fetchColumn() ?: date('Y-m-d');
+
         $outsideQ = $this->db->prepare("SELECT vs.product_id, p.name as product_name, SUM(vs.initial_qty) as qty FROM van_stock vs JOIN products p ON p.id = vs.product_id WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ? GROUP BY vs.product_id");
         $outsideQ->execute([$dsrIdInt, $date]);
         $stockMap = [];
@@ -2965,7 +2970,7 @@ class ManagerController extends Controller
                 $stock[] = $item;
             }
         }
-        echo json_encode(['success' => true, 'stock' => $stock]);
+        echo json_encode(['success' => true, 'stock' => $stock, 'actual_date' => $date]);
         exit;
     }
 

@@ -1487,7 +1487,8 @@ window.openReturnModal = async function(scheduleId, dsrId, date) {
     const res = await fetch(`<?= url("manager/api/dispatch/van-stock/") ?>${dsrId}?date=${date}`);
     const data = await res.json();
     if(data.success) {
-      let html = `<p class="mb-4 text-xs text-gray-600">The following quantities are currently in the van stock for this DSR on ${date}. Confirm to process as returns.</p>`;
+      const resolvedDate = data.actual_date || date;
+      let html = `<p class="mb-4 text-xs text-gray-600">The following quantities are currently in the van stock for this DSR on ${resolvedDate}. Confirm to process as returns.</p>`;
       if(data.stock.length === 0) {
          html += `<div class="bg-amber-50 text-amber-800 p-3 rounded-xl text-xs font-semibold border border-amber-200"><i class="fa-solid fa-info-circle mr-1"></i> No van stock found to return.</div>`;
       } else {
