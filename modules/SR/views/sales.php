@@ -79,10 +79,15 @@
         <label class="sr-form-label">অবস্থান <span style="color:#ef4444;">*</span></label>
         <div class="sr-mini-map-wrap">
           <div id="srMiniMap"></div>
-          <button type="button" class="sr-mini-map-fullscreen" id="miniMapFullscreenBtn" title="পূর্ণ মানচিত্র">
-            <i class="fa-solid fa-expand"></i>
-          </button>
-          <div class="sr-mini-map-hint">পিনের অবস্থান পরিবর্তন করতে মানচিত্রটি ড্র্যাগ করুন</div>
+          <div class="sr-mini-map-actions">
+            <button type="button" class="sr-mini-map-btn" id="miniMapMyLocBtn" title="আমার বর্তমান অবস্থান">
+              <i class="fa-solid fa-crosshairs"></i>
+            </button>
+            <button type="button" class="sr-mini-map-btn" id="miniMapFullscreenBtn" title="পূর্ণ মানচিত্র">
+              <i class="fa-solid fa-expand"></i>
+            </button>
+          </div>
+          <div class="sr-mini-map-hint"><i class="fa-solid fa-hand-pointer"></i> পিন বসাতে মানচিত্রে ক্লিক করুন</div>
         </div>
         <div id="selectedLocText" style="font-size:0.72rem;color:var(--sr-text-muted);margin-top:6px;text-align:center;">
           <i class="fa-solid fa-location-dot" style="color:var(--sr-primary);"></i> অবস্থান সনাক্ত করা হচ্ছে…
@@ -862,32 +867,106 @@ function renderRetailerCards(retailers) {
 // ADD RETAILER
 // ══════════════════════════════════════════════════════════════
 let miniMapInitialized = false;
-pinLat = myLat; pinLng = myLng;
+let miniMapMarker = null;
+pinLat = myLat || 23.8103; pinLng = myLng || 90.4125;
+
+function getMiniPinIcon() {
+  return L.divIcon({
+    className: 'sr-minimap-pin-wrap',
+    html: `<div class="sr-minimap-pin">
+      <i class="fa-solid fa-location-dot"></i>
+      <div class="sr-minimap-pin-pulse"></div>
+    </div>`,
+    iconSize: [36, 42],
+    iconAnchor: [18, 40]
+  });
+}
+
+function setPinCoordinates(lat, lng, panMini = false) {
+  pinLat = parseFloat(lat);
+  pinLng = parseFloat(lng);
+
+  if (miniMap) {
+    if (!miniMapMarker) {
+      miniMapMarker = L.marker([pinLat, pinLng], {
+        icon: getMiniPinIcon(),
+        draggable: true,
+        zIndexOffset: 1000
+      }).addTo(miniMap);
+
+      miniMapMarker.on('dragend', function(e) {
+        const pos = e.target.getLatLng();
+        setPinCoordinates(pos.lat, pos.lng, false);
+      });
+    } else {
+      miniMapMarker.setLatLng([pinLat, pinLng]);
+    }
+
+    if (panMini) {
+      miniMap.panTo([pinLat, pinLng], { animate: true, duration: 0.25 });
+    }
+  }
+
+  const locEl = document.getElementById('selectedLocText');
+  if (locEl) {
+    locEl.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#ef4444;"></i> <span style="font-weight:600;color:var(--sr-text);">${pinLat.toFixed(5)}, ${pinLng.toFixed(5)}</span> <span style="color:#10b981;font-size:0.75rem;margin-left:4px;"><i class="fa-solid fa-circle-check"></i> পিন সিলেক্টেড</span>`;
+  }
+}
 
 function openAddRetailerSheet() {
   openSheet('addRetSheet','addRetOverlay');
+  if (myLat && myLng && (!pinLat || pinLat === 23.8103)) {
+    pinLat = myLat;
+    pinLng = myLng;
+  }
   setTimeout(() => {
     if (!miniMapInitialized) {
-      miniMap = L.map('srMiniMap', { zoomControl: false, attributionControl: false, preferCanvas: true })
-        .setView([myLat, myLng], 15);
+      miniMap = L.map('srMiniMap', {
+        zoomControl: false,
+        attributionControl: false,
+        preferCanvas: true,
+        dragging: false,
+        touchZoom: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false
+      }).setView([pinLat, pinLng], 16);
+
       L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
         maxZoom: 20, maxNativeZoom: 19, subdomains: ['mt0','mt1','mt2','mt3'], keepBuffer: 4, updateWhenIdle: true
       }).addTo(miniMap);
+
+      // Clicking on mini map sets the pin
+      miniMap.on('click', function(e) {
+        setPinCoordinates(e.latlng.lat, e.latlng.lng, true);
+      });
+
       miniMapInitialized = true;
     } else {
-      miniMap.setView([myLat, myLng], 15);
+      miniMap.setView([pinLat, pinLng], 16);
     }
+
     miniMap.invalidateSize();
-    updatePinFromMiniMap();
-    miniMap.on('move', updatePinFromMiniMap);
+    setPinCoordinates(pinLat, pinLng, true);
   }, 350);
 }
 
-function updatePinFromMiniMap() {
-  const c = miniMap.getCenter();
-  pinLat = c.lat; pinLng = c.lng;
-  document.getElementById('selectedLocText').innerHTML =
-    `<i class="fa-solid fa-location-dot" style="color:var(--sr-primary);"></i> ${pinLat.toFixed(5)}, ${pinLng.toFixed(5)}`;
+function resetPinToMyLocation() {
+  if (myLat && myLng) {
+    setPinCoordinates(myLat, myLng, true);
+    showMiniToast('📍 বর্তমান অবস্থান সিলেক্ট করা হয়েছে');
+  } else {
+    detectLocation(false);
+    setTimeout(() => {
+      if (myLat && myLng) {
+        setPinCoordinates(myLat, myLng, true);
+        showMiniToast('📍 বর্তমান অবস্থান সিলেক্ট করা হয়েছে');
+      } else {
+        showMiniToast('⚠️ বর্তমান লোকেশন পাওয়া যায়নি', true);
+      }
+    }, 1000);
+  }
 }
 
 // Fullscreen map for pin
@@ -897,13 +976,18 @@ function openFullMap() {
   setTimeout(() => {
     if (!fullMapInitialized) {
       fullMap = L.map('srFullMap', { zoomControl: true, attributionControl: false, preferCanvas: true })
-        .setView([pinLat, pinLng], 16);
+        .setView([pinLat, pinLng], 17);
       L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
         maxZoom: 20, maxNativeZoom: 19, subdomains: ['mt0','mt1','mt2','mt3'], keepBuffer: 4, updateWhenIdle: true
       }).addTo(fullMap);
+
+      fullMap.on('click', function(e) {
+        fullMap.panTo(e.latlng, { animate: true });
+      });
+
       fullMapInitialized = true;
     } else {
-      fullMap.setView([pinLat, pinLng], 16);
+      fullMap.setView([pinLat, pinLng], 17);
     }
     fullMap.invalidateSize();
   }, 100);
@@ -911,10 +995,7 @@ function openFullMap() {
 
 function confirmFullMap() {
   const c = fullMap.getCenter();
-  pinLat = c.lat; pinLng = c.lng;
-  // Sync to mini map
-  if (miniMapInitialized) miniMap.setView([pinLat, pinLng], 15);
-  updatePinFromMiniMap();
+  setPinCoordinates(c.lat, c.lng, true);
   document.getElementById('fullMapOverlay').classList.add('hidden');
 }
 
@@ -940,6 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (d.success) {
         closeSheet('addRetSheet','addRetOverlay');
         document.getElementById('addRetailerForm').reset();
+        if (myLat && myLng) setPinCoordinates(myLat, myLng, true);
         loadRetailersOnMap();
         showMiniToast(`✓ Retailer "${name}" added!`);
       } else {
@@ -961,7 +1043,23 @@ function initEventListeners() {
   document.getElementById('addRetailerBtn').addEventListener('click', openAddRetailerSheet);
   document.getElementById('addRetOverlay').addEventListener('click', () => closeSheet('addRetSheet','addRetOverlay'));
   document.getElementById('addRetClose').addEventListener('click', () => closeSheet('addRetSheet','addRetOverlay'));
-  document.getElementById('miniMapFullscreenBtn').addEventListener('click', openFullMap);
+  
+  const myLocBtn = document.getElementById('miniMapMyLocBtn');
+  if (myLocBtn) {
+    myLocBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetPinToMyLocation();
+    });
+  }
+
+  const fullMapBtn = document.getElementById('miniMapFullscreenBtn');
+  if (fullMapBtn) {
+    fullMapBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFullMap();
+    });
+  }
+
   document.getElementById('fullMapBack').addEventListener('click', () => document.getElementById('fullMapOverlay').classList.add('hidden'));
   document.getElementById('fullMapConfirm').addEventListener('click', confirmFullMap);
 
