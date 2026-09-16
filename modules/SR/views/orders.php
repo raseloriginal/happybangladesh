@@ -1392,12 +1392,21 @@ function openInvoiceModal(orderData) {
         ? `<div style="font-size:9px;font-weight:700;color:${ocColor};margin-top:1px;">(${ocSign}৳${ocAbs})</div>`
         : '';
 
+      let freeBadgeHtml = '';
+      if (prod.free_items && prod.free_items.length > 0) {
+        const freeBadges = prod.free_items.map(fi => {
+          return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-semibold"><i class="fa-solid fa-gift text-amber-600 text-[8px]"></i> ${fi.free_product_name || 'ফ্রি'}: <b>${fi.quantity}</b>টি</span>`;
+        }).join(' ');
+        freeBadgeHtml = `<div class="mt-1 flex flex-wrap gap-1">${freeBadges}</div>`;
+      }
+
       const tr = document.createElement('tr');
       tr.className = 'bg-white hover:bg-slate-50/30 transition-colors';
       tr.innerHTML = `
         <td class="py-2 px-2.5 font-mono font-bold text-slate-400 text-[10px]">${index + 1}</td>
         <td class="py-2 px-2.5">
           <div class="font-bold text-slate-800 text-[11px] leading-tight break-words font-siliguri">${prod.product_name || 'পণ্য'}</div>
+          ${freeBadgeHtml}
         </td>
         <td class="py-2 px-2.5 text-center font-semibold text-slate-600 text-[11px]">${packingStr}</td>
         <td class="py-2 px-2.5 text-center font-mono font-bold text-slate-700 text-[11px]">${qty} পিস</td>
