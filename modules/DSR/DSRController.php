@@ -626,36 +626,33 @@ class DSRController extends Controller
         $isCompleted = ($qItems->fetchColumn() > 0 && $check->fetchColumn() == 0);
 
         // Van stock: calculate remaining stock dynamically based on initial_qty and delivered_quantity
-        $vanQ = $this->db->prepare("
-            SELECT 
-                vs.product_id, 
-                SUM(vs.initial_qty) - COALESCE((
-                    SELECT SUM(COALESCE(di.delivered_quantity, 0))
-                    FROM dispatches d
-                    JOIN dispatch_items di ON d.id = di.dispatch_id
-                    WHERE d.dsr_id = vs.dsr_id 
-                      AND d.dispatch_date = DATE(vs.loaded_at) 
-                      AND d.status IN ('delivered', 'partial')
-                      AND di.product_id = vs.product_id
-                ), 0) - COALESCE((
-                    SELECT SUM(ri.quantity)
-                    FROM returns r
-                    JOIN return_items ri ON r.id = ri.return_id
-                    WHERE r.dsr_id = vs.dsr_id
-                      AND r.return_date = DATE(vs.loaded_at)
-                      AND ri.product_id = vs.product_id
-                ), 0) as remaining_qty
-            FROM van_stock vs
-            WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
-            GROUP BY vs.product_id
-            HAVING remaining_qty > 0
-        ");
+        $vanQ = $this->db->prepare("SELECT product_id, SUM(initial_qty) as remaining_qty FROM van_stock WHERE dsr_id = ? AND DATE(loaded_at) = ? GROUP BY product_id");
         $vanQ->execute([$dsrId, $selectedDate]);
         $vanStockMap = [];
         foreach ($vanQ->fetchAll() as $row) {
-            $remaining = (int)$row['remaining_qty'];
-            if ($remaining > 0) {
-                $vanStockMap[(int)$row['product_id']] = $remaining;
+            $vanStockMap[(int)$row['product_id']] = (int)$row['remaining_qty'];
+        }
+
+        $saleQ = $this->db->prepare("SELECT di.product_id, SUM(COALESCE(di.delivered_quantity, 0)) as qty FROM dispatches d JOIN dispatch_items di ON d.id = di.dispatch_id WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') GROUP BY di.product_id");
+        $saleQ->execute([$dsrId, $selectedDate]);
+        foreach ($saleQ->fetchAll() as $row) {
+            if (isset($vanStockMap[(int)$row['product_id']])) {
+                $vanStockMap[(int)$row['product_id']] -= (int)$row['qty'];
+            }
+        }
+
+        $retQ = $this->db->prepare("SELECT ri.product_id, SUM(ri.quantity) as qty FROM returns r JOIN return_items ri ON r.id = ri.return_id WHERE r.dsr_id = ? AND r.return_date = ? GROUP BY ri.product_id");
+        $retQ->execute([$dsrId, $selectedDate]);
+        foreach ($retQ->fetchAll() as $row) {
+            if (isset($vanStockMap[(int)$row['product_id']])) {
+                $vanStockMap[(int)$row['product_id']] -= (int)$row['qty'];
+            }
+        }
+        
+        // Remove items with 0 or negative qty
+        foreach ($vanStockMap as $pid => $qty) {
+            if ($qty <= 0) {
+                unset($vanStockMap[$pid]);
             }
         }
 

@@ -2930,32 +2930,41 @@ class ManagerController extends Controller
     {
         header('Content-Type: application/json; charset=utf-8');
         $date = $_GET['date'] ?? date('Y-m-d');
-        $stock = $this->db->query("
-            SELECT 
-                vs.product_id, 
-                p.name as product_name, 
-                SUM(vs.initial_qty) - COALESCE((
-                    SELECT SUM(COALESCE(di.delivered_quantity, 0))
-                    FROM dispatches d
-                    JOIN dispatch_items di ON d.id = di.dispatch_id
-                    WHERE d.dsr_id = vs.dsr_id 
-                      AND d.dispatch_date = DATE(vs.loaded_at) 
-                      AND d.status IN ('delivered', 'partial')
-                      AND di.product_id = vs.product_id
-                ), 0) - COALESCE((
-                    SELECT SUM(ri.quantity)
-                    FROM returns r
-                    JOIN return_items ri ON r.id = ri.return_id
-                    WHERE r.dsr_id = vs.dsr_id
-                      AND r.return_date = DATE(vs.loaded_at)
-                      AND ri.product_id = vs.product_id
-                ), 0) as qty
-            FROM van_stock vs
-            JOIN products p ON p.id = vs.product_id
-            WHERE vs.dsr_id = " . (int)$dsrId . " AND DATE(vs.loaded_at) = '" . $date . "'
-            GROUP BY vs.product_id
-            HAVING qty > 0
-        ")->fetchAll();
+        $dsrIdInt = (int)$dsrId;
+        
+        $outsideQ = $this->db->prepare("SELECT vs.product_id, p.name as product_name, SUM(vs.initial_qty) as qty FROM van_stock vs JOIN products p ON p.id = vs.product_id WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ? GROUP BY vs.product_id");
+        $outsideQ->execute([$dsrIdInt, $date]);
+        $stockMap = [];
+        foreach ($outsideQ->fetchAll() as $row) {
+            $stockMap[$row['product_id']] = [
+                'product_id' => $row['product_id'],
+                'product_name' => $row['product_name'],
+                'qty' => (int)$row['qty']
+            ];
+        }
+
+        $saleQ = $this->db->prepare("SELECT di.product_id, SUM(COALESCE(di.delivered_quantity, 0)) as qty FROM dispatches d JOIN dispatch_items di ON d.id = di.dispatch_id WHERE d.dsr_id = ? AND d.dispatch_date = ? AND d.status IN ('delivered', 'partial') GROUP BY di.product_id");
+        $saleQ->execute([$dsrIdInt, $date]);
+        foreach ($saleQ->fetchAll() as $row) {
+            if (isset($stockMap[$row['product_id']])) {
+                $stockMap[$row['product_id']]['qty'] -= (int)$row['qty'];
+            }
+        }
+
+        $retQ = $this->db->prepare("SELECT ri.product_id, SUM(ri.quantity) as qty FROM returns r JOIN return_items ri ON r.id = ri.return_id WHERE r.dsr_id = ? AND r.return_date = ? GROUP BY ri.product_id");
+        $retQ->execute([$dsrIdInt, $date]);
+        foreach ($retQ->fetchAll() as $row) {
+            if (isset($stockMap[$row['product_id']])) {
+                $stockMap[$row['product_id']]['qty'] -= (int)$row['qty'];
+            }
+        }
+
+        $stock = [];
+        foreach ($stockMap as $item) {
+            if ($item['qty'] > 0) {
+                $stock[] = $item;
+            }
+        }
         echo json_encode(['success' => true, 'stock' => $stock]);
         exit;
     }
