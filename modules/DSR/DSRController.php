@@ -625,12 +625,30 @@ class DSRController extends Controller
         
         $isCompleted = ($qItems->fetchColumn() > 0 && $check->fetchColumn() == 0);
 
-        // Van stock: use van_stock table directly (reflects actual loaded qty minus delivered)
+        // Van stock: calculate remaining stock dynamically based on initial_qty and delivered_quantity
         $vanQ = $this->db->prepare("
-            SELECT product_id, SUM(quantity) as remaining_qty
-            FROM van_stock
-            WHERE dsr_id = ? AND DATE(loaded_at) = ?
-            GROUP BY product_id
+            SELECT 
+                vs.product_id, 
+                SUM(vs.initial_qty) - COALESCE((
+                    SELECT SUM(COALESCE(di.delivered_quantity, 0))
+                    FROM dispatches d
+                    JOIN dispatch_items di ON d.id = di.dispatch_id
+                    WHERE d.dsr_id = vs.dsr_id 
+                      AND d.dispatch_date = DATE(vs.loaded_at) 
+                      AND d.status IN ('delivered', 'partial')
+                      AND di.product_id = vs.product_id
+                ), 0) - COALESCE((
+                    SELECT SUM(ri.quantity)
+                    FROM returns r
+                    JOIN return_items ri ON r.id = ri.return_id
+                    WHERE r.dsr_id = vs.dsr_id
+                      AND r.return_date = DATE(vs.loaded_at)
+                      AND ri.product_id = vs.product_id
+                ), 0) as remaining_qty
+            FROM van_stock vs
+            WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
+            GROUP BY vs.product_id
+            HAVING remaining_qty > 0
         ");
         $vanQ->execute([$dsrId, $selectedDate]);
         $vanStockMap = [];

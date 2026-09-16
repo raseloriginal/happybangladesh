@@ -654,6 +654,30 @@ class ManagerController extends Controller
         }
         $batches = array_values($batches);
 
+        // Fetch free items grouped by company_id and lot_date
+        $freeItemsStmt = $this->db->query("
+            SELECT lfi.*, p.name AS product_name, p.image, p.sku, p.pieces_per_box, p.box_type
+            FROM lot_free_items lfi
+            JOIN products p ON p.id = lfi.product_id
+            ORDER BY lfi.id ASC
+        ");
+        $allFreeItems = $freeItemsStmt ? $freeItemsStmt->fetchAll() : [];
+        $freeItemsMap = [];
+        foreach ($allFreeItems as $fi) {
+            $key = $fi['company_id'] . '_' . $fi['lot_date'];
+            if (!isset($freeItemsMap[$key])) {
+                $freeItemsMap[$key] = [];
+            }
+            $freeItemsMap[$key][] = $fi;
+        }
+
+        foreach ($batches as &$batchRef) {
+            $key = $batchRef['company_id'] . '_' . $batchRef['lot_date'];
+            $batchRef['free_items'] = $freeItemsMap[$key] ?? [];
+            $batchRef['free_items_count'] = count($batchRef['free_items']);
+        }
+        unset($batchRef);
+
         $products = $this->db->query("
             SELECT p.id, p.name, p.sku, p.company_id, p.image, p.pieces_per_box, p.box_type, p.buying_price,
                    COALESCE(SUM(i.qty_boxes), 0) AS stock_boxes,
@@ -1047,6 +1071,75 @@ class ManagerController extends Controller
 
         \Helpers::logManagerActivity(\Auth::id(), 'request_lot_edit', "Requested edit approval for lot batch: company_id={$orig_company_id}, date={$orig_lot_date}", $orig_company_id);
         echo json_encode(['success' => true, 'message' => 'Edit request submitted. Waiting for admin approval.']);
+        exit;
+    }
+
+    public function apiLotFreeItems(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $company_id = (int)($_GET['company_id'] ?? 0);
+        $lot_date   = trim($_GET['lot_date'] ?? '');
+
+        if (!$company_id || empty($lot_date)) {
+            echo json_encode(['success' => true, 'free_items' => []]);
+            exit;
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT lfi.id, lfi.product_id, lfi.quantity, p.name AS product_name, p.image, p.sku, p.pieces_per_box, p.box_type
+            FROM lot_free_items lfi
+            JOIN products p ON p.id = lfi.product_id
+            WHERE lfi.company_id = ? AND lfi.lot_date = ?
+            ORDER BY lfi.id ASC
+        ");
+        $stmt->execute([$company_id, $lot_date]);
+        $items = $stmt->fetchAll();
+
+        echo json_encode(['success' => true, 'free_items' => $items]);
+        exit;
+    }
+
+    public function apiLotSaveFreeItems(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verifyCsrf();
+        $input = $GLOBALS['_PARSED_JSON_BODY'] ?? json_decode(file_get_contents('php://input'), true);
+
+        if (!$input || empty($input['company_id']) || empty($input['lot_date'])) {
+            echo json_encode(['success' => false, 'message' => 'Missing company or lot date']);
+            exit;
+        }
+
+        $company_id = (int)$input['company_id'];
+        $lot_date   = trim($input['lot_date']);
+        $items      = is_array($input['items'] ?? null) ? $input['items'] : [];
+
+        $this->db->beginTransaction();
+        try {
+            // Delete existing free items for this company and date
+            $del = $this->db->prepare("DELETE FROM lot_free_items WHERE company_id = ? AND lot_date = ?");
+            $del->execute([$company_id, $lot_date]);
+
+            $ins = $this->db->prepare("
+                INSERT INTO lot_free_items (company_id, lot_date, product_id, quantity)
+                VALUES (?, ?, ?, ?)
+            ");
+
+            foreach ($items as $item) {
+                $pid = (int)($item['product_id'] ?? 0);
+                $qty = (int)($item['quantity'] ?? 0);
+                if ($pid > 0 && $qty > 0) {
+                    $ins->execute([$company_id, $lot_date, $pid, $qty]);
+                }
+            }
+
+            $this->db->commit();
+            \Helpers::logManagerActivity(\Auth::id(), 'save_free_items', "Saved free items for company {$company_id} on {$lot_date}", $company_id);
+            echo json_encode(['success' => true, 'message' => 'Free items saved successfully']);
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
         exit;
     }
 
@@ -2838,11 +2931,30 @@ class ManagerController extends Controller
         header('Content-Type: application/json; charset=utf-8');
         $date = $_GET['date'] ?? date('Y-m-d');
         $stock = $this->db->query("
-            SELECT vs.product_id, p.name as product_name, SUM(vs.quantity) as qty
+            SELECT 
+                vs.product_id, 
+                p.name as product_name, 
+                SUM(vs.initial_qty) - COALESCE((
+                    SELECT SUM(COALESCE(di.delivered_quantity, 0))
+                    FROM dispatches d
+                    JOIN dispatch_items di ON d.id = di.dispatch_id
+                    WHERE d.dsr_id = vs.dsr_id 
+                      AND d.dispatch_date = DATE(vs.loaded_at) 
+                      AND d.status IN ('delivered', 'partial')
+                      AND di.product_id = vs.product_id
+                ), 0) - COALESCE((
+                    SELECT SUM(ri.quantity)
+                    FROM returns r
+                    JOIN return_items ri ON r.id = ri.return_id
+                    WHERE r.dsr_id = vs.dsr_id
+                      AND r.return_date = DATE(vs.loaded_at)
+                      AND ri.product_id = vs.product_id
+                ), 0) as qty
             FROM van_stock vs
             JOIN products p ON p.id = vs.product_id
-            WHERE vs.dsr_id = " . (int)$dsrId . " AND vs.quantity > 0
+            WHERE vs.dsr_id = " . (int)$dsrId . " AND DATE(vs.loaded_at) = '" . $date . "'
             GROUP BY vs.product_id
+            HAVING qty > 0
         ")->fetchAll();
         echo json_encode(['success' => true, 'stock' => $stock]);
         exit;
