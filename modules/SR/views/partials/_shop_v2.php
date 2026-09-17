@@ -701,60 +701,29 @@ function setSrFreeItemQty(productId, val) {
   if (input) input.value = next;
 }
 
-async function saveSrFreeItemsModal() {
+function saveSrFreeItemsModal() {
   if (!currentRetailer || !currentProduct) {
     showMiniToast('দোকান বা প্রোডাক্ট নির্বাচন করা হয়নি', true);
     return;
   }
 
-  const items = [];
-  Object.keys(currentProductFreeItems).forEach(pid => {
-    const q = parseInt(currentProductFreeItems[pid]) || 0;
-    if (q > 0) {
-      items.push({ free_product_id: parseInt(pid), quantity: q });
-    }
-  });
-
-  const btn = document.getElementById('srFreeItemSaveBtn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>সংরক্ষণ...</span>';
-
-  try {
-    const res = await fetch(`${BASE_URL}/sr/api/free-items/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        retailer_id: currentRetailer.id,
-        product_id: currentProduct.id,
-        items: items
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      if (!retailerFreeItemsCache[currentRetailer.id]) retailerFreeItemsCache[currentRetailer.id] = {};
-      retailerFreeItemsCache[currentRetailer.id][currentProduct.id] = { ...currentProductFreeItems };
-
-      // Also update in cart if product is already in cart
-      const cart = cartsByRetailer[currentRetailer.id] || [];
-      const existing = cart.find(c => c.id === currentProduct.id);
-      if (existing) {
-        existing.freeItems = { ...currentProductFreeItems };
-        renderRetailerCart();
-      }
-
-      updateSrFreeItemBadge();
-      closeSheet('srFreeItemSheet', 'srFreeItemOverlay');
-      showMiniToast('✓ ফ্রি আইটেম সংরক্ষিত হয়েছে');
-    } else {
-      alert(data.message || 'ফ্রি আইটেম সংরক্ষণ ব্যর্থ হয়েছে');
-    }
-  } catch (err) {
-    alert('Request failed: ' + (err.message || err));
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+  // Save in JS state/cache (not in DB yet)
+  if (!retailerFreeItemsCache[currentRetailer.id]) {
+    retailerFreeItemsCache[currentRetailer.id] = {};
   }
+  retailerFreeItemsCache[currentRetailer.id][currentProduct.id] = { ...currentProductFreeItems };
+
+  // Also update in cart if product is already in cart
+  const cart = cartsByRetailer[currentRetailer.id] || [];
+  const existing = cart.find(c => c.id === currentProduct.id);
+  if (existing) {
+    existing.freeItems = { ...currentProductFreeItems };
+    renderRetailerCart();
+  }
+
+  updateSrFreeItemBadge();
+  closeSheet('srFreeItemSheet', 'srFreeItemOverlay');
+  showMiniToast('✓ ফ্রি আইটেম সংরক্ষিত হয়েছে');
 }
 
 // ══════════════════════════════════════════════════════════════

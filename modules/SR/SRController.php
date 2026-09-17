@@ -1005,12 +1005,25 @@ class SRController extends Controller
                 INSERT INTO order_free_items (order_id, retailer_id, product_id, free_product_id, quantity)
                 VALUES (?, ?, ?, ?, ?)
             ");
+            
+            $delPreset = $retailerId ? $this->db->prepare("DELETE FROM retailer_product_free_items WHERE retailer_id = ? AND product_id = ?") : null;
+            $insPreset = $retailerId ? $this->db->prepare("INSERT INTO retailer_product_free_items (retailer_id, product_id, free_product_id, quantity) VALUES (?, ?, ?, ?)") : null;
+            $clearedParents = [];
+
             foreach ($orderFreeItemsList as $fi) {
                 $parentPid = intval($fi['product_id'] ?? 0);
                 $freePid   = intval($fi['free_product_id'] ?? 0);
                 $fQty      = intval($fi['quantity'] ?? 0);
                 if ($parentPid > 0 && $freePid > 0 && $fQty > 0) {
                     $insFreeStmt->execute([$orderId, $retailerId ?: 0, $parentPid, $freePid, $fQty]);
+
+                    if ($retailerId && $delPreset && $insPreset) {
+                        if (!isset($clearedParents[$parentPid])) {
+                            $delPreset->execute([$retailerId, $parentPid]);
+                            $clearedParents[$parentPid] = true;
+                        }
+                        $insPreset->execute([$retailerId, $parentPid, $freePid, $fQty]);
+                    }
                 }
             }
         }
