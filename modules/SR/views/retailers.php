@@ -356,7 +356,8 @@ function openShop(id, name, address, hasOrderToday = false) {
           if (data.success) {
             cartsByRetailer[ret.id] = data.items;
             ret.has_order_today = false;
-            openRetailerCartSheet(ret);
+            currentRetailer = ret;
+            openProductsForRetailer();
           } else {
             showMiniToast('❌ ' + (data.message || 'অর্ডার আনতে সমস্যা হয়েছে'), true);
           }

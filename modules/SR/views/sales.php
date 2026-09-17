@@ -757,7 +757,8 @@ function triggerRetailerAction(ret) {
           if (data.success) {
             cartsByRetailer[ret.id] = data.items;
             ret.has_order_today = false; // allow editing
-            openRetailerCartSheet(ret);
+            currentRetailer = ret;
+            openProductsForRetailer();
           } else {
             showMiniToast('❌ ' + (data.message || 'Error fetching order details'), true);
           }
