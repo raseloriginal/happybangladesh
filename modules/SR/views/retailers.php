@@ -355,7 +355,6 @@ function openShop(id, name, address, hasOrderToday = false) {
           SRLoader.hideOverlay();
           if (data.success) {
             cartsByRetailer[ret.id] = data.items;
-            ret.has_order_today = false;
             currentRetailer = ret;
             openProductsForRetailer();
           } else {
