@@ -744,9 +744,11 @@ body.sr-map-active {
   border-radius: 24px 24px 0 0;
   z-index: 701;
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  max-height: 92vh;
+  /* Cap height to full screen without any gap */
+  max-height: 100dvh;
   overflow-y: auto;
   will-change: transform;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .sr-bottom-sheet.open {
@@ -795,7 +797,8 @@ body.sr-map-active {
 }
 
 .sr-sheet-body {
-  padding: 16px 20px;
+  /* Extra bottom padding so content clears the 65px bottom nav */
+  padding: 16px 20px calc(var(--sr-nav-h) + 8px);
 }
 
 /* ── Add Retailer Form ─────────────────────────────────────── */
@@ -2350,6 +2353,11 @@ body.sr-map-active {
   left: 50%;
   transform: translate(-50%, 100%);
   will-change: transform;
+  /* Cap height to full screen without any gap */
+  max-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 @media(max-width: 500px) {
@@ -2407,7 +2415,8 @@ body.sr-map-active {
 }
 
 .sr-sheet-body-v2 {
-  padding: 16px 20px 24px;
+  /* Bottom padding accounts for 65px nav so buttons are always tappable */
+  padding: 16px 20px calc(var(--sr-nav-h) + 16px);
 }
 
 /* Image wrapper and Sticker */
@@ -2426,8 +2435,8 @@ body.sr-map-active {
 }
 
 .sr-product-sheet-img-v2 {
-  max-width: 80%;
-  max-height: 80%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 

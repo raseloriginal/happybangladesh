@@ -35,7 +35,7 @@ $formatOC = function($amount, $isCard = false) {
   }
 </style>
 
-<div class="p-3 sm:p-5 space-y-4 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none">
+<div class="p-3 sm:p-5 space-y-4 pb-4 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none">
 
   <!-- Premium Minimal Header Card -->
   <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 rounded-2xl border border-slate-200/60 shadow-2xs flex items-center justify-between gap-3 print:shadow-none print:border-none print:p-0">

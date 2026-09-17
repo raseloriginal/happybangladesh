@@ -7,7 +7,7 @@
   }
 </style>
 
-<div class="p-3 sm:p-5 space-y-5 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800">
+<div class="p-3 sm:p-5 space-y-5 pb-4 max-w-5xl mx-auto font-siliguri text-slate-800">
 
   <!-- 1. Top Header Profile Bar -->
   <div class="bg-white/95 backdrop-blur-md px-4 py-3 sm:px-5 sm:py-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between gap-3 transition-all">

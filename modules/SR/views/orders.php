@@ -35,7 +35,7 @@ $truncateName = function($name) {
   }
 </style>
 
-<div class="p-3 sm:p-5 space-y-4 pb-28 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none print:bg-white">
+<div class="p-3 sm:p-5 space-y-4 pb-4 max-w-5xl mx-auto font-siliguri text-slate-800 print:p-0 print:max-w-none print:bg-white">
 
   <!-- Toast Notification Container (Over everything, top-left) -->
   <div id="toastContainer" class="fixed top-5 left-5 space-y-2 pointer-events-none" style="z-index: 999999 !important;"></div>
