@@ -614,6 +614,9 @@ $truncateName = function($name) {
             <p id="delRetailerSub">আব্দুর রহিম · চারঘাট বাজার</p>
           </div>
           <div class="rt">
+            <div class="flex items-center justify-end gap-1.5 mb-1">
+              <span id="delStatusBadge" class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold"></span>
+            </div>
             <em id="delInvId">ইনভয়েস ১০২৪</em>
             <span id="delDate">১৪ সেপ্টেম্বর ২০২৬</span>
           </div>
@@ -2200,8 +2203,19 @@ function openDeliveryMemoModal(orderData) {
   const retailerSub = (order.retailer_phone ? order.retailer_phone : '') + (order.retailer_address ? ' · ' + order.retailer_address : '');
 
   document.getElementById('delRetailerName').innerText = retailerName;
-  document.getElementById('delRetailerSub').innerText = retailerSub || 'চারঘাট বাজার';
-  document.getElementById('delInvId').innerText = 'ইনভয়েস #' + bnNum(order.id);
+  // Set Real-Time Status Badge
+  const statusBadge = document.getElementById('delStatusBadge');
+  if (statusBadge) {
+    const statusMap = {
+      'pending': { label: 'প্যান্ডিং (Pending)', cls: 'bg-amber-100 text-amber-800 border border-amber-200' },
+      'confirmed': { label: 'কনফার্মড (Confirmed)', cls: 'bg-blue-100 text-blue-800 border border-blue-200' },
+      'delivered': { label: 'ডেলিভার্ড (Delivered)', cls: 'bg-emerald-100 text-emerald-800 border border-emerald-200' },
+      'cancelled': { label: 'বাতিল (Cancelled)', cls: 'bg-rose-100 text-rose-800 border border-rose-200' }
+    };
+    const st = statusMap[order.status] || { label: order.status || 'Unknown', cls: 'bg-slate-100 text-slate-700 border border-slate-200' };
+    statusBadge.className = `inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold ${st.cls}`;
+    statusBadge.innerText = st.label;
+  }
   
   const createdDate = order.created_at ? new Date(order.created_at.replace(/-/g, '/')) : new Date();
   const day = bnNum(createdDate.getDate());
@@ -2210,10 +2224,11 @@ function openDeliveryMemoModal(orderData) {
   const year = bnNum(createdDate.getFullYear());
   document.getElementById('delDate').innerText = `${day} ${month} ${year}`;
 
+  const isCancelled = order.status === 'cancelled';
   const items = (order.products || []).map(p => {
     const ordQty = parseInt(p.quantity || 0);
-    // If delivered/got items available or default to got=ordQty for complete order
-    const gotQty = p.delivered_qty !== undefined ? parseInt(p.delivered_qty) : ordQty;
+    // If order is cancelled, gotQty is 0. Otherwise use p.delivered_qty if available, or fallback to ordQty
+    const gotQty = isCancelled ? 0 : (p.delivered_qty !== undefined && p.delivered_qty !== null ? parseInt(p.delivered_qty) : ordQty);
     const unitPrice = parseFloat(p.unit_price || p.price || 0);
     return {
       name: p.product_name || p.name || 'পণ্য',
