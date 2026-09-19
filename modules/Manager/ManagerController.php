@@ -160,10 +160,40 @@ class ManagerController extends Controller
         $q->execute([$date, $companyId, $companyId, $srId]);
         $products = $q->fetchAll(PDO::FETCH_ASSOC);
 
-        if (!empty($products)) {
-            $pIds = array_column($products, 'product_id');
-            $inClause = implode(',', array_fill(0, count($pIds), '?'));
-            $invParams = array_merge([$wid], $pIds);
+        // Fetch connected free items for these orders
+        $freeStmt = $this->db->prepare("
+            SELECT ofi.product_id, ofi.free_product_id,
+                   fp.name as free_product_name,
+                   fp.pieces_per_box as free_pieces_per_box,
+                   fp.box_type as free_box_type,
+                   SUM(ofi.quantity) as free_qty
+            FROM order_free_items ofi
+            JOIN orders o ON o.id = ofi.order_id
+            JOIN products fp ON fp.id = ofi.free_product_id
+            JOIN products p ON p.id = ofi.product_id
+            WHERE DATE(o.created_at) = ? AND o.sr_id = ?
+              AND (p.company_id = ? OR (? = 0 AND p.company_id IS NULL))
+            GROUP BY ofi.product_id, ofi.free_product_id, fp.name, fp.pieces_per_box, fp.box_type
+            ORDER BY fp.name ASC
+        ");
+        $freeStmt->execute([$date, $srId, $companyId, $companyId]);
+        $freeRows = $freeStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $freeItemsMap = [];
+        $allProductIds = array_column($products, 'product_id');
+        foreach ($freeRows as $fr) {
+            $parentPid = (int)$fr['product_id'];
+            $freePid = (int)$fr['free_product_id'];
+            $allProductIds[] = $freePid;
+            if (!isset($freeItemsMap[$parentPid])) {
+                $freeItemsMap[$parentPid] = [];
+            }
+            $freeItemsMap[$parentPid][] = $fr;
+        }
+        $allProductIds = array_values(array_unique(array_filter($allProductIds)));
+
+        if (!empty($allProductIds)) {
+            $inClause = implode(',', array_fill(0, count($allProductIds), '?'));
             
             $qInv = $this->db->prepare("
                 SELECT p.id as product_id, 
@@ -178,17 +208,34 @@ class ManagerController extends Controller
                 FROM products p 
                 WHERE p.id IN ($inClause)
             ");
-            $qInv->execute($pIds);
+            $qInv->execute($allProductIds);
             $stockData = [];
             while ($row = $qInv->fetch(PDO::FETCH_ASSOC)) {
                 $stockData[$row['product_id']] = $row;
             }
 
             foreach ($products as &$p) {
-                $pId = $p['product_id'];
+                $pId = (int)$p['product_id'];
                 $p['stock_pieces'] = $stockData[$pId]['stock_pieces'] ?? 0;
                 $p['stock_boxes'] = $stockData[$pId]['stock_boxes'] ?? 0;
+
+                $fItems = $freeItemsMap[$pId] ?? [];
+                foreach ($fItems as &$fi) {
+                    $fPid = (int)$fi['free_product_id'];
+                    $fi['stock_pieces'] = $stockData[$fPid]['stock_pieces'] ?? 0;
+                    $fi['stock_boxes'] = $stockData[$fPid]['stock_boxes'] ?? 0;
+                }
+                unset($fi);
+                $p['free_items'] = $fItems;
             }
+            unset($p);
+        } else {
+            foreach ($products as &$p) {
+                $p['stock_pieces'] = 0;
+                $p['stock_boxes'] = 0;
+                $p['free_items'] = [];
+            }
+            unset($p);
         }
         
         echo json_encode($products);
@@ -1635,6 +1682,15 @@ class ManagerController extends Controller
 
                 UNION
 
+                SELECT fp.id AS product_id, fp.company_id
+                FROM dispatch_schedule_srs dss
+                JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
+                JOIN order_free_items ofi ON ofi.order_id = o.id
+                JOIN products fp ON fp.id = ofi.free_product_id
+                WHERE dss.schedule_id = {$scheduleId}
+
+                UNION
+
                 SELECT p.id AS product_id, p.company_id
                 FROM van_stock vs
                 JOIN products p ON p.id = vs.product_id
@@ -1727,6 +1783,13 @@ class ManagerController extends Controller
                            WHERE dss.schedule_id = {$scheduleId} AND oi.product_id = p.id
                        ) as ordered_qty,
                        (
+                           SELECT COALESCE(SUM(ofi.quantity), 0)
+                           FROM dispatch_schedule_srs dss
+                           JOIN orders o ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
+                           JOIN order_free_items ofi ON ofi.order_id = o.id
+                           WHERE dss.schedule_id = {$scheduleId} AND ofi.free_product_id = p.id
+                       ) as free_qty,
+                       (
                            COALESCE((
                                SELECT SUM(di.quantity)
                                FROM dispatches d
@@ -1771,7 +1834,7 @@ class ManagerController extends Controller
                        ) as returned_qty
                 FROM products p
                 WHERE {$companyCondition}
-                HAVING ordered_qty > 0 OR dispatched_qty > 0 OR sale_qty > 0 OR returned_qty > 0
+                HAVING ordered_qty > 0 OR free_qty > 0 OR dispatched_qty > 0 OR sale_qty > 0 OR returned_qty > 0
                 ORDER BY p.name ASC
             ")->fetchAll();
 
@@ -1821,7 +1884,7 @@ class ManagerController extends Controller
             foreach ($srs as &$sr) {
                 $srId = (int)$sr['id'];
                 $sr['products'] = $this->db->query("
-                    SELECT p.name,
+                    SELECT p.id, p.name,
                            MAX(COALESCE(oi.base_selling_price, p.price)) as base_price,
                            SUM(oi.quantity) as ordered_qty,
                            SUM(oi.quantity * COALESCE(oi.base_selling_price, p.price)) as total_base_order_value,
@@ -1832,7 +1895,29 @@ class ManagerController extends Controller
                     WHERE o.sr_id = {$srId} AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
                     GROUP BY p.id, p.name
                     ORDER BY p.name ASC
-                ")->fetchAll();
+                ")->fetchAll(PDO::FETCH_ASSOC);
+
+                // Fetch free items for this SR on this date for products under this company
+                $srFreeRows = $this->db->query("
+                    SELECT ofi.product_id, ofi.free_product_id, fp.name as free_product_name, SUM(ofi.quantity) as free_qty
+                    FROM orders o
+                    JOIN order_free_items ofi ON ofi.order_id = o.id
+                    JOIN products fp ON fp.id = ofi.free_product_id
+                    JOIN products p ON p.id = ofi.product_id
+                    WHERE o.sr_id = {$srId} AND DATE(o.created_at) = '{$dispatchDate}' AND {$companyCondition}
+                    GROUP BY ofi.product_id, ofi.free_product_id, fp.name
+                    ORDER BY fp.name ASC
+                ")->fetchAll(PDO::FETCH_ASSOC);
+
+                $srFreeMap = [];
+                foreach ($srFreeRows as $sfr) {
+                    $srFreeMap[(int)$sfr['product_id']][] = $sfr;
+                }
+
+                foreach ($sr['products'] as &$srp) {
+                    $srp['free_items'] = $srFreeMap[(int)$srp['id']] ?? [];
+                }
+                unset($srp);
             }
 
             $company['srs'] = $srs;
@@ -1853,19 +1938,79 @@ class ManagerController extends Controller
                 exit;
             }
 
-            $products = $this->db->query("
+            $schId = (int)$id;
+            $dispatchDate = $schedule['dispatch_date'];
+
+            // 1. Regular ordered products
+            $regProducts = $this->db->query("
                 SELECT p.id as product_id, p.name, p.image, p.pieces_per_box, p.box_type,
-                       SUM(oi.quantity)          as total_ordered_qty,
+                       SUM(oi.quantity)          as regular_qty,
                        IFNULL(MAX(de.qty_boxes),  0) as extra_boxes,
                        IFNULL(MAX(de.qty_pieces), 0) as extra_pieces
                 FROM dispatch_schedule_srs dss
-                JOIN orders o     ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$schedule['dispatch_date']}'
+                JOIN orders o     ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
                 JOIN order_items oi ON oi.order_id = o.id
                 JOIN products p   ON p.id = oi.product_id
                 LEFT JOIN dispatch_extras de ON de.schedule_id = dss.schedule_id AND de.product_id = p.id
-                WHERE dss.schedule_id = " . (int)$id . "
+                WHERE dss.schedule_id = {$schId}
                 GROUP BY p.id, p.name, p.image, p.pieces_per_box, p.box_type
-            ")->fetchAll();
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            // 2. Free promotional items from order_free_items
+            $freeProducts = $this->db->query("
+                SELECT fp.id as product_id, fp.name, fp.image, fp.pieces_per_box, fp.box_type,
+                       SUM(ofi.quantity)         as free_qty,
+                       IFNULL(MAX(de.qty_boxes),  0) as extra_boxes,
+                       IFNULL(MAX(de.qty_pieces), 0) as extra_pieces
+                FROM dispatch_schedule_srs dss
+                JOIN orders o     ON o.sr_id = dss.sr_id AND DATE(o.created_at) = '{$dispatchDate}'
+                JOIN order_free_items ofi ON ofi.order_id = o.id
+                JOIN products fp  ON fp.id = ofi.free_product_id
+                LEFT JOIN dispatch_extras de ON de.schedule_id = dss.schedule_id AND de.product_id = fp.id
+                WHERE dss.schedule_id = {$schId}
+                GROUP BY fp.id, fp.name, fp.image, fp.pieces_per_box, fp.box_type
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            $merged = [];
+            foreach ($regProducts as $rp) {
+                $pid = (int)$rp['product_id'];
+                $merged[$pid] = [
+                    'product_id' => $pid,
+                    'name' => $rp['name'],
+                    'image' => $rp['image'],
+                    'pieces_per_box' => $rp['pieces_per_box'],
+                    'box_type' => $rp['box_type'],
+                    'regular_qty' => (int)$rp['regular_qty'],
+                    'free_qty' => 0,
+                    'total_ordered_qty' => (int)$rp['regular_qty'],
+                    'extra_boxes' => (int)$rp['extra_boxes'],
+                    'extra_pieces' => (int)$rp['extra_pieces'],
+                ];
+            }
+
+            foreach ($freeProducts as $fp) {
+                $pid = (int)$fp['product_id'];
+                if (isset($merged[$pid])) {
+                    $merged[$pid]['free_qty'] = (int)$fp['free_qty'];
+                    $merged[$pid]['total_ordered_qty'] += (int)$fp['free_qty'];
+                } else {
+                    $merged[$pid] = [
+                        'product_id' => $pid,
+                        'name' => $fp['name'],
+                        'image' => $fp['image'],
+                        'pieces_per_box' => $fp['pieces_per_box'],
+                        'box_type' => $fp['box_type'],
+                        'regular_qty' => 0,
+                        'free_qty' => (int)$fp['free_qty'],
+                        'total_ordered_qty' => (int)$fp['free_qty'],
+                        'extra_boxes' => (int)$fp['extra_boxes'],
+                        'extra_pieces' => (int)$fp['extra_pieces'],
+                    ];
+                }
+            }
+
+            $products = array_values($merged);
+            usort($products, fn($a, $b) => strcmp($a['name'], $b['name']));
 
             echo json_encode($products);
         } catch (\Exception $e) {
@@ -2037,7 +2182,33 @@ class ManagerController extends Controller
                     GROUP BY di.product_id, di.lot_id, d.warehouse_id
                 ");
                 $q->execute([$dsrId, $deliv_date]);
-                $itemsToLoad = $q->fetchAll();
+                $itemsToLoad = $q->fetchAll(PDO::FETCH_ASSOC);
+
+                // 1b. Also include free promotional items from order_free_items
+                $freeQ = $this->db->prepare("
+                    SELECT ofi.free_product_id as product_id, NULL as lot_id, d.warehouse_id, SUM(ofi.quantity) as total_qty
+                    FROM order_free_items ofi
+                    JOIN dispatches d ON d.order_id = ofi.order_id
+                    WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status='pending'
+                    GROUP BY ofi.free_product_id, d.warehouse_id
+                ");
+                $freeQ->execute([$dsrId, $deliv_date]);
+                $freeItemsToLoad = $freeQ->fetchAll(PDO::FETCH_ASSOC);
+
+                $loadMap = [];
+                foreach ($itemsToLoad as $item) {
+                    $key = $item['product_id'] . '_' . ($item['lot_id'] ?? 'null') . '_' . $item['warehouse_id'];
+                    $loadMap[$key] = $item;
+                }
+                foreach ($freeItemsToLoad as $fItem) {
+                    $key = $fItem['product_id'] . '_null_' . $fItem['warehouse_id'];
+                    if (isset($loadMap[$key])) {
+                        $loadMap[$key]['total_qty'] += (int)$fItem['total_qty'];
+                    } else {
+                        $loadMap[$key] = $fItem;
+                    }
+                }
+                $itemsToLoad = array_values($loadMap);
 
                 // 2. Get dispatch_extras adjustments for this schedule (negative = manager reduced van load)
                 //    Only apply NEGATIVE adjustments — positive extras are already in separate dispatch_items.
@@ -2170,7 +2341,33 @@ class ManagerController extends Controller
                 GROUP BY di.product_id, di.lot_id, d.warehouse_id
             ");
             $q->execute([$dsrId, $deliv_date]);
-            $itemsToUndo = $q->fetchAll();
+            $itemsToUndo = $q->fetchAll(PDO::FETCH_ASSOC);
+
+            // 1b. Also include free promotional items from order_free_items
+            $freeUndoQ = $this->db->prepare("
+                SELECT ofi.free_product_id as product_id, NULL as lot_id, d.warehouse_id, SUM(ofi.quantity) as total_qty
+                FROM order_free_items ofi
+                JOIN dispatches d ON d.order_id = ofi.order_id
+                WHERE d.dsr_id=? AND d.dispatch_date=? AND d.status='in_transit'
+                GROUP BY ofi.free_product_id, d.warehouse_id
+            ");
+            $freeUndoQ->execute([$dsrId, $deliv_date]);
+            $freeItemsToUndo = $freeUndoQ->fetchAll(PDO::FETCH_ASSOC);
+
+            $undoMap = [];
+            foreach ($itemsToUndo as $item) {
+                $key = $item['product_id'] . '_' . ($item['lot_id'] ?? 'null') . '_' . $item['warehouse_id'];
+                $undoMap[$key] = $item;
+            }
+            foreach ($freeItemsToUndo as $fItem) {
+                $key = $fItem['product_id'] . '_null_' . $fItem['warehouse_id'];
+                if (isset($undoMap[$key])) {
+                    $undoMap[$key]['total_qty'] += (int)$fItem['total_qty'];
+                } else {
+                    $undoMap[$key] = $fItem;
+                }
+            }
+            $itemsToUndo = array_values($undoMap);
 
             // 2. Get dispatch_extras adjustments for this schedule (negative = manager reduced van load)
             $extrasQ = $this->db->prepare("

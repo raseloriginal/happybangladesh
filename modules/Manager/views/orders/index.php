@@ -307,6 +307,59 @@ async function toggleSr(dateStr, companyId, srId) {
                             </td>
                         </tr>
                     `;
+
+                    if (prod.free_items && prod.free_items.length > 0) {
+                        prod.free_items.forEach(fi => {
+                            const fPpb = parseInt(fi.pieces_per_box) || 1;
+                            const fOrderQty = parseInt(fi.free_qty) || 0;
+                            const fStockPcs = parseInt(fi.stock_pieces) || 0;
+
+                            const fBoxType = (fi.box_type || '').trim();
+                            const fBoxTypeLower = fBoxType.toLowerCase();
+
+                            let fOrderQtyDisplay = '';
+                            let fStockQtyDisplay = '';
+
+                            if (fBoxTypeLower === 'pcs') {
+                                fOrderQtyDisplay = `${fOrderQty} পিস`;
+                                fStockQtyDisplay = `${fStockPcs} পিস`;
+                            } else if (fBoxType === 'পিস' || fBoxType === 'পলি' || fBoxType === 'জার') {
+                                fOrderQtyDisplay = `${fOrderQty} ${fBoxType}`;
+                                fStockQtyDisplay = `${fStockPcs} ${fBoxType}`;
+                            } else {
+                                const fBoxLabel = fBoxType ? fBoxType : 'Box';
+                                const fOrderBoxes = Math.floor(fOrderQty / fPpb);
+                                const fOrderPieces = fOrderQty % fPpb;
+                                fOrderQtyDisplay = `${fOrderBoxes} ${fBoxLabel} - ${fOrderPieces} পিস`;
+
+                                const fStockBoxes = Math.floor(fStockPcs / fPpb);
+                                const fStockPieces = fStockPcs % fPpb;
+                                fStockQtyDisplay = `${fStockBoxes} ${fBoxLabel} - ${fStockPieces} পিস`;
+                            }
+
+                            const fIsShort = fStockPcs < fOrderQty;
+                            const fStockColorClass = fIsShort ? 'text-red-600 font-bold bg-red-50' : 'text-slate-600';
+
+                            html += `
+                                <tr class="bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors border-l-2 border-emerald-400">
+                                    <td class="py-1.5 px-3 pl-6 font-medium text-slate-700">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-emerald-600 font-black text-sm">↳</span>
+                                            <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-emerald-300 shadow-2xs">
+                                                <i class="fa-solid fa-gift text-emerald-600"></i> FREE
+                                            </span>
+                                            <span class="font-bold text-slate-800">${fi.free_product_name}</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-1.5 px-3 text-center font-mono text-xs ${fStockColorClass}">${fStockQtyDisplay}</td>
+                                    <td class="py-1.5 px-3 text-center font-mono font-bold text-emerald-700 text-xs">${fOrderQtyDisplay}</td>
+                                    <td class="py-1.5 px-3 text-right font-mono text-slate-400 text-xs">—</td>
+                                    <td class="py-1.5 px-3 text-right font-mono text-slate-400 text-xs">—</td>
+                                    <td class="py-1.5 px-3 text-right font-mono text-slate-400 text-xs">—</td>
+                                </tr>
+                            `;
+                        });
+                    }
                 });
 
                 html += `</tbody></table>`;

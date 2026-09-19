@@ -1326,6 +1326,19 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
 
                     const origPrice = parseFloat(p.original_selling_price || p.base_price || p.price || 0);
 
+                    const freeItems = p.free_items || [];
+                    let freeHtml = '';
+                    if (freeItems.length > 0) {
+                        freeHtml = `<div class="mt-1 space-y-1">` + freeItems.map(fi => `
+                            <div class="flex items-center gap-1.5 text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-md px-2 py-0.5 font-medium">
+                                <span class="text-emerald-500 font-bold">↳</span>
+                                <span class="bg-emerald-600 text-white text-[8px] font-black px-1 rounded uppercase tracking-wider">FREE</span>
+                                <span class="font-semibold text-slate-700 truncate">${fi.free_product_name}</span>
+                                <span class="text-emerald-700 font-bold ml-auto shrink-0">${fi.free_qty} পিস</span>
+                            </div>
+                        `).join('') + `</div>`;
+                    }
+
                     orderHtml += `
                     <div class="product-item flex items-stretch divide-x divide-slate-100 text-xs hover:bg-slate-50/50 transition-colors" data-price="${p.price || 0}" data-baseprice="${p.base_price || 0}" data-prevdelivered="${prevDelivered}" data-pid="${p.product_id}">
                         <!-- Product & Stock Cell -->
@@ -1346,6 +1359,7 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                                 <span class="bg-blue-50 text-blue-700 font-extrabold px-1.5 py-0.5 rounded" id="itemPrice-${orderIdx}-${idx}">৳${(parseFloat(p.price || 0) * initialDeliveredQty).toFixed(2)}</span>
                                 <span id="itemOc-${orderIdx}-${idx}" class="hidden"></span>
                             </div>
+                            ${freeHtml}
                         </div>
 
                         <!-- Delivered Input Cell -->
