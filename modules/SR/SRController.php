@@ -1134,6 +1134,7 @@ class SRController extends Controller
 
             // ── Store Free Items for this Order ─────────────────────────
             $rawFreeItems = $this->post('free_items');
+            $hasFreeItemsPayload = ($rawFreeItems !== null);
             $orderFreeItemsList = [];
             if (!empty($rawFreeItems)) {
                 if (is_string($rawFreeItems)) {
@@ -1144,7 +1145,8 @@ class SRController extends Controller
             }
 
             $retId = intval($order['retailer_id'] ?? 0);
-            if (empty($orderFreeItemsList) && $retId && !empty($productIds)) {
+            // Only fallback to retailer defaults if free_items parameter was not provided at all
+            if (!$hasFreeItemsPayload && empty($orderFreeItemsList) && $retId && !empty($productIds)) {
                 $inClause = implode(',', array_map('intval', $productIds));
                 $defaultFreeStmt = $this->db->query("
                     SELECT product_id, free_product_id, quantity
@@ -1186,6 +1188,24 @@ class SRController extends Controller
             ");
             $iq->execute([$orderId]);
             $updatedProducts = $iq->fetchAll(PDO::FETCH_ASSOC);
+
+            // Fetch and attach refreshed free items for this order
+            $fq = $this->db->prepare("
+                SELECT ofi.product_id, ofi.free_product_id, ofi.quantity, p.name AS free_product_name
+                FROM order_free_items ofi
+                JOIN products p ON p.id = ofi.free_product_id
+                WHERE ofi.order_id = ?
+            ");
+            $fq->execute([$orderId]);
+            $freeRows = $fq->fetchAll(PDO::FETCH_ASSOC);
+            $orderFreeMap = [];
+            foreach ($freeRows as $fr) {
+                $orderFreeMap[$fr['product_id']][] = $fr;
+            }
+            foreach ($updatedProducts as &$prRef) {
+                $prRef['free_items'] = $orderFreeMap[$prRef['product_id']] ?? [];
+            }
+            unset($prRef);
 
             $order['total_amount'] = $total;
             $order['products'] = $updatedProducts;
