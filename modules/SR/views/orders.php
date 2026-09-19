@@ -480,9 +480,9 @@ $truncateName = function($name) {
 <!-- ========================================================================= -->
 <!-- BEAUTIFUL RETAILER INVOICE MODAL                                         -->
 <!-- ========================================================================= -->
-<div id="invoiceModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-3 sm:p-4 overflow-y-auto pointer-events-none" style="z-index: 99990 !important;">
+<div id="invoiceModal" onclick="if(event.target === this) closeInvoiceModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-3 sm:p-4 overflow-y-auto pointer-events-none cursor-pointer" style="z-index: 99990 !important;">
   
-  <div id="invoiceModalContent" class="bg-white w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-xl space-y-4 transform scale-95 transition-transform duration-200 border border-slate-100 my-auto text-slate-800 font-siliguri pointer-events-auto">
+  <div id="invoiceModalContent" class="bg-white w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-xl space-y-4 transform scale-95 transition-transform duration-200 border border-slate-100 my-auto text-slate-800 font-siliguri pointer-events-auto cursor-default">
     
     <!-- Printable Invoice Container -->
     <div id="printableInvoiceArea" class="space-y-4 bg-white">
@@ -496,12 +496,17 @@ $truncateName = function($name) {
           <p class="text-[9px] text-slate-400 font-semibold mt-0.5">Distribution Management System</p>
         </div>
 
-        <div class="text-right">
-          <div class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 font-bold text-[9px] uppercase tracking-wider rounded border border-slate-200/50">
-            অর্ডার চালানি ইনভয়েস
+        <div class="text-right flex items-center gap-2">
+          <div>
+            <div class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 font-bold text-[9px] uppercase tracking-wider rounded border border-slate-200/50">
+              অর্ডার চালানি ইনভয়েস
+            </div>
+            <div class="text-xs font-bold font-mono text-slate-900 mt-1" id="invOrderId">#ORD-0000</div>
+            <div class="text-[10px] text-slate-400 font-medium" id="invDate">00 Jan 2026, 1:50 PM</div>
           </div>
-          <div class="text-xs font-bold font-mono text-slate-900 mt-1" id="invOrderId">#ORD-0000</div>
-          <div class="text-[10px] text-slate-400 font-medium" id="invDate">00 Jan 2026, 1:50 PM</div>
+          <button type="button" onclick="closeInvoiceModal()" class="print:hidden w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition flex items-center justify-center active:scale-95 ml-1" title="বন্ধ করুন">
+            <i class="fa-solid fa-xmark text-xs"></i>
+          </button>
         </div>
       </div>
 
@@ -598,9 +603,9 @@ $truncateName = function($name) {
 <!-- ========================================================================= -->
 <!-- DELIVERY MEMO MODAL (Minimalist Clean Executive Theme)                    -->
 <!-- ========================================================================= -->
-<div id="deliveryMemoModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-3 sm:p-4 overflow-y-auto pointer-events-none" style="z-index: 99992 !important;">
+<div id="deliveryMemoModal" onclick="if(event.target === this) closeDeliveryMemoModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-3 sm:p-4 overflow-y-auto pointer-events-none cursor-pointer" style="z-index: 99992 !important;">
   
-  <div id="deliveryMemoModalContent" class="bg-white w-full max-w-[155mm] rounded-2xl shadow-2xl space-y-0 transform scale-95 transition-transform duration-200 border border-slate-200/80 my-auto text-slate-800 font-siliguri pointer-events-auto max-h-[92vh] flex flex-col overflow-hidden">
+  <div id="deliveryMemoModalContent" class="bg-white w-full max-w-[155mm] rounded-2xl shadow-2xl space-y-0 transform scale-95 transition-transform duration-200 border border-slate-200/80 my-auto text-slate-800 font-siliguri pointer-events-auto max-h-[92vh] flex flex-col overflow-hidden cursor-default">
     
     <!-- Top Action Bar (Non-Printable) -->
     <div class="del-bar print:hidden flex items-center justify-between px-5 py-3 bg-slate-900 text-white shrink-0">
@@ -2090,105 +2095,126 @@ function recalculateTableFooterTotals() {
   }
 }
 
+// ── Safe DOM Text Setter Helper ─────────────────────────────────────────────
+function safeSetText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = (text !== undefined && text !== null) ? text : '';
+}
+
+let invoiceModalTimer = null;
+let deliveryMemoModalTimer = null;
+
 // ── Beautiful Retailer Invoice Modal ─────────────────────────────────────────
 function openInvoiceModal(orderData) {
+  if (!orderData) return;
   const orderId = orderData.id;
   const order = ORDERS_MAP[orderId] || orderData;
 
   const modal = document.getElementById('invoiceModal');
   const modalContent = document.getElementById('invoiceModalContent');
+  if (!modal || !modalContent) return;
+
+  // Clear pending close timer
+  if (invoiceModalTimer) {
+    clearTimeout(invoiceModalTimer);
+    invoiceModalTimer = null;
+  }
 
   // Order & Retailer Header Data
   const retailerName = order.retailer_name || order.dealer_name || 'সাধারণ কাস্টমার';
   const retailerPhone = order.retailer_phone || 'N/A';
   const retailerAddress = order.retailer_address || 'ঠিকানা দেওয়া নেই';
 
-  document.getElementById('invOrderId').innerText = '#ORD-' + order.id;
-  document.getElementById('invDate').innerText = formatDateTime12Hr(order.created_at);
-  document.getElementById('invRetailerName').innerText = retailerName;
-  document.getElementById('invRetailerPhone').innerText = retailerPhone;
-  document.getElementById('invRetailerAddress').innerText = retailerAddress;
-  document.getElementById('invDealerName').innerText = 'ডিলার: ' + (order.dealer_name || 'Direct');
+  safeSetText('invOrderId', '#ORD-' + order.id);
+  safeSetText('invDate', formatDateTime12Hr(order.created_at));
+  safeSetText('invRetailerName', retailerName);
+  safeSetText('invRetailerPhone', retailerPhone);
+  safeSetText('invRetailerAddress', retailerAddress);
+  safeSetText('invDealerName', 'ডিলার: ' + (order.dealer_name || 'Direct'));
 
   // Status Badge
   const stBadge = document.getElementById('invStatusBadge');
-  const statusMap = {
-    'pending': { label: 'প্যান্ডিং', cls: 'bg-amber-100 text-amber-800' },
-    'confirmed': { label: 'কনফার্মড', cls: 'bg-blue-100 text-blue-800' },
-    'dispatched': { label: 'ডিসপ্যাচড', cls: 'bg-indigo-100 text-indigo-800' },
-    'in_transit': { label: 'অন দ্য ওয়ে', cls: 'bg-indigo-100 text-indigo-800' },
-    'delivered': { label: 'ডেলিভার্ড', cls: 'bg-emerald-100 text-emerald-800' },
-    'partial': { label: 'আংশিক', cls: 'bg-amber-100 text-amber-800' },
-    'cancelled': { label: 'বাতিল', cls: 'bg-rose-100 text-rose-800' }
-  };
-  const stInfo = statusMap[order.status] || { label: order.status, cls: 'bg-slate-100 text-slate-800' };
-  stBadge.innerText = stInfo.label;
-  stBadge.className = 'font-extrabold px-2.5 py-0.5 rounded-md text-[10px] ' + stInfo.cls;
+  if (stBadge) {
+    const statusMap = {
+      'pending': { label: 'প্যান্ডিং', cls: 'bg-amber-100 text-amber-800' },
+      'confirmed': { label: 'কনফার্মড', cls: 'bg-blue-100 text-blue-800' },
+      'dispatched': { label: 'ডিসপ্যাচড', cls: 'bg-indigo-100 text-indigo-800' },
+      'in_transit': { label: 'অন দ্য ওয়ে', cls: 'bg-indigo-100 text-indigo-800' },
+      'delivered': { label: 'ডেলিভার্ড', cls: 'bg-emerald-100 text-emerald-800' },
+      'partial': { label: 'আংশিক', cls: 'bg-amber-100 text-amber-800' },
+      'cancelled': { label: 'বাতিল', cls: 'bg-rose-100 text-rose-800' }
+    };
+    const stInfo = statusMap[order.status] || { label: order.status, cls: 'bg-slate-100 text-slate-800' };
+    stBadge.innerText = stInfo.label;
+    stBadge.className = 'font-extrabold px-2.5 py-0.5 rounded-md text-[10px] ' + stInfo.cls;
+  }
 
   // Populate Table Rows
   const tableBody = document.getElementById('invItemsTableBody');
-  tableBody.innerHTML = '';
+  if (tableBody) {
+    tableBody.innerHTML = '';
 
-  let totalQtyPcs = 0;
-  let totalItemsCount = 0;
+    let totalQtyPcs = 0;
+    let totalItemsCount = 0;
 
-  if (order.products && order.products.length > 0) {
-    totalItemsCount = order.products.length;
-    order.products.forEach((prod, index) => {
-      const qty = parseInt(prod.quantity || 0);
-      const ppb = parseInt(prod.pieces_per_box || 1) || 1;
-      totalQtyPcs += qty;
+    if (order.products && order.products.length > 0) {
+      totalItemsCount = order.products.length;
+      order.products.forEach((prod, index) => {
+        const qty = parseInt(prod.quantity || 0);
+        const ppb = parseInt(prod.pieces_per_box || 1) || 1;
+        totalQtyPcs += qty;
 
-      const boxes = Math.floor(qty / ppb);
-      const pcs = qty % ppb;
-      const packingStr = (boxes > 0 ? boxes + ' কার্টন ' : '') + (pcs > 0 || boxes === 0 ? pcs + ' পিস' : '');
-      const itemTotal = parseFloat(prod.total_price || (qty * parseFloat(prod.unit_price || 0)));
+        const boxes = Math.floor(qty / ppb);
+        const pcs = qty % ppb;
+        const packingStr = (boxes > 0 ? boxes + ' কার্টন ' : '') + (pcs > 0 || boxes === 0 ? pcs + ' পিস' : '');
+        const itemTotal = parseFloat(prod.total_price || (qty * parseFloat(prod.unit_price || 0)));
 
-      // O/C = (unit_price - base_price) × qty
-      const unitPrice  = parseFloat(prod.unit_price  || 0);
-      const basePrice  = parseFloat(prod.base_price  || 0);
-      const itemOC     = (unitPrice - basePrice) * qty;
-      const ocAbs      = Math.abs(itemOC).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-      const ocSign     = itemOC >= 0 ? '+' : '-';
-      const ocColor    = itemOC >= 0 ? '#10b981' : '#f43f5e';
-      const ocHtml     = itemOC !== 0
-        ? `<div style="font-size:9px;font-weight:700;color:${ocColor};margin-top:1px;">(${ocSign}৳${ocAbs})</div>`
-        : '';
+        // O/C = (unit_price - base_price) × qty
+        const unitPrice  = parseFloat(prod.unit_price  || 0);
+        const basePrice  = parseFloat(prod.base_price  || 0);
+        const itemOC     = (unitPrice - basePrice) * qty;
+        const ocAbs      = Math.abs(itemOC).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+        const ocSign     = itemOC >= 0 ? '+' : '-';
+        const ocColor    = itemOC >= 0 ? '#10b981' : '#f43f5e';
+        const ocHtml     = itemOC !== 0
+          ? `<div style="font-size:9px;font-weight:700;color:${ocColor};margin-top:1px;">(${ocSign}৳${ocAbs})</div>`
+          : '';
 
-      let freeBadgeHtml = '';
-      if (prod.free_items && prod.free_items.length > 0) {
-        const freeBadges = prod.free_items.map(fi => {
-          return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-semibold"><i class="fa-solid fa-gift text-amber-600 text-[8px]"></i> ${fi.free_product_name || 'ফ্রি'}: <b>${fi.quantity}</b>টি</span>`;
-        }).join(' ');
-        freeBadgeHtml = `<div class="mt-1 flex flex-wrap gap-1">${freeBadges}</div>`;
-      }
+        let freeBadgeHtml = '';
+        if (prod.free_items && prod.free_items.length > 0) {
+          const freeBadges = prod.free_items.map(fi => {
+            return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-semibold"><i class="fa-solid fa-gift text-amber-600 text-[8px]"></i> ${fi.free_product_name || 'ফ্রি'}: <b>${fi.quantity}</b>টি</span>`;
+          }).join(' ');
+          freeBadgeHtml = `<div class="mt-1 flex flex-wrap gap-1">${freeBadges}</div>`;
+        }
 
-      const tr = document.createElement('tr');
-      tr.className = 'bg-white hover:bg-slate-50/30 transition-colors';
-      tr.innerHTML = `
-        <td class="py-2 px-2.5 font-mono font-bold text-slate-400 text-[10px]">${index + 1}</td>
-        <td class="py-2 px-2.5">
-          <div class="font-bold text-slate-800 text-[11px] leading-tight break-words font-siliguri">${prod.product_name || 'পণ্য'}</div>
-          ${freeBadgeHtml}
-        </td>
-        <td class="py-2 px-2.5 text-center font-semibold text-slate-600 text-[11px]">${packingStr}</td>
-        <td class="py-2 px-2.5 text-center font-mono font-bold text-slate-700 text-[11px]">${qty} পিস</td>
-        <td class="py-2 px-2.5 text-right font-mono text-slate-600 text-[11px]">৳ ${parseFloat(prod.unit_price || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-        <td class="py-2 px-2.5 text-right font-mono font-bold text-slate-900 text-[11px]">
-          ৳ ${itemTotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
-          ${ocHtml}
-        </td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  } else {
-    tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-400 text-xs font-bold font-siliguri">কোনো আইটেম পাওয়া যায়নি।</td></tr>';
+        const tr = document.createElement('tr');
+        tr.className = 'bg-white hover:bg-slate-50/30 transition-colors';
+        tr.innerHTML = `
+          <td class="py-2 px-2.5 font-mono font-bold text-slate-400 text-[10px]">${index + 1}</td>
+          <td class="py-2 px-2.5">
+            <div class="font-bold text-slate-800 text-[11px] leading-tight break-words font-siliguri">${prod.product_name || 'পণ্য'}</div>
+            ${freeBadgeHtml}
+          </td>
+          <td class="py-2 px-2.5 text-center font-semibold text-slate-600 text-[11px]">${packingStr}</td>
+          <td class="py-2 px-2.5 text-center font-mono font-bold text-slate-700 text-[11px]">${qty} পিস</td>
+          <td class="py-2 px-2.5 text-right font-mono text-slate-600 text-[11px]">৳ ${parseFloat(prod.unit_price || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+          <td class="py-2 px-2.5 text-right font-mono font-bold text-slate-900 text-[11px]">
+            ৳ ${itemTotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}
+            ${ocHtml}
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    } else {
+      tableBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-400 text-xs font-bold font-siliguri">কোনো আইটেম পাওয়া যায়নি।</td></tr>';
+    }
+
+    // Summary Totals
+    safeSetText('invTotalItems', totalItemsCount + 'টি');
+    safeSetText('invTotalQtyPcs', totalQtyPcs + ' পিস');
+    safeSetText('invGrandTotal', '৳ ' + parseFloat(order.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
   }
-
-  // Summary Totals
-  document.getElementById('invTotalItems').innerText = totalItemsCount + 'টি';
-  document.getElementById('invTotalQtyPcs').innerText = totalQtyPcs + ' পিস';
-  document.getElementById('invGrandTotal').innerText = '৳ ' + parseFloat(order.total_amount || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
 
   // Portal to body to guarantee on-top rendering
   if (modal.parentElement !== document.body) {
@@ -2207,14 +2233,20 @@ function openInvoiceModal(orderData) {
 function closeInvoiceModal() {
   const modal = document.getElementById('invoiceModal');
   const modalContent = document.getElementById('invoiceModalContent');
+  if (!modal || !modalContent) return;
+
+  if (invoiceModalTimer) {
+    clearTimeout(invoiceModalTimer);
+  }
 
   modalContent.classList.remove('scale-100');
   modalContent.classList.add('scale-95');
   modal.classList.add('opacity-0');
   document.body.classList.remove('overflow-hidden');
 
-  setTimeout(() => {
+  invoiceModalTimer = setTimeout(() => {
     modal.classList.add('hidden', 'pointer-events-none');
+    invoiceModalTimer = null;
   }, 200);
 }
 
@@ -2228,16 +2260,27 @@ function toggleRetailerName(element, fullName, shortName) {
 
 // ── Delivery Memo Modal Logic ────────────────────────────────────────────────
 function openDeliveryMemoModal(orderData) {
+  if (!orderData) return;
   const orderId = orderData.id;
   const order = ORDERS_MAP[orderId] || orderData;
 
   const modal = document.getElementById('deliveryMemoModal');
   const modalContent = document.getElementById('deliveryMemoModalContent');
+  if (!modal || !modalContent) return;
+
+  // Clear pending close timer
+  if (deliveryMemoModalTimer) {
+    clearTimeout(deliveryMemoModalTimer);
+    deliveryMemoModalTimer = null;
+  }
 
   const retailerName = order.retailer_name || order.dealer_name || 'সাধারণ কাস্টমার';
   const retailerSub = (order.retailer_phone ? order.retailer_phone : '') + (order.retailer_address ? ' · ' + order.retailer_address : '');
 
-  document.getElementById('delRetailerName').innerText = retailerName;
+  safeSetText('delRetailerName', retailerName);
+  safeSetText('delRetailerSub', retailerSub || 'ঠিকানা বা ফোন নেই');
+  safeSetText('delInvId', 'ইনভয়েস #' + order.id);
+
   // Set Real-Time Status Badge
   const statusBadge = document.getElementById('delStatusBadge');
   if (statusBadge) {
@@ -2260,7 +2303,7 @@ function openDeliveryMemoModal(orderData) {
   const monthNames = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
   const month = monthNames[createdDate.getMonth()] || '';
   const year = bnNum(createdDate.getFullYear());
-  document.getElementById('delDate').innerText = `${day} ${month} ${year}`;
+  safeSetText('delDate', `${day} ${month} ${year}`);
 
   const isCancelled = order.status === 'cancelled';
   const isDelivered = order.status === 'delivered';
@@ -2298,25 +2341,23 @@ function openDeliveryMemoModal(orderData) {
   const valGot = items.reduce((a, i) => a + (i.got * i.price), 0);
   const valBak = Math.max(0, valOrd - valGot);
 
-  document.getElementById('delHOrd').innerText = bnNum(totalOrd);
-  document.getElementById('delHGot').innerText = bnNum(totalGot);
-  document.getElementById('delHBak').innerText = bnNum(totalBak);
+  safeSetText('delHOrd', bnNum(totalOrd));
+  safeSetText('delHGot', bnNum(totalGot));
+  safeSetText('delHBak', bnNum(totalBak));
 
   if (isCancelled) {
-    document.getElementById('delEq').innerText = `০ + ${bnNum(totalOrd)} = ${bnNum(totalOrd)} পিস — সম্পূর্ণ অর্ডার বাতিল`;
+    safeSetText('delEq', `০ + ${bnNum(totalOrd)} = ${bnNum(totalOrd)} পিস — সম্পূর্ণ অর্ডার বাতিল`);
   } else if (totalBak === 0) {
-    document.getElementById('delEq').innerText = `${bnNum(totalGot)} + ০ = ${bnNum(totalOrd)} পিস — সম্পূর্ণ মাল ডেলিভারি হয়েছে`;
+    safeSetText('delEq', `${bnNum(totalGot)} + ০ = ${bnNum(totalOrd)} পিস — সম্পূর্ণ মাল ডেলিভারি হয়েছে`);
   } else {
-    document.getElementById('delEq').innerText = `${bnNum(totalGot)} + ${bnNum(totalBak)} = ${bnNum(totalOrd)} পিস — হিসাব মিলেছে`;
+    safeSetText('delEq', `${bnNum(totalGot)} + ${bnNum(totalBak)} = ${bnNum(totalOrd)} পিস — হিসাব মিলেছে`);
   }
 
-  document.getElementById('delMOrd').innerText = tkFormat(valOrd);
-  document.getElementById('delMGot').innerText = tkFormat(valGot);
-  document.getElementById('delMBak').innerText = '−' + tkFormat(valBak);
+  safeSetText('delMOrd', tkFormat(valOrd));
+  safeSetText('delMGot', tkFormat(valGot));
+  safeSetText('delMBak', '−' + tkFormat(valBak));
 
-  document.getElementById('delPay').innerText = tkFormat(valGot);
-  document.getElementById('delS1').innerText = bnNum(totalBak) + ' পিস';
-  document.getElementById('delS2').innerText = tkFormat(valBak);
+  safeSetText('delPay', tkFormat(valGot));
 
   const skipSec = document.querySelector('.del-skip-sec');
   const laterSec = document.querySelector('.del-later-sec');
@@ -2328,31 +2369,33 @@ function openDeliveryMemoModal(orderData) {
     } else if (totalBak > 0) {
       skipSec.style.display = 'block';
       laterSec.style.display = 'block';
-      skipSec.innerHTML = `<b id="delS1">${bnNum(totalBak)} পিস</b> ফেরত গেছে। এই <b id="delS2">${tkFormat(valBak)}</b> টাকা আজ <b>দেবেন না</b>।`;
+      skipSec.innerHTML = `<b>${bnNum(totalBak)} পিস</b> ফেরত গেছে। এই <b>${tkFormat(valBak)}</b> টাকা আজ <b>দেবেন না</b>।`;
     } else {
       skipSec.style.display = 'none';
       laterSec.style.display = 'none';
     }
   }
 
-  document.getElementById('delSRSign').innerText = '<?= h(Auth::name()) ?>';
-  document.getElementById('delRetSign').innerText = retailerName;
-  document.getElementById('delSup').innerText = bnNum('01700-000000');
-  document.getElementById('delPg').innerText = bnNum('1') + '/' + bnNum('1');
+  safeSetText('delSRSign', '<?= h(Auth::name()) ?>');
+  safeSetText('delRetSign', retailerName);
+  safeSetText('delSup', bnNum('01700-000000'));
+  safeSetText('delPg', bnNum('1') + '/' + bnNum('1'));
 
   const rowsContainer = document.getElementById('delRows');
-  rowsContainer.innerHTML = items.map(it => {
-    const b = Math.max(0, it.ord - it.got);
-    return `<div class="del-row-item ${b ? '' : 'done'}">
-      <div class="nm pr-1">
-        <b>${it.name}</b>
-        <small>${it.pack} · ${tkFormat(it.price)} দরে</small>
-      </div>
-      <div class="n ord">${bnNum(it.ord)}</div>
-      <div class="n got">${bnNum(it.got)}</div>
-      <div class="n bak ${b ? '' : 'zero'}">${b ? bnNum(b) : '—'}</div>
-    </div>`;
-  }).join('');
+  if (rowsContainer) {
+    rowsContainer.innerHTML = items.map(it => {
+      const b = Math.max(0, it.ord - it.got);
+      return `<div class="del-row-item ${b ? '' : 'done'}">
+        <div class="nm pr-1">
+          <b>${it.name}</b>
+          <small>${it.pack} · ${tkFormat(it.price)} দরে</small>
+        </div>
+        <div class="n ord">${bnNum(it.ord)}</div>
+        <div class="n got">${bnNum(it.got)}</div>
+        <div class="n bak ${b ? '' : 'zero'}">${b ? bnNum(b) : '—'}</div>
+      </div>`;
+    }).join('');
+  }
 
   if (modal.parentElement !== document.body) {
     document.body.appendChild(modal);
@@ -2370,14 +2413,20 @@ function openDeliveryMemoModal(orderData) {
 function closeDeliveryMemoModal() {
   const modal = document.getElementById('deliveryMemoModal');
   const modalContent = document.getElementById('deliveryMemoModalContent');
+  if (!modal || !modalContent) return;
+
+  if (deliveryMemoModalTimer) {
+    clearTimeout(deliveryMemoModalTimer);
+  }
 
   modalContent.classList.remove('scale-100');
   modalContent.classList.add('scale-95');
   modal.classList.add('opacity-0');
   document.body.classList.remove('overflow-hidden');
 
-  setTimeout(() => {
+  deliveryMemoModalTimer = setTimeout(() => {
     modal.classList.add('hidden', 'pointer-events-none');
+    deliveryMemoModalTimer = null;
   }, 200);
 }
 
@@ -2392,4 +2441,25 @@ function bnNum(v) {
 function tkFormat(v) {
   return '৳' + bnNum(Math.round(v).toLocaleString('en-US'));
 }
+
+// Global ESC key listener to close modals
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const delModal = document.getElementById('deliveryMemoModal');
+    if (delModal && !delModal.classList.contains('hidden')) {
+      closeDeliveryMemoModal();
+      return;
+    }
+    const invModal = document.getElementById('invoiceModal');
+    if (invModal && !invModal.classList.contains('hidden')) {
+      closeInvoiceModal();
+      return;
+    }
+    const editModal = document.getElementById('editOrderModal');
+    if (editModal && !editModal.classList.contains('hidden')) {
+      closeEditOrderModal();
+      return;
+    }
+  }
+});
 </script>
