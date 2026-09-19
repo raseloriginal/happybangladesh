@@ -84,75 +84,82 @@
 <!-- ========================================== -->
 <!-- PRODUCT RETAILERS MODAL                    -->
 <!-- ========================================== -->
-<div id="productRetailersModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-3 sm:p-4 transition-all" onclick="if(event.target===this) closeProductRetailersModal()">
-    <div class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-slate-200">
-        <!-- Modal Header -->
-        <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50/50">
-            <div class="min-w-0 pr-3">
-                <div class="flex items-center gap-2 flex-wrap mb-1">
-                    <span id="prm-date-badge" class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                        <i class="fa-regular fa-calendar text-[10px]"></i> <span id="prm-date-text"></span>
-                    </span>
-                    <span id="prm-sr-badge" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                        <i class="fa-solid fa-user-tie text-[10px]"></i> <span id="prm-sr-text"></span>
-                    </span>
-                    <span id="prm-comp-badge" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-700">
-                        <i class="fa-solid fa-building text-[10px]"></i> <span id="prm-comp-text"></span>
-                    </span>
+<div id="productRetailersModal" 
+     class="modal-overlay hidden" 
+     style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 9999; overflow-y: auto; padding: 12px; display: none;" 
+     onclick="if(event.target===this || event.target.id==='prm-centering-wrapper') closeProductRetailersModal()">
+    <div id="prm-centering-wrapper" style="display: flex; align-items: center; justify-content: center; min-height: 100%; width: 100%; pointer-events: none;">
+        <div class="bg-white rounded-2xl w-full border border-slate-200 shadow-2xl flex flex-col pointer-events-auto" 
+             style="max-width: 920px; width: 100%; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); height: min(92vh, 850px); display: flex; flex-direction: column; overflow: hidden; margin: auto;">
+            
+            <!-- Pinned Modal Header (Never cut off) -->
+            <div class="px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50/50" style="flex-shrink: 0;">
+                <div class="min-w-0 pr-3">
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                        <span id="prm-date-badge" class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                            <i class="fa-regular fa-calendar text-[10px]"></i> <span id="prm-date-text"></span>
+                        </span>
+                        <span id="prm-sr-badge" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                            <i class="fa-solid fa-user-tie text-[10px]"></i> <span id="prm-sr-text"></span>
+                        </span>
+                        <span id="prm-comp-badge" class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-700">
+                            <i class="fa-solid fa-building text-[10px]"></i> <span id="prm-comp-text"></span>
+                        </span>
+                    </div>
+                    <h3 id="prm-product-name" class="font-bold text-slate-900 text-base sm:text-lg truncate flex items-center gap-2">
+                        <i class="fa-solid fa-box-open text-blue-600"></i> <span>Product Name</span>
+                    </h3>
                 </div>
-                <h3 id="prm-product-name" class="font-bold text-slate-900 text-base sm:text-lg truncate flex items-center gap-2">
-                    <i class="fa-solid fa-box-open text-blue-600"></i> <span>Product Name</span>
-                </h3>
-            </div>
-            <button type="button" onclick="closeProductRetailersModal()" class="w-8 h-8 rounded-xl bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition flex items-center justify-center border border-slate-200 shadow-2xs">
-                <i class="fa-solid fa-xmark text-sm"></i>
-            </button>
-        </div>
-
-        <!-- KPI Summary Bar & Search Filter -->
-        <div class="px-5 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div class="flex items-center gap-4 text-xs flex-wrap">
-                <div>
-                    <span class="text-slate-500 font-medium">Retailers:</span>
-                    <span id="prm-kpi-retailers" class="font-bold text-slate-800 font-mono ml-1">0</span>
-                </div>
-                <div class="border-l border-slate-300 pl-4">
-                    <span class="text-slate-500 font-medium">Total Qty:</span>
-                    <span id="prm-kpi-qty" class="font-bold text-blue-700 font-mono ml-1">0</span>
-                </div>
-                <div class="border-l border-slate-300 pl-4">
-                    <span class="text-slate-500 font-medium">SR Sales Value:</span>
-                    <span id="prm-kpi-sr-val" class="font-bold text-emerald-700 font-mono ml-1">৳0.00</span>
-                </div>
-                <div class="border-l border-slate-300 pl-4">
-                    <span class="text-slate-500 font-medium">Total O/C:</span>
-                    <span id="prm-kpi-oc" class="font-bold font-mono ml-1">৳0.00</span>
-                </div>
+                <button type="button" onclick="closeProductRetailersModal()" class="w-8 h-8 rounded-xl bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition flex items-center justify-center border border-slate-200 shadow-2xs shrink-0" title="Close (Esc)">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
             </div>
 
-            <!-- Instant Search Input -->
-            <div class="relative w-full sm:w-64">
-                <i class="fa-solid fa-search absolute left-3 top-2.5 text-xs text-slate-400 pointer-events-none"></i>
-                <input type="text" id="prm-search-input" oninput="filterProductRetailers()" 
-                       placeholder="Filter retailer or phone..." 
-                       class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
-            </div>
-        </div>
+            <!-- Pinned KPI Summary Bar & Search Filter (Never cut off) -->
+            <div class="px-4 sm:px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5" style="flex-shrink: 0;">
+                <div class="flex items-center gap-3 sm:gap-4 text-xs flex-wrap">
+                    <div>
+                        <span class="text-slate-500 font-medium">Retailers:</span>
+                        <span id="prm-kpi-retailers" class="font-bold text-slate-800 font-mono ml-1">0</span>
+                    </div>
+                    <div class="border-l border-slate-300 pl-3 sm:pl-4">
+                        <span class="text-slate-500 font-medium">Total Qty:</span>
+                        <span id="prm-kpi-qty" class="font-bold text-blue-700 font-mono ml-1">0</span>
+                    </div>
+                    <div class="border-l border-slate-300 pl-3 sm:pl-4">
+                        <span class="text-slate-500 font-medium">SR Sales:</span>
+                        <span id="prm-kpi-sr-val" class="font-bold text-emerald-700 font-mono ml-1">৳0.00</span>
+                    </div>
+                    <div class="border-l border-slate-300 pl-3 sm:pl-4">
+                        <span class="text-slate-500 font-medium">Total O/C:</span>
+                        <span id="prm-kpi-oc" class="font-bold font-mono ml-1">৳0.00</span>
+                    </div>
+                </div>
 
-        <!-- Modal Body (Retailers List & Accordions) -->
-        <div id="prm-body" class="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1">
-            <!-- Dynamic Retailers Rendered Here -->
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="px-5 py-3 border-t border-slate-200 bg-slate-50/70 flex items-center justify-between text-xs text-slate-500">
-            <div>
-                <i class="fa-solid fa-circle-info text-blue-500 mr-1"></i>
-                Click any retailer to view their complete orders from all companies on this date.
+                <!-- Instant Search Input -->
+                <div class="relative w-full sm:w-60 shrink-0">
+                    <i class="fa-solid fa-search absolute left-3 top-2.5 text-xs text-slate-400 pointer-events-none"></i>
+                    <input type="text" id="prm-search-input" oninput="filterProductRetailers()" 
+                           placeholder="Filter retailer or phone..." 
+                           class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+                </div>
             </div>
-            <button type="button" onclick="closeProductRetailersModal()" class="btn btn-secondary text-xs px-4 py-1.5">
-                Close
-            </button>
+
+            <!-- Scrollable Modal Body (Only this area scrolls) -->
+            <div id="prm-body" class="p-3 sm:p-5 space-y-3" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;">
+                <!-- Dynamic Retailers Rendered Here -->
+            </div>
+
+            <!-- Pinned Modal Footer (Never cut off) -->
+            <div class="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-slate-200 bg-slate-50/90 flex items-center justify-between text-xs text-slate-500" style="flex-shrink: 0;">
+                <div class="truncate mr-2">
+                    <i class="fa-solid fa-circle-info text-blue-500 mr-1"></i>
+                    Click any retailer to view their complete orders from all companies on this date.
+                </div>
+                <button type="button" onclick="closeProductRetailersModal()" class="btn btn-secondary text-xs px-4 py-1.5 shrink-0">
+                    Close
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -487,6 +494,7 @@ async function openProductRetailers(dateStr, productId, productName, companyId, 
     document.getElementById('prm-kpi-oc').textContent = '...';
 
     // Show Loading
+    modal.style.display = 'block';
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     body.innerHTML = `
@@ -855,6 +863,7 @@ function renderRetailerDayOrdersContent(container, data) {
 
 function closeProductRetailersModal() {
     const modal = document.getElementById('productRetailersModal');
+    modal.style.display = 'none';
     modal.classList.add('hidden');
     document.body.style.overflow = '';
 }
