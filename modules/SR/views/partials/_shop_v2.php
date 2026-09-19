@@ -249,7 +249,7 @@
   <div class="sr-sheet-body-v2 space-y-4 pt-2">
     <!-- Image Wrapper -->
     <div class="sr-prod-sheet-img-wrap-v2 rounded-2xl overflow-hidden border border-slate-100 shadow-2xs">
-      <div id="productSheetImgWrap"></div>
+      <div id="productSheetImgWrap" class="w-full h-full flex items-center justify-center p-2"></div>
     </div>
     
     <!-- Product Name & Free Item Button (Red Area) -->
@@ -443,7 +443,7 @@
      SR PRODUCT FREE ITEM BOTTOM SHEET MODAL
 ══════════════════════════════════════════════════════════════ -->
 <div class="sr-sheet-overlay" id="srFreeItemOverlay" style="z-index: 1049;" onclick="closeSheet('srFreeItemSheet','srFreeItemOverlay')"></div>
-<div class="sr-bottom-sheet-v2" id="srFreeItemSheet" style="z-index: 1050; max-height: 85vh; display: flex; flex-direction: column;">
+<div class="sr-bottom-sheet-v2" id="srFreeItemSheet" style="z-index: 1050; max-height: 100dvh; display: flex; flex-direction: column;">
   <div class="sr-sheet-handle-v2"></div>
   
   <!-- Header with Save button at top right -->
@@ -701,60 +701,29 @@ function setSrFreeItemQty(productId, val) {
   if (input) input.value = next;
 }
 
-async function saveSrFreeItemsModal() {
+function saveSrFreeItemsModal() {
   if (!currentRetailer || !currentProduct) {
     showMiniToast('দোকান বা প্রোডাক্ট নির্বাচন করা হয়নি', true);
     return;
   }
 
-  const items = [];
-  Object.keys(currentProductFreeItems).forEach(pid => {
-    const q = parseInt(currentProductFreeItems[pid]) || 0;
-    if (q > 0) {
-      items.push({ free_product_id: parseInt(pid), quantity: q });
-    }
-  });
-
-  const btn = document.getElementById('srFreeItemSaveBtn');
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>সংরক্ষণ...</span>';
-
-  try {
-    const res = await fetch(`${BASE_URL}/sr/api/free-items/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        retailer_id: currentRetailer.id,
-        product_id: currentProduct.id,
-        items: items
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      if (!retailerFreeItemsCache[currentRetailer.id]) retailerFreeItemsCache[currentRetailer.id] = {};
-      retailerFreeItemsCache[currentRetailer.id][currentProduct.id] = { ...currentProductFreeItems };
-
-      // Also update in cart if product is already in cart
-      const cart = cartsByRetailer[currentRetailer.id] || [];
-      const existing = cart.find(c => c.id === currentProduct.id);
-      if (existing) {
-        existing.freeItems = { ...currentProductFreeItems };
-        renderRetailerCart();
-      }
-
-      updateSrFreeItemBadge();
-      closeSheet('srFreeItemSheet', 'srFreeItemOverlay');
-      showMiniToast('✓ ফ্রি আইটেম সংরক্ষিত হয়েছে');
-    } else {
-      alert(data.message || 'ফ্রি আইটেম সংরক্ষণ ব্যর্থ হয়েছে');
-    }
-  } catch (err) {
-    alert('Request failed: ' + (err.message || err));
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+  // Save in JS state/cache (not in DB yet)
+  if (!retailerFreeItemsCache[currentRetailer.id]) {
+    retailerFreeItemsCache[currentRetailer.id] = {};
   }
+  retailerFreeItemsCache[currentRetailer.id][currentProduct.id] = { ...currentProductFreeItems };
+
+  // Also update in cart if product is already in cart
+  const cart = cartsByRetailer[currentRetailer.id] || [];
+  const existing = cart.find(c => c.id === currentProduct.id);
+  if (existing) {
+    existing.freeItems = { ...currentProductFreeItems };
+    renderRetailerCart();
+  }
+
+  updateSrFreeItemBadge();
+  closeSheet('srFreeItemSheet', 'srFreeItemOverlay');
+  showMiniToast('✓ ফ্রি আইটেম সংরক্ষিত হয়েছে');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1501,74 +1470,84 @@ function confirmRetailerCart() {
     SRLoader.hideOverlay();
 
     if (d.success) {
-      // 1. Populating the success screen before clearing the cart
-      document.getElementById('successCustName').textContent = currentRetailer.name;
-      const cleanAddress = (currentRetailer.address && !currentRetailer.address.toLowerCase().includes('imported dummy')) ? currentRetailer.address.trim() : '';
-      document.getElementById('successAddress').textContent = cleanAddress || 'ঠিকানা দেওয়া নেই';
-      document.getElementById('successDateStr').textContent = new Date().toLocaleDateString('bn-BD', {day: 'numeric', month: 'short', year: 'numeric'});
-      
-      const prodList = document.getElementById('successProductList');
-      let grandTotal = 0;
-      
-      prodList.innerHTML = cart.map((item, idx) => {
-        grandTotal += item.total;
-        const pcsPerCarton = item.pcsPerCarton || 12;
-        const boxes = Math.floor(item.qty / pcsPerCarton);
-        const pcs = item.qty % pcsPerCarton;
+      try {
+        // 1. Populating the success screen before clearing the cart
+        document.getElementById('successCustName').textContent = currentRetailer ? currentRetailer.name : '—';
+        const cleanAddress = (currentRetailer && currentRetailer.address && !currentRetailer.address.toLowerCase().includes('imported dummy')) ? currentRetailer.address.trim() : '';
+        document.getElementById('successAddress').textContent = cleanAddress || 'ঠিকানা দেওয়া নেই';
+        document.getElementById('successDateStr').textContent = new Date().toLocaleDateString('bn-BD', {day: 'numeric', month: 'short', year: 'numeric'});
         
-        let freeHtml = '';
-        if (item.freeItems && typeof item.freeItems === 'object') {
-          const fList = Object.keys(item.freeItems).filter(k => (parseInt(item.freeItems[k]) || 0) > 0);
-          if (fList.length > 0) {
-            const tags = fList.map(k => {
-              const fp = allProductsList.find(x => String(x.id) === String(k));
-              const fName = fp ? fp.name : `আইটেম #${k}`;
-              return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold"><i class="fa-solid fa-gift text-amber-600 text-[9px]"></i> ${escHtml(fName)}: <b>${item.freeItems[k]}</b>টি</span>`;
-            }).join(' ');
-            freeHtml = `<div class="mt-1 flex flex-wrap gap-1">${tags}</div>`;
+        const prodList = document.getElementById('successProductList');
+        let grandTotal = 0;
+        
+        prodList.innerHTML = cart.map((item, idx) => {
+          grandTotal += (item.total || 0);
+          const pcsPerCarton = item.pcsPerCarton || 12;
+          const boxes = Math.floor(item.qty / pcsPerCarton);
+          const pcs = item.qty % pcsPerCarton;
+          
+          let freeHtml = '';
+          if (item.freeItems && typeof item.freeItems === 'object') {
+            const fList = Object.keys(item.freeItems).filter(k => (parseInt(item.freeItems[k]) || 0) > 0);
+            if (fList.length > 0) {
+              const tags = fList.map(k => {
+                const fp = (typeof ALL_PRODUCTS !== 'undefined' ? ALL_PRODUCTS : []).find(x => String(x.id) === String(k));
+                const fName = fp ? fp.name : `আইটেম #${k}`;
+                return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold"><i class="fa-solid fa-gift text-amber-600 text-[9px]"></i> ${escHtml(fName)}: <b>${item.freeItems[k]}</b>টি</span>`;
+              }).join(' ');
+              freeHtml = `<div class="mt-1 flex flex-wrap gap-1">${tags}</div>`;
+            }
           }
-        }
 
-        return `
-        <tr class="hover:bg-slate-50/50 transition">
-          <td class="p-2.5 border-r border-slate-200 text-center font-mono font-bold text-slate-500">${idx + 1}</td>
-          <td class="p-2.5 border-r border-slate-200 font-semibold text-slate-800">
-            <div>${escHtml(item.name)}</div>
-            ${freeHtml}
-          </td>
-          <td class="p-2.5 text-center font-mono text-[10px] text-slate-600">
-            <div class="flex justify-center items-center">
-              <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200/50 font-bold text-xs">${item.qty.toString().padStart(2, '0')} P</span>
-            </div>
-          </td>
-        </tr>`;
-      }).join('');
-      
-      // Total O/C computation
-      const totalOc = cart.reduce((sum, item) => sum + (item.oc || 0), 0);
-      const successOcRow = document.getElementById('successOcRow');
-      if (totalOc !== 0) {
-        successOcRow.style.display = 'table-row';
-        document.getElementById('successOcAmount').textContent = `${totalOc > 0 ? '+' : ''}${Math.round(totalOc)}`;
-      } else {
-        successOcRow.style.display = 'none';
+          return `
+          <tr class="hover:bg-slate-50/50 transition">
+            <td class="p-2.5 border-r border-slate-200 text-center font-mono font-bold text-slate-500">${idx + 1}</td>
+            <td class="p-2.5 border-r border-slate-200 font-semibold text-slate-800">
+              <div>${escHtml(item.name || '')}</div>
+              ${freeHtml}
+            </td>
+            <td class="p-2.5 text-center font-mono text-[10px] text-slate-600">
+              <div class="flex justify-center items-center">
+                <span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200/50 font-bold text-xs">${(item.qty || 0).toString().padStart(2, '0')} P</span>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+        
+        // Total O/C computation
+        const totalOc = cart.reduce((sum, item) => sum + (item.oc || 0), 0);
+        const successOcRow = document.getElementById('successOcRow');
+        if (totalOc !== 0) {
+          successOcRow.style.display = 'table-row';
+          document.getElementById('successOcAmount').textContent = `${totalOc > 0 ? '+' : ''}${Math.round(totalOc)}`;
+        } else {
+          successOcRow.style.display = 'none';
+        }
+        
+        document.getElementById('successSubtotalVal').textContent = `Tk ${Math.round(grandTotal)}`;
+      } catch (renderErr) {
+        console.error('Receipt rendering error:', renderErr);
       }
-      
-      document.getElementById('successSubtotalVal').textContent = `Tk ${Math.round(grandTotal)}`;
 
       // Clear cart for this retailer
-      cartsByRetailer[currentRetailer.id] = [];
+      if (currentRetailer && currentRetailer.id) {
+        cartsByRetailer[currentRetailer.id] = [];
+      }
       
       // Close sheets and popups
       closeSheet('retCartSheet', 'retCartOverlay');
       
       // Open Success Screen overlay
-      document.getElementById('successOverlay').classList.add('open');
-      triggerDualCannonShower();
+      const successOverlay = document.getElementById('successOverlay');
+      if (successOverlay) successOverlay.classList.add('open');
+      
+      if (typeof triggerDualCannonShower === 'function') {
+        triggerDualCannonShower();
+      }
 
       // Play success notification sound
       try {
-        const audio = new Audio(`${BASE_URL}/public/assets/dragon-studio-notification-sound-effect-372475.mp3.mpeg`);
+        const audio = new Audio('<?= asset("dragon-studio-notification-sound-effect-372475.mp3.mpeg") ?>');
         audio.play().catch(e => console.log('Audio playback blocked or failed:', e));
       } catch (err) {
         console.error('Audio error:', err);
@@ -1576,7 +1555,12 @@ function confirmRetailerCart() {
       
       if (currentRetailer) currentRetailer.has_order_today = true;
       // Update map pins (so yellow cart indicator is removed and it's marked as ordered)
-      updateAllPins();
+      if (typeof updateAllPins === 'function') {
+        updateAllPins();
+      }
+      if (typeof updatePopupCartInfo === 'function') {
+        updatePopupCartInfo();
+      }
     } else {
       showMiniToast('❌ ' + (d.message || 'Failed to place order'), true);
     }
@@ -1586,8 +1570,9 @@ function confirmRetailerCart() {
     confirmBtn.disabled = false;
     confirmBtn.innerHTML = originalBtnHtml;
     SRLoader.hideOverlay();
-    showMiniToast('❌ Network error', true);
-    console.error(err);
+    const errMsg = (err && err.message && !err.message.includes('fetch')) ? err.message : 'Network error';
+    showMiniToast('❌ ' + errMsg, true);
+    console.error('Confirm order error:', err);
   });
 }
 

@@ -497,8 +497,8 @@ function redrawConnectorLines() {
 }
 
 function getMarkerColor(ret) {
-  if (cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0) return '#eab308';
   if (ret.has_order_today) return '#10b981';
+  if (cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0) return '#eab308';
   return '#2563eb';
 }
 
@@ -712,8 +712,8 @@ function updateAllPins() {
 }
 
 function addRetailerPin(ret) {
-  const hasCart     = cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
-  const statusClass = hasCart ? 'has-cart' : (ret.has_order_today ? 'already-ordered' : '');
+  const hasCart     = !ret.has_order_today && cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
+  const statusClass = ret.has_order_today ? 'already-ordered' : (hasCart ? 'has-cart' : '');
 
   // ── 1. Tiny dot at EXACT GPS location (non-interactive) ──────
   const dotIcon = L.divIcon({
@@ -756,8 +756,8 @@ function triggerRetailerAction(ret) {
           SRLoader.hideOverlay();
           if (data.success) {
             cartsByRetailer[ret.id] = data.items;
-            ret.has_order_today = false; // allow editing
-            openRetailerCartSheet(ret);
+            currentRetailer = ret;
+            openProductsForRetailer();
           } else {
             showMiniToast('❌ ' + (data.message || 'Error fetching order details'), true);
           }
@@ -790,10 +790,13 @@ function handleCardClick(ret) {
   }
 }
 
+let navClickTimeout = null;
 function handleNavigationClick(ret) {
+  if (navClickTimeout) clearTimeout(navClickTimeout);
   mainMap.flyTo([ret.lat, ret.lng], 17, { duration: 0.8 });
-  setTimeout(() => {
+  navClickTimeout = setTimeout(() => {
     triggerRetailerAction(ret);
+    navClickTimeout = null;
   }, 800);
 }
 
@@ -819,9 +822,9 @@ function renderRetailerCards(retailers) {
     const distMeters = ret.calculated_dist;
     const cleanAddress = (ret.address && !ret.address.toLowerCase().includes('imported dummy')) ? ret.address.trim() : '';
     
-    // Highlight if has active cart
-    const hasCart = cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
-    const cardClass = hasCart ? 'has-cart-card' : (ret.has_order_today ? 'visited-card' : '');
+    // Highlight if has active cart (only if not already ordered)
+    const hasCart = !ret.has_order_today && cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0;
+    const cardClass = ret.has_order_today ? 'visited-card' : (hasCart ? 'has-cart-card' : '');
     
     const distStr = distMeters > 1000 ? `${(distMeters / 1000).toFixed(1)} km` : `${distMeters} m`;
 

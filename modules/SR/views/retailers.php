@@ -168,7 +168,7 @@ $cardPalettes = [
   }
 </style>
 
-<div class="max-w-2xl mx-auto font-siliguri text-slate-900 pb-28 print:p-0 print:max-w-none print:bg-white">
+<div class="max-w-2xl mx-auto font-siliguri text-slate-900 pb-4 print:p-0 print:max-w-none print:bg-white">
 
   <!-- Top App Bar (Header from sketch) -->
   <div class="bg-white px-3 py-3 border-b border-slate-300 flex items-center justify-between sticky top-0 z-30 select-none">
@@ -355,8 +355,8 @@ function openShop(id, name, address, hasOrderToday = false) {
           SRLoader.hideOverlay();
           if (data.success) {
             cartsByRetailer[ret.id] = data.items;
-            ret.has_order_today = false;
-            openRetailerCartSheet(ret);
+            currentRetailer = ret;
+            openProductsForRetailer();
           } else {
             showMiniToast('❌ ' + (data.message || 'অর্ডার আনতে সমস্যা হয়েছে'), true);
           }
