@@ -688,9 +688,11 @@ class DSRController extends Controller
         $dsrId = Auth::id();
         
         // Check if settlement is already submitted/approved for this dispatch's date
-        $dispatch = $this->db->prepare("SELECT dispatch_date FROM dispatches WHERE id=? AND dsr_id=?");
-        $dispatch->execute([$id, $dsrId]);
-        $dispatchDate = $dispatch->fetchColumn();
+        $dispatchInfo = $this->db->prepare("SELECT dispatch_date, order_id FROM dispatches WHERE id=? AND dsr_id=?");
+        $dispatchInfo->execute([$id, $dsrId]);
+        $dispatchRow = $dispatchInfo->fetch();
+        $dispatchDate = $dispatchRow['dispatch_date'] ?? null;
+        $orderId = !empty($dispatchRow['order_id']) ? (int)$dispatchRow['order_id'] : null;
 
         if ($dispatchDate) {
             $check = $this->db->prepare("SELECT status FROM settlements WHERE dsr_id=? AND date=? AND status IN ('pending', 'approved')");
@@ -760,6 +762,12 @@ class DSRController extends Controller
         $dbStatus = $status;
         $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
                  ->execute([$dbStatus, $paidAmount, $notes, $id, $dsrId]);
+
+        if (!empty($orderId)) {
+            $orderStatus = in_array($dbStatus, ['delivered', 'partial', 'cancelled']) ? $dbStatus : 'dispatched';
+            $this->db->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=?")
+                     ->execute([$orderStatus, $orderId]);
+        }
         
         foreach($items as $item) {
             $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
@@ -795,7 +803,7 @@ class DSRController extends Controller
         $dsrId = Auth::id();
         
         // 1. Check if settlement is already submitted/approved for this dispatch's date
-        $dispatchInfo = $this->db->prepare("SELECT dispatch_date, status, paid_amount FROM dispatches WHERE id=? AND dsr_id=?");
+        $dispatchInfo = $this->db->prepare("SELECT dispatch_date, status, paid_amount, order_id FROM dispatches WHERE id=? AND dsr_id=?");
         $dispatchInfo->execute([$id, $dsrId]);
         $dispatch = $dispatchInfo->fetch();
         
@@ -863,6 +871,12 @@ class DSRController extends Controller
             // 6. Reset dispatch status
             $this->db->prepare("UPDATE dispatches SET status='in_transit', paid_amount=0, notes=NULL, updated_at=NOW() WHERE id=? AND dsr_id=?")
                      ->execute([$id, $dsrId]);
+
+            // 7. Reset order status to dispatched
+            if (!empty($dispatch['order_id'])) {
+                $this->db->prepare("UPDATE orders SET status='dispatched', updated_at=NOW() WHERE id=?")
+                         ->execute([$dispatch['order_id']]);
+            }
 
             $this->db->commit();
             $this->json(['success' => true]);

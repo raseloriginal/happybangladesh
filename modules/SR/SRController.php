@@ -292,11 +292,13 @@ class SRController extends Controller
 
         $q = $this->db->prepare("
             SELECT o.*, d.name AS dealer_name, d.happy_commission, w.name AS warehouse_name,
-                   r.name AS retailer_name, r.phone AS retailer_phone, r.address AS retailer_address
+                   r.name AS retailer_name, r.phone AS retailer_phone, r.address AS retailer_address,
+                   disp.id AS dispatch_id, disp.status AS dispatch_status, disp.paid_amount AS dispatch_paid_amount
             FROM orders o
             LEFT JOIN dealers d ON d.id=o.dealer_id
             LEFT JOIN warehouses w ON w.id=o.warehouse_id
             LEFT JOIN retailers r ON r.id=o.retailer_id
+            LEFT JOIN dispatches disp ON disp.order_id=o.id
             {$whereSql}
             ORDER BY o.created_at DESC
         ");
@@ -307,6 +309,15 @@ class SRController extends Controller
         $productSummary = [];
 
         foreach ($items as &$item) {
+            // Determine accurate realtime order status
+            if (!empty($item['dispatch_status'])) {
+                if (in_array($item['dispatch_status'], ['delivered', 'partial', 'cancelled'])) {
+                    $item['status'] = $item['dispatch_status'];
+                } elseif (in_array($item['dispatch_status'], ['in_transit', 'pending'])) {
+                    $item['status'] = 'dispatched';
+                }
+            }
+
             if (!empty($item['retailer_id'])) {
                 $retailersSet['retailer_'.$item['retailer_id']] = true;
             } elseif (!empty($item['dealer_id'])) {
@@ -314,10 +325,14 @@ class SRController extends Controller
             }
 
             $iq = $this->db->prepare("
-                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
+                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, 
+                       oi.base_selling_price AS base_price, c.name AS company_name,
+                       di.delivered_quantity
                 FROM order_items oi
                 JOIN products p ON p.id = oi.product_id
                 LEFT JOIN companies c ON c.id = p.company_id
+                LEFT JOIN dispatches d ON d.order_id = oi.order_id
+                LEFT JOIN dispatch_items di ON di.dispatch_id = d.id AND di.product_id = oi.product_id
                 WHERE oi.order_id = ?
             ");
             $iq->execute([$item['id']]);
@@ -338,6 +353,13 @@ class SRController extends Controller
             }
             foreach ($item['products'] as &$prRef) {
                 $prRef['free_items'] = $orderFreeMap[$prRef['product_id']] ?? [];
+                if ($item['status'] === 'cancelled') {
+                    $prRef['delivered_quantity'] = 0;
+                } elseif ($item['status'] === 'delivered') {
+                    $prRef['delivered_quantity'] = $prRef['delivered_quantity'] !== null ? (int)$prRef['delivered_quantity'] : (int)$prRef['quantity'];
+                } elseif ($prRef['delivered_quantity'] !== null) {
+                    $prRef['delivered_quantity'] = (int)$prRef['delivered_quantity'];
+                }
             }
             unset($prRef);
 
@@ -1180,10 +1202,14 @@ class SRController extends Controller
 
             // Fetch refreshed products for invoice and UI sync
             $iq = $this->db->prepare("
-                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, oi.base_selling_price AS base_price, c.name AS company_name
+                SELECT oi.*, p.name AS product_name, p.image AS product_image, p.pieces_per_box, p.box_type, 
+                       oi.base_selling_price AS base_price, c.name AS company_name,
+                       di.delivered_quantity
                 FROM order_items oi
                 JOIN products p ON p.id = oi.product_id
                 LEFT JOIN companies c ON c.id = p.company_id
+                LEFT JOIN dispatches d ON d.order_id = oi.order_id
+                LEFT JOIN dispatch_items di ON di.dispatch_id = d.id AND di.product_id = oi.product_id
                 WHERE oi.order_id = ?
             ");
             $iq->execute([$orderId]);

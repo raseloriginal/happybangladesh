@@ -138,12 +138,28 @@ $truncateName = function($name) {
                     </div>
                   <?php endif; ?>
                   
-                  <!-- Phone info subtext with icons -->
+                  <!-- Phone info subtext with icons & Real-time Status Badge -->
                   <div class="text-[10px] text-slate-400 font-medium mt-1 flex items-center gap-1.5 flex-wrap">
                     <div class="flex items-center gap-1">
                       <i class="fa-solid fa-phone text-slate-300 text-[9px]"></i>
                       <span><?= h($rPhone) ?></span>
                     </div>
+                    <span class="text-slate-300">•</span>
+                    <?php
+                      $stMap = [
+                        'pending'    => ['label' => 'প্যান্ডিং', 'cls' => 'bg-amber-50 text-amber-700 border-amber-200'],
+                        'confirmed'  => ['label' => 'কনফার্মড', 'cls' => 'bg-blue-50 text-blue-700 border-blue-200'],
+                        'dispatched' => ['label' => 'ডিসপ্যাচড', 'cls' => 'bg-indigo-50 text-indigo-700 border-indigo-200'],
+                        'in_transit' => ['label' => 'অন দ্য ওয়ে', 'cls' => 'bg-indigo-50 text-indigo-700 border-indigo-200'],
+                        'delivered'  => ['label' => 'ডেলিভার্ড', 'cls' => 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+                        'partial'    => ['label' => 'আংশিক', 'cls' => 'bg-amber-50 text-amber-800 border-amber-300'],
+                        'cancelled'  => ['label' => 'বাতিল', 'cls' => 'bg-rose-50 text-rose-700 border-rose-200'],
+                      ];
+                      $st = $stMap[$ord['status']] ?? ['label' => $ord['status'], 'cls' => 'bg-slate-50 text-slate-700 border-slate-200'];
+                    ?>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border <?= $st['cls'] ?>" id="order-row-status-<?= $ord['id'] ?>">
+                      <?= $st['label'] ?>
+                    </span>
                   </div>
                 </div>
               </td>
@@ -2012,6 +2028,23 @@ function updateOrderTableRow(order) {
     `;
   }
 
+  // Update Row Status Badge
+  const rowStBadge = document.getElementById(`order-row-status-${orderId}`);
+  if (rowStBadge) {
+    const stMap = {
+      'pending': { label: 'প্যান্ডিং', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+      'confirmed': { label: 'কনফার্মড', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+      'dispatched': { label: 'ডিসপ্যাচড', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      'in_transit': { label: 'অন দ্য ওয়ে', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      'delivered': { label: 'ডেলিভার্ড', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      'partial': { label: 'আংশিক', cls: 'bg-amber-50 text-amber-800 border-amber-300' },
+      'cancelled': { label: 'বাতিল', cls: 'bg-rose-50 text-rose-700 border-rose-200' }
+    };
+    const st = stMap[order.status] || { label: order.status, cls: 'bg-slate-50 text-slate-700 border-slate-200' };
+    rowStBadge.className = `inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${st.cls}`;
+    rowStBadge.innerText = st.label;
+  }
+
   // Update action buttons with refreshed order JSON
   const btnInvoice = document.getElementById(`btn-invoice-order-${orderId}`);
   if (btnInvoice) {
@@ -2083,7 +2116,9 @@ function openInvoiceModal(orderData) {
     'pending': { label: 'প্যান্ডিং', cls: 'bg-amber-100 text-amber-800' },
     'confirmed': { label: 'কনফার্মড', cls: 'bg-blue-100 text-blue-800' },
     'dispatched': { label: 'ডিসপ্যাচড', cls: 'bg-indigo-100 text-indigo-800' },
+    'in_transit': { label: 'অন দ্য ওয়ে', cls: 'bg-indigo-100 text-indigo-800' },
     'delivered': { label: 'ডেলিভার্ড', cls: 'bg-emerald-100 text-emerald-800' },
+    'partial': { label: 'আংশিক', cls: 'bg-amber-100 text-amber-800' },
     'cancelled': { label: 'বাতিল', cls: 'bg-rose-100 text-rose-800' }
   };
   const stInfo = statusMap[order.status] || { label: order.status, cls: 'bg-slate-100 text-slate-800' };
@@ -2209,7 +2244,10 @@ function openDeliveryMemoModal(orderData) {
     const statusMap = {
       'pending': { label: 'প্যান্ডিং (Pending)', cls: 'bg-amber-100 text-amber-800 border border-amber-200' },
       'confirmed': { label: 'কনফার্মড (Confirmed)', cls: 'bg-blue-100 text-blue-800 border border-blue-200' },
-      'delivered': { label: 'ডেলিভার্ড (Delivered)', cls: 'bg-emerald-100 text-emerald-800 border border-emerald-200' },
+      'dispatched': { label: 'ডিসপ্যাচড / অন দ্য ওয়ে', cls: 'bg-indigo-100 text-indigo-800 border border-indigo-200' },
+      'in_transit': { label: 'অন দ্য ওয়ে (In Transit)', cls: 'bg-indigo-100 text-indigo-800 border border-indigo-200' },
+      'delivered': { label: 'ডেলিভার্ড / সম্পূর্ণ (Delivered)', cls: 'bg-emerald-100 text-emerald-800 border border-emerald-200' },
+      'partial': { label: 'আংশিক ডেলিভারি (Partial)', cls: 'bg-amber-100 text-amber-800 border border-amber-200' },
       'cancelled': { label: 'বাতিল (Cancelled)', cls: 'bg-rose-100 text-rose-800 border border-rose-200' }
     };
     const st = statusMap[order.status] || { label: order.status || 'Unknown', cls: 'bg-slate-100 text-slate-700 border border-slate-200' };
@@ -2225,10 +2263,23 @@ function openDeliveryMemoModal(orderData) {
   document.getElementById('delDate').innerText = `${day} ${month} ${year}`;
 
   const isCancelled = order.status === 'cancelled';
+  const isDelivered = order.status === 'delivered';
+  const isPartial = order.status === 'partial';
+
   const items = (order.products || []).map(p => {
     const ordQty = parseInt(p.quantity || 0);
-    // If order is cancelled, gotQty is 0. Otherwise use p.delivered_qty if available, or fallback to ordQty
-    const gotQty = isCancelled ? 0 : (p.delivered_qty !== undefined && p.delivered_qty !== null ? parseInt(p.delivered_qty) : ordQty);
+    let gotQty;
+    if (isCancelled) {
+      gotQty = 0;
+    } else if (p.delivered_quantity !== undefined && p.delivered_quantity !== null) {
+      gotQty = parseInt(p.delivered_quantity);
+    } else if (p.delivered_qty !== undefined && p.delivered_qty !== null) {
+      gotQty = parseInt(p.delivered_qty);
+    } else if (isDelivered) {
+      gotQty = ordQty;
+    } else {
+      gotQty = ordQty;
+    }
     const unitPrice = parseFloat(p.unit_price || p.price || 0);
     return {
       name: p.product_name || p.name || 'পণ্য',
@@ -2251,7 +2302,14 @@ function openDeliveryMemoModal(orderData) {
   document.getElementById('delHGot').innerText = bnNum(totalGot);
   document.getElementById('delHBak').innerText = bnNum(totalBak);
 
-  document.getElementById('delEq').innerText = `${bnNum(totalGot)} + ${bnNum(totalBak)} = ${bnNum(totalOrd)} পিস — হিসাব মিলেছে`;
+  if (isCancelled) {
+    document.getElementById('delEq').innerText = `০ + ${bnNum(totalOrd)} = ${bnNum(totalOrd)} পিস — সম্পূর্ণ অর্ডার বাতিল`;
+  } else if (totalBak === 0) {
+    document.getElementById('delEq').innerText = `${bnNum(totalGot)} + ০ = ${bnNum(totalOrd)} পিস — সম্পূর্ণ মাল ডেলিভারি হয়েছে`;
+  } else {
+    document.getElementById('delEq').innerText = `${bnNum(totalGot)} + ${bnNum(totalBak)} = ${bnNum(totalOrd)} পিস — হিসাব মিলেছে`;
+  }
+
   document.getElementById('delMOrd').innerText = tkFormat(valOrd);
   document.getElementById('delMGot').innerText = tkFormat(valGot);
   document.getElementById('delMBak').innerText = '−' + tkFormat(valBak);
@@ -2259,6 +2317,23 @@ function openDeliveryMemoModal(orderData) {
   document.getElementById('delPay').innerText = tkFormat(valGot);
   document.getElementById('delS1').innerText = bnNum(totalBak) + ' পিস';
   document.getElementById('delS2').innerText = tkFormat(valBak);
+
+  const skipSec = document.querySelector('.del-skip-sec');
+  const laterSec = document.querySelector('.del-later-sec');
+  if (skipSec && laterSec) {
+    if (isCancelled) {
+      skipSec.style.display = 'block';
+      laterSec.style.display = 'none';
+      skipSec.innerHTML = `পুরো অর্ডারটি <b>বাতিল</b> করা হয়েছে। কোনো টাকা <b>দেবেন না</b>।`;
+    } else if (totalBak > 0) {
+      skipSec.style.display = 'block';
+      laterSec.style.display = 'block';
+      skipSec.innerHTML = `<b id="delS1">${bnNum(totalBak)} পিস</b> ফেরত গেছে। এই <b id="delS2">${tkFormat(valBak)}</b> টাকা আজ <b>দেবেন না</b>।`;
+    } else {
+      skipSec.style.display = 'none';
+      laterSec.style.display = 'none';
+    }
+  }
 
   document.getElementById('delSRSign').innerText = '<?= h(Auth::name()) ?>';
   document.getElementById('delRetSign').innerText = retailerName;
