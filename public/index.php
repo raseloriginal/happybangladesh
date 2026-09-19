@@ -219,6 +219,8 @@ $router->get( '/manager/orders',                             ['ManagerController
 $router->get( '/manager/api/orders/companies',               ['ManagerController', 'apiOrdersCompanies']);
 $router->get( '/manager/api/orders/srs',                     ['ManagerController', 'apiOrdersSrs']);
 $router->get( '/manager/api/orders/products',                ['ManagerController', 'apiOrdersProducts']);
+$router->get( '/manager/api/orders/product-retailers',        ['ManagerController', 'apiOrdersProductRetailers']);
+$router->get( '/manager/api/orders/retailer-day-details',    ['ManagerController', 'apiOrdersRetailerDayDetails']);
 
 // Other manager pages
 $router->get( '/manager/inventory',           ['ManagerController', 'inventory']);

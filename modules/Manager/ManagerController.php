@@ -242,6 +242,339 @@ class ManagerController extends Controller
         exit;
     }
 
+    public function apiOrdersProductRetailers(): void
+    {
+        header('Content-Type: application/json');
+        $date = $_GET['date'] ?? '';
+        $productId = (int)($_GET['product_id'] ?? 0);
+        $srId = !empty($_GET['sr_id']) ? (int)$_GET['sr_id'] : null;
+        $companyId = isset($_GET['company_id']) && $_GET['company_id'] !== '' ? (int)$_GET['company_id'] : null;
+
+        if (!$date || !$productId) {
+            echo json_encode([]);
+            exit;
+        }
+
+        $where = " WHERE DATE(o.created_at) = ? AND oi.product_id = ? ";
+        $params = [$date, $productId];
+
+        if ($srId) {
+            $where .= " AND o.sr_id = ? ";
+            $params[] = $srId;
+        }
+        if ($companyId !== null) {
+            $where .= " AND (p.company_id = ? OR (? = 0 AND p.company_id IS NULL)) ";
+            $params[] = $companyId;
+            $params[] = $companyId;
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT 
+                o.id as order_id,
+                o.retailer_id,
+                COALESCE(NULLIF(TRIM(r.name), ''), NULLIF(TRIM(o.retailer_name), ''), 'Unknown Retailer') as retailer_name,
+                COALESCE(NULLIF(TRIM(r.phone), ''), NULLIF(TRIM(o.retailer_phone), ''), '') as retailer_phone,
+                COALESCE(NULLIF(TRIM(r.address), ''), NULLIF(TRIM(o.retailer_address), ''), '') as retailer_address,
+                u.id as sr_id,
+                u.name as sr_name,
+                o.status as order_status,
+                o.created_at as order_time,
+                oi.id as order_item_id,
+                oi.quantity,
+                oi.unit_price,
+                oi.base_selling_price,
+                oi.total_price,
+                (oi.quantity * COALESCE(oi.base_selling_price, p.price, 0)) as total_base_value,
+                (oi.total_price - (oi.quantity * COALESCE(oi.base_selling_price, p.price, 0))) as total_oc,
+                p.id as product_id,
+                p.name as product_name,
+                p.pieces_per_box,
+                p.box_type,
+                c.name as company_name
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            JOIN products p ON p.id = oi.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
+            JOIN users u ON u.id = o.sr_id
+            LEFT JOIN retailers r ON r.id = o.retailer_id
+            $where
+            ORDER BY o.created_at DESC, r.name ASC
+        ");
+        $stmt->execute($params);
+        $retailers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch free items linked to this product in these orders
+        $orderIds = array_values(array_unique(array_column($retailers, 'order_id')));
+        if (!empty($orderIds)) {
+            $inClause = implode(',', array_fill(0, count($orderIds), '?'));
+            $freeStmt = $this->db->prepare("
+                SELECT ofi.order_id, ofi.product_id, ofi.free_product_id,
+                       fp.name as free_product_name,
+                       fp.pieces_per_box as free_pieces_per_box,
+                       fp.box_type as free_box_type,
+                       ofi.quantity as free_qty
+                FROM order_free_items ofi
+                JOIN products fp ON fp.id = ofi.free_product_id
+                WHERE ofi.order_id IN ($inClause) AND ofi.product_id = ?
+            ");
+            $freeParams = array_merge($orderIds, [$productId]);
+            $freeStmt->execute($freeParams);
+            $freeMap = [];
+            while ($fr = $freeStmt->fetch(PDO::FETCH_ASSOC)) {
+                $freeMap[$fr['order_id']][] = $fr;
+            }
+
+            foreach ($retailers as &$r) {
+                $fItems = $freeMap[$r['order_id']] ?? [];
+                foreach ($fItems as &$fi) {
+                    $fPpb = (int)($fi['free_pieces_per_box'] ?? 1) ?: 1;
+                    $fQty = (int)$fi['free_qty'];
+                    $fBoxType = trim($fi['free_box_type'] ?? '');
+                    $fBoxTypeLower = strtolower($fBoxType);
+                    if ($fBoxTypeLower === 'pcs' || $fBoxType === 'পিস' || $fBoxType === 'পলি' || $fBoxType === 'জার') {
+                        $fi['qty_display'] = $fQty . ' ' . ($fBoxType ?: 'পিস');
+                    } else {
+                        $fBoxLabel = $fBoxType ?: 'Box';
+                        $fBoxes = floor($fQty / $fPpb);
+                        $fPieces = $fQty % $fPpb;
+                        $fi['qty_display'] = $fBoxes . ' ' . $fBoxLabel . ' - ' . $fPieces . ' পিস';
+                    }
+                }
+                unset($fi);
+                $r['free_items'] = $fItems;
+            }
+            unset($r);
+        }
+
+        // Format order quantity display
+        foreach ($retailers as &$r) {
+            if (!isset($r['free_items'])) {
+                $r['free_items'] = [];
+            }
+            $ppb = (int)($r['pieces_per_box'] ?? 1) ?: 1;
+            $qty = (int)$r['quantity'];
+            $boxType = trim($r['box_type'] ?? '');
+            $boxTypeLower = strtolower($boxType);
+
+            if ($boxTypeLower === 'pcs' || $boxType === 'পিস' || $boxType === 'পলি' || $boxType === 'জার') {
+                $r['qty_display'] = $qty . ' ' . ($boxType ?: 'পিস');
+            } else {
+                $boxLabel = $boxType ?: 'Box';
+                $boxes = floor($qty / $ppb);
+                $pieces = $qty % $ppb;
+                $r['qty_display'] = $boxes . ' ' . $boxLabel . ' - ' . $pieces . ' পিস';
+            }
+        }
+        unset($r);
+
+        echo json_encode($retailers);
+        exit;
+    }
+
+    public function apiOrdersRetailerDayDetails(): void
+    {
+        header('Content-Type: application/json');
+        $date = $_GET['date'] ?? '';
+        $retailerId = !empty($_GET['retailer_id']) ? (int)$_GET['retailer_id'] : null;
+        $orderId = !empty($_GET['order_id']) ? (int)$_GET['order_id'] : null;
+        $retailerName = trim($_GET['retailer_name'] ?? '');
+
+        if (!$date) {
+            echo json_encode(['error' => 'Date is required']);
+            exit;
+        }
+
+        $where = " WHERE DATE(o.created_at) = ? ";
+        $params = [$date];
+
+        if ($retailerId) {
+            $where .= " AND o.retailer_id = ? ";
+            $params[] = $retailerId;
+        } elseif ($orderId) {
+            $orderInfoStmt = $this->db->prepare("SELECT retailer_id, retailer_name FROM orders WHERE id = ?");
+            $orderInfoStmt->execute([$orderId]);
+            $orderInfo = $orderInfoStmt->fetch(PDO::FETCH_ASSOC);
+            if ($orderInfo && !empty($orderInfo['retailer_id'])) {
+                $where .= " AND o.retailer_id = ? ";
+                $params[] = (int)$orderInfo['retailer_id'];
+            } elseif ($orderInfo && !empty($orderInfo['retailer_name'])) {
+                $where .= " AND (o.retailer_name = ? OR o.id = ?) ";
+                $params[] = $orderInfo['retailer_name'];
+                $params[] = $orderId;
+            } else {
+                $where .= " AND o.id = ? ";
+                $params[] = $orderId;
+            }
+        } elseif ($retailerName !== '') {
+            $where .= " AND (o.retailer_name = ? OR r.name = ?) ";
+            $params[] = $retailerName;
+            $params[] = $retailerName;
+        } else {
+            echo json_encode(['error' => 'Missing retailer identifier']);
+            exit;
+        }
+
+        // Fetch retailer profile
+        $retInfoStmt = $this->db->prepare("
+            SELECT 
+                COALESCE(r.id, o.retailer_id) as retailer_id,
+                COALESCE(NULLIF(TRIM(r.name), ''), NULLIF(TRIM(o.retailer_name), ''), 'Unknown Retailer') as name,
+                COALESCE(NULLIF(TRIM(r.phone), ''), NULLIF(TRIM(o.retailer_phone), ''), '') as phone,
+                COALESCE(NULLIF(TRIM(r.address), ''), NULLIF(TRIM(o.retailer_address), ''), '') as address
+            FROM orders o
+            LEFT JOIN retailers r ON r.id = o.retailer_id
+            $where
+            LIMIT 1
+        ");
+        $retInfoStmt->execute($params);
+        $retailerInfo = $retInfoStmt->fetch(PDO::FETCH_ASSOC) ?: [
+            'retailer_id' => $retailerId,
+            'name' => $retailerName ?: 'Retailer',
+            'phone' => '',
+            'address' => ''
+        ];
+
+        // Fetch all ordered items on this date across ALL companies
+        $stmt = $this->db->prepare("
+            SELECT 
+                o.id as order_id,
+                o.status as order_status,
+                o.created_at as order_time,
+                o.notes as order_notes,
+                u.id as sr_id,
+                u.name as sr_name,
+                c.id as company_id,
+                COALESCE(c.name, 'No Company') as company_name,
+                p.id as product_id,
+                p.name as product_name,
+                p.pieces_per_box,
+                p.box_type,
+                oi.id as order_item_id,
+                oi.quantity,
+                oi.unit_price,
+                oi.base_selling_price,
+                oi.total_price,
+                (oi.quantity * COALESCE(oi.base_selling_price, p.price, 0)) as total_base_value,
+                (oi.total_price - (oi.quantity * COALESCE(oi.base_selling_price, p.price, 0))) as total_oc
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+            JOIN products p ON p.id = oi.product_id
+            LEFT JOIN companies c ON c.id = p.company_id
+            JOIN users u ON u.id = o.sr_id
+            LEFT JOIN retailers r ON r.id = o.retailer_id
+            $where
+            ORDER BY c.name ASC, p.name ASC
+        ");
+        $stmt->execute($params);
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch free promotional items
+        $orderIds = array_values(array_unique(array_column($items, 'order_id')));
+        $freeItemsMap = [];
+        if (!empty($orderIds)) {
+            $inClause = implode(',', array_fill(0, count($orderIds), '?'));
+            $freeStmt = $this->db->prepare("
+                SELECT ofi.order_id, ofi.product_id, ofi.free_product_id,
+                       fp.name as free_product_name,
+                       fp.pieces_per_box as free_pieces_per_box,
+                       fp.box_type as free_box_type,
+                       ofi.quantity as free_qty
+                FROM order_free_items ofi
+                JOIN products fp ON fp.id = ofi.free_product_id
+                WHERE ofi.order_id IN ($inClause)
+            ");
+            $freeStmt->execute($orderIds);
+            while ($fr = $freeStmt->fetch(PDO::FETCH_ASSOC)) {
+                $key = $fr['order_id'] . '_' . $fr['product_id'];
+                $freeItemsMap[$key][] = $fr;
+            }
+        }
+
+        $companiesMap = [];
+        $grandTotalBase = 0;
+        $grandTotalSr = 0;
+        $grandTotalOc = 0;
+
+        foreach ($items as $item) {
+            $compId = (int)($item['company_id'] ?? 0);
+            $compName = $item['company_name'] ?? 'General';
+            $orderIdVal = (int)$item['order_id'];
+            $prodId = (int)$item['product_id'];
+
+            $ppb = (int)($item['pieces_per_box'] ?? 1) ?: 1;
+            $qty = (int)$item['quantity'];
+            $boxType = trim($item['box_type'] ?? '');
+            $boxTypeLower = strtolower($boxType);
+
+            if ($boxTypeLower === 'pcs' || $boxType === 'পিস' || $boxType === 'পলি' || $boxType === 'জার') {
+                $item['qty_display'] = $qty . ' ' . ($boxType ?: 'পিস');
+            } else {
+                $boxLabel = $boxType ?: 'Box';
+                $boxes = floor($qty / $ppb);
+                $pieces = $qty % $ppb;
+                $item['qty_display'] = $boxes . ' ' . $boxLabel . ' - ' . $pieces . ' পিস';
+            }
+
+            $rawFree = $freeItemsMap[$orderIdVal . '_' . $prodId] ?? [];
+            foreach ($rawFree as &$fi) {
+                $fPpb = (int)($fi['free_pieces_per_box'] ?? 1) ?: 1;
+                $fQty = (int)$fi['free_qty'];
+                $fBoxType = trim($fi['free_box_type'] ?? '');
+                $fBoxTypeLower = strtolower($fBoxType);
+                if ($fBoxTypeLower === 'pcs' || $fBoxType === 'পিস' || $fBoxType === 'পলি' || $fBoxType === 'জার') {
+                    $fi['qty_display'] = $fQty . ' ' . ($fBoxType ?: 'পিস');
+                } else {
+                    $fBoxLabel = $fBoxType ?: 'Box';
+                    $fBoxes = floor($fQty / $fPpb);
+                    $fPieces = $fQty % $fPpb;
+                    $fi['qty_display'] = $fBoxes . ' ' . $fBoxLabel . ' - ' . $fPieces . ' পিস';
+                }
+            }
+            unset($fi);
+            $item['free_items'] = $rawFree;
+
+            if (!isset($companiesMap[$compId])) {
+                $companiesMap[$compId] = [
+                    'company_id' => $compId,
+                    'company_name' => $compName,
+                    'sr_name' => $item['sr_name'],
+                    'order_id' => $orderIdVal,
+                    'order_status' => $item['order_status'],
+                    'items' => [],
+                    'total_base_value' => 0,
+                    'total_sr_value' => 0,
+                    'total_oc' => 0
+                ];
+            }
+
+            $baseVal = (float)$item['total_base_value'];
+            $srVal = (float)$item['total_price'];
+            $oc = (float)$item['total_oc'];
+
+            $companiesMap[$compId]['total_base_value'] += $baseVal;
+            $companiesMap[$compId]['total_sr_value'] += $srVal;
+            $companiesMap[$compId]['total_oc'] += $oc;
+
+            $grandTotalBase += $baseVal;
+            $grandTotalSr += $srVal;
+            $grandTotalOc += $oc;
+
+            $companiesMap[$compId]['items'][] = $item;
+        }
+
+        echo json_encode([
+            'retailer' => $retailerInfo,
+            'date' => $date,
+            'companies' => array_values($companiesMap),
+            'grand_total' => [
+                'total_base_value' => $grandTotalBase,
+                'total_sr_value' => $grandTotalSr,
+                'total_oc' => $grandTotalOc
+            ]
+        ]);
+        exit;
+    }
+
     // ══════════════════════════════════════════════════════════
     //  Products CRUD
     // ══════════════════════════════════════════════════════════
