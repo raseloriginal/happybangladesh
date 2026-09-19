@@ -661,6 +661,8 @@ function toggleProductRow(schId, compId) {
     products.forEach((p, pIdx) => {
       const basePrice = parseFloat(p.base_price || 0);
       const orderedQty = parseInt(p.ordered_qty || 0);
+      const freeQty = parseInt(p.free_qty || 0);
+      const totalOrderedQty = orderedQty + freeQty;
       const dispatchedQty = parseInt(p.dispatched_qty || 0);
       const saleQty = parseInt(p.sale_qty || 0);
       const returnedQty = parseInt(p.returned_qty || 0);
@@ -673,17 +675,31 @@ function toggleProductRow(schId, compId) {
       const escapedName = (p.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
       const actionCol = canEdit ? `
         <td class="text-center no-print">
-          <button type="button" onclick="openEditDispatchQtyModal(${schId}, ${compId}, ${p.id}, '${escapedName}', ${orderedQty}, ${dispatchedQty}, ${saleQty}, ${basePrice})" class="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-0.5 rounded border border-blue-200 transition text-[11px] font-semibold flex items-center justify-center gap-1 mx-auto" title="Edit Dispatched Qty">
+          <button type="button" onclick="openEditDispatchQtyModal(${schId}, ${compId}, ${p.id}, '${escapedName}', ${totalOrderedQty}, ${dispatchedQty}, ${saleQty}, ${basePrice})" class="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-0.5 rounded border border-blue-200 transition text-[11px] font-semibold flex items-center justify-center gap-1 mx-auto" title="Edit Dispatched Qty">
             <i class="fa-solid fa-pen-to-square text-[10px]"></i> Edit
           </button>
         </td>
       ` : `<td class="text-center no-print text-gray-400 text-[11px]">-</td>`;
 
+      let nameDisplay = p.name;
+      if (orderedQty === 0 && freeQty > 0) {
+        nameDisplay += ` <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 ml-1 border border-emerald-300">FREE</span>`;
+      }
+
+      let orderedQtyDisplay = orderedQty;
+      if (freeQty > 0) {
+        if (orderedQty > 0) {
+          orderedQtyDisplay = `${orderedQty} <span class="text-[10px] text-emerald-600 font-bold block">+${freeQty} ফ্রি</span>`;
+        } else {
+          orderedQtyDisplay = `<span class="text-[11px] text-emerald-700 font-bold">${freeQty} ফ্রি</span>`;
+        }
+      }
+
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
-        <td class="font-bold text-gray-800">${p.name}</td>
+        <td class="font-bold text-gray-800">${nameDisplay}</td>
         <td class="excel-money text-right text-amber-600">৳ ${basePrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-        <td class="excel-qty text-center">${orderedQty}</td>
+        <td class="excel-qty text-center">${orderedQtyDisplay}</td>
         <td class="excel-money text-right text-gray-600">৳ ${orderedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
         <td class="excel-qty text-center">${dispatchedQty}</td>
         <td class="excel-money text-right text-blue-600">৳ ${dispatchedVal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
@@ -824,9 +840,22 @@ function toggleSrProductRow(schId, compId, srId) {
         ocClass = 'text-emerald-600';
       }
 
+      const freeItems = p.free_items || [];
+      let freeHtml = '';
+      if (freeItems.length > 0) {
+        freeHtml = `<div class="mt-1 space-y-0.5">` + freeItems.map(fi => `
+          <div class="text-[11px] text-emerald-700 font-medium flex items-center gap-1.5 pl-2 border-l-2 border-emerald-400">
+            <span class="text-emerald-500">↳</span>
+            <span class="inline-block px-1 py-0.2 bg-emerald-100 text-emerald-800 font-extrabold rounded text-[9px] tracking-wider border border-emerald-200">FREE</span>
+            <span class="font-semibold text-gray-800">${fi.free_product_name}</span>
+            <span class="text-emerald-700 font-bold">(${fi.free_qty} pcs)</span>
+          </div>
+        `).join('') + `</div>`;
+      }
+
       html += `<tr>
         <td class="excel-row-num">${pIdx + 1}</td>
-        <td class="font-bold text-gray-800">${p.name}</td>
+        <td class="font-bold text-gray-800">${p.name}${freeHtml}</td>
         <td class="excel-money text-right text-amber-600">৳ ${basePrice.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
         <td class="excel-qty text-center">${orderedQty}</td>
         <td class="excel-money text-right text-gray-600">৳ ${rowVal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
@@ -989,6 +1018,15 @@ async function openOrganizeModal(schId) {
 
       const subtitleText = isPcs ? `1 Pcs` : `${ppb} Pcs / ${boxLabel}`;
 
+      let freeTagHtml = '';
+      if (p.free_qty && parseInt(p.free_qty) > 0) {
+        if (!p.regular_qty || parseInt(p.regular_qty) === 0) {
+          freeTagHtml = `<span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow-2xs ml-1.5"><i class="fa-solid fa-gift text-emerald-600"></i> FREE ITEM</span>`;
+        } else {
+          freeTagHtml = `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-2xs ml-1.5"><i class="fa-solid fa-gift text-emerald-600"></i> Incl. ${p.free_qty} Free</span>`;
+        }
+      }
+
       const inputControlsHtml = isPcs ? `
         <div class="flex items-center gap-1 sm:gap-2">
           <div class="flex items-center bg-white border border-gray-300 rounded-lg overflow-hidden focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 shadow-sm max-w-full">
@@ -1015,14 +1053,14 @@ async function openOrganizeModal(schId) {
             <div class="flex items-center gap-2 sm:gap-3">
               ${img}
               <div>
-                <div class="font-bold text-gray-800 text-xs sm:text-xs whitespace-nowrap">${p.name}</div>
+                <div class="font-bold text-gray-800 text-xs sm:text-xs whitespace-nowrap flex items-center">${p.name} ${freeTagHtml}</div>
                 <div class="text-[10px] sm:text-[11px] text-gray-400 font-medium whitespace-nowrap">${subtitleText}</div>
               </div>
             </div>
           </td>
           <td class="p-2 sm:p-3 whitespace-nowrap">
             <span class="bg-slate-100 text-gray-700 px-1.5 sm:px-2 py-0.5 rounded text-[11px] sm:text-xs font-bold border border-slate-200 whitespace-nowrap">${origStr}</span>
-            <div class="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">Total: ${origPcs} pcs</div>
+            <div class="text-[10px] sm:text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">Total: ${origPcs} pcs ${p.free_qty && parseInt(p.free_qty) > 0 && p.regular_qty && parseInt(p.regular_qty) > 0 ? `<span class="text-emerald-600 font-bold">(${p.regular_qty} Reg + ${p.free_qty} Free)</span>` : ''}</div>
           </td>
           <td class="p-2 sm:p-3 whitespace-nowrap">
             ${inputControlsHtml}

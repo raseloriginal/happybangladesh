@@ -546,6 +546,26 @@ class DSRController extends Controller
 
         if (!empty($dispatchIds)) {
             $inClause = implode(',', array_fill(0, count($dispatchIds), '?'));
+            $dispatchIdsValues = array_values($dispatchIds);
+
+            // Fetch free items linked to these dispatches
+            $freeQ = $this->db->prepare("
+                SELECT d.id as dispatch_id, ofi.product_id, ofi.free_product_id,
+                       fp.name as free_product_name, ofi.quantity as free_qty
+                FROM dispatches d
+                JOIN order_free_items ofi ON ofi.order_id = d.order_id
+                JOIN products fp ON fp.id = ofi.free_product_id
+                WHERE d.id IN ($inClause)
+                ORDER BY fp.name ASC
+            ");
+            $freeQ->execute($dispatchIdsValues);
+            $dispatchFreeMap = [];
+            foreach ($freeQ->fetchAll(PDO::FETCH_ASSOC) as $frow) {
+                $dId = (int)$frow['dispatch_id'];
+                $pId = (int)$frow['product_id'];
+                $dispatchFreeMap[$dId][$pId][] = $frow;
+            }
+
             $iq = $this->db->prepare("
                 SELECT di.dispatch_id, di.product_id, di.quantity, di.lot_id, di.delivered_quantity,
                        p.name, p.image, p.pieces_per_box, p.box_type,
@@ -560,9 +580,12 @@ class DSRController extends Controller
                 LEFT JOIN order_items oi ON oi.order_id = d.order_id AND oi.product_id = di.product_id
                 WHERE di.dispatch_id IN ($inClause)
             ");
-            $iq->execute(array_values($dispatchIds));
+            $iq->execute($dispatchIdsValues);
             foreach ($iq->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $dispatchProducts[$row['dispatch_id']][] = $row;
+                $dId = (int)$row['dispatch_id'];
+                $pId = (int)$row['product_id'];
+                $row['free_items'] = $dispatchFreeMap[$dId][$pId] ?? [];
+                $dispatchProducts[$dId][] = $row;
             }
         }
 
