@@ -293,12 +293,14 @@ class SRController extends Controller
         $q = $this->db->prepare("
             SELECT o.*, d.name AS dealer_name, d.happy_commission, w.name AS warehouse_name,
                    r.name AS retailer_name, r.phone AS retailer_phone, r.address AS retailer_address,
-                   disp.id AS dispatch_id, disp.status AS dispatch_status, disp.paid_amount AS dispatch_paid_amount
+                   disp.id AS dispatch_id, disp.status AS dispatch_status, disp.paid_amount AS dispatch_paid_amount,
+                   dsr.name AS delivery_man_name
             FROM orders o
             LEFT JOIN dealers d ON d.id=o.dealer_id
             LEFT JOIN warehouses w ON w.id=o.warehouse_id
             LEFT JOIN retailers r ON r.id=o.retailer_id
             LEFT JOIN dispatches disp ON disp.order_id=o.id
+            LEFT JOIN users dsr ON dsr.id=disp.dsr_id
             {$whereSql}
             ORDER BY o.created_at DESC
         ");

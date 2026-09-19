@@ -682,21 +682,15 @@ $truncateName = function($name) {
 
         <!-- Pay -->
         <div class="del-pay-sec">
-          <span>আজ দিতে হবে</span>
+          <span>মোট দিয়েছে</span>
           <b id="delPay">৳৩,৫১০</b>
         </div>
-
-        <!-- Skip Banner -->
-        <div class="del-skip-sec">
-          <b id="delS1">৩০ পিস</b> ফেরত গেছে। এই <b id="delS2">৳১,৪৯০</b> টাকা আজ <b>দেবেন না</b>।
-        </div>
-        <div class="del-later-sec">ফেরত যাওয়া মাল কালকের গাড়িতে চলে আসবে। ফোন দিতে হবে না।</div>
 
         <!-- Signatures -->
         <div class="del-sign-sec">
           <div>
-            <b id="delSRSign">মোঃ হাসান</b>
-            <small>মাল দিয়েছেন · ডেলিভারি ম্যান</small>
+            <b id="delSRSign">ডেলিভারি ম্যান</b>
+            <small>মাল দিয়েছেন · ডেলিভারি ম্যান</small>
           </div>
           <div>
             <b id="delRetSign">আব্দুর রহিম</b>
@@ -2359,24 +2353,8 @@ function openDeliveryMemoModal(orderData) {
 
   safeSetText('delPay', tkFormat(valGot));
 
-  const skipSec = document.querySelector('.del-skip-sec');
-  const laterSec = document.querySelector('.del-later-sec');
-  if (skipSec && laterSec) {
-    if (isCancelled) {
-      skipSec.style.display = 'block';
-      laterSec.style.display = 'none';
-      skipSec.innerHTML = `পুরো অর্ডারটি <b>বাতিল</b> করা হয়েছে। কোনো টাকা <b>দেবেন না</b>।`;
-    } else if (totalBak > 0) {
-      skipSec.style.display = 'block';
-      laterSec.style.display = 'block';
-      skipSec.innerHTML = `<b>${bnNum(totalBak)} পিস</b> ফেরত গেছে। এই <b>${tkFormat(valBak)}</b> টাকা আজ <b>দেবেন না</b>।`;
-    } else {
-      skipSec.style.display = 'none';
-      laterSec.style.display = 'none';
-    }
-  }
-
-  safeSetText('delSRSign', '<?= h(Auth::name()) ?>');
+  const deliveryMan = order.delivery_man_name || 'ডেলিভারি ম্যান';
+  safeSetText('delSRSign', deliveryMan);
   safeSetText('delRetSign', retailerName);
   safeSetText('delSup', bnNum('01700-000000'));
   safeSetText('delPg', bnNum('1') + '/' + bnNum('1'));
