@@ -404,7 +404,7 @@ $hasDeliveries = !empty($retailers);
                   <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">প্রাপ্ত টাকা লিখুন (৳)</label>
                   <div class="relative flex items-center">
                       <span class="absolute left-4 text-gray-400 font-bold text-lg">৳</span>
-                      <input type="number" min="0" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-lg font-black text-gray-800 outline-none focus:border-[#1e73be] focus:ring-4 focus:ring-blue-500/10 transition">
+                      <input type="number" min="0" step="0.01" id="paidPaymentInput" oninput="onPaidPaymentInput(this)" class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-lg font-black text-gray-800 outline-none focus:border-[#1e73be] focus:ring-4 focus:ring-blue-500/10 transition">
                   </div>
               </div>
 
@@ -1549,7 +1549,10 @@ function selectCompanyOrder(orderIndex) {
         } else if (order.status === 'partial') {
             actionContainer.innerHTML = `
                 <div class="flex flex-col gap-2 w-full">
-                    <button onclick="markDelivery('cancelled')" class="w-full py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
+                    <div class="flex gap-2 w-full">
+                        <button onclick="markDelivery('cancelled')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #d83b01;">বাতিল করুন</button>
+                        <button id="pay-btn" onclick="markDelivery('delivered')" class="flex-1 py-2.5 rounded-lg font-bold text-white active:scale-[0.98] transition text-sm shadow-md" style="background-color: #1e73be;">পরিশোধ করুন</button>
+                    </div>
                     ${undoBtnHtml}
                 </div>
             `;
@@ -1767,23 +1770,26 @@ function openPaidPaymentModal() {
     // Check if this order already has some paid amount
     let existingPaid = 0;
     if (currentRetailerObj && currentRetailerObj.orders) {
-        const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
+        const order = currentRetailerObj.orders.find(o => String(o.dispatch_id) === String(currentDispatchId));
         if (order) existingPaid = parseFloat(order.paid_amount || 0);
     }
-    const remainingDue = totalPayable - existingPaid;
+    const remainingDue = Math.max(0, totalPayable - existingPaid);
     
     // Populate new structural info elements
     if (document.getElementById('paidRetailerName') && currentRetailerObj) {
         document.getElementById('paidRetailerName').innerText = currentRetailerObj.retailer_name || currentRetailerObj.dealer_name || currentRetailerObj.name;
-        document.getElementById('paidTotalPayable').innerText = '৳' + totalPayable.toFixed(0);
-        document.getElementById('paidAlreadyPaid').innerText = '৳' + existingPaid.toFixed(0);
-        document.getElementById('paidRemainingDue').innerText = '৳' + remainingDue.toFixed(0);
+        document.getElementById('paidTotalPayable').innerText = '৳' + totalPayable.toFixed(2);
+        document.getElementById('paidAlreadyPaid').innerText = '৳' + existingPaid.toFixed(2);
+        document.getElementById('paidRemainingDue').innerText = '৳' + remainingDue.toFixed(2);
     }
     
-    document.getElementById('paidPaymentInput').value = remainingDue.toFixed(0);
+    const inputEl = document.getElementById('paidPaymentInput');
+    if (inputEl) {
+        inputEl.value = remainingDue > 0 ? (remainingDue % 1 === 0 ? remainingDue : remainingDue.toFixed(2)) : '0';
+    }
     
     if (existingPaid > 0) {
-        document.getElementById('paymentDueInfo').innerHTML = `ইতিমধ্যে পরিশোধিত: ৳${existingPaid.toFixed(0)} | বাকি পাওনা: ৳${remainingDue.toFixed(0)}`;
+        document.getElementById('paymentDueInfo').innerHTML = `ইতিমধ্যে পরিশোধিত: ৳${existingPaid.toFixed(2)} | বাকি পাওনা: ৳${remainingDue.toFixed(2)}`;
         document.getElementById('paymentDueInfo').className = 'text-xs font-bold text-amber-600 mb-4 h-5';
     } else {
         document.getElementById('paymentDueInfo').innerText = 'সম্পূর্ণ পরিশোধিত';
@@ -1804,37 +1810,36 @@ function closePaidPaymentModal() {
 }
 
 function onPaidPaymentInput(el) {
-    let entered = parseFloat(el.value) || 0;
-    if (entered < 0) {
+    let entered = parseFloat(el.value);
+    if (isNaN(entered) || entered < 0) {
         entered = 0;
-        el.value = '';
     }
     const total = getSelectedOrderGettingTotal();
     
     let existingPaid = 0;
     if (currentRetailerObj && currentRetailerObj.orders) {
-        const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
+        const order = currentRetailerObj.orders.find(o => String(o.dispatch_id) === String(currentDispatchId));
         if (order) existingPaid = parseFloat(order.paid_amount || 0);
     }
-    const maxPayable = total - existingPaid;
+    const maxPayable = Math.max(0, total - existingPaid);
     
     if (entered > maxPayable) {
         entered = maxPayable;
-        el.value = entered.toFixed(0);
+        el.value = (entered % 1 === 0) ? entered : entered.toFixed(2);
     }
     
     const due = maxPayable - entered;
     
     if (document.getElementById('paidRemainingDue')) {
-        document.getElementById('paidRemainingDue').innerText = '৳' + due.toFixed(0);
+        document.getElementById('paidRemainingDue').innerText = '৳' + (due > 0 ? due.toFixed(2) : '0.00');
     }
     
     const info = document.getElementById('paymentDueInfo');
-    if (Math.round(due) > 0) {
-        info.innerText = `বাকি পাওনা: ৳${Math.round(due)} (আংশিক পরিশোধ হবে)`;
+    if (due > 0.009) {
+        info.innerText = `বাকি পাওনা: ৳${due.toFixed(2)} (আংশিক পরিশোধ হবে)`;
         info.className = 'text-xs font-bold text-red-500 mb-4 h-5';
-    } else if (Math.round(due) < 0) {
-        info.innerText = `অতিরিক্ত পরিশোধ: ৳${Math.abs(Math.round(due))} (সমন্বয় করুন)`;
+    } else if (due < -0.009) {
+        info.innerText = `অতিরিক্ত পরিশোধ: ৳${Math.abs(due).toFixed(2)} (সমন্বয় করুন)`;
         info.className = 'text-xs font-bold text-orange-500 mb-4 h-5';
     } else {
         info.innerText = 'সম্পূর্ণ পরিশোধিত';
@@ -1843,19 +1848,20 @@ function onPaidPaymentInput(el) {
 }
 
 function submitPaidPayment() {
-    const entered = parseFloat(document.getElementById('paidPaymentInput').value) || 0;
+    const inputEl = document.getElementById('paidPaymentInput');
+    const entered = inputEl ? (parseFloat(inputEl.value) || 0) : 0;
     const total = getSelectedOrderGettingTotal();
     
     // Get existing paid amount for this order (for cumulative calculation)
     let existingPaid = 0;
     if (currentRetailerObj && currentRetailerObj.orders) {
-        const order = currentRetailerObj.orders.find(o => o.dispatch_id === currentDispatchId);
+        const order = currentRetailerObj.orders.find(o => String(o.dispatch_id) === String(currentDispatchId));
         if (order) existingPaid = parseFloat(order.paid_amount || 0);
     }
-    const cumulativePaid = existingPaid + entered;
+    const cumulativePaid = Math.round((existingPaid + entered) * 100) / 100;
     
     let status = 'delivered';
-    if (Math.round(cumulativePaid) < Math.round(total)) {
+    if (cumulativePaid < (total - 0.01)) {
         status = 'partial';
     }
     
@@ -1970,7 +1976,14 @@ async function undoOrder(dispatchId, orderIndex) {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `csrf_token=<?= Helpers::csrfToken() ?>`
             });
-            const data = await res.json();
+            const resText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(resText);
+            } catch (jsonErr) {
+                const cleanErr = resText.replace(/<[^>]*>?/gm, '').trim();
+                throw new Error(cleanErr ? cleanErr.substring(0, 150) : 'সার্ভার থেকে ত্রুটিপূর্ণ উত্তর এসেছে (Server Error)');
+            }
             if(!data.success) {
                 throw new Error(data.message || 'Error undoing delivery');
             }
@@ -2428,7 +2441,14 @@ async function submitSelectedDeliveries(status, targetDispatchIds, paidAmounts =
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `csrf_token=<?= Helpers::csrfToken() ?>&status=${status}&paid_amount=${paidAmount}&notes=${encodeURIComponent(reason)}&items=${encodeURIComponent(JSON.stringify(deliveredItems))}`
             });
-            const data = await res.json();
+            const resText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(resText);
+            } catch (jsonErr) {
+                const cleanErr = resText.replace(/<[^>]*>?/gm, '').trim();
+                throw new Error(cleanErr ? cleanErr.substring(0, 150) : 'সার্ভার থেকে ত্রুটিপূর্ণ উত্তর এসেছে (Server Error)');
+            }
             if(!data.success) {
                 throw new Error(data.message || 'Error updating delivery');
             }

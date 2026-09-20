@@ -706,119 +706,144 @@ class DSRController extends Controller
 
     public function deliveryUpdate(string $id): void
     {
-        $status = $this->post('status', 'delivered');
-        $paidAmount = (float) $this->post('paid_amount', 0);
-        $dsrId = Auth::id();
-        
-        // Check if settlement is already submitted/approved for this dispatch's date
-        $dispatchInfo = $this->db->prepare("SELECT dispatch_date, order_id FROM dispatches WHERE id=? AND dsr_id=?");
-        $dispatchInfo->execute([$id, $dsrId]);
-        $dispatchRow = $dispatchInfo->fetch();
-        $dispatchDate = $dispatchRow['dispatch_date'] ?? null;
-        $orderId = !empty($dispatchRow['order_id']) ? (int)$dispatchRow['order_id'] : null;
-
-        if ($dispatchDate) {
-            $check = $this->db->prepare("SELECT status FROM settlements WHERE dsr_id=? AND date=? AND status IN ('pending', 'approved')");
-            $check->execute([$dsrId, $dispatchDate]);
-            if ($check->fetch()) {
-                $this->json(['success' => false, 'message' => 'Settlement already submitted for this date. Cannot modify delivery.']);
-                return;
-            }
-
-            // Check if the dispatch is already returned
-            $schCheck = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
-            $schCheck->execute([$dsrId, $dispatchDate, $dispatchDate]);
-            $schStatus = $schCheck->fetchColumn();
+        try {
+            $status = $this->post('status', 'delivered');
+            $paidAmount = (float) $this->post('paid_amount', 0);
+            $dsrId = Auth::id();
             
-            if ($schStatus === 'returned') {
-                $this->json(['success' => false, 'message' => 'ডেলিভারি রিটার্ন সম্পন্ন হয়েছে। আর কোনো পরিবর্তন সম্ভব নয়।']);
+            // Check if settlement is already submitted/approved for this dispatch's date
+            $dispatchInfo = $this->db->prepare("SELECT dispatch_date, order_id FROM dispatches WHERE id=? AND dsr_id=?");
+            $dispatchInfo->execute([$id, $dsrId]);
+            $dispatchRow = $dispatchInfo->fetch();
+            if (!$dispatchRow) {
+                $this->json(['success' => false, 'message' => 'Delivery dispatch not found.']);
                 return;
             }
-        }
-        
-        $notes = $this->post('notes', null);
-        
-        // Fetch items and delivered quantities first to perform validation
-        $items = $this->db->prepare("SELECT product_id, lot_id, quantity, delivered_quantity FROM dispatch_items WHERE dispatch_id=?");
-        $items->execute([$id]);
-        $items = $items->fetchAll();
-        
-        $deliveredItemsStr = $this->post('items', '{}');
-        $deliveredItems = json_decode($deliveredItemsStr, true) ?? [];
+            $dispatchDate = $dispatchRow['dispatch_date'] ?? null;
+            $orderId = !empty($dispatchRow['order_id']) ? (int)$dispatchRow['order_id'] : null;
 
-        // Validate van stock sufficiency before making database updates
-        if ($status !== 'cancelled') {
-            foreach($items as $item) {
-                $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
-                $newDelivered = $item['quantity'];
-                if (isset($deliveredItems[$item['product_id']])) {
-                    $newDelivered = (int) $deliveredItems[$item['product_id']];
+            if ($dispatchDate) {
+                $check = $this->db->prepare("SELECT status FROM settlements WHERE dsr_id=? AND date=? AND status IN ('pending', 'approved')");
+                $check->execute([$dsrId, $dispatchDate]);
+                if ($check->fetch()) {
+                    $this->json(['success' => false, 'message' => 'Settlement already submitted for this date. Cannot modify delivery.']);
+                    return;
                 }
-                $diff = $newDelivered - $prevDelivered;
-                if ($diff > 0) {
-                    $dateQ = $this->db->prepare("SELECT MAX(DATE(loaded_at)) FROM van_stock WHERE dsr_id = ? AND product_id = ?");
-                    $dateQ->execute([$dsrId, $item['product_id']]);
-                    $vDate = $dateQ->fetchColumn() ?: date('Y-m-d');
-                    
-                    $vsQuery = $this->db->prepare("SELECT SUM(initial_qty) FROM van_stock WHERE dsr_id = ? AND product_id = ? AND DATE(loaded_at) = ?");
-                    $vsQuery->execute([$dsrId, $item['product_id'], $vDate]);
-                    $vanStock = (int)$vsQuery->fetchColumn();
-                    
-                    $sQ = $this->db->prepare("SELECT SUM(COALESCE(di.delivered_quantity, 0)) FROM dispatches d JOIN dispatch_items di ON d.id = di.dispatch_id WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND d.status IN ('delivered', 'partial')");
-                    $sQ->execute([$dsrId, $vDate, $item['product_id']]);
-                    $vanStock -= (int)$sQ->fetchColumn();
-                    
-                    $rQ = $this->db->prepare("SELECT SUM(ri.quantity) FROM returns r JOIN return_items ri ON r.id = ri.return_id WHERE r.dsr_id = ? AND r.return_date = ? AND ri.product_id = ?");
-                    $rQ->execute([$dsrId, $vDate, $item['product_id']]);
-                    $vanStock -= (int)$rQ->fetchColumn();
-                    if ($diff > $vanStock) {
-                        $prodQuery = $this->db->prepare("SELECT name FROM products WHERE id = ?");
-                        $prodQuery->execute([$item['product_id']]);
-                        $prodName = $prodQuery->fetchColumn() ?: 'Product';
-                        $this->json(['success' => false, 'message' => "Insufficient van stock for '{$prodName}'. Available: {$vanStock}, requested increase: {$diff}."]);
-                        return;
+
+                // Check if the dispatch is already returned
+                $schCheck = $this->db->prepare("SELECT status FROM dispatch_schedules WHERE dsr_id=? AND (delivery_date=? OR (delivery_date IS NULL AND dispatch_date=?)) LIMIT 1");
+                $schCheck->execute([$dsrId, $dispatchDate, $dispatchDate]);
+                $schStatus = $schCheck->fetchColumn();
+                
+                if ($schStatus === 'returned') {
+                    $this->json(['success' => false, 'message' => 'ডেলিভারি রিটার্ন সম্পন্ন হয়েছে। আর কোনো পরিবর্তন সম্ভব নয়।']);
+                    return;
+                }
+            }
+            
+            $notes = $this->post('notes', null);
+            
+            // Fetch items and delivered quantities first to perform validation
+            $items = $this->db->prepare("SELECT product_id, lot_id, quantity, delivered_quantity FROM dispatch_items WHERE dispatch_id=?");
+            $items->execute([$id]);
+            $items = $items->fetchAll();
+            
+            $deliveredItemsStr = $this->post('items', '{}');
+            $deliveredItems = json_decode($deliveredItemsStr, true) ?? [];
+
+            // Validate van stock sufficiency before making database updates
+            if ($status !== 'cancelled') {
+                foreach($items as $item) {
+                    $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
+                    $newDelivered = $item['quantity'];
+                    if (isset($deliveredItems[$item['product_id']])) {
+                        $newDelivered = (int) $deliveredItems[$item['product_id']];
+                    }
+                    $diff = $newDelivered - $prevDelivered;
+                    if ($diff > 0) {
+                        $dateQ = $this->db->prepare("SELECT MAX(DATE(loaded_at)) FROM van_stock WHERE dsr_id = ? AND product_id = ?");
+                        $dateQ->execute([$dsrId, $item['product_id']]);
+                        $vDate = $dateQ->fetchColumn() ?: date('Y-m-d');
+                        
+                        $vsQuery = $this->db->prepare("SELECT SUM(initial_qty) FROM van_stock WHERE dsr_id = ? AND product_id = ? AND DATE(loaded_at) = ?");
+                        $vsQuery->execute([$dsrId, $item['product_id'], $vDate]);
+                        $vanStock = (int)$vsQuery->fetchColumn();
+                        
+                        $sQ = $this->db->prepare("SELECT SUM(COALESCE(di.delivered_quantity, 0)) FROM dispatches d JOIN dispatch_items di ON d.id = di.dispatch_id WHERE d.dsr_id = ? AND d.dispatch_date = ? AND di.product_id = ? AND d.status IN ('delivered', 'partial')");
+                        $sQ->execute([$dsrId, $vDate, $item['product_id']]);
+                        $vanStock -= (int)$sQ->fetchColumn();
+                        
+                        $rQ = $this->db->prepare("SELECT SUM(ri.quantity) FROM returns r JOIN return_items ri ON r.id = ri.return_id WHERE r.dsr_id = ? AND r.return_date = ? AND ri.product_id = ?");
+                        $rQ->execute([$dsrId, $vDate, $item['product_id']]);
+                        $vanStock -= (int)$rQ->fetchColumn();
+                        if ($diff > $vanStock) {
+                            $prodQuery = $this->db->prepare("SELECT name FROM products WHERE id = ?");
+                            $prodQuery->execute([$item['product_id']]);
+                            $prodName = $prodQuery->fetchColumn() ?: 'Product';
+                            $this->json(['success' => false, 'message' => "Insufficient van stock for '{$prodName}'. Available: {$vanStock}, requested increase: {$diff}."]);
+                            return;
+                        }
                     }
                 }
             }
-        }
 
-        $dbStatus = $status;
-        $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
-                 ->execute([$dbStatus, $paidAmount, $notes, $id, $dsrId]);
+            $this->db->beginTransaction();
 
-        if (!empty($orderId)) {
-            $orderStatus = in_array($dbStatus, ['delivered', 'partial', 'cancelled']) ? $dbStatus : 'dispatched';
-            $this->db->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=?")
-                     ->execute([$orderStatus, $orderId]);
-        }
-        
-        foreach($items as $item) {
-            $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
-            
-            if ($status === 'cancelled') {
-                $newDelivered = 0;
-            } else {
-                // If specific delivery amounts are provided from frontend, use them
-                // Otherwise, default to full quantity (for complete)
-                $newDelivered = $item['quantity'];
-                if (isset($deliveredItems[$item['product_id']])) {
-                    $newDelivered = (int) $deliveredItems[$item['product_id']];
+            $dbStatus = $status;
+            $this->db->prepare("UPDATE dispatches SET status=?, paid_amount=?, notes=?, updated_at=NOW() WHERE id=? AND dsr_id=?")
+                     ->execute([$dbStatus, $paidAmount, $notes, $id, $dsrId]);
+
+            if (!empty($orderId)) {
+                $orderStatus = in_array($dbStatus, ['delivered', 'partial', 'cancelled']) ? $dbStatus : 'dispatched';
+                try {
+                    $this->db->prepare("UPDATE orders SET status=?, updated_at=NOW() WHERE id=?")
+                             ->execute([$orderStatus, $orderId]);
+                } catch (\Throwable $orderErr) {
+                    // If live DB orders table enum doesn't support 'partial', fallback gracefully
+                    if ($orderStatus === 'partial') {
+                        $this->db->prepare("UPDATE orders SET status='dispatched', updated_at=NOW() WHERE id=?")
+                                 ->execute([$orderId]);
+                    } else {
+                        throw $orderErr;
+                    }
                 }
             }
             
-            $diff = $newDelivered - $prevDelivered;
-            
-            if ($diff != 0) {
-                $this->db->prepare("UPDATE van_stock SET quantity = quantity - ? WHERE dsr_id=? AND product_id=? AND (lot_id=? OR (? IS NULL AND lot_id IS NULL))")
-                         ->execute([$diff, $dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+            foreach($items as $item) {
+                $prevDelivered = $item['delivered_quantity'] !== null ? (int)$item['delivered_quantity'] : 0;
+                
+                if ($status === 'cancelled') {
+                    $newDelivered = 0;
+                } else {
+                    // If specific delivery amounts are provided from frontend, use them
+                    // Otherwise, default to full quantity (for complete)
+                    $newDelivered = $item['quantity'];
+                    if (isset($deliveredItems[$item['product_id']])) {
+                        $newDelivered = (int) $deliveredItems[$item['product_id']];
+                    }
+                }
+                
+                $diff = $newDelivered - $prevDelivered;
+                
+                if ($diff != 0) {
+                    $this->db->prepare("UPDATE van_stock SET quantity = quantity - ? WHERE dsr_id=? AND product_id=? AND (lot_id=? OR (? IS NULL AND lot_id IS NULL))")
+                             ->execute([$diff, $dsrId, $item['product_id'], $item['lot_id'], $item['lot_id']]);
+                }
+                
+                // Save the new delivered quantity in DB
+                $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE dispatch_id = ? AND product_id = ?")
+                         ->execute([$newDelivered, $id, $item['product_id']]);
             }
             
-            // Save the new delivered quantity in DB
-            $this->db->prepare("UPDATE dispatch_items SET delivered_quantity = ? WHERE dispatch_id = ? AND product_id = ?")
-                     ->execute([$newDelivered, $id, $item['product_id']]);
+            $this->db->commit();
+            $this->json(['success' => true]);
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log("Delivery update error: " . $e->getMessage());
+            $this->json(['success' => false, 'message' => 'ডেলিভারি সংরক্ষণে সমস্যা হয়েছে: ' . $e->getMessage()]);
         }
-        
-        $this->json(['success' => true]);
     }
 
     public function deliveryUndo(string $id): void

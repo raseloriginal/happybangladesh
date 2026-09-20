@@ -637,7 +637,7 @@ CREATE TABLE `orders` (
   `retailer_phone` varchar(30) DEFAULT NULL,
   `retailer_address` text DEFAULT NULL,
   `warehouse_id` int(10) unsigned NOT NULL,
-  `status` enum('pending','confirmed','dispatched','delivered','cancelled') NOT NULL DEFAULT 'pending',
+  `status` enum('pending','confirmed','dispatched','delivered','partial','cancelled') NOT NULL DEFAULT 'pending',
   `total_amount` decimal(14,2) NOT NULL DEFAULT 0.00,
   `is_ready_sale` tinyint(1) NOT NULL DEFAULT 0,
   `notes` text DEFAULT NULL,
