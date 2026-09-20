@@ -755,6 +755,12 @@ function triggerRetailerAction(ret) {
         .then(data => {
           SRLoader.hideOverlay();
           if (data.success) {
+            if (data.is_dispatched) {
+              showMiniToast('⚠️ Order has already been dispatched and cannot be modified. Opening new cart.', true);
+              currentRetailer = ret;
+              openProductsForRetailer();
+              return;
+            }
             cartsByRetailer[ret.id] = data.items;
             currentRetailer = ret;
             openProductsForRetailer();

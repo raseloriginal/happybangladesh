@@ -354,6 +354,12 @@ function openShop(id, name, address, hasOrderToday = false) {
         .then(data => {
           SRLoader.hideOverlay();
           if (data.success) {
+            if (data.is_dispatched) {
+              showMiniToast('⚠️ অর্ডারটি ইতিমধ্যে ডিসপ্যাচ হয়ে গেছে, এটি পরিবর্তন করা যাবে না। নতুন অর্ডার করুন।', true);
+              currentRetailer = ret;
+              openProductsForRetailer();
+              return;
+            }
             cartsByRetailer[ret.id] = data.items;
             currentRetailer = ret;
             openProductsForRetailer();
