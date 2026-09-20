@@ -647,10 +647,12 @@ class SRController extends Controller
 
         // Fetch today's order for this retailer by this SR
         $q = $this->db->prepare("
-            SELECT id, notes, dealer_id
-            FROM orders 
-            WHERE retailer_id = ? AND sr_id = ? AND DATE(created_at) = CURDATE()
-            ORDER BY id DESC LIMIT 1
+            SELECT o.id, o.notes, o.dealer_id, o.status,
+                   disp.id AS dispatch_id, disp.status AS dispatch_status
+            FROM orders o
+            LEFT JOIN dispatches disp ON disp.order_id = o.id AND disp.status != 'cancelled'
+            WHERE o.retailer_id = ? AND o.sr_id = ? AND DATE(o.created_at) = CURDATE()
+            ORDER BY o.id DESC LIMIT 1
         ");
         $q->execute([$retailerId, $srId]);
         $order = $q->fetch(PDO::FETCH_ASSOC);
@@ -696,9 +698,12 @@ class SRController extends Controller
             ];
         }
 
+        $isDispatched = !empty($order['dispatch_id']) || in_array($order['status'] ?? '', ['dispatched', 'in_transit', 'delivered', 'partial']);
+
         $this->json([
             'success' => true,
             'order' => $order,
+            'is_dispatched' => $isDispatched,
             'free_items_by_product' => $freeItemsByProduct,
             'items' => array_map(function($item) use ($freeItemsByProduct) {
                 $pId = intval($item['product_id']);
@@ -1093,6 +1098,16 @@ class SRController extends Controller
             return;
         }
 
+        // Check if order is already dispatched or delivered
+        $checkDisp = $this->db->prepare("SELECT id FROM dispatches WHERE order_id = ? AND status != 'cancelled' LIMIT 1");
+        $checkDisp->execute([$orderId]);
+        $hasDispatch = $checkDisp->fetch(PDO::FETCH_ASSOC);
+
+        if ($hasDispatch || in_array($order['status'] ?? '', ['dispatched', 'in_transit', 'delivered', 'partial'])) {
+            $this->json(['success' => false, 'message' => 'অর্ডারটি ইতিমধ্যে ডিসপ্যাচ করা হয়েছে। ডিসপ্যাচ করার পর অর্ডার এডিট করা সম্ভব নয়।']);
+            return;
+        }
+
         if (empty($productIds)) {
             $this->json(['success' => false, 'message' => 'অন্তত একটি পণ্য অর্ডারে থাকতে হবে।']);
             return;
@@ -1282,7 +1297,11 @@ class SRController extends Controller
         }
 
         // Check status - do not allow deleting if already delivered or dispatched
-        if (in_array($order['status'] ?? '', ['delivered', 'dispatched'])) {
+        $checkDisp = $this->db->prepare("SELECT id FROM dispatches WHERE order_id = ? AND status != 'cancelled' LIMIT 1");
+        $checkDisp->execute([$orderId]);
+        $hasDispatch = $checkDisp->fetch(PDO::FETCH_ASSOC);
+
+        if ($hasDispatch || in_array($order['status'] ?? '', ['delivered', 'dispatched', 'in_transit', 'partial'])) {
             $this->json(['success' => false, 'message' => 'ডেলিভারি সম্পন্ন বা ডিসপ্যাচ হওয়া অর্ডার মুছে ফেলা সম্ভব নয়।']);
             return;
         }

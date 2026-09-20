@@ -180,6 +180,10 @@ $truncateName = function($name) {
               <td class="p-3 text-center align-middle bg-white" id="order-actions-cell-<?= $ord['id'] ?>">
                 <div class="flex items-center justify-center gap-1.5">
                   <!-- Edit Button -->
+                  <?php 
+                    $isDispatched = !empty($ord['dispatch_id']) || in_array($ord['status'] ?? '', ['dispatched', 'in_transit', 'delivered', 'partial']);
+                  ?>
+                  <?php if (!$isDispatched): ?>
                   <button type="button" 
                           id="btn-edit-order-<?= $ord['id'] ?>"
                           onclick='openEditOrderModal(ORDERS_MAP[<?= $ord['id'] ?>])'
@@ -187,6 +191,15 @@ $truncateName = function($name) {
                           title="অর্ডার এডিট করুন">
                     <i class="fa-solid fa-pen-to-square text-xs"></i>
                   </button>
+                  <?php else: ?>
+                  <button type="button" 
+                          id="btn-edit-order-<?= $ord['id'] ?>"
+                          disabled
+                          class="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed flex items-center justify-center shadow-3xs opacity-60"
+                          title="অর্ডারটি ইতিমধ্যে ডিসপ্যাচ হয়েছে, এডিট করা সম্ভব নয়">
+                    <i class="fa-solid fa-lock text-xs"></i>
+                  </button>
+                  <?php endif; ?>
 
                   <!-- Invoice Button -->
                   <button type="button" 
@@ -1113,8 +1126,19 @@ function showToast(message, type = 'success') {
 
 // ── Open Edit Order Popup Modal ──────────────────────────────────────────────
 function openEditOrderModal(orderData) {
+  if (!orderData) return;
   const orderId = orderData.id;
   const order = ORDERS_MAP[orderId] || orderData;
+
+  const isDispatched = !!order.dispatch_id || ['dispatched', 'in_transit', 'delivered', 'partial'].includes(order.status);
+  if (isDispatched) {
+    if (typeof showToast === 'function') {
+      showToast('অর্ডারটি ইতিমধ্যে ডিসপ্যাচ হয়ে গেছে, এডিট করা সম্ভব নয়।', 'warning');
+    } else {
+      alert('অর্ডারটি ইতিমধ্যে ডিসপ্যাচ হয়ে গেছে, এডিট করা সম্ভব নয়।');
+    }
+    return;
+  }
 
   const retailerName = order.retailer_name || order.dealer_name || 'সাধারণ কাস্টমার';
   document.getElementById('editModalRetailerName').innerText = retailerName;
@@ -1926,6 +1950,13 @@ async function executeOrderDelete() {
 async function submitOrderEdit() {
   if (!editingOrder) return;
 
+  const currentOrd = ORDERS_MAP[editingOrder.id];
+  if (currentOrd && (currentOrd.dispatch_id || ['dispatched', 'in_transit', 'delivered', 'partial'].includes(currentOrd.status))) {
+    alert('অর্ডারটি ইতিমধ্যে ডিসপ্যাচ হয়ে গেছে, পরিবর্তন সংরক্ষণ করা সম্ভব নয়।');
+    closeEditOrderModal();
+    return;
+  }
+
   const validItems = editingOrder.items.filter(item => item.total_qty > 0);
   if (validItems.length === 0) {
     alert('অর্ডারে অন্তত একটি পণ্যের পরিমাণ থাকতে হবে।');
@@ -2055,7 +2086,20 @@ function updateOrderTableRow(order) {
   }
   const btnEdit = document.getElementById(`btn-edit-order-${orderId}`);
   if (btnEdit) {
-    btnEdit.setAttribute('onclick', `openEditOrderModal(ORDERS_MAP[${orderId}])`);
+    const isDispatched = !!order.dispatch_id || ['dispatched', 'in_transit', 'delivered', 'partial'].includes(order.status);
+    if (isDispatched) {
+      btnEdit.disabled = true;
+      btnEdit.className = "w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed flex items-center justify-center shadow-3xs opacity-60";
+      btnEdit.title = "অর্ডারটি ইতিমধ্যে ডিসপ্যাচ হয়েছে, এডিট করা সম্ভব নয়";
+      btnEdit.innerHTML = '<i class="fa-solid fa-lock text-xs"></i>';
+      btnEdit.removeAttribute('onclick');
+    } else {
+      btnEdit.disabled = false;
+      btnEdit.className = "w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-600 hover:text-white transition duration-200 flex items-center justify-center shadow-3xs active:scale-95";
+      btnEdit.title = "অর্ডার এডিট করুন";
+      btnEdit.innerHTML = '<i class="fa-solid fa-pen-to-square text-xs"></i>';
+      btnEdit.setAttribute('onclick', `openEditOrderModal(ORDERS_MAP[${orderId}])`);
+    }
   }
 }
 
