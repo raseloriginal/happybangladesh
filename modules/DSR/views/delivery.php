@@ -52,7 +52,7 @@ $hasDeliveries = !empty($retailers);
           </a>
         <?php endif; ?>
 
-        <button onclick="openReadySaleModal()" class="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Ready Sale is disabled"' : '' ?>>
+        <button onclick="window.location.href='<?= url('dsr/ready-sale') ?>'" class="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-sm active:scale-95 transition flex items-center justify-center gap-2" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Ready Sale is disabled"' : '' ?>>
           <i class="fa-solid fa-bolt"></i>
           <span>Ready Sale by DSR (রেডি সেল)</span>
         </button>
@@ -93,7 +93,7 @@ $hasDeliveries = !empty($retailers);
         </div>
         <div class="text-white text-base font-black leading-tight truncate"><?= count($retailers) ?> Retailer<?= count($retailers) !== 1 ? 's' : '' ?> on Van</div>
       </div>
-      <button onclick="openReadySaleModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 active:scale-95 transition" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Ready Sale is disabled"' : '' ?>>
+      <button onclick="window.location.href='<?= url('dsr/ready-sale') ?>'" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 active:scale-95 transition" <?= isset($isReturned) && $isReturned ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="DSR has returned, Ready Sale is disabled"' : '' ?>>
         <i class="fa-solid fa-bolt text-amber-100"></i> Ready Sale
       </button>
       <button onclick="openRetailerListModal()" class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-gray-800 shadow-md active:scale-95 transition">
@@ -246,15 +246,19 @@ $hasDeliveries = !empty($retailers);
               $actionedCount = 0;
               $totalVal = 0;
 
+              $isReadySale = false;
               foreach ($r['orders'] as $o) {
                   $totalVal += (float)($o['total_amount'] ?? 0);
+                  if (!empty($o['is_ready_sale']) || ($o['status'] ?? '') === 'ready_sale') {
+                      $isReadySale = true;
+                  }
                   if ($o['status'] === 'in_transit') {
                       $hasPending = true;
                   } else {
                       $actionedCount++;
                   }
                   if ($o['status'] === 'partial') $hasPartial = true;
-                  if ($o['status'] === 'delivered') $hasDelivered = true;
+                  if ($o['status'] === 'delivered' || $o['status'] === 'ready_sale' || !empty($o['is_ready_sale'])) $hasDelivered = true;
                   if ($o['status'] === 'cancelled') $hasCancelled = true;
               }
               $totalOrders = count($r['orders']);
@@ -277,11 +281,14 @@ $hasDeliveries = !empty($retailers);
             <div class="bg-white rounded-2xl p-3.5 shadow-2xs hover:shadow-md active:scale-[0.99] transition cursor-pointer border border-slate-200/90 flex flex-col justify-between space-y-3 group" onclick="handleRetailerListClick(<?= $idx ?>)">
                 
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1.5 flex-wrap">
                     <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black border border-blue-100">
                       <i class="fa-solid fa-store"></i>
                     </div>
                     <?= $statusBadge ?>
+                    <?php if ($isReadySale): ?>
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1"><i class="fa-solid fa-bolt text-amber-500"></i>রেডি সেল</span>
+                    <?php endif; ?>
                   </div>
                   <span class="font-mono font-black text-xs text-slate-900 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
                     ৳<?= number_format($totalVal) ?>
@@ -1272,11 +1279,15 @@ function openRetailerSheet(retailer, defaultIndex = 0) {
                 statusIcon = '<i class="fa-solid fa-circle-half-stroke text-amber-500 text-[10px]"></i>';
             }
 
+            const isRs = !!order.is_ready_sale;
+            const rsBadge = isRs ? '<span class="bg-amber-100 text-amber-800 text-[9px] px-1 py-0.5 rounded font-black ml-1">⚡ রেডি সেল</span>' : '';
+
             tabsContainer.insertAdjacentHTML('beforeend', `
                 <button type="button" onclick="selectCompanyOrder(${idx})" id="tab-order-${idx}"
                         class="whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 transition active:scale-95">
                     ${statusIcon}
                     <span>${order.company_name || 'কোম্পানি'}</span>
+                    ${rsBadge}
                     <span class="text-[10px] opacity-70">(${count})</span>
                 </button>
             `);

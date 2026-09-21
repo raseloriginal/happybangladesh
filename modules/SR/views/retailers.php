@@ -221,8 +221,10 @@ $cardPalettes = [
         ?>
         <div class="retailer-card"
              style="background-color: <?= $bgColor ?>;"
-             onclick="openShop(<?= $r['id'] ?>, '<?= h(addslashes($r['name'])) ?>', '<?= h(addslashes($r['address'] ?? '')) ?>', <?= $hasOrder ? 'true' : 'false' ?>)"
-             data-id="<?= $r['id'] ?>"
+             data-id="<?= (int)$r['id'] ?>"
+             data-name="<?= htmlspecialchars($r['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+             data-address="<?= htmlspecialchars($r['address'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+             data-has-order="<?= $hasOrder ? '1' : '0' ?>"
              data-lat="<?= $r['lat'] ?? '' ?>"
              data-lng="<?= $r['lng'] ?? '' ?>"
              data-dist="<?= $r['distance_meters'] ?? '' ?>">
@@ -336,6 +338,23 @@ const CARD_PALETTES = [
 const emojis = ['📦','🛒','🏪','🎁','🧴','🍬','🧃','🍪'];
 
 function updateAllPins() {}
+function handleRetailerCardClick(el) {
+  console.log('Retailer card clicked', el);
+  if (!el) return;
+  const id = parseInt(el.getAttribute('data-id'), 10);
+  console.log('Parsed retailer id:', id);
+  if (window.allRetailersMap && window.allRetailersMap[id]) {
+    const r = window.allRetailersMap[id];
+    console.log('Retailer data from map:', r);
+    openShop(r.id, r.name, r.address || '', !!(r.has_order_today > 0));
+    return;
+  }
+  const name = el.getAttribute('data-name') || '';
+  const address = el.getAttribute('data-address') || '';
+  const hasOrder = el.getAttribute('data-has-order') === '1' || el.getAttribute('data-has-order') === 'true';
+  console.log('Retailer attributes fallback:', {name, address, hasOrder});
+  openShop(id, name, address, hasOrder);
+}
 
 function openShop(id, name, address, hasOrderToday = false) {
   const ret = { id: id, name: name, address: address, has_order_today: hasOrderToday };
@@ -400,6 +419,12 @@ function toggleSearchBar() {
 
 // ── Client-side Retailers Data & Distance Calculation ──────────
 const allRetailers = <?= isset($allRetailers) ? json_encode($allRetailers) : '[]' ?>;
+window.allRetailersMap = {};
+if (Array.isArray(allRetailers)) {
+  allRetailers.forEach(r => {
+    window.allRetailersMap[r.id] = r;
+  });
+}
 let userLat = parseFloat(localStorage.getItem('sr_last_lat')) || <?= !empty($lat) ? (float)$lat : 'null' ?>;
 let userLng = parseFloat(localStorage.getItem('sr_last_lng')) || <?= !empty($lng) ? (float)$lng : 'null' ?>;
 
@@ -484,8 +509,10 @@ function renderRetailerCardHtml(r, index = 0) {
   return `
     <div class="retailer-card"
          style="background-color: ${bgColor};"
-         onclick="openShop(${r.id}, '${escName.replace(/'/g, "\\'")}', '${escAddr.replace(/'/g, "\\'")}', ${hasOrder ? 'true' : 'false'})"
          data-id="${r.id}"
+         data-name="${escName}"
+         data-address="${escAddr}"
+         data-has-order="${hasOrder ? '1' : '0'}"
          data-lat="${r.lat || ''}"
          data-lng="${r.lng || ''}"
          data-dist="${r.distance_meters !== null && r.distance_meters !== undefined ? r.distance_meters : ''}">
@@ -602,6 +629,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('retailerSearchInput');
   const searchForm = document.getElementById('retailerSearchForm');
   const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+  const retailersContainer = document.getElementById('retailersContainer');
+  if (retailersContainer) {
+    retailersContainer.addEventListener('click', (e) => {
+      const card = e.target.closest('.retailer-card');
+      if (card) {
+        handleRetailerCardClick(card);
+      }
+    });
+  }
 
   if (userLat && userLng) {
     updateRetailersDistancesAndSort();

@@ -269,10 +269,10 @@
       <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
         <i class="fa-solid fa-file-pen text-sm"></i>
       </div>
-      <span>অর্ডার সংশোধন করবেন?</span>
+      <span>রেডি সেল সংশোধন করবেন?</span>
     </div>
     <div class="sr-confirm-body" id="confirmModalBody">
-      এই দোকানে আজ ইতিমধ্যে একটি অর্ডার করা হয়েছে। আপনি কি অর্ডারটি পরিবর্তন করতে চান?
+      এই দোকানে আজ ইতিমধ্যে রেডি সেল করা হয়েছে। আপনি কি এটি পরিবর্তন/সংশোধন করতে চান?
     </div>
     <div class="sr-confirm-actions">
       <button class="sr-confirm-btn-no" id="confirmModalNoBtn" type="button">না, বাতিল</button>
@@ -367,14 +367,9 @@
       <div id="productSheetImgWrap" class="w-full h-full flex items-center justify-center p-2"></div>
     </div>
     
-    <!-- Product Name & Free Item Button (Red Area) -->
+    <!-- Product Name -->
     <div class="flex items-center justify-between gap-2.5">
-      <div class="sr-prod-sheet-name-v2 font-sans font-black text-slate-900 text-lg leading-snug truncate flex-1" id="productSheetName">—</div>
-      <button type="button" id="srProductFreeItemBtn" onclick="openSrFreeItemModal()" class="shrink-0 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:scale-95 border border-amber-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs transition-all select-none" title="ফ্রি আইটেম যুক্ত করুন">
-        <i class="fa-solid fa-gift text-amber-600 text-sm"></i>
-        <span>ফ্রি আইটেম</span>
-        <span id="srProductFreeItemBadge" class="hidden ml-0.5 px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-black leading-tight">0</span>
-      </button>
+      <div class="sr-prod-sheet-name-v2 font-sans font-black text-slate-900 text-lg leading-snug truncate w-full" id="productSheetName">—</div>
     </div>
     
     <!-- Product Info Table (Excel Style) -->
@@ -1176,10 +1171,10 @@ function renderProductsGrid() {
   }
 
   if (!filteredProducts.length) {
-    grid.innerHTML = `<div style="text-align:center;padding:28px;color:#94a3b8;background:#fff;border-radius:12px;border:1px solid #e2e8f0;">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>`;
+    grid.innerHTML = `<div style="text-align:center;padding:28px;color:#94a3b8;background:#fff;border-radius:12px;border:1px solid #e2e8f0;">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>`;
     return;
   }
-
+  
   const cart = cartsByRetailer[currentRetailer?.id] || [];
 
   // ── 2-COLUMN GRID VIEW ──────────────────────────────────────
@@ -1286,6 +1281,7 @@ function renderProductsGrid() {
       </table>
     </div>
   `;
+  
   grid.innerHTML = tableHtml;
 }
 
@@ -1509,6 +1505,11 @@ function addToCart() {
   const totalPcs = cartons * pcsPerCarton + pieces;
 
   if (totalPcs <= 0) { shakeElement('addToCartBtn'); return; }
+  if (totalPcs > (p.stock || 0)) {
+    shakeElement('addToCartBtn');
+    showMiniToast(`❌ পর্যাপ্ত স্টক নেই! এভেইলেবল: ${p.stock || 0}`, true);
+    return;
+  }
 
   const actualTotal = totalPcs * currentPiecePrice;
   const basePrice = parseFloat(document.getElementById('baseUnitPrice').value) || 0;
@@ -1550,60 +1551,46 @@ function confirmRetailerCart() {
 
   const form = document.createElement('form');
   form.method = 'POST';
-  form.action = `${BASE_URL}/sr/orders/store`;
+  form.action = `${BASE_URL}/dsr/ready-sale/store`;
 
-  const csrf = document.querySelector('meta[name="csrf"]');
-  if (csrf) addInput(form, '_csrf', csrf.content);
+  addInput(form, '_csrf_token', '<?= Helpers::csrfToken() ?>');
 
   addInput(form, 'retailer_id', currentRetailer.id);
-  addInput(form, 'notes', notes);
-  addInput(form, 'ajax', '1');
   
-  const allFreeItemsPayload = [];
-  cart.forEach((c, i) => {
-    addInput(form, `product_id[${i}]`, c.id);
-    addInput(form, `quantity[${i}]`, c.qty);
-    addInput(form, `unit_price[${i}]`, c.price);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  addInput(form, 'date', today);
+  
+  const itemsPayload = cart.map(c => ({
+    product_id: c.id,
+    qty: c.qty,
+    unit_price: c.price
+  }));
 
-    if (c.freeItems && typeof c.freeItems === 'object') {
-      Object.keys(c.freeItems).forEach(freePid => {
-        const fQty = parseInt(c.freeItems[freePid]) || 0;
-        if (fQty > 0) {
-          allFreeItemsPayload.push({
-            product_id: c.id,
-            free_product_id: parseInt(freePid),
-            quantity: fQty
-          });
-        }
-      });
-    }
-  });
-
-  if (allFreeItemsPayload.length > 0) {
-    addInput(form, 'free_items', JSON.stringify(allFreeItemsPayload));
-  }
+  addInput(form, 'items', JSON.stringify(itemsPayload));
 
   isSubmitting = true;
   const confirmBtn = document.getElementById('retCartConfirmBtn');
   const originalBtnHtml = confirmBtn.innerHTML;
   confirmBtn.disabled = true;
-  confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Placing Order...';
+  confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing Ready Sale...';
 
   // Show frosted glass loading overlay
-  SRLoader.showOverlay('আপনার অর্ডার সম্পন্ন করা হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন...');
+  // SRLoader.showOverlay('আপনার সেল সম্পন্ন করা হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন...');
 
-  const formData = new FormData(form);
+  const formData = new URLSearchParams(new FormData(form));
 
-  fetch(`${BASE_URL}/sr/orders/store`, {
+  fetch(`${BASE_URL}/dsr/ready-sale/store`, {
     method: 'POST',
-    body: formData
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData.toString()
   })
   .then(r => r.json())
   .then(d => {
     isSubmitting = false;
     confirmBtn.disabled = false;
     confirmBtn.innerHTML = originalBtnHtml;
-    SRLoader.hideOverlay();
+    // SRLoader.hideOverlay();
 
     if (d.success) {
       try {
@@ -1707,7 +1694,7 @@ function confirmRetailerCart() {
     isSubmitting = false;
     confirmBtn.disabled = false;
     confirmBtn.innerHTML = originalBtnHtml;
-    SRLoader.hideOverlay();
+    // SRLoader.hideOverlay();
     const errMsg = (err && err.message && !err.message.includes('fetch')) ? err.message : 'Network error';
     showMiniToast('❌ ' + errMsg, true);
     console.error('Confirm order error:', err);
