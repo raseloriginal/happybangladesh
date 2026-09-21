@@ -420,7 +420,7 @@
     <div class="sr-prod-qty-counters-grid-v2" id="qtyCountersGrid">
       <!-- Box counter -->
       <div class="sr-prod-qty-counter-v2" id="boxCounterGroup">
-        <div class="sr-prod-qty-counter-label-v2 font-sans font-bold text-slate-700">বক্স</div>
+        <div class="sr-prod-qty-counter-label-v2 font-sans font-bold text-slate-700" id="boxCounterLabel">বক্স</div>
         <div class="sr-prod-qty-counter-row-v2 rounded-xl border border-slate-200 bg-white" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('qtyCartons').focus()" style="cursor:text;">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('cartons',-1)">−</button>
           <input type="number" id="qtyCartons" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2 font-black text-slate-900">
@@ -429,7 +429,7 @@
       </div>
       <!-- Piece counter -->
       <div class="sr-prod-qty-counter-v2" id="pieceCounterGroup">
-        <div class="sr-prod-qty-counter-label-v2 font-sans">পিস</div>
+        <div class="sr-prod-qty-counter-label-v2 font-sans" id="pieceCounterLabel">পিস</div>
         <div class="sr-prod-qty-counter-row-v2" onclick="if(event.target.tagName !== 'BUTTON') document.getElementById('qtyPieces').focus()" style="cursor:text;">
           <button class="sr-qty-counter-btn-v2" onclick="changeQty('pieces',-1)">−</button>
           <input type="number" id="qtyPieces" value="0" min="0" oninput="calcTotal()" class="sr-qty-counter-input-v2">
@@ -1288,11 +1288,26 @@ function renderProductsGrid() {
 // ══════════════════════════════════════════════════════════════
 // PRODUCT BOTTOM SHEET
 // ══════════════════════════════════════════════════════════════
+function getBoxLabel(p) {
+  const bt = (p?.box_type || '').toString().trim();
+  if (!bt) return 'বক্স';
+  const lower = bt.toLowerCase();
+  if (['box', 'boxes'].includes(lower)) return 'বক্স';
+  if (['carton', 'cartons'].includes(lower)) return 'কার্টন';
+  if (['jar', 'jars'].includes(lower)) return 'জার';
+  if (['case', 'cases'].includes(lower)) return 'কেস';
+  if (['bag', 'sack', 'sacks'].includes(lower)) return 'বস্তা';
+  if (['poly', 'poly pack', 'packet', 'pack'].includes(lower)) return 'পলি';
+  if (['piece', 'pieces', 'pcs', 'pc'].includes(lower)) return 'পিস';
+  if (['kg', 'kgs'].includes(lower)) return 'কেজি';
+  return bt;
+}
+
 function isPcsProduct(p) {
   if (!p) return false;
-  const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || 12);
+  const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || p.pcsPerCarton || 1);
   const boxTypeStr = (p.box_type || '').toString().trim().toLowerCase();
-  const pcsKeywords = ['pcs', 'pc', 'piece', 'pieces', 'পিস', 'পিছ'];
+  const pcsKeywords = ['pcs', 'pc', 'piece', 'pieces', 'পিস', 'পিছ', 'singles', 'single'];
 
   return pcsKeywords.includes(boxTypeStr) || (ppb <= 1);
 }
@@ -1302,24 +1317,30 @@ function openProductSheet(idx) {
   const p = currentProduct;
   initProductFreeItems(p);
 
-  const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || 12);
+  const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || p.pcsPerCarton || 1);
   const isPcs = isPcsProduct(p);
+  const boxLabel = getBoxLabel(p);
 
   document.getElementById('productSheetName').textContent = p.name;
   
   const pkgInner = document.getElementById('productSheetPackageInner');
   const boxCounter = document.getElementById('boxCounterGroup');
   const grid = document.getElementById('qtyCountersGrid');
+  const boxLabelEl = document.getElementById('boxCounterLabel');
+  const pieceLabelEl = document.getElementById('pieceCounterLabel');
 
   if (isPcs) {
-    if (pkgInner) pkgInner.textContent = 'পিস';
+    const unitLabel = (p.box_type && p.box_type.trim()) ? getBoxLabel(p) : 'পিস';
+    if (pkgInner) pkgInner.textContent = unitLabel;
     if (boxCounter) boxCounter.style.display = 'none';
     if (grid) grid.style.gridTemplateColumns = '1fr';
+    if (pieceLabelEl) pieceLabelEl.textContent = unitLabel;
   } else {
-    const boxLabel = p.box_type || 'বক্স';
     if (pkgInner) pkgInner.innerHTML = `${escHtml(boxLabel)} ( <span id="productSheetPcsPerBox">${ppb}</span> পিস )`;
     if (boxCounter) boxCounter.style.display = 'flex';
     if (grid) grid.style.gridTemplateColumns = '1fr 1fr';
+    if (boxLabelEl) boxLabelEl.textContent = boxLabel;
+    if (pieceLabelEl) pieceLabelEl.textContent = 'পিস';
   }
   
   // Calculate standard selling price per piece based on buying_price & dealer_percentage
@@ -1421,7 +1442,7 @@ function updateOcDisplay(totalPcs, actualTotal) {
 
 function calcTotal() {
   const p = currentProduct;
-  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || 12);
+  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || p?.pcsPerCarton || 1);
   const isPcs = isPcsProduct(p);
 
   const cartons = isPcs ? 0 : (parseInt(document.getElementById('qtyCartons').value) || 0);
@@ -1457,7 +1478,7 @@ function calcTotal() {
 
 function calcFromTotal() {
   const p = currentProduct;
-  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || 12);
+  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || p?.pcsPerCarton || 1);
   const isPcs = isPcsProduct(p);
 
   const cartons = isPcs ? 0 : (parseInt(document.getElementById('qtyCartons').value) || 0);
@@ -1490,7 +1511,7 @@ function calcFromTotal() {
 
 function addToCart() {
   const p = currentProduct;
-  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || 12);
+  const ppb = parseInt(p?.pieces_per_carton || p?.pieces_per_box || p?.pcsPerCarton || 1);
   const isPcs = isPcsProduct(p);
 
   const cartons = isPcs ? 0 : (parseInt(document.getElementById('qtyCartons').value) || 0);

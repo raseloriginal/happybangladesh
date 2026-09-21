@@ -168,8 +168,14 @@ fetch(ALL_PRODUCTS_URL)
         name: p.product_name,
         price: p.base_price,
         stock: p.available_qty,
+        pieces_per_box: p.pieces_per_box,
+        pieces_per_carton: p.pieces_per_box,
         pcsPerCarton: p.pieces_per_box,
-        box_type: 'Box'
+        box_type: p.box_type || 'বক্স',
+        image: p.image || null,
+        buying_price: p.buying_price || 0,
+        dealer_percentage: p.dealer_percentage || 0,
+        company_name: p.company_name || ''
       }));
     }
   })

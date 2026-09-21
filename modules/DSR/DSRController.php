@@ -1546,6 +1546,10 @@ class DSRController extends Controller
                    p.sku,
                    p.price as base_price,
                    p.pieces_per_box,
+                   p.box_type,
+                   p.image,
+                   p.buying_price,
+                   p.dealer_percentage,
                    c.name as company_name,
                    SUM(vs.initial_qty) as dispatched_qty,
                    SUM(vs.initial_qty) as available_qty
@@ -1553,7 +1557,7 @@ class DSRController extends Controller
             JOIN products p ON p.id = vs.product_id
             LEFT JOIN companies c ON c.id = p.company_id
             WHERE vs.dsr_id = ? AND DATE(vs.loaded_at) = ?
-            GROUP BY vs.product_id, vs.lot_id, p.id, p.name, p.sku, p.price, p.pieces_per_box, c.name
+            GROUP BY vs.product_id, vs.lot_id, p.id, p.name, p.sku, p.price, p.pieces_per_box, p.box_type, p.image, p.buying_price, p.dealer_percentage, c.name
         ");
         $vanQ->execute([$dsrId, $vDate]);
         $itemsMap = [];
@@ -1562,14 +1566,19 @@ class DSRController extends Controller
             $pid = (int)$row['product_id'];
             if (!isset($itemsMap[$pid])) {
                 $itemsMap[$pid] = [
-                    'product_id'     => $pid,
-                    'lot_id'         => $row['lot_id'] ? (int)$row['lot_id'] : null,
-                    'product_name'   => $row['product_name'],
-                    'sku'            => $row['sku'],
-                    'company_name'   => $row['company_name'] ?: 'No Company',
-                    'base_price'     => (float)$row['base_price'],
-                    'pieces_per_box' => (int)$row['pieces_per_box'],
-                    'available_qty'  => (int)$row['available_qty']
+                    'product_id'        => $pid,
+                    'lot_id'            => $row['lot_id'] ? (int)$row['lot_id'] : null,
+                    'product_name'      => $row['product_name'],
+                    'sku'               => $row['sku'],
+                    'company_name'      => $row['company_name'] ?: 'No Company',
+                    'base_price'        => (float)$row['base_price'],
+                    'pieces_per_box'    => (int)($row['pieces_per_box'] ?: 1),
+                    'pieces_per_carton' => (int)($row['pieces_per_box'] ?: 1),
+                    'box_type'          => $row['box_type'] ?: 'বক্স',
+                    'image'             => $row['image'] ?? null,
+                    'buying_price'      => (float)($row['buying_price'] ?? 0),
+                    'dealer_percentage' => (float)($row['dealer_percentage'] ?? 0),
+                    'available_qty'     => (int)$row['available_qty']
                 ];
             } else {
                 $itemsMap[$pid]['available_qty'] += (int)$row['available_qty'];
