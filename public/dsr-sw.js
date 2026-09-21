@@ -16,7 +16,7 @@
 
 'use strict';
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = `dsr-shell-${CACHE_VERSION}`;
 const PAGES_CACHE = `dsr-pages-${CACHE_VERSION}`;
 

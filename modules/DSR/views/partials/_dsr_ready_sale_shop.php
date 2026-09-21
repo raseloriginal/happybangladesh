@@ -1301,8 +1301,6 @@ function openProductSheet(idx) {
   currentProduct = ALL_PRODUCTS[idx];
   const p = currentProduct;
   initProductFreeItems(p);
-  const grad  = gradients[idx % gradients.length];
-  const emoji = emojis[idx % emojis.length];
 
   const ppb = parseInt(p.pieces_per_carton || p.pieces_per_box || 12);
   const isPcs = isPcsProduct(p);
@@ -1847,5 +1845,32 @@ function triggerDualCannonShower() {
     }
   }());
 }
+// Ensure modals/sheets are attached directly to document.body to avoid parent transform/containment bugs
+(function moveModalsToBody() {
+  const ids = [
+    'retailerPopup',
+    'productSheetOverlay',
+    'productSheet',
+    'retCartOverlay',
+    'retCartSheet',
+    'srFreeItemOverlay',
+    'srFreeItemSheet',
+    'successOverlay',
+    'confirmModalOverlay'
+  ];
+  function doMove() {
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.parentNode !== document.body) {
+        document.body.appendChild(el);
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', doMove);
+  } else {
+    doMove();
+  }
+})();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
