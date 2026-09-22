@@ -320,7 +320,11 @@ $router->post('/dsr/damage/store',            ['DSRController', 'damageStore']);
 $router->get( '/dsr/api/companies-products',   ['DSRController', 'apiCompanyProducts']);
 $router->post('/dsr/api/location/push',       ['DSRController', 'apiPushLocation']);
 $router->get( '/dsr/api/van-stock',           ['DSRController', 'apiVanStock']);
+$router->get( '/dsr/ready-sale',              ['DSRController', 'readySale']);
+$router->get( '/dsr/api/ready-sale/retailers', ['DSRController', 'apiReadySaleRetailers']);
+$router->get( '/dsr/api/ready-sale/today-order', ['DSRController', 'apiReadySaleTodayOrder']);
 $router->post('/dsr/ready-sale/store',         ['DSRController', 'readySaleStore']);
+
 $router->get( '/dsr/qr-code',                  ['DSRController', 'qrCode']);
 $router->post('/dsr/qr-code/mark',             ['DSRController', 'qrCodeMark']);
 

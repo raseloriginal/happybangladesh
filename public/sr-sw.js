@@ -16,7 +16,7 @@
 
 'use strict';
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = `sr-shell-${CACHE_VERSION}`;
 const PAGES_CACHE = `sr-pages-${CACHE_VERSION}`;
 

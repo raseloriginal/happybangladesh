@@ -22,7 +22,7 @@
 
   <!-- Search Bar & Filter Button Overlay -->
   <div class="sr-map-header-wrap">
-    <a href="<?= url('sr/dashboard') ?>" class="w-[54px] h-[54px] bg-white text-slate-700 rounded-[14px] flex items-center justify-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-95 transition-all text-lg flex-shrink-0" title="পিছনে">
+    <a href="<?= url('dsr/delivery') ?>" class="w-[54px] h-[54px] bg-white text-slate-700 rounded-[14px] flex items-center justify-center shadow-[0_8px_30px_rgba(0,0,0,0.08)] active:scale-95 transition-all text-lg flex-shrink-0" title="ফিরে যান">
       <i class="fa-solid fa-arrow-left"></i>
     </a>
     <div class="sr-map-searchbar-new">
@@ -139,7 +139,7 @@
   </div>
 </div>
 
-<?php include __DIR__ . '/partials/_shop_v2.php'; ?>
+<?php include __DIR__ . '/partials/_dsr_ready_sale_shop.php'; ?>
 
 <?php
 // $allProducts is passed from SRController::sales()
@@ -155,15 +155,28 @@ $allProducts = $allProducts ?? [];
 
 const BASE_URL = '<?= BASE_URL ?>';
 const SR_ID    = <?= Auth::id() ?>;
-const ALL_PRODUCTS_URL = `${BASE_URL}/sr/api/products`;
+const ALL_PRODUCTS_URL = `${BASE_URL}/dsr/api/van-stock`;
 let ALL_PRODUCTS = [];
 
-// Fetch products asynchronously to avoid massive HTML payloads
+// Fetch van stock asynchronously
 fetch(ALL_PRODUCTS_URL)
   .then(res => res.json())
   .then(data => {
     if (data.success) {
-      ALL_PRODUCTS = data.products || [];
+      ALL_PRODUCTS = (data.items || []).map(p => ({
+        id: p.product_id,
+        name: p.product_name,
+        price: p.base_price,
+        stock: p.available_qty,
+        pieces_per_box: p.pieces_per_box,
+        pieces_per_carton: p.pieces_per_box,
+        pcsPerCarton: p.pieces_per_box,
+        box_type: p.box_type || 'বক্স',
+        image: p.image || null,
+        buying_price: p.buying_price || 0,
+        dealer_percentage: p.dealer_percentage || 0,
+        company_name: p.company_name || ''
+      }));
     }
   })
   .catch(err => console.error('Failed to load products', err));
@@ -624,7 +637,7 @@ function loadRetailersOnMap() {
   }
 
   // Network Fetch
-  fetch(`${BASE_URL}/sr/api/retailers?lat=${myLat}&lng=${myLng}&radius=1000`)
+  fetch(`${BASE_URL}/dsr/api/ready-sale/retailers?lat=${myLat}&lng=${myLng}&radius=50`)
     .then(r => r.json())
     .then(data => {
       sessionStorage.setItem(cacheKey, JSON.stringify(data));
@@ -750,35 +763,29 @@ function addRetailerPin(ret) {
 
 function triggerRetailerAction(ret) {
   if (ret.has_order_today) {
-    showConfirmModal(`"${ret.name}" দোকানে আজ একটি অর্ডার দেওয়া হয়েছে। আপনি কি এই অর্ডার পরিবর্তন করতে চান?`, () => {
-      SRLoader.showOverlay('দোকানের পূর্বের অর্ডার লোড হচ্ছে...', 'অনুগ্রহ করে অপেক্ষা করুন...');
-      fetch(`${BASE_URL}/sr/api/today-order?retailer_id=${ret.id}`)
+    showConfirmModal(`"${ret.name}"-এর জন্য আজকের রেডি সেল ইতিমধ্যে সম্পন্ন হয়েছে। আপনি কি এটি সংশোধন (Modify) করতে চান?`, () => {
+      fetch(`${BASE_URL}/dsr/api/ready-sale/today-order?retailer_id=${ret.id}`)
         .then(res => res.json())
         .then(data => {
-          SRLoader.hideOverlay();
-          if (data.success) {
-            if (data.is_dispatched) {
-              showMiniToast('⚠️ অর্ডারটি ইতিমধ্যে ডিসপ্যাচ হয়ে গেছে, এটি পরিবর্তন করা যাবে না। নতুন অর্ডার করুন।', true);
-              currentRetailer = ret;
-              openProductsForRetailer();
-              return;
-            }
+          if (data.success && data.items) {
             cartsByRetailer[ret.id] = data.items;
             currentRetailer = ret;
             openProductsForRetailer();
+            showMiniToast('পূর্বের অর্ডার লোড করা হয়েছে');
           } else {
-            showMiniToast('❌ ' + (data.message || 'অর্ডার আনতে সমস্যা হয়েছে'), true);
+            currentRetailer = ret;
+            if (!cartsByRetailer[ret.id]) cartsByRetailer[ret.id] = [];
+            openProductsForRetailer();
           }
         })
-        .catch(() => {
-          SRLoader.hideOverlay();
-          showMiniToast('❌ নেটওয়ার্ক ত্রুটি', true);
+        .catch(err => {
+          console.error(err);
+          currentRetailer = ret;
+          if (!cartsByRetailer[ret.id]) cartsByRetailer[ret.id] = [];
+          openProductsForRetailer();
         });
     });
-    return;
-  }
-
-  if (cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0) {
+  } else if (cartsByRetailer[ret.id] && cartsByRetailer[ret.id].length > 0) {
     openRetailerCartSheet(ret);
   } else {
     currentRetailer = ret;
@@ -1018,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitBtn = this.querySelector('button[type="submit"]');
     SRLoader.buttonLoading(submitBtn, 'সংরক্ষণ হচ্ছে...');
 
-    fetch(`${BASE_URL}/sr/api/retailers/store`, {
+    fetch(`${BASE_URL}/dsr/api/retailers/store`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, phone, lat: pinLat, lng: pinLng })
