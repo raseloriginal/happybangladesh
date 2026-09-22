@@ -167,10 +167,10 @@
     box-sizing: border-box !important;
     overflow: hidden !important;
   }
-  #productSheetOverlay, #retCartOverlay {
+  #productSheetOverlay, #retCartOverlay, #addRetOverlay, #filterModalOverlay, .sr-sheet-overlay {
     z-index: 1600 !important;
   }
-  #productSheet, #retCartSheet {
+  #productSheet, #retCartSheet, #addRetSheet, #filterModalSheet, .sr-bottom-sheet {
     z-index: 1601 !important;
   }
   .sr-success-overlay-v2 {
